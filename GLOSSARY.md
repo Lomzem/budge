@@ -95,3 +95,15 @@ _Avoid_: Savings goal, sinking fund
 **Bank Connection**:
 A link to a financial institution that imports Transactions into one or more Accounts.
 _Avoid_: Integration, link, feed
+
+**Unapproved**:
+An imported Transaction you have not yet reviewed. It already counts in balances and the budget; approving it only marks it reviewed.
+_Avoid_: Pending, new, inbox
+
+**Match**:
+Linking an imported Transaction to one you entered by hand, so the two become a single Cleared Transaction that keeps what you entered.
+_Avoid_: Merge, reconcile, dedupe
+
+**Bank Text**:
+The raw description a bank sends for a Transaction, kept read-only alongside its Payee.
+_Avoid_: Memo, raw payee, statement name
