@@ -51,8 +51,8 @@ A build-ready v1 spec for Budge: scope, budget rules, sync approach, data model,
 
 ## Not yet specified
 
-- **Offline support**: read-only cache or queued edits, for a later version.
-- **Assembling the spec**: collapsing the resolved decisions into the final v1 spec, once the tickets above are resolved.
+Nothing left: every area is decided or ruled out. Next step: `/to-spec`.
+
 
 ## Out of scope
 
@@ -61,4 +61,5 @@ A build-ready v1 spec for Budge: scope, budget rules, sync approach, data model,
 - Native iOS app: no Mac or Apple Developer account; the PWA covers iOS.
 - Multi-user, sharing, and external customers.
 - Multi-currency.
+- Offline support (read-only cache or queued edits): v1 is online-only; revisit in a later version.
 - Notifications (email or push): v1 tells the owner in the app only, per [How often does sync run, and what happens when a Bank Connection breaks?](issues/15-sync-schedule.md); web push would need the service worker v1 doesn't ship.
