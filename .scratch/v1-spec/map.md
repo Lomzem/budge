@@ -46,11 +46,11 @@ A build-ready v1 spec for Budge: scope, budget rules, sync approach, data model,
 - [Where does Effect go in Budge?](issues/14-effect-boundaries.md): Effect for actions, Plaid and file decoding, retries, and typed errors behind plain Convex exports and `v.*` (Confect deferred, ADR 0001); budget math, queries, SvelteKit server code, and components stay plain; shared UI state in context-provided `.svelte.ts` classes; fixed public `ConvexError` codes.
 - [How is the repo set up?](issues/10-repo-setup.md): one Bun package with pure domain code in `src/lib/domain/`; strict TS, ESLint, `@shadcn/lint`, Prettier; lefthook staged checks pre-commit, typecheck and tests pre-push; PR-only `main` with CI and CodeRabbit (rate limits are not approval); local Convex for dev, agents, and CI, never prod; Plaid Sandbox outside prod; secrets only in Convex and Vercel env; gitleaks plus push protection; synthetic fixtures only.
 - [Which domain does Budge run on?](issues/12-domain.md): Clerk production at `budge.lomzem.dev` (Cloudflare DNS-only records); Clerk development instance for local, CI, and previews; GitHub-only sign-in, Invite-only, `requireOwner` on the Clerk user ID so the sign-in method stays reversible; free fixed 7-day sessions, no Clerk Pro; preview deployments with Convex previews, synthetic seed, and Plaid Sandbox, as long as they stay within the free tiers (database I/O handed to the data model).
+- [How often does sync run, and what happens when a Bank Connection breaks?](issues/15-sync-schedule.md): Plaid webhook plus a daily cron backup plus Sync now (with Refresh); a per-Bank Connection "Synced …" line with a 48-hour warning; in-app reconnect notice only, no email or push; renewal through Link update mode, 14 days early; Budge never creates or deletes Items (setup script loads the one token); unknown Plaid Accounts are held until mapped; Trial has no stated end and existing Items have uncapped calls.
 
 ## Not yet specified
 
 - **Offline support**: read-only cache or queued edits, for a later version.
-- **Notifications**: whether anything (Overspending, sync failure) is worth a push notification on the PWA.
 - **Assembling the spec**: collapsing the resolved decisions into the final v1 spec, once the tickets above are resolved.
 
 ## Out of scope
@@ -60,3 +60,4 @@ A build-ready v1 spec for Budge: scope, budget rules, sync approach, data model,
 - Native iOS app: no Mac or Apple Developer account; the PWA covers iOS.
 - Multi-user, sharing, and external customers.
 - Multi-currency.
+- Notifications (email or push): v1 tells the owner in the app only, per [How often does sync run, and what happens when a Bank Connection breaks?](issues/15-sync-schedule.md); web push would need the service worker v1 doesn't ship.
