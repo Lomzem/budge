@@ -28,6 +28,10 @@ _Avoid_: Move, internal payment
 A Transaction the bank has confirmed. Cleared Transactions make up the balance the bank would show.
 _Avoid_: Posted, settled
 
+**Reconciled**:
+A Cleared Transaction locked by a Reconciliation.
+_Avoid_: Locked, closed
+
 **Reconciliation**:
 Checking an Account's cleared balance against the bank's real balance, then locking those Transactions or recording the difference as one adjustment Transaction.
 _Avoid_: Balancing, sync check
@@ -100,10 +104,14 @@ _Avoid_: Integration, link, feed
 An imported Transaction you have not yet reviewed. It already counts in balances and the budget; approving it only marks it reviewed.
 _Avoid_: Pending, new, inbox
 
+**Bank Row**:
+What a bank reported for one Transaction, through a Bank Connection or a file import, kept apart from what you entered.
+_Avoid_: Import record, raw transaction, bank transaction
+
 **Match**:
-Linking an imported Transaction to one you entered by hand, so the two become a single Cleared Transaction that keeps what you entered.
+Linking a Bank Row to a Transaction you entered by hand, so the two become a single Cleared Transaction that keeps what you entered.
 _Avoid_: Merge, reconcile, dedupe
 
 **Bank Text**:
-The raw description a bank sends for a Transaction, kept read-only alongside its Payee.
+The raw description on a Bank Row, kept read-only and shown alongside the Transaction's Payee.
 _Avoid_: Memo, raw payee, statement name
