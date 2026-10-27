@@ -1,0 +1,13 @@
+# Machine-local agent configuration and session data
+/.claude/
+/.codex/
+/.agents/
+
+# Personal instruction overrides
+/AGENTS.local.md
+/CLAUDE.local.md
+
+# Local worktree checkouts
+/.worktrees/
+
+# .scratch/ holds the local issue tracker and stays versioned.
