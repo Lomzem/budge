@@ -32,6 +32,8 @@ A build-ready v1 spec for Budge: scope, budget rules, sync approach, data model,
 
 <!-- one line per resolved ticket: [title](issues/NN-slug.md): gist -->
 
+- [Connect real accounts and capture sample data](issues/08-connect-accounts.md): one Capital One Bank Connection supplies checking, savings, and migrated Discover; 216 Transactions with complete history, none pending, 148 with `merchant_name`. Credentials, raw captures, and structural samples are stored privately outside the repo.
+
 - [What is in v1 and what waits?](issues/05-v1-scope.md): v1 has splits, Transfers, credit-card model, Monthly (with due day) and repeating By date Targets, an Upcoming list, simple reconciliation, Payee memory, search, any-month editing, Category management, move money, manual Accounts, and export; scheduled Transactions, reports, Payee rules, and tracking Accounts wait.
 - [Which aggregator syncs Capital One and Discover for at most $25 a year?](issues/01-bank-sync-provider.md): Plaid Trial (free, 10 lifetime Items), SimpleFIN Bridge as fallback; Capital One gives no pending transactions.
 - [What is the current state of SvelteKit with Convex, Clerk, and Vercel?](issues/03-stack-integration.md): it fits; pin SvelteKit 2 for `svelte-clerk`, Clerk Invite-only plus an owner guard in every Convex function, sync and AES-GCM token encryption in Convex actions; Clerk production needs an owned domain.
