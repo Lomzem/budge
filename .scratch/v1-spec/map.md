@@ -17,7 +17,7 @@ A build-ready v1 spec for Budge: scope, budget rules, sync approach, data model,
 - **Copy YNAB by default**: when a behavior isn't decided by a ticket, do what YNAB does; tickets record any deliberate difference.
 - **Security**: encrypt bank-sync tokens at rest where practical. Convex storing the data on its servers is acceptable.
 - **iOS**: installable PWA through Safari. Online-only in v1.
-- **Testing**: budget math is built test-first (Vitest, `/tdd`); the UI gets light Playwright smoke tests.
+- **Testing**: budget math is built test-first (Vitest, `/tdd`); the UI gets light Playwright smoke tests. Agents call the `test-audit` skill whenever they write, change, or review tests.
 - **UI rules** (from the `visual-report` skill):
   - No badges or pills. Write status, category, and count labels as plain text: a word in a sentence, a table column, or a label beside its value.
   - No corny subtitles or taglines. Each heading is a plain label for its content, with the content directly beneath it.
@@ -43,6 +43,7 @@ A build-ready v1 spec for Budge: scope, budget rules, sync approach, data model,
 - [How does Effect fit with Convex and SvelteKit?](issues/13-effect-fit.md): Effect 4 is stable; recommended for domain workflows, external-data decoding, Plaid orchestration, and tests behind native Convex and Svelte boundaries; Confect 10.x is viable but not the starting foundation.
 - [How do synced Transactions arrive?](issues/07-import-flow.md): YNAB-style: imports count at once but arrive Unapproved and Cleared; pending ignored; one matcher (import ID, then same Account, amount, within 10 days, single candidate) for sync and file; Payee from Plaid `merchant_name` with Bank Text kept, exact-text rename memory, Category from Payee memory; Transfers matched via a created counterpart.
 - [What does the budget screen look like on desktop and phone?](issues/09-budget-screen.md): variant A, the YNAB layout: an Account sidebar, a grouped budget table with inline Assigned and Target progress under each Category, and an inspector column with the selected Category and the Upcoming list; on a phone, a View menu and inline Category details.
+- [Where does Effect go in Budge?](issues/14-effect-boundaries.md): Effect for actions, Plaid and file decoding, retries, and typed errors behind plain Convex exports and `v.*` (Confect deferred, ADR 0001); budget math, queries, SvelteKit server code, and components stay plain; shared UI state in context-provided `.svelte.ts` classes; fixed public `ConvexError` codes.
 
 ## Not yet specified
 
