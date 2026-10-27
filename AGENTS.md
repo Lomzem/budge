@@ -1,7 +1,7 @@
 # Model ownership
 
-- **GPT-6.1-Sol** is the default for general work, including personal tooling and configuration.
 - **Opus 5.5** owns production application and library code: architecture, API design, and implementation.
+- **UI implementation belongs exclusively to Opus 5.5**, including UI in prototypes. Sol must delegate all UI implementation and changes to Opus; Sol may review UI code but must not edit it.
 
 # Delegation
 
