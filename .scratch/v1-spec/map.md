@@ -33,6 +33,7 @@ A build-ready v1 spec for Budge: scope, budget rules, sync approach, data model,
 - [What is in v1 and what waits?](issues/05-v1-scope.md): v1 has splits, Transfers, credit-card model, Monthly (with due day) and repeating By date Targets, an Upcoming list, simple reconciliation, Payee memory, search, any-month editing, Category management, move money, manual Accounts, and export; scheduled Transactions, reports, Payee rules, and tracking Accounts wait.
 - [Which aggregator syncs Capital One and Discover for at most $25 a year?](issues/01-bank-sync-provider.md): Plaid Trial (free, 10 lifetime Items), SimpleFIN Bridge as fallback; Capital One gives no pending transactions.
 - [What is the current state of SvelteKit with Convex, Clerk, and Vercel?](issues/03-stack-integration.md): it fits; pin SvelteKit 2 for `svelte-clerk`, Clerk Invite-only plus an owner guard in every Convex function, sync and AES-GCM token encryption in Convex actions; Clerk production needs an owned domain.
+- [What are the exact budget rules?](issues/06-budget-rules.md): one formula, Available = prior + Assigned + Activity, with negatives carried forward (no YNAB month-end reset); one global Ready to Assign that may go negative; card purchases move their full amount to the Payment Category; Uncategorized counts as Ready to Assign; Monthly Targets refill up to or set aside; By date Targets spread over months left and repeat after the due month; only Transactions and Assigned are stored.
 
 ## Not yet specified
 

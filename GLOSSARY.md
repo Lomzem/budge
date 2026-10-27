@@ -63,8 +63,16 @@ A Category's balance: prior Available plus Assigned plus Activity. It rolls over
 _Avoid_: Remaining, left over
 
 **Overspending**:
-A Category whose Available is below zero.
+A Category whose Available is below zero. The negative carries into later months until it is covered.
 _Avoid_: Over budget, deficit
+
+**Cover**:
+To assign or move money into an overspent Category until its Available is back to zero.
+_Avoid_: Fix, top up
+
+**Uncategorized**:
+A Transaction not yet given a Category. It counts against Ready to Assign until it gets one.
+_Avoid_: Unassigned, pending
 
 **Credit Card Payment Category**:
 A Category per Credit Card Account that holds the money set aside to pay that card.
@@ -73,6 +81,14 @@ _Avoid_: Card reserve, payoff bucket
 **Target**:
 A goal attached to a Category that states how much it needs and by when.
 _Avoid_: Goal, budget limit
+
+**Monthly Target**:
+A Target for an amount each month, with an optional due day. It either refills the Category up to the amount or sets aside the amount on top of what is left over.
+_Avoid_: Recurring goal, spending target
+
+**By date Target**:
+A Target for an amount Available by a date, optionally repeating every N months.
+_Avoid_: Savings goal, sinking fund
 
 ## Sync
 
