@@ -11,6 +11,8 @@ export default defineConfig({
 				test: {
 					name: 'domain',
 					environment: 'node',
+					// West of UTC, so a date shifted by the time zone shows up as the day before.
+					env: { TZ: 'America/Los_Angeles' },
 					include: ['src/lib/domain/**/*.test.ts']
 				}
 			},

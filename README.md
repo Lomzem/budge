@@ -20,3 +20,11 @@ bunx convex env set BUDGE_OWNER_SUBJECT <your Clerk user ID>
 ```
 
 Scripts for checks and tests are in `package.json`. Variable names and where each one lives are in `.env.example`.
+
+To fill an empty local backend with synthetic Accounts and about three months of Transactions:
+
+```sh
+bunx convex run seed:run
+```
+
+It refuses once any Account exists, and on a deployment where `BUDGE_PRODUCTION` is set.
