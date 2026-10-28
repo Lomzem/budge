@@ -8,13 +8,13 @@
 
 **Spec:** [Budge v1](../../v1-spec/spec.md): stories 2, 4, 130–131, 133, 135–136; Environments, deployment, and free-tier limits
 
-- [ ] The Vercel project is linked to the repo, and its Git integration deploys previews and production. Production builds with `npx convex deploy --cmd 'bun run build'` and the production `CONVEX_DEPLOY_KEY`. SSR runs on the Node runtime.
+- [x] The Vercel project is linked to the repo, and its Git integration deploys previews and production. Production builds with `npx convex deploy --cmd 'bun run build'` and the production `CONVEX_DEPLOY_KEY`. SSR runs on the Node runtime.
 - [ ] Clerk production instance on `budge.lomzem.dev`. Its DNS records (Frontend API, Account Portal, email/DKIM) and Vercel's record are added in Cloudflare as DNS-only. The owner's own GitHub OAuth app points its callback at Clerk. GitHub and email verification code sign-in, with Email enabled. Invite-only, with only the owner's verified email invited.
 - [x] Production Convex env holds `BUDGE_OWNER_SUBJECT`, `CLERK_JWT_ISSUER_DOMAIN`, `BUDGE_TOKEN_KEY`, the production flag, and Plaid Trial credentials. Vercel Production env holds the production Convex URL and Clerk production keys.
-- [ ] The Vercel Preview environment holds a Convex preview deploy key and Clerk development keys, and the build uses `--preview-run` to load `seed:run`. Convex default preview env vars are set for the Clerk dev instance, Plaid Sandbox, and a throwaway `BUDGE_TOKEN_KEY`. Vercel Authentication protects preview URLs.
+- [x] The Vercel Preview environment holds a Convex preview deploy key and Clerk development keys, and the build uses `--preview-run` to load `seed:run`. Convex default preview env vars are set for the Clerk dev instance, Plaid Sandbox, and a throwaway `BUDGE_TOKEN_KEY`. Vercel Authentication protects preview URLs.
 - [ ] A Vercel Ignored Build Step skips the build (and so the Convex preview deployment) when a push changes only `.scratch/**`, `docs/**`, or Markdown files. One docs-only push proves it.
 - [x] The cloud dev deployment exists only for Plaid Sandbox webhooks and real-iPhone checks, and has a daily function-call usage limit that pauses it.
-- [ ] The README notes where to check Convex team usage and Vercel usage. One preview's I/O and storage are checked against the free tier after it deploys.
+- [x] The README notes where to check Convex team usage and Vercel usage. One preview's I/O and storage are checked against the free tier after it deploys.
 - [ ] Production signs in as the same Clerk owner user with GitHub and email verification codes. A second user is refused through either method.
 
 ## Comments
@@ -321,3 +321,20 @@ No automated test contacted a cloud backend.
 
 This fix is ready to push and verify in the PR preview. The docs-only skipped
 build and the owner's remaining manual access checks are still pending.
+
+### Repaired preview verified, 2026-10-28
+
+Commit `6d22b2f` deployed successfully as Vercel deployment
+`FrFSFTmwWJuN9QyVVZnrES3UcM5f`:
+https://budge-b1y61dt2y-lawjay-lees-projects.vercel.app.
+The owner signed in with GitHub and reached the seeded Budget screen with
+Checking, Savings, and Card accounts. A same-origin page request returned HTTP
+200 and `Cache-Control: private, no-store`. The existing Convex branch preview
+was reused. Production was not seeded.
+
+All deterministic CI checks passed on this commit: application checks, browser
+E2E, secret scanning, and Vercel deployment. CodeRabbit has not reviewed it;
+the PR remains a draft while the docs-only skip proof is prepared.
+
+This documentation-only commit is the test push for the Ignored Build Step.
+Its result must be checked in Vercel before that checklist item is closed.
