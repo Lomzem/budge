@@ -61,17 +61,40 @@ jobs:
       - name: Install Playwright browser
         run: bunx playwright install --with-deps chromium
       # An anonymous local deployment: no Convex account, no cloud quota, never production.
+      # The first push fails until the required env vars are set; `convex dev` then retries it.
+      # The test user is the owner of this backend.
       - name: Start local Convex backend
+        env:
+          CLERK_JWT_ISSUER_DOMAIN: ${{ secrets.CLERK_DEV_JWT_ISSUER_DOMAIN }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
         run: |
+          for name in CLERK_JWT_ISSUER_DOMAIN E2E_CLERK_USER_ID; do
+            [ -n "${!name}" ] || { echo "::error::$name is empty: add its Clerk development secret to the repo."; exit 1; }
+          done
           CONVEX_AGENT_MODE=anonymous bunx convex dev --typecheck disable > convex.log 2>&1 &
           for _ in $(seq 1 90); do
-            curl -sf http://127.0.0.1:3210/version > /dev/null && grep -q '^PUBLIC_CONVEX_URL=' .env.local 2>/dev/null && exit 0
+            curl -sf http://127.0.0.1:3210/version > /dev/null && grep -q '^PUBLIC_CONVEX_URL=' .env.local 2>/dev/null && break
+            sleep 2
+          done
+          bunx convex env set CLERK_JWT_ISSUER_DOMAIN "$CLERK_JWT_ISSUER_DOMAIN"
+          bunx convex env set BUDGE_OWNER_SUBJECT "$E2E_CLERK_USER_ID"
+          for _ in $(seq 1 60); do
+            grep -q 'Convex functions ready' convex.log && exit 0
             sleep 2
           done
           cat convex.log
           exit 1
       - name: Playwright
-        run: bun run test:e2e
+        # The Clerk development instance and its one hand-made test user. Never production.
+        env:
+          PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEV_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_DEV_SECRET_KEY }}
+          E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
+        run: |
+          for name in PUBLIC_CLERK_PUBLISHABLE_KEY CLERK_SECRET_KEY E2E_CLERK_USER_EMAIL; do
+            [ -n "${!name}" ] || { echo "::error::$name is empty: add its Clerk development secret to the repo."; exit 1; }
+          done
+          bun run test:e2e
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

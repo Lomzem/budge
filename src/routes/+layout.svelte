@@ -1,9 +1,21 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { ClerkProvider } from 'svelte-clerk';
 
 	import '../app.css';
+	import { Theme, setTheme } from '$lib/theme.svelte';
 
-	let { children }: { children: Snippet } = $props();
+	import type { LayoutProps } from './$types';
+
+	let { children, data }: LayoutProps = $props();
+
+	setTheme(new Theme());
 </script>
 
-{@render children()}
+<ClerkProvider
+	{...data}
+	signInUrl="/sign-in"
+	signInFallbackRedirectUrl="/"
+	afterSignOutUrl="/sign-in"
+>
+	{@render children()}
+</ClerkProvider>

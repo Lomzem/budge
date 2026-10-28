@@ -8,7 +8,10 @@
  * @module
  */
 
-import type * as health from "../health.js";
+import type * as lib_owner from "../lib/owner.js";
+import type * as lib_publicError from "../lib/publicError.js";
+import type * as lib_runEffect from "../lib/runEffect.js";
+import type * as owner from "../owner.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +20,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  health: typeof health;
+  "lib/owner": typeof lib_owner;
+  "lib/publicError": typeof lib_publicError;
+  "lib/runEffect": typeof lib_runEffect;
+  owner: typeof owner;
 }>;
 
 /**

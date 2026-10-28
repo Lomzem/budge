@@ -12,4 +12,11 @@ bun run dev:backend  # Convex backend; on first run, choose a local deployment (
 bun run dev          # the app
 ```
 
+Signing in needs the Clerk development instance: put its keys in `.env.local`, then point the local backend at it and make your Clerk user the owner:
+
+```sh
+bunx convex env set CLERK_JWT_ISSUER_DOMAIN <Frontend API URL>
+bunx convex env set BUDGE_OWNER_SUBJECT <your Clerk user ID>
+```
+
 Scripts for checks and tests are in `package.json`. Variable names and where each one lives are in `.env.example`.

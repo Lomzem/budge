@@ -1,8 +1,10 @@
 import { defineConfig } from '@playwright/test';
 
-// Smoke tests run only in CI, against an anonymous local Convex backend.
+// Smoke tests run only in CI, against an anonymous local Convex backend and the Clerk
+// development instance.
 export default defineConfig({
 	testDir: 'e2e',
+	globalSetup: './e2e/global.setup.ts',
 	forbidOnly: !!process.env.CI,
 	reporter: process.env.CI ? 'github' : 'list',
 	webServer: {
