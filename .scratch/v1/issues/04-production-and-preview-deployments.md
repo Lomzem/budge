@@ -4,18 +4,18 @@
 
 **Blocked by:** 03 (Manual Accounts and Transactions)
 
-**Status:** ready-for-human
+**Status:** done
 
 **Spec:** [Budge v1](../../v1-spec/spec.md): stories 2, 4, 130–131, 133, 135–136; Environments, deployment, and free-tier limits
 
 - [x] The Vercel project is linked to the repo, and its Git integration deploys previews and production. Production builds with `npx convex deploy --cmd 'bun run build'` and the production `CONVEX_DEPLOY_KEY`. SSR runs on the Node runtime.
-- [ ] Clerk production instance on `budge.lomzem.dev`. Its DNS records (Frontend API, Account Portal, email/DKIM) and Vercel's record are added in Cloudflare as DNS-only. The owner's own GitHub OAuth app points its callback at Clerk. GitHub and email verification code sign-in, with Email enabled. Invite-only, with only the owner's verified email invited.
+- [x] Clerk production instance on `budge.lomzem.dev`. Its DNS records (Frontend API, Account Portal, email/DKIM) and Vercel's record are added in Cloudflare as DNS-only. The owner's own GitHub OAuth app points its callback at Clerk. GitHub and email verification code sign-in, with Email enabled. Invite-only, with only the owner's verified email invited.
 - [x] Production Convex env holds `BUDGE_OWNER_SUBJECT`, `CLERK_JWT_ISSUER_DOMAIN`, `BUDGE_TOKEN_KEY`, the production flag, and Plaid Trial credentials. Vercel Production env holds the production Convex URL and Clerk production keys.
 - [x] The Vercel Preview environment holds a Convex preview deploy key and Clerk development keys, and the build uses `--preview-run` to load `seed:run`. Convex default preview env vars are set for the Clerk dev instance, Plaid Sandbox, and a throwaway `BUDGE_TOKEN_KEY`. Vercel Authentication protects preview URLs.
 - [x] A Vercel Ignored Build Step skips the build (and so the Convex preview deployment) when a push changes only `.scratch/**`, `docs/**`, or Markdown files. One docs-only push proves it.
 - [x] The cloud dev deployment exists only for Plaid Sandbox webhooks and real-iPhone checks, and has a daily function-call usage limit that pauses it.
 - [x] The README notes where to check Convex team usage and Vercel usage. One preview's I/O and storage are checked against the free tier after it deploys.
-- [ ] Production signs in as the same Clerk owner user with GitHub and email verification codes. A second user is refused through either method.
+- [x] Owner production sign-in succeeds through GitHub and email verification codes. An uninvited email is refused. The owner waived the manual uninvited-GitHub check; that case remains unverified.
 
 ## Comments
 
@@ -386,3 +386,46 @@ Exact provider references and the verified preview URL remain in ignored
 Clarified `.env.example`: the deploy command supplies `PUBLIC_CONVEX_URL` during
 the build, so Vercel does not require a separate variable. The earlier Production
 variable remains a recorded setup fact. No provider configuration changed.
+
+### Completion check, 2026-10-28
+
+[PR #3](https://github.com/Lomzem/budge/pull/3) merged at 22:50:05 UTC as
+`60b9c6fc0648cfe72bfa608541ad24d8fd55e687`. CodeRabbit explicitly approved
+the final PR head `e8587d9`; application checks, E2E, secret scanning, and Vercel
+all passed. Review and merge are complete.
+
+At approximately 23:01 UTC, used the production sign-in form with a synthetic,
+uninvited address under `example.com`. Clerk refused it with “Couldn't find
+your account.” The browser stayed on `/sign-in`; no authenticated access was
+granted. This proves the uninvited-email case only. The owner's email-code
+sign-in and an uninvited GitHub identity remain unverified.
+
+The authenticated Convex team usage dashboard still reports an above-Free-limit
+warning for October 1–31, 2026 (UTC), with Data Egress at 1.6 GB against the
+1 GB allowance. No plan change or unrelated-project change was made. The Free
+usage requirement remains unresolved. Clerk setup is checked off based on the
+DNS, OAuth, invitation, and saved sign-in settings verified earlier; the final
+live-access checklist item remains open. The ticket stays ready-for-human.
+
+### Owner email-code check, 2026-10-28
+
+The owner followed the production email-code sign-in steps using the invited
+owner email and reported successfully reaching the Budget screen. Combined
+with the earlier owner GitHub sign-in and the uninvited-email refusal, this
+leaves rejection of an uninvited GitHub identity as the remaining live-access
+check. The shared team's October Free-tier data-egress overage remains
+unresolved. No credentials or verification codes were collected.
+
+### Closed with a verification exception, 2026-10-28
+
+The owner requested closing this ticket and pushing its documentation directly
+to `main`, without creating a second GitHub account for the remaining manual
+check. The uninvited-GitHub test is waived, not recorded as a passing test.
+Owner sign-in through both supported methods and uninvited-email rejection
+are verified as described above. Deployment implementation shipped in PR #3.
+
+The existing shared Convex team's October data-egress overage remains a known
+limitation outside this ticket's completed deployment work. Closing this ticket
+does not establish that the shared team is within every Free allowance. No plan
+upgrade, unrelated-project changes, or production configuration changes are
+included in this closeout.
