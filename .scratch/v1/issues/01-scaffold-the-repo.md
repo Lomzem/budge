@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** [Budge v1](../../v1-spec/spec.md): Architecture; Repo and workflow; Environments, deployment, and free-tier limits
 
@@ -20,7 +20,7 @@
 - [x] `.coderabbit.yaml` uses the `assertive` profile with `request_changes_workflow: true`. Its `path_instructions` point at `AGENTS.md`, `GLOSSARY.md`, and the UI rules, and flag real-looking financial data. It excludes the lockfile and generated Convex code, and reviews `.scratch/**` lightly. It skips Renovate's PRs.
 - [x] Renovate runs weekly with grouped updates (Effect and Convex in separate groups) and never auto-merges.
 - [x] `AGENTS.md` gains a "Pull requests" section. Every ticket from 02 onward is a PR reviewed by CodeRabbit; docs, `.scratch/`, ticket 01, and small fixes outside a ticket go straight to `main`; when unsure, open a PR. A CodeRabbit rate-limit or "review skipped" message is neither a review nor an approval. Wait out the window, re-request with `@coderabbitai review`, address every comment, and merge only after CodeRabbit approves and CI is green.
-- [ ] The owner turns on GitHub secret scanning with push protection and installs the Renovate GitHub App, and the ticket records this. `main` has no branch protection.
+- [x] The owner turns on GitHub secret scanning with push protection and installs the Renovate GitHub App, and the ticket records this. `main` has no branch protection.
 
 ## Comments
 
@@ -35,4 +35,4 @@
   - Pre-commit runs Prettier then ESLint `--fix` (both rewrite and re-stage files, so in parallel they would race), alongside `@shadcn/lint`; `gitleaks git --staged` runs last, so it scans the index after the fixers re-stage.
   - Prettier skips `.scratch/`: it would pad wide Markdown tables and renumber lists across the tracker.
   - Checked by hand: gitleaks rules against invented tokens, Item IDs, and Clerk keys, plus near-miss placeholders; the gitignore against sample paths; the domain-purity rule and the shadcn rules against planted violations; the Effect typecheck against a planted floating Effect.
-- Owner steps still open: turn on GitHub secret scanning with push protection, install the Renovate GitHub App on `Lomzem/budge`, and install gitleaks locally (`pacman -S gitleaks`).
+- Owner steps done: GitHub secret scanning and push protection are on (confirmed through the repo API), the Renovate GitHub App is installed on `Lomzem/budge`, and gitleaks is installed locally.
