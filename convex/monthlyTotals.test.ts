@@ -10,7 +10,7 @@ useOwnerEnv();
 function random(seed: number) {
 	let state = seed;
 	const next = () => {
-		state = (state * 1_103_515_245 + 12_345) % 2_147_483_648;
+		state = (Math.imul(state, 1_103_515_245) + 12_345) & 0x7fffffff;
 		return state / 2_147_483_648;
 	};
 	return {

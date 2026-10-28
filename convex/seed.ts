@@ -8,13 +8,13 @@ import { rebuildMonthlyTotals } from './lib/monthlyTotals';
 // Invented Payees and amounts that mirror only the shape of a real budget. The repo is public:
 // nothing here may come from real data.
 const PAYEES = {
-	paycheck: 'Northwind Payroll',
-	rent: 'Maple Court Rentals',
-	groceries: ['Corner Grocer', 'Green Basket Market'],
-	transit: 'Metro Transit Card',
-	coffee: 'Bean There Cafe',
-	dining: ['Noodle Nook', 'Taco Teca'],
-	utilities: 'City Power & Water',
+	paycheck: 'Sample Employer Payroll',
+	rent: 'Sample Landlord',
+	groceries: ['Sample Grocer', 'Sample Market'],
+	transit: 'Sample Transit Pass',
+	coffee: 'Sample Coffee Shop',
+	dining: ['Sample Noodle Bar', 'Sample Taco Stand'],
+	utilities: 'Sample Utility Co',
 	interest: 'Savings Interest'
 } as const;
 
@@ -27,7 +27,8 @@ export const run = internalMutation({
 	args: {},
 	returns: v.null(),
 	handler: async (ctx) => {
-		if (env.BUDGE_PRODUCTION) throw new Error('The seed never runs on production.');
+		// Any value, even an empty one, marks production.
+		if (env.BUDGE_PRODUCTION !== undefined) throw new Error('The seed never runs on production.');
 		const started =
 			(await ctx.db.query('accounts').first()) !== null ||
 			(await ctx.db.query('settings').first()) !== null;

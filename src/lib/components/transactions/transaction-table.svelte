@@ -114,8 +114,9 @@
 						<Table.Cell align="end" numeric>{formatCents(row.amount)}</Table.Cell>
 						<Table.Cell align="center">
 							<Checkbox
-								checked={row.cleared}
-								onCheckedChange={(checked: boolean) => void toggleCleared(row, checked)}
+								bind:checked={
+									() => row.cleared, (checked: boolean) => void toggleCleared(row, checked)
+								}
 								aria-label="Cleared: {payee}, {formatDate(row.date)}"
 							/>
 						</Table.Cell>
