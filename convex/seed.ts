@@ -131,7 +131,7 @@ export const run = internalMutation({
 			const cleared =
 				date < localIsoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 4));
 			// The newest few stay Uncategorized, waiting for review.
-			const sorted = <T>(value: T) => (cleared ? value : undefined);
+			const categorizeIfCleared = <T>(value: T) => (cleared ? value : undefined);
 			if (dayOfMonth === 1) {
 				await write(checking, date, -1_450_00, PAYEES.rent, cleared, to('Rent'));
 			}
@@ -154,11 +154,18 @@ export const run = internalMutation({
 			}
 			if (next(3) === 0) {
 				const amount = -(3_75 + next(3_00));
-				await write(card, date, amount, PAYEES.coffee, cleared, sorted(to('Coffee')));
+				await write(card, date, amount, PAYEES.coffee, cleared, categorizeIfCleared(to('Coffee')));
 			}
 			if (next(6) === 0) {
 				const payee = PAYEES.dining[next(2)] ?? '';
-				await write(card, date, -(14_00 + next(30_00)), payee, cleared, sorted(to('Dining Out')));
+				await write(
+					card,
+					date,
+					-(14_00 + next(30_00)),
+					payee,
+					cleared,
+					categorizeIfCleared(to('Dining Out'))
+				);
 			}
 		}
 

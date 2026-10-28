@@ -22,6 +22,15 @@
 	setAccounts(new Accounts(() => auth.isAuthenticated));
 	const budget = new BudgetMonth(() => auth.isAuthenticated);
 	setBudgetMonth(budget);
+	// Income dated today starts counting at midnight, even if Budge stays open and focused.
+	$effect(() => {
+		const timer = setInterval(() => {
+			budget.refreshToday();
+		}, 60_000);
+		return () => {
+			clearInterval(timer);
+		};
+	});
 
 	const access = $derived.by(() => {
 		if (auth.isLoading) return 'loading';

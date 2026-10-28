@@ -84,28 +84,38 @@ function statusOf(available: number): AvailableStatus {
 	return available > 0 ? 'funded' : 'empty';
 }
 
+/** Per Category: the amount in `month` (`now`) and through the end of `month` (`through`). */
+function sumByCategory<C extends string>(
+	month: string,
+	rows: readonly { month: string; key: C; amount: number }[]
+): Map<C, { now: number; through: number }> {
+	const sums = new Map<C, { now: number; through: number }>();
+	for (const row of rows) {
+		if (row.month > month) continue;
+		const sum = sums.get(row.key) ?? { now: 0, through: 0 };
+		sum.through += row.amount;
+		if (row.month === month) sum.now += row.amount;
+		sums.set(row.key, sum);
+	}
+	return sums;
+}
+
 const byPosition = (a: { position: number }, b: { position: number }) => a.position - b.position;
 
 export function computeBudget<C extends string, G extends string>(
 	input: BudgetInput<C, G>
 ): Budget<C, G> {
 	const { month } = input;
-	const assigned = new Map<C, { now: number; through: number }>();
-	for (const row of input.assignments) {
-		if (row.month > month) continue;
-		const sums = assigned.get(row.categoryId) ?? { now: 0, through: 0 };
-		sums.through += row.amount;
-		if (row.month === month) sums.now += row.amount;
-		assigned.set(row.categoryId, sums);
-	}
-	const activity = new Map<C, { now: number; through: number }>();
-	for (const row of input.monthlyTotals) {
-		if (row.bucket === 'uncategorized' || row.month > month) continue;
-		const sums = activity.get(row.bucket) ?? { now: 0, through: 0 };
-		sums.through += row.amount;
-		if (row.month === month) sums.now += row.amount;
-		activity.set(row.bucket, sums);
-	}
+	const assigned = sumByCategory(
+		month,
+		input.assignments.map((row) => ({ ...row, key: row.categoryId }))
+	);
+	const activity = sumByCategory(
+		month,
+		input.monthlyTotals.flatMap((row) =>
+			row.bucket === 'uncategorized' ? [] : [{ ...row, key: row.bucket }]
+		)
+	);
 
 	const groups = input.groups
 		.filter((group) => group.kind === 'normal')

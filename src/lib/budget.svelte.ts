@@ -50,7 +50,7 @@ export class BudgetMonth {
 		this.month = addMonths(this.month, 1);
 	}
 
-	/** Refreshes `today`, so income dated today starts counting after midnight. */
+	/** Refreshes `today`, so income dated today starts counting after midnight. A same-day refresh changes nothing. */
 	refreshToday() {
 		this.today = localToday();
 	}

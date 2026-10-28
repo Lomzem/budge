@@ -233,6 +233,39 @@ describe('the cash invariant', () => {
 			const transactions: { date: string; amount: number; categoryId: CategoryId | null }[] = [];
 			const assigned = new Map<string, number>();
 
+			// Every Transaction has happened by now.
+			const today = '2027-01-01';
+			const check = () => {
+				const totals = new Map<string, { amount: number; count: number }>();
+				for (const t of transactions) {
+					const key = `${t.date.slice(0, 7)}|${t.categoryId ?? 'uncategorized'}`;
+					const row = totals.get(key) ?? { amount: 0, count: 0 };
+					row.amount += t.amount;
+					row.count += 1;
+					totals.set(key, row);
+				}
+				const input = budget({
+					today,
+					month: '2026-12',
+					assignments: [...assigned].map(([key, amount]) => {
+						const [month = '', categoryId] = key.split('|');
+						return { month, categoryId: categoryId as CategoryId, amount };
+					}),
+					monthlyTotals: [...totals].map(([key, row]) => {
+						const [month = '', bucket] = key.split('|');
+						return { month, bucket: bucket as CategoryId | 'uncategorized', ...row };
+					})
+				});
+
+				const cash = transactions.reduce((total, t) => total + t.amount, 0);
+				const result = computeBudget(input);
+				const available = result.groups.reduce((total, group) => total + group.available, 0);
+				expect(result.readyToAssign.amount + available).toBe(cash);
+				expect(computeBudget({ ...input, month: '2026-09' }).readyToAssign).toEqual(
+					result.readyToAssign
+				);
+			};
+
 			for (let step = 0; step < 60; step++) {
 				const action = transactions.length === 0 ? 0 : rand.int(4);
 				const entry = () => ({
@@ -249,37 +282,9 @@ describe('the cash invariant', () => {
 						`${rand.pick(months)}|${rand.pick(['groceries', 'rent'])}`,
 						rand.pick([0, 5_000, 40_000, 125_000])
 					);
+				// After every edit, not only at the end.
+				check();
 			}
-
-			const totals = new Map<string, { amount: number; count: number }>();
-			for (const t of transactions) {
-				const key = `${t.date.slice(0, 7)}|${t.categoryId ?? 'uncategorized'}`;
-				const row = totals.get(key) ?? { amount: 0, count: 0 };
-				row.amount += t.amount;
-				row.count += 1;
-				totals.set(key, row);
-			}
-			const input = budget({
-				// Every Transaction has happened by now.
-				today: '2027-01-01',
-				month: '2026-12',
-				assignments: [...assigned].map(([key, amount]) => {
-					const [month = '', categoryId] = key.split('|');
-					return { month, categoryId: categoryId as CategoryId, amount };
-				}),
-				monthlyTotals: [...totals].map(([key, row]) => {
-					const [month = '', bucket] = key.split('|');
-					return { month, bucket: bucket as CategoryId | 'uncategorized', ...row };
-				})
-			});
-
-			const cash = transactions.reduce((total, t) => total + t.amount, 0);
-			const result = computeBudget(input);
-			const available = result.groups.reduce((total, group) => total + group.available, 0);
-			expect(result.readyToAssign.amount + available).toBe(cash);
-			expect(computeBudget({ ...input, month: '2026-09' }).readyToAssign).toEqual(
-				result.readyToAssign
-			);
 		}
 	);
 });

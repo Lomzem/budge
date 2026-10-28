@@ -53,7 +53,7 @@ describe('the budget query', () => {
 		// Planning ahead: December's rent, and a paycheck that hasn't arrived.
 		await b.assign('2026-12', b.rent, 150_000);
 		await b.spend('2026-10-31', 230_000, b.readyToAssignId);
-		const unsorted = await b.spend('2026-10-12', -4_000);
+		const uncategorizedId = await b.spend('2026-10-12', -4_000);
 		await b.spend('2026-10-20', 10_000);
 		// Fixing a past month recalculates every later Available.
 		await b.assign('2026-08', b.groceries, 45_000);
@@ -102,7 +102,7 @@ describe('the budget query', () => {
 
 		// Categorizing the Uncategorized outflow moves it from Ready to Assign to Groceries.
 		await b.owner.mutation(api.transactions.update, {
-			transactionId: unsorted,
+			transactionId: uncategorizedId,
 			accountId: b.checking,
 			date: '2026-10-12',
 			amount: -4_000,
@@ -110,10 +110,12 @@ describe('the budget query', () => {
 			categoryId: b.groceries,
 			memo: ''
 		});
-		const sorted = await b.view('2026-12', '2026-10-31');
-		expect(sorted.readyToAssign).toEqual({ amount: 165_000, uncategorized: 10_000 });
-		expect(sorted.uncategorizedCount).toBe(1);
-		expect(sorted.groups[0]?.categories.map((c) => c.available)).toEqual([18_000, 150_000]);
+		const afterCategorizing = await b.view('2026-12', '2026-10-31');
+		expect(afterCategorizing.readyToAssign).toEqual({ amount: 165_000, uncategorized: 10_000 });
+		expect(afterCategorizing.uncategorizedCount).toBe(1);
+		expect(afterCategorizing.groups[0]?.categories.map((c) => c.available)).toEqual([
+			18_000, 150_000
+		]);
 	});
 
 	test('setting Assigned to 0 removes the row', async () => {
