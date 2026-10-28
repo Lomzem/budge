@@ -39,6 +39,10 @@ the matching backend URL:
 npx convex deploy --cmd 'bun run build' --cmd-url-env-var-name PUBLIC_CONVEX_URL --preview-run seed:run
 ```
 
+The app embeds `PUBLIC_CONVEX_URL` during the build. CI uses an explicit localhost
+value for type generation. Vercel supplies each build with its matching backend
+URL through the deploy command.
+
 Vercel Production uses a production Convex deploy key and Clerk production keys.
 Preview uses a separate preview deploy key and Clerk development keys. New Convex
 previews load synthetic Accounts and Transactions and expire after five days.

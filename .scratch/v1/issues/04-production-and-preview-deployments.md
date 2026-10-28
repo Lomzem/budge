@@ -283,3 +283,41 @@ Remaining proof: a protected, seeded PR preview, its actual expiration and usage
 a docs-only skipped build, and the owner's email-code and uninvited-user sign-in
 checks. The team data egress overage still prevents claiming that all shared
 usage is within the Free allowance.
+
+### PR preview and SSR fix, 2026-10-28
+
+Opened draft PR https://github.com/Lomzem/budge/pull/3. Its first Vercel preview
+reached Ready in 31 seconds and created Convex preview `enchanted-kudu-640`,
+reference `preview/04-production-and-preview-deployments`. Creation was
+2026-10-28 20:02:21 UTC; expiration is 2026-11-02 20:02:21 UTC, five days later.
+The anonymous browser was redirected to Vercel login before it could reach Budge.
+
+Measured the synthetic preview through a preview-only export and the installed
+Convex SDK's `getDocumentSize`, including system fields. It contains 117 documents
+and 21,318 bytes of document payload: 3 Accounts, 93 Transactions, 11 Payees,
+9 monthly totals, and 1 settings document. Deleted the export after measuring it.
+This is document payload size, not a claim about the billing dashboard's total.
+The deployment usage API reported 0.00007723364979028702 GB database I/O for the
+current UTC day and calendar month after seeding and the measurement. Its
+`seedStatus` was `partial`, so ingestion may revise that counter. These are small
+relative to the shared 0.5 GB database-storage and 1 GB monthly I/O allowances.
+The team's previously recorded data-egress overage is a separate unresolved limit.
+
+The first preview returned 500 after GitHub sign-in. Runtime logs reported a
+second `cache-control` assignment from the root layout. Opus reproduced it
+locally and found the underlying error that it masked: Preview gets its Convex
+URL only during the build, while the app read it from the runtime environment.
+
+Opus's fix reads the Convex URL from static public build configuration and moves
+private/no-store header assignment to the finished response in the outer hook.
+It preserves the original render error instead of masking it when SvelteKit
+reruns the root layout to render an error page. CI's checks job gets an explicit
+localhost URL for environment type generation. There is no application fallback.
+Four local SSR tests cover signed-in and sign-in responses, the error path, and
+a built app running without the Convex URL at request time. The old code failed
+the relevant regressions. The fixed code passed all 78 tests, formatting, both
+linters, and both typechecks, including a clean checkout with CI's environment.
+No automated test contacted a cloud backend.
+
+This fix is ready to push and verify in the PR preview. The docs-only skipped
+build and the owner's remaining manual access checks are still pending.
