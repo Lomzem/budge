@@ -12,7 +12,7 @@
 - [ ] Clerk production instance on `budge.lomzem.dev`. Its DNS records (Frontend API, Account Portal, email/DKIM) and Vercel's record are added in Cloudflare as DNS-only. The owner's own GitHub OAuth app points its callback at Clerk. GitHub and email verification code sign-in, with Email enabled. Invite-only, with only the owner's verified email invited.
 - [x] Production Convex env holds `BUDGE_OWNER_SUBJECT`, `CLERK_JWT_ISSUER_DOMAIN`, `BUDGE_TOKEN_KEY`, the production flag, and Plaid Trial credentials. Vercel Production env holds the production Convex URL and Clerk production keys.
 - [x] The Vercel Preview environment holds a Convex preview deploy key and Clerk development keys, and the build uses `--preview-run` to load `seed:run`. Convex default preview env vars are set for the Clerk dev instance, Plaid Sandbox, and a throwaway `BUDGE_TOKEN_KEY`. Vercel Authentication protects preview URLs.
-- [ ] A Vercel Ignored Build Step skips the build (and so the Convex preview deployment) when a push changes only `.scratch/**`, `docs/**`, or Markdown files. One docs-only push proves it.
+- [x] A Vercel Ignored Build Step skips the build (and so the Convex preview deployment) when a push changes only `.scratch/**`, `docs/**`, or Markdown files. One docs-only push proves it.
 - [x] The cloud dev deployment exists only for Plaid Sandbox webhooks and real-iPhone checks, and has a daily function-call usage limit that pauses it.
 - [x] The README notes where to check Convex team usage and Vercel usage. One preview's I/O and storage are checked against the free tier after it deploys.
 - [ ] Production signs in as the same Clerk owner user with GitHub and email verification codes. A second user is refused through either method.
@@ -352,3 +352,28 @@ The original command exceeded it. Replaced the shell `if` wrapper with an AND/OR
 chain that preserves the same build-on-missing-base behavior in 226 characters.
 Reloaded the dashboard, expanded Project Settings, and confirmed Custom plus
 the exact 226-character command persisted. This docs-only push tests that rule.
+
+### Docs-only skip proved, 2026-10-28
+
+Vercel canceled deployment `EkpYzCMVfQx1JA2S9A4sdE2tmaQV` for docs-only
+commit `70c675e` with the status “Canceled by Ignored Build Step”. The full build
+and Convex deploy command did not run. All deterministic GitHub checks passed
+on the same commit. CodeRabbit was skipped while the PR was a draft; that is
+not review approval.
+
+The saved command is:
+
+```sh
+git cat-file -e "$VERCEL_GIT_PREVIOUS_SHA^{commit}" 2>/dev/null && git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- . ':(exclude).scratch/**' ':(exclude)docs/**' ':(exclude,icase)*.md' ':(exclude,icase)*.markdown' || exit 1
+```
+
+Local checks confirmed that docs-only changes skip, application changes build,
+and absent or invalid base commits build. The command is 226 characters, within
+Vercel's 256-character limit. The untracked one-run wizard uses this command too.
+
+Remaining work: CodeRabbit review and merge, the owner's production email-code
+sign-in test, refusal of an uninvited identity through both methods, and the
+shared Convex team's existing October data-egress overage. The owner has not
+reported those access checks as complete. Dashboard authentication does not
+prove application sign-in. Keep the ticket ready-for-human until these remaining
+requirements are resolved.
