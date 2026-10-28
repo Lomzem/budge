@@ -39,6 +39,14 @@ describe('seed:run', () => {
 				.reduce((total, row) => total + row.amount, 0);
 			expect(account.balance, account.name).toBe(sum);
 		}
+
+		const { groups } = await owner.query(api.categories.list, {});
+		expect(groups.map((group) => group.categories.length)).toEqual([4, 4, 4]);
+		const budget = await owner.query(api.budget.month, { month: '2026-10', today: '2026-10-27' });
+		expect(budget.groups.flatMap((group) => group.categories).every((c) => c.assigned > 0)).toBe(
+			true
+		);
+		expect(budget.uncategorizedCount).toBeGreaterThan(0);
 	});
 
 	test('refuses once any Account exists', async () => {

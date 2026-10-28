@@ -67,6 +67,7 @@
 						<Table.Head showFrom="2xl">Account</Table.Head>
 					{/if}
 					<Table.Head width="fill">Payee</Table.Head>
+					<Table.Head showFrom="lg">Category</Table.Head>
 					<Table.Head showFrom="xl">Memo</Table.Head>
 					<Table.Head width="fit" align="end">Amount</Table.Head>
 					<Table.Head width="fit" align="center">Cleared</Table.Head>
@@ -75,6 +76,8 @@
 			<Table.Body>
 				{#each transactions.results as row (row._id)}
 					{@const payee = row.payeeName ?? 'No Payee'}
+					{@const category = row.categoryName ?? 'Uncategorized'}
+					{@const categoryClass = row.categoryName === null ? 'text-warning' : undefined}
 					<Table.Row>
 						<Table.Cell numeric>
 							<time datetime={row.date}>
@@ -97,6 +100,9 @@
 								</span>
 								<span class="sr-only">, edit Transaction on {formatDate(row.date)}</span>
 							</button>
+							<span class="block truncate text-xs text-muted-foreground @lg:hidden">
+								<span class={categoryClass}>{category}</span>
+							</span>
 							{#if allAccounts}
 								<span class="block truncate text-xs text-muted-foreground @2xl:hidden">
 									{row.accountName}
@@ -107,6 +113,9 @@
 									{row.memo}
 								</span>
 							{/if}
+						</Table.Cell>
+						<Table.Cell showFrom="lg">
+							<span class={['block max-w-48 truncate', categoryClass]}>{category}</span>
 						</Table.Cell>
 						<Table.Cell showFrom="xl">
 							<span class="block max-w-60 truncate">{row.memo ?? ''}</span>
@@ -123,7 +132,7 @@
 					</Table.Row>
 				{:else}
 					<Table.Row>
-						<Table.Cell colspan={allAccounts ? 6 : 5}>
+						<Table.Cell colspan={allAccounts ? 7 : 6}>
 							<span class="text-muted-foreground">
 								{transactions.isLoading ? 'Loading…' : 'No Transactions yet.'}
 							</span>

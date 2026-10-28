@@ -2,21 +2,20 @@ import { monthOf } from '../../src/lib/domain/dates';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
-type Counted = Pick<Doc<'transactions'>, 'accountId' | 'date' | 'amount'>;
+type Counted = Pick<Doc<'transactions'>, 'accountId' | 'date' | 'amount' | 'categoryId'>;
 type Key = Pick<Doc<'monthlyTotals'>, 'month' | 'accountId' | 'bucket'>;
 
-// Transactions have no Category yet, so every one is Uncategorized.
 function keyOf(transaction: Counted): Key {
 	return {
 		month: monthOf(transaction.date),
 		accountId: transaction.accountId,
-		bucket: 'uncategorized'
+		bucket: transaction.categoryId ?? 'uncategorized'
 	};
 }
 
 /**
- * Adds a Transaction's amount to its monthly total (`sign` 1), or takes it back out (`sign` -1).
- * A total that reaches zero is deleted, as the rebuild never writes one.
+ * Adds a Transaction to its monthly total (`sign` 1), or takes it back out (`sign` -1). A total
+ * left summing no Transactions is deleted, as the rebuild never writes one.
  */
 export async function countTransaction(ctx: MutationCtx, transaction: Counted, sign: 1 | -1) {
 	const key = keyOf(transaction);
@@ -28,12 +27,13 @@ export async function countTransaction(ctx: MutationCtx, transaction: Counted, s
 		)
 		.unique();
 	const amount = (row?.amount ?? 0) + delta;
+	const count = (row?.count ?? 0) + sign;
 	if (row === null) {
-		if (amount !== 0) await ctx.db.insert('monthlyTotals', { ...key, amount });
-	} else if (amount === 0) {
+		if (count > 0) await ctx.db.insert('monthlyTotals', { ...key, amount, count });
+	} else if (count <= 0) {
 		await ctx.db.delete('monthlyTotals', row._id);
 	} else {
-		await ctx.db.patch('monthlyTotals', row._id, { amount });
+		await ctx.db.patch('monthlyTotals', row._id, { amount, count });
 	}
 }
 
@@ -42,17 +42,16 @@ export async function rebuildMonthlyTotals(ctx: MutationCtx) {
 	for await (const row of ctx.db.query('monthlyTotals')) {
 		await ctx.db.delete('monthlyTotals', row._id);
 	}
-	const totals = new Map<string, Key & { amount: number }>();
+	const totals = new Map<string, Key & { amount: number; count: number }>();
 	for await (const transaction of ctx.db.query('transactions')) {
 		const key = keyOf(transaction);
 		const id = `${key.month}|${key.accountId}|${key.bucket}`;
-		const total = totals.get(id) ?? { ...key, amount: 0 };
+		const total = totals.get(id) ?? { ...key, amount: 0, count: 0 };
 		total.amount += transaction.amount;
+		total.count += 1;
 		totals.set(id, total);
 	}
-	for (const total of totals.values()) {
-		if (total.amount !== 0) await ctx.db.insert('monthlyTotals', total);
-	}
+	for (const total of totals.values()) await ctx.db.insert('monthlyTotals', total);
 }
 
 /** Each Account's balance, summed from the monthly totals rather than its Transactions. */

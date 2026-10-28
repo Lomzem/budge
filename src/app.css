@@ -23,6 +23,9 @@
 	--accent: oklch(0.97 0 0);
 	--accent-foreground: oklch(0.205 0 0);
 	--destructive: oklch(0.577 0.245 27.325);
+	/* Status text: 4.5:1 on --background and --muted, always beside words that say the same. */
+	--funded: oklch(0.5 0.13 150);
+	--warning: oklch(0.52 0.12 65);
 	--border: oklch(0.922 0 0);
 	/* Control boundaries need 3:1 contrast (WCAG 1.4.11). */
 	--input: oklch(0.556 0 0);
@@ -60,6 +63,8 @@
 	--accent: oklch(0.269 0 0);
 	--accent-foreground: oklch(0.985 0 0);
 	--destructive: oklch(0.704 0.191 22.216);
+	--funded: oklch(0.78 0.15 150);
+	--warning: oklch(0.82 0.14 75);
 	--border: oklch(1 0 0 / 10%);
 	/* Control boundaries need 3:1 contrast (WCAG 1.4.11). */
 	--input: oklch(0.556 0 0);
@@ -98,6 +103,8 @@
 	--color-input: var(--input);
 	--color-border: var(--border);
 	--color-destructive: var(--destructive);
+	--color-funded: var(--funded);
+	--color-warning: var(--warning);
 	--color-accent-foreground: var(--accent-foreground);
 	--color-accent: var(--accent);
 	--color-muted-foreground: var(--muted-foreground);

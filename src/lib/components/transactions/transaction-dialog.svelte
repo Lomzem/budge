@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { FunctionReturnType } from 'convex/server';
-	import { useMutation } from 'convex-svelte';
+	import { useMutation, useQuery } from 'convex-svelte';
 	import { untrack } from 'svelte';
 
 	import { api } from '$convex/_generated/api';
@@ -33,10 +33,13 @@
 	const create = useMutation(api.transactions.create);
 	const update = useMutation(api.transactions.update);
 	const remove = useMutation(api.transactions.remove);
+	const categories = useQuery(api.categories.list, () => (open ? {} : 'skip'));
 
 	let accountId = $state('');
 	let date = $state('');
 	let payee = $state('');
+	/** A Category ID, or `''` for Uncategorized. */
+	let categoryId = $state('');
 	let direction: 'outflow' | 'inflow' = $state('outflow');
 	let amount = $state('');
 	let memo = $state('');
@@ -56,6 +59,7 @@
 			accountId = transaction.accountId;
 			date = transaction.date;
 			payee = transaction.payeeName ?? '';
+			categoryId = transaction.categoryId ?? '';
 			direction = transaction.amount < 0 ? 'outflow' : 'inflow';
 			amount = formatCents(Math.abs(transaction.amount)).replace('$', '');
 			memo = transaction.memo ?? '';
@@ -63,10 +67,20 @@
 			accountId = defaultAccountId ?? accounts.all[0]?._id ?? '';
 			date = localIsoDate(new Date());
 			payee = '';
+			categoryId = '';
 			direction = 'outflow';
 			amount = '';
 			memo = '';
 		}
+	}
+
+	/** The Category picked, or `undefined` for Uncategorized. */
+	function findCategory(id: string): Id<'categories'> | undefined {
+		if (id === '') return undefined;
+		const list = categories.data;
+		if (!list) return id === transaction?.categoryId ? transaction.categoryId : undefined;
+		if (id === list.readyToAssignId) return list.readyToAssignId;
+		return list.groups.flatMap((group) => group.categories).find((c) => c._id === id)?._id;
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -81,11 +95,13 @@
 			error = 'Enter the amount, such as 12.50.';
 			return;
 		}
+		const category = findCategory(categoryId);
 		const fields = {
 			accountId: account._id,
 			date,
 			amount: direction === 'outflow' ? -Math.abs(cents) : Math.abs(cents),
 			payee,
+			...(category === undefined ? {} : { categoryId: category }),
 			memo
 		};
 		saving = true;
@@ -143,6 +159,31 @@
 			<div class="flex flex-col gap-2">
 				<Label for="transaction-payee">Payee</Label>
 				<Input id="transaction-payee" bind:value={payee} autocomplete="off" />
+			</div>
+			<div class="flex flex-col gap-2">
+				<Label for="transaction-category">Category</Label>
+				<select
+					id="transaction-category"
+					bind:value={categoryId}
+					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+				>
+					<option value="">Uncategorized</option>
+					{#if categories.data}
+						{#if categories.data.readyToAssignId !== null}
+							<option value={categories.data.readyToAssignId}>Ready to Assign</option>
+						{/if}
+						{#each categories.data.groups as group (group._id)}
+							<optgroup label={group.name}>
+								{#each group.categories as category (category._id)}
+									<option value={category._id}>{category.name}</option>
+								{/each}
+							</optgroup>
+						{/each}
+					{:else if transaction?.categoryId}
+						<!-- Keeps the saved Category selected while the list loads. -->
+						<option value={transaction.categoryId}>{transaction.categoryName}</option>
+					{/if}
+				</select>
 			</div>
 			<fieldset>
 				<legend class="mb-2 text-sm font-medium">Direction</legend>

@@ -1,8 +1,9 @@
 import { v } from 'convex/values';
 
-import { localIsoDate } from '../src/lib/domain/dates';
+import { localIsoDate, monthOf } from '../src/lib/domain/dates';
 import type { Id } from './_generated/dataModel';
 import { env, internalMutation, type MutationCtx } from './_generated/server';
+import { ensureReadyToAssign } from './lib/categories';
 import { rebuildMonthlyTotals } from './lib/monthlyTotals';
 
 // Invented Payees and amounts that mirror only the shape of a real budget. The repo is public:
@@ -18,9 +19,42 @@ const PAYEES = {
 	interest: 'Savings Interest'
 } as const;
 
+// Twelve Categories in three groups, each with what the seed Assigns to it every month.
+const GROUPS = [
+	{
+		name: 'Bills',
+		categories: [
+			['Rent', 1_450_00],
+			['Utilities', 130_00],
+			['Phone', 45_00],
+			['Internet', 60_00]
+		]
+	},
+	{
+		name: 'Everyday',
+		categories: [
+			['Groceries', 380_00],
+			['Dining Out', 90_00],
+			['Coffee', 40_00],
+			['Transit', 100_00]
+		]
+	},
+	{
+		name: 'Savings Goals',
+		categories: [
+			['Emergency Fund', 500_00],
+			['Vacation', 150_00],
+			['Gifts', 50_00],
+			['Car Repairs', 75_00]
+		]
+	}
+] as const;
+
+type CategoryName = (typeof GROUPS)[number]['categories'][number][0];
+
 /**
- * Writes a small synthetic budget on an empty backend: three Accounts and about three months of
- * made-up Transactions, from the first of the month two months back through today. Ends by
+ * Writes a small synthetic budget on an empty backend: three Accounts, twelve Categories in three
+ * groups with Assigned amounts each month, and about three months of made-up Transactions, from the first of the month two months back through today. Ends by
  * rebuilding the monthly totals, so every seeded deployment exercises the rebuild.
  */
 export const run = internalMutation({
@@ -43,6 +77,31 @@ export const run = internalMutation({
 		const cutover = new Date(now.getFullYear(), now.getMonth() - 2, 1);
 		const cutoverDate = localIsoDate(cutover);
 		await ctx.db.insert('settings', { cutoverDate });
+		const readyToAssign = await ensureReadyToAssign(ctx);
+		const category = new Map<CategoryName, Id<'categories'>>();
+		const months = [0, 1, 2].map((ago) =>
+			monthOf(localIsoDate(new Date(now.getFullYear(), now.getMonth() - ago, 1)))
+		);
+		for (const [groupPosition, group] of GROUPS.entries()) {
+			const groupId = await ctx.db.insert('categoryGroups', {
+				name: group.name,
+				position: groupPosition,
+				kind: 'normal'
+			});
+			for (const [position, [name, monthly]] of group.categories.entries()) {
+				const categoryId = await ctx.db.insert('categories', {
+					groupId,
+					name,
+					position,
+					kind: 'normal'
+				});
+				category.set(name, categoryId);
+				for (const month of months) {
+					await ctx.db.insert('assignments', { month, categoryId, amount: monthly });
+				}
+			}
+		}
+		const to = (name: CategoryName) => category.get(name);
 
 		const checking = await ctx.db.insert('accounts', {
 			name: 'Checking',
@@ -54,8 +113,9 @@ export const run = internalMutation({
 
 		// Amounts are cents, written with a separator before the cents: 2_418_37 is $2,418.37.
 		const write = writer(ctx);
-		await write(checking, cutoverDate, 2_418_37, 'Starting Balance', true);
-		await write(savings, cutoverDate, 8_150_00, 'Starting Balance', true);
+		await write(checking, cutoverDate, 2_418_37, 'Starting Balance', true, readyToAssign);
+		await write(savings, cutoverDate, 8_150_00, 'Starting Balance', true, readyToAssign);
+		// A card's starting debt touches no Category.
 		await write(card, cutoverDate, -612_48, 'Starting Balance', true);
 
 		// A fixed pseudo-random sequence, so every seeded backend looks the same on the same day.
@@ -70,20 +130,35 @@ export const run = internalMutation({
 			// Recent days stay uncleared, as if the bank hasn't confirmed them yet.
 			const cleared =
 				date < localIsoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 4));
-			if (dayOfMonth === 1) await write(checking, date, -1_450_00, PAYEES.rent, cleared);
+			// The newest few stay Uncategorized, waiting for review.
+			const sorted = <T>(value: T) => (cleared ? value : undefined);
+			if (dayOfMonth === 1) {
+				await write(checking, date, -1_450_00, PAYEES.rent, cleared, to('Rent'));
+			}
 			if (dayOfMonth === 1 || dayOfMonth === 15) {
-				await write(checking, date, 2_310_42, PAYEES.paycheck, cleared);
+				await write(checking, date, 2_310_42, PAYEES.paycheck, cleared, readyToAssign);
 			}
-			if (dayOfMonth === 20)
-				await write(checking, date, -(96_00 + next(40_00)), PAYEES.utilities, cleared);
-			if (dayOfMonth === 28) await write(savings, date, 6_12, PAYEES.interest, cleared);
+			if (dayOfMonth === 20) {
+				const amount = -(96_00 + next(40_00));
+				await write(checking, date, amount, PAYEES.utilities, cleared, to('Utilities'));
+			}
+			if (dayOfMonth === 28) {
+				await write(savings, date, 6_12, PAYEES.interest, cleared, readyToAssign);
+			}
 			if (day.getDay() === 6) {
-				await write(card, date, -(48_00 + next(70_00)), PAYEES.groceries[next(2)] ?? '', cleared);
+				const payee = PAYEES.groceries[next(2)] ?? '';
+				await write(card, date, -(48_00 + next(70_00)), payee, cleared, to('Groceries'));
 			}
-			if (day.getDay() === 1) await write(checking, date, -25_00, PAYEES.transit, cleared);
-			if (next(3) === 0) await write(card, date, -(3_75 + next(3_00)), PAYEES.coffee, cleared);
+			if (day.getDay() === 1) {
+				await write(checking, date, -25_00, PAYEES.transit, cleared, to('Transit'));
+			}
+			if (next(3) === 0) {
+				const amount = -(3_75 + next(3_00));
+				await write(card, date, amount, PAYEES.coffee, cleared, sorted(to('Coffee')));
+			}
 			if (next(6) === 0) {
-				await write(card, date, -(14_00 + next(30_00)), PAYEES.dining[next(2)] ?? '', cleared);
+				const payee = PAYEES.dining[next(2)] ?? '';
+				await write(card, date, -(14_00 + next(30_00)), payee, cleared, sorted(to('Dining Out')));
 			}
 		}
 
@@ -100,7 +175,8 @@ function writer(ctx: MutationCtx) {
 		date: string,
 		amount: number,
 		payee: string,
-		cleared: boolean
+		cleared: boolean,
+		categoryId?: Id<'categories'>
 	) => {
 		let payeeId = payees.get(payee);
 		if (payeeId === undefined) {
@@ -112,6 +188,7 @@ function writer(ctx: MutationCtx) {
 			date,
 			amount,
 			payeeId,
+			...(categoryId === undefined ? {} : { categoryId }),
 			cleared: cleared ? 'cleared' : 'uncleared'
 		});
 	};

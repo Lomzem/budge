@@ -14,8 +14,13 @@ const clerkIssuer = 'https://budge-dev.clerk.accounts.dev';
 
 // Valid arguments for every public function, so the guard (not argument validation) is what
 // rejects a caller. A new public function fails the sweep below until it is listed here.
-function sampleArgs(ids: { accountId: Id<'accounts'>; transactionId: Id<'transactions'> }) {
-	const { accountId, transactionId } = ids;
+function sampleArgs(ids: {
+	accountId: Id<'accounts'>;
+	transactionId: Id<'transactions'>;
+	groupId: Id<'categoryGroups'>;
+	categoryId: Id<'categories'>;
+}) {
+	const { accountId, transactionId, groupId, categoryId } = ids;
 	const entry = { accountId, date: '2026-08-14', amount: -500, payee: 'Corner Grocer', memo: '' };
 	const args: Record<string, Record<string, unknown>> = {
 		'owner:whoami': {},
@@ -29,7 +34,12 @@ function sampleArgs(ids: { accountId: Id<'accounts'>; transactionId: Id<'transac
 		'transactions:create': entry,
 		'transactions:update': { transactionId, ...entry },
 		'transactions:remove': { transactionId },
-		'transactions:setCleared': { transactionId, cleared: true }
+		'transactions:setCleared': { transactionId, cleared: true },
+		'categories:list': {},
+		'categories:createGroup': { name: 'Bills' },
+		'categories:create': { groupId, name: 'Rent' },
+		'budget:month': { month: '2026-08', today: '2026-08-14' },
+		'budget:setAssigned': { month: '2026-08', categoryId, amount: 500 }
 	};
 	return args;
 }
@@ -97,7 +107,18 @@ describe('the owner guard', () => {
 				amount: 0,
 				cleared: 'uncleared'
 			});
-			return { accountId, transactionId };
+			const groupId = await ctx.db.insert('categoryGroups', {
+				name: 'Bills',
+				position: 0,
+				kind: 'normal'
+			});
+			const categoryId = await ctx.db.insert('categories', {
+				groupId,
+				name: 'Rent',
+				position: 0,
+				kind: 'normal'
+			});
+			return { accountId, transactionId, groupId, categoryId };
 		});
 		const sample = sampleArgs(ids);
 		const callers = {

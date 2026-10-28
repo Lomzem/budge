@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 
 import { mutation, query } from './_generated/server';
 import { requireCents, requireName } from './lib/input';
+import { ensureReadyToAssign } from './lib/categories';
 import { accountBalances } from './lib/monthlyTotals';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
@@ -49,6 +50,9 @@ export const create = mutation({
 			date: cutoverDate,
 			amount,
 			payee: 'Starting Balance',
+			// A Cash Account's starting balance is money to budget. A card's debt touches no
+			// Category (Credit Card Accounts arrive in full later), so it stays Uncategorized.
+			...(args.kind === 'cash' ? { categoryId: await ensureReadyToAssign(ctx) } : {}),
 			memo: ''
 		});
 		await insertTransaction(ctx, { ...fields, cleared: 'cleared' });

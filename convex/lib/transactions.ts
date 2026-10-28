@@ -13,6 +13,8 @@ export interface TransactionInput {
 	date: string;
 	amount: number;
 	payee: string;
+	/** Left out for Uncategorized. */
+	categoryId?: Id<'categories'> | undefined;
 	memo: string;
 }
 
@@ -26,6 +28,12 @@ export async function transactionFields(
 	if (input.date < (await requireCutoverDate(ctx))) {
 		throw publicError('INVALID_INPUT', 'Budge starts on the cutover date; pick a later date.');
 	}
+	if (
+		input.categoryId !== undefined &&
+		(await ctx.db.get('categories', input.categoryId)) === null
+	) {
+		throw publicError('NOT_FOUND');
+	}
 	const payeeId = await payeeNamed(ctx, input.payee);
 	const memo = input.memo.trim();
 	return {
@@ -33,6 +41,7 @@ export async function transactionFields(
 		date: input.date,
 		amount: requireCents(input.amount),
 		...(payeeId === undefined ? {} : { payeeId }),
+		...(input.categoryId === undefined ? {} : { categoryId: input.categoryId }),
 		...(memo === '' ? {} : { memo })
 	};
 }
