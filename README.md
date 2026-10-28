@@ -28,3 +28,39 @@ bunx convex run seed:run
 ```
 
 It refuses once any Account exists, and on a deployment where `BUDGE_PRODUCTION` is set.
+
+## Deployments
+
+Production is [budge.lomzem.dev](https://budge.lomzem.dev). Vercel deploys the
+SvelteKit frontend and Node 24 SSR. Its build command deploys Convex and injects
+the matching backend URL:
+
+```sh
+npx convex deploy --cmd 'bun run build' --cmd-url-env-var-name PUBLIC_CONVEX_URL --preview-run seed:run
+```
+
+Vercel Production uses a production Convex deploy key and Clerk production keys.
+Preview uses a separate preview deploy key and Clerk development keys. New Convex
+previews load synthetic Accounts and Transactions and expire after five days.
+Vercel Authentication protects preview URLs. Keep `BUDGE_PRODUCTION` absent from
+all non-production backends, including Preview defaults.
+
+Activate Clerk's Convex integration separately on Production and Development.
+The app uses the standard session token and requires its `aud: "convex"` claim.
+Cloning an instance does not activate that integration on the new instance.
+
+Check shared backend usage in the [Convex dashboard](https://dashboard.convex.dev/)
+under the team's Usage page. Production, cloud dev, and previews share its limits.
+Check hosting usage in the [Vercel dashboard](https://vercel.com/dashboard) under
+the team's Usage page, filtered to Budge. Review a preview's measured database
+I/O and storage against the current plan limits before completing ticket 04.
+The cloud dev deployment pauses after 1000 function calls per UTC day.
+
+The Vercel Ignored Build Step avoids full builds and Convex preview creation for
+changes limited to `.scratch/**`, `docs/**`, and Markdown files. It builds if the
+previous successful deployment's commit is unavailable. Canceled builds still
+count toward Vercel's deployment quotas and concurrent build slots.
+
+[Ticket 04](.scratch/v1/issues/04-production-and-preview-deployments.md) records
+setup evidence and remaining manual checks. Credentials belong in the provider
+dashboards and the password manager. Do not save them in the repository.
