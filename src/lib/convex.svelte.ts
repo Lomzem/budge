@@ -1,7 +1,7 @@
 import { setupAuth, setupConvex, type FetchAccessToken } from 'convex-svelte';
 import { useClerkContext } from 'svelte-clerk';
 
-import { env } from '$env/dynamic/public';
+import { PUBLIC_CONVEX_URL } from '$env/static/public';
 
 /**
  * Connects this page to Convex and authenticates it with the Clerk session token, which Clerk's
@@ -9,9 +9,9 @@ import { env } from '$env/dynamic/public';
  * `ClerkProvider`.
  */
 export function setupConvexWithClerk() {
-	const url = env.PUBLIC_CONVEX_URL;
-	if (!url) throw new Error('PUBLIC_CONVEX_URL is not set.');
-	setupConvex(url);
+	// Read at build time: `convex deploy` gives each deployment's URL only to the build it runs.
+	if (!PUBLIC_CONVEX_URL) throw new Error('PUBLIC_CONVEX_URL is not set.');
+	setupConvex(PUBLIC_CONVEX_URL);
 
 	const clerk = useClerkContext();
 	const sessionId = $derived(clerk.session?.id);

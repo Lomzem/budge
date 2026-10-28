@@ -18,6 +18,16 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'ssr',
+					environment: 'node',
+					include: ['src/ssr.test.ts'],
+					// Each suite starts the SvelteKit dev server.
+					testTimeout: 30_000,
+					hookTimeout: 60_000
+				}
+			},
+			{
+				test: {
 					name: 'convex',
 					environment: 'edge-runtime',
 					include: ['convex/**/*.test.ts'],
