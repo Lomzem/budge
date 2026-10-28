@@ -31,6 +31,7 @@ type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
   readonly BUDGE_OWNER_SUBJECT: string;
+  readonly BUDGE_PRODUCTION: string | undefined;
   readonly CLERK_JWT_ISSUER_DOMAIN: string;
 };
 

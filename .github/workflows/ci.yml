@@ -84,6 +84,9 @@ jobs:
           done
           cat convex.log
           exit 1
+      # Synthetic Accounts and Transactions for the smoke tests; never real data.
+      - name: Seed the local backend
+        run: bunx convex run seed:run
       - name: Playwright
         # The Clerk development instance and its one hand-made test user. Never production.
         env:
