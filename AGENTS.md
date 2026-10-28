@@ -21,6 +21,10 @@ Before triaging issues or changing their status, read `docs/agents/triage-labels
 
 Before exploring the codebase, read `docs/agents/domain.md` for the single-context glossary and ADR consumer rules.
 
+### Authentication
+
+Before changing Clerk setup, sign-in, or CI authentication, read `docs/agents/authentication.md`.
+
 ## Pull requests
 
 Every ticket from 02 onward is a branch and a PR into `main`, squash-merged once CodeRabbit approves. Docs, `.scratch/`, ticket 01 (the scaffold), and small fixes outside a ticket are committed straight to `main`. When unsure, open a PR.
@@ -30,3 +34,17 @@ Every ticket from 02 onward is a branch and a PR into `main`, squash-merged once
 1. Wait for CodeRabbit's review. A rate-limit or "review skipped" message is neither a review nor an approval: wait out the window, then comment `@coderabbitai review`.
 2. Address every CodeRabbit comment with a fix or a reply, and push.
 3. Merge only when CodeRabbit has approved the latest commit and CI is green.
+
+<!-- convex-ai-start -->
+
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read
+`convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
+
+<!-- convex-ai-end -->

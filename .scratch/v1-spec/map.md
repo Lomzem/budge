@@ -6,6 +6,15 @@ Labels: wayfinder:map
 
 A build-ready v1 spec for Budge: scope, budget rules, sync approach, data model, stack, and UI rules all decided, so implementation (`/to-spec` → `/to-tickets`) starts with no open questions. The map stops before implementation.
 
+## Current progress
+
+Planning is complete: the [v1 spec](spec.md) and [23 implementation tickets](../v1/issues/) are written. This map records planning decisions; implementation progress lives in those tickets.
+
+- 01 — Scaffold: done.
+- 02 — Signed-in owner shell: done, merged in [PR #1](https://github.com/Lomzem/budge/pull/1). Local owner sign-in was confirmed; CI passed and CodeRabbit approved the final revision.
+- **Next: [03 — Manual Accounts and Transactions](../v1/issues/03-manual-accounts-and-transactions.md)**, implemented by Opus under the repository's model ownership rules.
+- After 03: [04 — Production and preview deployments](../v1/issues/04-production-and-preview-deployments.md) covers owner setup, and [05 — Budget screen](../v1/issues/05-budget-screen.md) builds the budgeting workflow. Production go-live and real-iPhone validation remain in ticket 23.
+
 ## Notes
 
 - **Domain**: a personal, single-user, YNAB-style zero-based budget. Use the vocabulary in `GLOSSARY.md` (Ready to Assign, Assigned, Activity, Available, Target, Payee, etc.).
@@ -45,13 +54,13 @@ A build-ready v1 spec for Budge: scope, budget rules, sync approach, data model,
 - [What does the budget screen look like on desktop and phone?](issues/09-budget-screen.md): variant A, the YNAB layout: an Account sidebar, a grouped budget table with inline Assigned and Target progress under each Category, and an inspector column with the selected Category and the Upcoming list; on a phone, a View menu and inline Category details.
 - [Where does Effect go in Budge?](issues/14-effect-boundaries.md): Effect for actions, Plaid and file decoding, retries, and typed errors behind plain Convex exports and `v.*` (Confect deferred, ADR 0001); budget math, queries, SvelteKit server code, and components stay plain; shared UI state in context-provided `.svelte.ts` classes; fixed public `ConvexError` codes.
 - [How is the repo set up?](issues/10-repo-setup.md): one Bun package with pure domain code in `src/lib/domain/`; strict TS, ESLint, `@shadcn/lint`, Prettier; lefthook staged checks pre-commit, typecheck and tests pre-push; PR-only `main` with CI and CodeRabbit (rate limits are not approval); local Convex for dev, agents, and CI, never prod; Plaid Sandbox outside prod; secrets only in Convex and Vercel env; gitleaks plus push protection; synthetic fixtures only.
-- [Which domain does Budge run on?](issues/12-domain.md): Clerk production at `budge.lomzem.dev` (Cloudflare DNS-only records); Clerk development instance for local, CI, and previews; GitHub-only sign-in, Invite-only, `requireOwner` on the Clerk user ID so the sign-in method stays reversible; free fixed 7-day sessions, no Clerk Pro; preview deployments with Convex previews, synthetic seed, and Plaid Sandbox, as long as they stay within the free tiers (database I/O handed to the data model).
+- [Which domain does Budge run on?](issues/12-domain.md): Clerk production at `budge.lomzem.dev` (Cloudflare DNS-only records); Clerk development instance for local, CI, and previews; GitHub and email verification code sign-in, Invite-only, `requireOwner` on the Clerk user ID so the sign-in method stays reversible; free fixed 7-day sessions, no Clerk Pro; preview deployments with Convex previews, synthetic seed, and Plaid Sandbox, as long as they stay within the free tiers (database I/O handed to the data model).
 - [How often does sync run, and what happens when a Bank Connection breaks?](issues/15-sync-schedule.md): Plaid webhook plus a daily cron backup plus Sync now (with Refresh); a per-Bank Connection "Synced …" line with a 48-hour warning; in-app reconnect notice only, no email or push; renewal through Link update mode, 14 days early; Budge never creates or deletes Items (setup script loads the one token); unknown Plaid Accounts are held until mapped; Trial has no stated end and existing Items have uncapped calls.
 - [What does the data model look like in Convex?](issues/11-data-model.md): whole-cent `v.number()` and ISO date strings; Transactions with inline Category, split lines in their own table, Transfers as linked pairs; Ready to Assign as a system Category; Bank Rows hold what the bank reported, apart from Transactions; provider-neutral Bank Connections with a tagged `provider` field and a `connectionAccounts` mapping; a rebuildable `monthlyTotals` cache (ADR 0002) keeps database I/O near 340 MB a month in year 5; synthetic `seed:run`.
 
 ## Not yet specified
 
-Nothing left: every area is decided or ruled out. Next step: `/to-spec`.
+Nothing left: every area is decided or ruled out. Spec and implementation tickets are written; continue with ticket 03 above.
 
 
 ## Out of scope

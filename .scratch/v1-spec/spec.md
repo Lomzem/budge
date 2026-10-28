@@ -24,7 +24,7 @@ Budge is a personal, single-user, YNAB-style budget web app that runs at `budge.
 - **Bank sync**: Plaid's free Trial plan syncs Capital One checking, savings, and the Discover card through one Bank Connection. Imported Transactions count at once and arrive Unapproved and Cleared. One matcher links Bank Rows to Transactions I entered by hand.
 - **File import**: Capital One CSV and QFX, and Discover CSV, as a fallback.
 - **Upkeep**: Reconciliation, Category management, move money, Payee memory, and a full CSV/JSON export.
-- **Access**: only I can sign in, using GitHub. Every backend function checks that the caller is the owner.
+- **Access**: only I can sign in, using GitHub or an email verification code. Every backend function checks that the caller is the owner.
 
 Development, CI, and previews stay inside the free tiers of Convex, Clerk, Vercel, Plaid, GitHub, and CodeRabbit. Automated tests never touch a cloud backend or a real bank.
 
@@ -32,8 +32,8 @@ Development, CI, and previews stay inside the free tiers of Convex, Clerk, Verce
 
 ### Access and security
 
-1. As the owner, I want to sign in with my GitHub account, so that I don't manage another password and my GitHub 2FA protects my budget.
-2. As the owner, I want sign-up closed (Invite-only, with only my GitHub email invited), so that nobody else can create an account.
+1. As the owner, I want to sign in with GitHub or an email verification code, so that I can use either method without managing another password.
+2. As the owner, I want sign-up closed (Invite-only, with only my verified email invited), so that nobody else can create an account.
 3. As the owner, I want every backend function to reject any caller who isn't me, so that even a valid Clerk session for another user can't read or change my budget.
 4. As the owner, I want my session to last Clerk's free 7 days and re-sign-in to be one tap, so that I stay secure without paying for Clerk Pro.
 5. As the owner, I want Bank Connection tokens encrypted at rest, so that a database copy or export can't be used to read my bank.
@@ -339,13 +339,13 @@ Built as decided in [What does the data model look like in Convex?](issues/11-da
 
 ### Environments, deployment, and free-tier limits
 
-- **Deployments**: production is `budge.lomzem.dev`, with production Convex, a Clerk production instance (GitHub OAuth through the owner's own OAuth app, Invite-only), and Plaid Trial. Everything else pairs a Convex deployment with the Clerk development instance and Plaid Sandbox. (10, 12)
+- **Deployments**: production is `budge.lomzem.dev`, with production Convex, a Clerk production instance (GitHub OAuth through the owner's own OAuth app, email verification codes, Invite-only), and Plaid Trial. Everything else pairs a Convex deployment with the Clerk development instance and Plaid Sandbox. (10, 12)
 - **Quota and secrets**: Convex's free tier allows 1M function calls a month, 0.5 GB of storage, 1 GB of database I/O a month, and 40 deployments. Production, the cloud dev deployment, and previews share that quota, and writes fail once a limit is hit. Database I/O is the limit at risk; the design estimate is about 70 MB a month in year 1 and about 340 MB in year 5. (11, 12) Secrets live only in Convex env and Vercel env, and the repo holds a names-only `.env.example`. (10)
 - **Free-tier rules for development and testing** (the owner's requirement; items marked *new* are decided here):
   - Every automated test (Vitest and Playwright, locally and in CI) runs against the in-memory `convex-test` or a Convex **local deployment**, whose function calls and bandwidth don't count against plan quotas. No hook, CI job, or agent session targets a cloud deployment, and production is never a test target. (10)
   - The cloud dev deployment is used only for Plaid Sandbox webhooks and real-iPhone checks, and has a daily function-call usage limit set in the Convex dashboard that pauses it. (10)
   - No automated test makes a network call to Plaid. Effect workflows use the `PlaidClient` test layer, and Convex tests replace the action's layers the same way. Manual Sandbox checks use the cloud dev deployment. Production Plaid Items are never created by the app or by tests. (14, 15, 10)
-  - Playwright signs in with `@clerk/testing` as one test user created once by hand on the Clerk development instance. Tests never sign up users or create Clerk users. *(new)*
+  - Playwright signs in with `@clerk/testing` as one test user created once by hand on the Clerk development instance. Keep Email enabled and choose an invented email for that user, saved as `E2E_CLERK_USER_EMAIL`. The backend sign-in token needs no mailbox or password. Tests never sign up users or create Clerk users. *(new)*
   - Preview deployments are allowed only while they stay within the free tiers, and can be turned off without app changes. Each one loads the roughly 100 KB synthetic seed through `--preview-run` and is deleted after 5 days. A Vercel Ignored Build Step skips builds, and so skips creating a Convex preview deployment, when a push changes only `.scratch/**`, `docs/**`, or Markdown files. This protects Vercel Hobby's 100 deployments a day and one concurrent build, and Convex's 40 deployments. *(new: the ignored build step)* (12)
   - `seed:run` refuses to run when any Account exists or when the production flag is set. It creates a Sandbox-kind Bank Connection with no token. The daily cron and the webhook return at once for a Bank Connection with no token, so previews and local backends never call Plaid. *(new: the cron's early return)* (11)
   - Playwright runs only in CI, once per push, never in a git hook. It runs a few smoke tests against the seeded local backend. GitHub Actions minutes are free for this public repo on standard runners. (10)
@@ -391,7 +391,7 @@ Set up as decided in [How is the repo set up?](issues/10-repo-setup.md):
 - **No other seams**: no component unit tests, and no tests of per-table helpers or private functions.
 - **Free-tier guardrails in tests**: none of the four seams talks to a cloud Convex deployment, Plaid's network, or Clerk user creation. A test that needs any of them is wrong by design.
 - **Prior art**: none in the repo yet, since this is a new codebase. Follow `convex-test`'s documented `t.withIdentity` and `t.run` patterns, and `@effect/vitest`'s `it.effect` with `Layer` test doubles. The first tests written at each seam become the prior art for the rest.
-- **Manual checks before launch** (not automated): on a real iPhone against production, check Home Screen install, GitHub sign-in inside the Home Screen app, weekly re-sign-in, and token refresh after time in the background. Also run one Plaid Sandbox webhook round-trip on the cloud dev deployment. (04, 12)
+- **Manual checks before launch** (not automated): on a real iPhone against production, check Home Screen install, GitHub and email sign-in inside the Home Screen app, weekly re-sign-in, and token refresh after time in the background. Also run one Plaid Sandbox webhook round-trip on the cloud dev deployment. (04, 12)
 
 ## Out of Scope
 

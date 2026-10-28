@@ -12,7 +12,7 @@
 - [ ] Map the checking, savings, and Discover Credit Card Accounts. Confirm each suggested starting balance. Sync, and check that pending and pre-cutover rows are absent.
 - [ ] Real-iPhone checks against `budge.lomzem.dev`:
   - Add to Home Screen opens standalone.
-  - GitHub sign-in works inside the Home Screen app.
+  - GitHub and email sign-in work inside the Home Screen app.
   - Live data shows after the app returns from the background.
   - Re-sign-in works after the 7-day session ends.
   - Safe areas and the status bar look right in dark and light themes.
