@@ -338,3 +338,11 @@ the PR remains a draft while the docs-only skip proof is prepared.
 
 This documentation-only commit is the test push for the Ignored Build Step.
 Its result must be checked in Vercel before that checklist item is closed.
+
+The first docs-only test, `b3c076f`, built in 24 seconds instead of skipping.
+Vercel still had Automatic selected: the earlier save had not persisted. Saved
+the Custom ignored-build command with a browser click and checked the setting
+after reload. This follow-up docs-only push tests the persisted setting.
+After the owner preview visit, the usage API reported 7 function calls and
+0.00007895566523075104 GB database I/O for the current UTC day and month;
+`seedStatus` remained `partial`.
