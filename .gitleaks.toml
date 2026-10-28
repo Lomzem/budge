@@ -1,0 +1,24 @@
+# gitleaks: the default rules plus Budge's own secrets.
+# Runs in pre-commit (`gitleaks git --staged`) and in CI (gitleaks Action).
+# Test data never uses real-looking tokens or IDs; prefer obvious placeholders such as "item-synthetic-1".
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "budge-plaid-access-token"
+description = "Plaid access token. The default rule only finds it next to the word 'plaid'; this one finds it anywhere."
+regex = '''\b(access-(?:sandbox|development|production)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b'''
+keywords = ["access-sandbox-", "access-development-", "access-production-"]
+
+[[rules]]
+id = "budge-plaid-item-id"
+description = "Plaid Item ID assigned to an item_id or itemId field."
+regex = '''(?i)\bitem_?id["']?\s*(?::|=|=>)\s*["'`]([A-Za-z0-9]{30,40})["'`]'''
+keywords = ["item_id", "itemid"]
+
+[[rules]]
+id = "budge-clerk-secret-key"
+description = "Clerk secret key."
+regex = '''\b(sk_(?:test|live)_[A-Za-z0-9]{20,})\b'''
+keywords = ["sk_test_", "sk_live_"]

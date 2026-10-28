@@ -1,0 +1,47 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+	"timezone": "America/Los_Angeles",
+	"schedule": ["before 6am on monday"],
+	"automerge": false,
+	"rangeStrategy": "pin",
+	"lockFileMaintenance": {
+		"enabled": true,
+		"schedule": ["before 6am on monday"]
+	},
+	"packageRules": [
+		{
+			"description": "Group minor and patch updates; majors stay separate.",
+			"matchUpdateTypes": ["minor", "patch"],
+			"groupName": "non-major dependencies"
+		},
+		{
+			"description": "effect and @effect/vitest move together on the same exact version.",
+			"matchPackageNames": ["effect", "@effect/**"],
+			"groupName": "Effect"
+		},
+		{
+			"matchPackageNames": ["convex", "convex-test", "@convex-dev/**"],
+			"groupName": "Convex"
+		},
+		{
+			"matchManagers": ["github-actions"],
+			"groupName": "GitHub Actions"
+		},
+		{
+			"description": "svelte-clerk supports SvelteKit 2 only.",
+			"matchPackageNames": ["@sveltejs/kit"],
+			"allowedVersions": "<3"
+		},
+		{
+			"description": "adapter-vercel 7 requires SvelteKit 3.",
+			"matchPackageNames": ["@sveltejs/adapter-vercel"],
+			"allowedVersions": "<7"
+		},
+		{
+			"description": "typescript-eslint, svelte-check, and SvelteKit 2 support TypeScript up to 6.0. The Convex typecheck uses @effect/tsgo's own TypeScript 7.",
+			"matchPackageNames": ["typescript"],
+			"allowedVersions": "<6.1"
+		}
+	]
+}

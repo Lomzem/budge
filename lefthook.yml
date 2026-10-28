@@ -1,0 +1,42 @@
+# Git hooks: https://lefthook.dev/configuration/
+# `bun install` runs `lefthook install`. gitleaks is a system binary, not an npm package.
+# Playwright never runs in a hook; it runs in CI.
+
+glob_matcher: doublestar
+
+pre-commit:
+  # gitleaks runs last, so it scans the index after the fixers have re-staged their files.
+  piped: true
+  jobs:
+    - name: lint
+      group:
+        parallel: true
+        jobs:
+          # Prettier and ESLint both rewrite staged files, so they run one after the other.
+          - name: format and lint
+            group:
+              piped: true
+              jobs:
+                - name: prettier
+                  glob: '**/*'
+                  run: bunx prettier --write --ignore-unknown {staged_files}
+                  stage_fixed: true
+                - name: eslint
+                  glob: '**/*.{js,ts,svelte}'
+                  run: bunx eslint --fix --no-warn-ignored --max-warnings 0 {staged_files}
+                  stage_fixed: true
+
+          - name: shadcn-lint
+            glob: '**/*.svelte'
+            run: bunx eslint --config eslint.ui.config.js --no-warn-ignored --max-warnings 0 {staged_files}
+
+    - name: gitleaks
+      run: gitleaks git --staged --redact --no-banner
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: typecheck
+      run: bun run typecheck
+    - name: test
+      run: bun run test

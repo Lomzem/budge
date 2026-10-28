@@ -1,0 +1,33 @@
+{
+	/* Typecheck for Convex functions and the pure domain module. Run through `effect-tsgo tsc` so Effect diagnostics fail the check. */
+	"compilerOptions": {
+		"target": "ESNext",
+		"lib": ["ES2023", "dom"],
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"jsx": "react-jsx",
+		"isolatedModules": true,
+		"allowSyntheticDefaultImports": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"types": ["vite/client"],
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"noImplicitOverride": true,
+		"plugins": [
+			{
+				"name": "@effect/language-service",
+				"diagnosticSeverity": { "floatingEffect": "error" },
+				"overrides": [
+					{
+						"include": ["**/*.test.ts", "../src/**/*.test.ts"],
+						"options": { "diagnosticSeverity": { "unstableApiUsage": "off" } }
+					}
+				]
+			}
+		]
+	},
+	"include": ["./**/*", "../src/lib/domain/**/*"],
+	"exclude": ["./_generated"]
+}

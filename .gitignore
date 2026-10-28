@@ -11,3 +11,41 @@
 /.worktrees/
 
 # .scratch/ holds the local issue tracker and stays versioned.
+
+# Dependencies and build output
+node_modules/
+/.svelte-kit/
+/build/
+/.vercel/
+/.output/
+vite.config.*.timestamp-*
+vitest.config.*.timestamp-*
+
+# Test output
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+
+# Secrets: every env file except the names-only template
+.env*
+!.env.example
+
+# Convex local deployment state
+.convex/
+
+# Bank data: real exports and captures never enter the repo.
+# Hand-written synthetic fixtures are the only exception.
+*.[cC][sS][vV]
+*.[qQ][fF][xX]
+*.[oO][fF][xX]
+*.[qQ][iI][fF]
+captures/
+!src/**/fixtures/synthetic/**/*.[cC][sS][vV]
+!src/**/fixtures/synthetic/**/*.[qQ][fF][xX]
+!src/**/fixtures/synthetic/**/*.[oO][fF][xX]
+!src/**/fixtures/synthetic/**/*.[qQ][iI][fF]

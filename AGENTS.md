@@ -20,3 +20,13 @@ Before triaging issues or changing their status, read `docs/agents/triage-labels
 ### Domain docs
 
 Before exploring the codebase, read `docs/agents/domain.md` for the single-context glossary and ADR consumer rules.
+
+## Pull requests
+
+Every ticket from 02 onward is a branch and a PR into `main`, squash-merged once CodeRabbit approves. Docs, `.scratch/`, ticket 01 (the scaffold), and small fixes outside a ticket are committed straight to `main`. When unsure, open a PR.
+
+`main` has no branch protection, so this merge rule is the gate:
+
+1. Wait for CodeRabbit's review. A rate-limit or "review skipped" message is neither a review nor an approval: wait out the window, then comment `@coderabbitai review`.
+2. Address every CodeRabbit comment with a fix or a reply, and push.
+3. Merge only when CodeRabbit has approved the latest commit and CI is green.

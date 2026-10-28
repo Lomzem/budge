@@ -1,0 +1,13 @@
+# Package manager files
+bun.lock
+
+# Generated
+/.svelte-kit/
+/build/
+/.vercel/
+/convex/_generated/
+/test-results/
+/playwright-report/
+
+# The local issue tracker: prose kept as written
+/.scratch/

@@ -360,9 +360,9 @@ Set up as decided in [How is the repo set up?](issues/10-repo-setup.md):
 - **Lint**: strict TypeScript flags, and ESLint `strictTypeChecked` plus Svelte, Convex, and domain-purity rules. `@shadcn/lint` runs as `bun run lint:ui`.
 - **Format**: Prettier with the Svelte and Tailwind plugins.
 - **lefthook**: pre-commit runs Prettier, ESLint, `@shadcn/lint`, and `gitleaks git --staged`; pre-push runs the full typecheck (with `@effect/language-service` diagnostics) and `bun run test`.
-- **Branches and CI**: PRs only into a protected `main`, with one CI workflow and squash merges. CodeRabbit is configured in `.coderabbit.yaml`, and Renovate runs weekly with grouped updates and no auto-merge.
+- **Branches and CI**: every ticket from 02 onward is a branch and a PR into `main`, reviewed by CodeRabbit and squash-merged. Everything else (docs, `.scratch/`, ticket 01, small fixes outside a ticket) is committed straight to `main`; when unsure, open a PR. `main` has no branch protection, so the rule lives in `AGENTS.md`. One CI workflow runs on every PR and every push to `main`. CodeRabbit is configured in `.coderabbit.yaml` and skips Renovate's PRs, and Renovate runs weekly with grouped updates and no auto-merge.
 - **Secrets and data**: gitleaks has custom rules for Plaid and Clerk secrets, and GitHub push protection is on. Bank export file types are gitignored except synthetic fixtures.
-- **Scaffolding** adds a "Pull requests" section to `AGENTS.md` with the CodeRabbit merge rule.
+- **Scaffolding** adds a "Pull requests" section to `AGENTS.md` with the PR rule and the CodeRabbit merge rule.
 
 ## Testing Decisions
 

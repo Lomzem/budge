@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit reviews every ticket PR. The merge rule lives in AGENTS.md ("Pull requests").
+language: en-US
+
+reviews:
+  profile: assertive
+  # Request changes for blocking findings, and approve once they are resolved.
+  # (Replaces the deprecated `request_changes_workflow: true`.)
+  auto_approvals:
+    enabled: true
+    # An author's `@coderabbitai approve` must not stand in for a review.
+    allow_author_approval: false
+  auto_review:
+    enabled: true
+    drafts: false
+    # Dependency bumps are checked by CI; skipping them saves the free plan's rate limit.
+    ignore_usernames:
+      - renovate[bot]
+  path_filters:
+    - '!bun.lock'
+    - '!convex/_generated/**'
+  path_instructions:
+    - path: '**'
+      instructions: |
+        This repo is public. Flag any real-looking financial data anywhere in the diff:
+        real merchant or payee names, real-looking balances or amounts copied from a bank,
+        personal names, account or routing numbers, Plaid access tokens, Item IDs, or account IDs,
+        and Clerk secret keys. Test data must use invented payees and amounts.
+        Follow AGENTS.md, and use the vocabulary defined in GLOSSARY.md for domain concepts.
+    - path: 'src/**/*.svelte'
+      instructions: |
+        Check the UI rules in the "UI rules" note of .scratch/v1-spec/map.md and the UI section of
+        .scratch/v1-spec/spec.md: shadcn-svelte components and semantic HTML; no badges, pills, or
+        taglines; cards only for items compared side by side; theme color tokens; WCAG 2.2 AA in
+        dark and light themes; a visible label and keyboard path for every control; responsive
+        from 320 px. Shared UI state lives in context-provided classes in .svelte.ts modules, never
+        in module-level $state, and no Effect runs in components.
+    - path: '.scratch/**'
+      instructions: |
+        These are planning documents: the spec, tickets, and decisions. Review them lightly as
+        prose. Comment only on contradictions with other documents, broken links, or real-looking
+        financial data. Skip style and wording nitpicks.
