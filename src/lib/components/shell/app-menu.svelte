@@ -29,7 +29,7 @@
 		{#snippet child({ props })}
 			{#if wide}
 				<button
-					class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none aria-expanded:bg-sidebar-accent"
+					class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none aria-expanded:bg-sidebar-accent"
 					{...props}
 				>
 					<MenuIcon aria-hidden="true" class="size-4" />

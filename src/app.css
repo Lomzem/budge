@@ -139,7 +139,8 @@
 
 @layer base {
 	* {
-		@apply border-border outline-ring/50;
+		/* Native focus outlines need 3:1 contrast (WCAG 1.4.11). */
+		@apply border-border outline-ring;
 	}
 	body {
 		@apply flex min-h-svh flex-col bg-background text-foreground;
