@@ -107,11 +107,11 @@ GitHub sign-in provided access to Convex, Clerk, Vercel, and Cloudflare.
   instance. Production instance ID is `ins_3LKrsAi9IwQGvnulXXAxthRWaPR` under
   app `app_3LIk0flxSb9SMx5gSOESSvxnxV4`. Clerk uses `lomzem.dev` as its primary
   domain. The production Frontend API is `https://clerk.lomzem.dev`.
-- Created Vercel project `lawjay-lees-projects/budge`, linked to `Lomzem/budge`
+- Created Vercel project `budge`, linked to `Lomzem/budge`
   on Hobby. Project ID is `prj_XDXCv15q8jjAiHxCBGRC35So9wf5`. No deployment yet.
   Added `budge.lomzem.dev` as its Production domain.
 - Created Convex production deployment `scrupulous-fox-38` in US East under
-  team `lawjaylee1`, project slug `budge`. URL is
+  the owner's team, project slug `budge`. URL is
   `https://scrupulous-fox-38.convex.cloud`. Left the older `budge-488ea` project
   unchanged. No application code deployed yet.
 - Imported six CNAME records into Cloudflare for `lomzem.dev`, all DNS-only.
@@ -156,7 +156,7 @@ from the actual dashboard state. Do not treat this progress note as completion.
 - Convex Preview defaults now have owner the development owner ID in ignored local state
   and issuer `https://vocal-goldfish-7280.clerk.accounts.dev`. No production flag
   is set in the Preview defaults. Plaid and token-key defaults remain unset.
-- Created cloud dev reference `lawjaylee1:budge:dev/webhooks`, deployment name
+- Created cloud dev reference `<team>:budge:dev/webhooks`, deployment name
   `trustworthy-falcon-764`, URL `https://trustworthy-falcon-764.convex.cloud`.
   Its Development owner and issuer match the Preview defaults. An active daily
   Function calls disable limit of 1000 was set and verified with the CLI.
@@ -210,7 +210,7 @@ CLI authentication. Saved each as Secret `CONVEX_DEPLOY_KEY` in Vercel:
 - `vercel-budge-production-2026-10-28` targets `scrupulous-fox-38`, allows only
   `deployment:deploy`, and is scoped to Vercel Production only.
 - `vercel-budge-preview-2026-10-28` targets project `3304592`, team
-  `lawjaylee1`, slug `budge`, and is scoped to Vercel Preview only.
+  the owner's team, slug `budge`, and is scoped to Vercel Preview only.
 
 Vercel initially refused Secret values until a first deployment existed. Used
 Deployments, Actions, Create Deployment to start an initial build of `main`,
@@ -325,8 +325,8 @@ build and the owner's remaining manual access checks are still pending.
 ### Repaired preview verified, 2026-10-28
 
 Commit `6d22b2f` deployed successfully as Vercel deployment
-`FrFSFTmwWJuN9QyVVZnrES3UcM5f`:
-https://budge-b1y61dt2y-lawjay-lees-projects.vercel.app.
+`FrFSFTmwWJuN9QyVVZnrES3UcM5f`. Its exact preview URL is in the ignored local
+deployment record.
 The owner signed in with GitHub and reached the seeded Budget screen with
 Checking, Savings, and Card accounts. A same-origin page request returned HTTP
 200 and `Cache-Control: private, no-store`. The existing Convex branch preview
@@ -377,3 +377,12 @@ shared Convex team's existing October data-egress overage. The owner has not
 reported those access checks as complete. Dashboard authentication does not
 prove application sign-in. Keep the ticket ready-for-human until these remaining
 requirements are resolved.
+
+### Review corrections, 2026-10-28
+
+Removed personal-looking provider team namespaces from this public task record.
+Exact provider references and the verified preview URL remain in ignored
+`.env.deployments.local`. Public deployment IDs still identify the evidence.
+Clarified `.env.example`: the deploy command supplies `PUBLIC_CONVEX_URL` during
+the build, so Vercel does not require a separate variable. The earlier Production
+variable remains a recorded setup fact. No provider configuration changed.
