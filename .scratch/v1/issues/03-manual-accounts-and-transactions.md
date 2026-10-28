@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (Signed-in owner shell)
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** [Budge v1](../../v1-spec/spec.md): stories 9–11, 16–17, 49–52, 64–65, 70, 128, 137–138; Convex data model; ADR 0002
 
@@ -19,7 +19,7 @@
 
 ## Comments
 
-- Implemented on branch `03-manual-accounts-and-transactions`, not yet opened as a PR. The status stays `ready-for-agent` until the PR merges; then it becomes `done`.
+- Implemented on branch `03-manual-accounts-and-transactions`.
 - Decisions:
   - Fields arrive with the tickets that use them. Category, split, approved, search text, transfer link, and last reconciled date are not in the schema yet.
   - A Transaction can't be dated before the cutover date, and the cutover date can't move later than the earliest Transaction.
@@ -32,4 +32,4 @@
 - Code review (GPT-6.1-Sol, standards and spec):
   - Fixed: `seed:run` now also refuses once a cutover date is set (it used to add a second settings row). Amounts are capped at $10 billion, so monthly totals stay exact. Live Account updates no longer reset an open Transaction form. The mobile View menu gained Add Account. The Cash/Credit grouping moved into `Accounts.groups`.
   - Deferred: `accountBalances` reads every `monthlyTotals` row, and `monthlyTotals:rebuild` runs as one mutation. Both are sized by Accounts × months (ADR 0002) and fit v1. If history outgrows one transaction, batch the rebuild with scheduled continuations.
-- Remaining: PR, CodeRabbit, and CI under the merge rule.
+- Shipped in https://github.com/Lomzem/budge/pull/2, squash-merged to `main` as 0ec99ab. CodeRabbit approved head f5c115e, and all four checks (checks, e2e, gitleaks, CodeRabbit) passed. CodeRabbit raised 6 findings in total: 3 fixed (seed LCG overflow, invented payee names, checkbox binding), 1 partly fixed (an empty `BUDGE_PRODUCTION` now also counts as production), and 2 declined with reasons it accepted (the `$effect` dialog reset; keeping signed negation for a card's amount owed, so a negative entry records a credit).
