@@ -26,6 +26,8 @@ export default defineConfig(
 		'build/',
 		'.vercel/',
 		'convex/_generated/',
+		// shadcn-svelte's generated components; svelte-check still typechecks them.
+		'src/lib/components/ui/',
 		'test-results/',
 		'playwright-report/'
 	]),

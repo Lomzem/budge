@@ -9,6 +9,7 @@ const config = {
 	},
 	kit: {
 		adapter: adapter({ runtime: 'nodejs24.x' }),
+		alias: { $convex: 'convex' },
 		typescript: {
 			// Typecheck the Playwright config and suite with the app.
 			config: (tsconfig) => {
