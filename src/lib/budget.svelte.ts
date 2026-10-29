@@ -1,4 +1,4 @@
-import type { FunctionReturnType } from 'convex/server';
+import type { FunctionArgs, FunctionReturnType } from 'convex/server';
 import { useMutation, useQuery, type UseQueryReturn } from 'convex-svelte';
 import { createContext } from 'svelte';
 
@@ -21,6 +21,8 @@ export class BudgetMonth {
 	readonly #setAssigned = useMutation(api.budget.setAssigned);
 	readonly #moveMoney = useMutation(api.budget.moveMoney);
 	readonly #cover = useMutation(api.budget.cover);
+	readonly #assignTarget = useMutation(api.budget.assignTarget);
+	readonly #setTarget = useMutation(api.categories.setTarget);
 	/** The selected month's budget, once it has loaded. */
 	readonly view: BudgetView | undefined = $derived.by(() => {
 		const data = this.#query.data;
@@ -87,6 +89,19 @@ export class BudgetMonth {
 	/** Covers an overspent Category in the selected month from Ready to Assign. */
 	async cover(categoryId: Id<'categories'>) {
 		await this.#cover({ month: this.month, categoryId });
+	}
+
+	/** "Assign $X": assigns what a Category's Target still needs in the selected month. */
+	async assignTarget(categoryId: Id<'categories'>) {
+		await this.#assignTarget({ month: this.month, categoryId });
+	}
+
+	/** Sets or replaces a Category's Target, or clears it with `null`. */
+	async setTarget(
+		categoryId: Id<'categories'>,
+		target: FunctionArgs<typeof api.categories.setTarget>['target']
+	) {
+		await this.#setTarget({ categoryId, target });
 	}
 }
 

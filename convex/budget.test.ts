@@ -78,7 +78,8 @@ describe('the budget query', () => {
 							assigned: 30_000,
 							activity: 2_000,
 							available: 22_000,
-							status: 'funded'
+							status: 'funded',
+							target: null
 						},
 						{
 							id: b.rent,
@@ -87,13 +88,15 @@ describe('the budget query', () => {
 							assigned: 0,
 							activity: 0,
 							available: 0,
-							status: 'empty'
+							status: 'empty',
+							target: null
 						}
 					]
 				}
 			],
 			hidden: [],
-			overspent: []
+			overspent: [],
+			upcoming: []
 		});
 		expect((await b.view('2026-09')).overspent).toEqual([
 			{ id: b.groceries, name: 'Groceries', available: -10_000 }
@@ -242,6 +245,72 @@ describe('Cover', () => {
 				b.owner.mutation(api.budget.cover, { month: '2026-10', categoryId: b.readyToAssignId })
 			)
 		).toBe('INVALID_INPUT');
+	});
+});
+
+describe('Targets', () => {
+	test('"Assign $X" assigns what the Target still needs, so it reads Funded', async () => {
+		const b = await budgetWithCategories();
+		await b.assign('2026-09', b.groceries, 15_000);
+		await b.spend('2026-09-20', -5_000, b.groceries);
+		await b.owner.mutation(api.categories.setTarget, {
+			categoryId: b.groceries,
+			target: { kind: 'monthly', amount: 40_000, mode: 'refill', dueDay: 20 }
+		});
+		const before = await b.view('2026-10');
+		expect(before.groups[0]?.categories[0]).toMatchObject({
+			name: 'Groceries',
+			status: 'underfunded',
+			target: { needed: 30_000 }
+		});
+		expect(before.upcoming).toEqual([
+			{ id: b.groceries, name: 'Groceries', dueDate: '2026-10-20', amount: 40_000, funded: false }
+		]);
+
+		const assigned = await b.owner.mutation(api.budget.assignTarget, {
+			month: '2026-10',
+			categoryId: b.groceries
+		});
+
+		const after = await b.view('2026-10');
+		expect(assigned).toBe(30_000);
+		expect(after.groups[0]?.categories[0]).toMatchObject({
+			assigned: 30_000,
+			available: 40_000,
+			status: 'funded',
+			target: { needed: 0, progress: 1 }
+		});
+		expect(after.upcoming).toMatchObject([{ id: b.groceries, funded: true }]);
+		expect(after.readyToAssign.amount).toBe(before.readyToAssign.amount - 30_000);
+		// Nothing is left to assign.
+		expect(
+			await b.owner.mutation(api.budget.assignTarget, { month: '2026-10', categoryId: b.groceries })
+		).toBe(0);
+	});
+
+	test('a repeating By date Target rolls to its next date only after its due month ends', async () => {
+		const b = await budgetWithCategories();
+		await b.owner.mutation(api.categories.setTarget, {
+			categoryId: b.rent,
+			target: { kind: 'byDate', amount: 12_000, firstDate: '2026-11-03', everyMonths: 3 }
+		});
+		for (const month of ['2026-10', '2026-11']) {
+			await b.owner.mutation(api.budget.assignTarget, { month, categoryId: b.rent });
+		}
+		await b.spend('2026-11-03', -12_000, b.rent);
+
+		const rentIn = async (month: string) =>
+			(await b.view(month, '2026-11-25')).groups[0]?.categories[1];
+		// Late in November the date has passed, but November is still its due month.
+		expect(await rentIn('2026-11')).toMatchObject({
+			name: 'Rent',
+			assigned: 6_000,
+			target: { dueDate: '2026-11-03', needed: 0 }
+		});
+		// December through February saves for the next date: $120 ÷ 3.
+		expect(await rentIn('2026-12')).toMatchObject({
+			target: { dueDate: '2027-02-03', needed: 4_000 }
+		});
 	});
 });
 

@@ -12,6 +12,7 @@
 	import AddCategoryDialog from '$lib/components/budget/add-category-dialog.svelte';
 	import BudgetTable from '$lib/components/budget/budget-table.svelte';
 	import CategoryInspector from '$lib/components/budget/category-inspector.svelte';
+	import UpcomingList from '$lib/components/budget/upcoming-list.svelte';
 	import CutoverDate from '$lib/components/settings/cutover-date.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { formatMonth } from '$lib/domain/dates';
@@ -200,12 +201,19 @@
 							inline={selected && !wide.current ? inspector : undefined}
 						/>
 					</div>
-					{#if selected && wide.current}
-						<aside class="sticky top-6 w-72 shrink-0 rounded-lg border p-4">
-							{@render inspector()}
+					{#if wide.current}
+						<!-- The inspector column, with the Upcoming list below it. -->
+						<aside class="sticky top-6 flex w-72 shrink-0 flex-col gap-6">
+							{#if selected}
+								<div class="rounded-lg border p-4">{@render inspector()}</div>
+							{/if}
+							<UpcomingList upcoming={view.upcoming} />
 						</aside>
 					{/if}
 				</div>
+				{#if !wide.current}
+					<UpcomingList upcoming={view.upcoming} />
+				{/if}
 			{:else if view.hidden.length === 0}
 				<p class="text-muted-foreground">
 					No Categories yet. Add a Category Group, then Categories to assign money to.

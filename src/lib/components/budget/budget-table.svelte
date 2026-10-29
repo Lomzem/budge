@@ -7,7 +7,8 @@
 	import { formatCents } from '$lib/domain/money';
 
 	import AssignedInput from './assigned-input.svelte';
-	import { AVAILABLE_STATUS } from './status';
+	import { availableStatus } from './status';
+	import TargetBar from './target-bar.svelte';
 
 	let {
 		groups,
@@ -53,7 +54,7 @@
 				</Table.Cell>
 			</Table.Row>
 			{#each group.categories as category (category.id)}
-				{@const status = AVAILABLE_STATUS[category.status]}
+				{@const status = availableStatus(category)}
 				{@const selected = category.id === selectedId}
 				<Table.Row data-state={selected ? 'selected' : undefined}>
 					<Table.Cell width="fill">
@@ -69,6 +70,18 @@
 						>
 							{category.name}
 						</button>
+						{#if category.target}
+							<div class="mt-1 pl-3">
+								<TargetBar
+									progress={category.target.progress}
+									label="{category.name} Target"
+									text={status?.text ?? ''}
+								/>
+							</div>
+						{/if}
+						{#if status}
+							<span class="block truncate pl-3 text-xs {status.class}">{status.text}</span>
+						{/if}
 					</Table.Cell>
 					<Table.Cell align="end">
 						<AssignedInput
@@ -82,9 +95,6 @@
 					</Table.Cell>
 					<Table.Cell align="end" numeric>
 						<span class={status?.class}>{formatCents(category.available)}</span>
-						{#if status}
-							<span class="block text-xs {status.class}">{status.text}</span>
-						{/if}
 					</Table.Cell>
 				</Table.Row>
 				{#if selected && inline}

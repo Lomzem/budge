@@ -13,6 +13,7 @@ import { requireName } from './lib/input';
 import { rebuildTotals } from './lib/monthlyTotals';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
+import { requireTarget, targetValidator } from './lib/targets';
 
 /**
  * Every Category a Transaction can take, hidden ones included: Ready to Assign, then the groups
@@ -110,6 +111,19 @@ export const rename = mutation({
 		const name = requireName(args.name);
 		const category = await requireOwnCategory(ctx, args.categoryId);
 		await ctx.db.patch('categories', category._id, { name });
+		return null;
+	}
+});
+
+/** Sets, replaces, or with `null` clears a Category's Target. */
+export const setTarget = mutation({
+	args: { categoryId: v.id('categories'), target: v.union(targetValidator, v.null()) },
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		await requireOwner(ctx);
+		const target = args.target === null ? undefined : requireTarget(args.target);
+		const category = await requireOwnCategory(ctx, args.categoryId);
+		await ctx.db.patch('categories', category._id, { target });
 		return null;
 	}
 });

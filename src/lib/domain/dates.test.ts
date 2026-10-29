@@ -7,7 +7,8 @@ import {
 	isIsoDate,
 	isIsoMonth,
 	localIsoDate,
-	monthOf
+	monthOf,
+	ordinal
 } from './dates';
 
 describe('isIsoDate', () => {
@@ -57,4 +58,20 @@ test('a month is written YYYY-MM', () => {
 
 test('a month shows by name', () => {
 	expect(formatMonth('2026-01')).toBe('January 2026');
+});
+
+test.each([
+	[1, '1st'],
+	[2, '2nd'],
+	[3, '3rd'],
+	[4, '4th'],
+	[11, '11th'],
+	[12, '12th'],
+	[13, '13th'],
+	[21, '21st'],
+	[22, '22nd'],
+	[23, '23rd'],
+	[31, '31st']
+])('day %i of the month reads %s', (day, text) => {
+	expect(ordinal(day)).toBe(text);
 });

@@ -31,6 +31,37 @@ export function addMonths(month: string, count: number): string {
 	return `${String(Math.floor(moved / 12)).padStart(4, '0')}-${pad((moved % 12) + 1)}`;
 }
 
+/** How many months `to` is after `from`, both `YYYY-MM`; negative when it is before. */
+export function monthsBetween(from: string, to: string): number {
+	const index = (month: string) => {
+		const [year = 0, number = 1] = month.split('-').map(Number);
+		return year * 12 + number - 1;
+	};
+	return index(to) - index(from);
+}
+
+/** The `YYYY-MM-DD` date `count` days after `date`. */
+export function addDays(date: string, count: number): string {
+	const moved = new Date(`${date}T00:00:00Z`);
+	moved.setUTCDate(moved.getUTCDate() + count);
+	return moved.toISOString().slice(0, 10);
+}
+
+/**
+ * The `YYYY-MM-DD` date `count` months after `date`, on the same day of the month, or the month's
+ * last day when it is shorter.
+ */
+export function addMonthsToDate(date: string, count: number): string {
+	return dayOfMonth(addMonths(monthOf(date), count), Number(date.slice(8)));
+}
+
+/** The `YYYY-MM-DD` date of `day` in `month`, or the month's last day when it is shorter. */
+export function dayOfMonth(month: string, day: number): string {
+	const [year = 0, index = 1] = month.split('-').map(Number);
+	const last = new Date(Date.UTC(year, index, 0)).getUTCDate();
+	return `${month}-${String(Math.min(day, last)).padStart(2, '0')}`;
+}
+
 /** The `YYYY-MM-DD` date `instant` falls on in the local time zone. */
 export function localIsoDate(instant: Date): string {
 	const pad = (n: number) => String(n).padStart(2, '0');
@@ -61,4 +92,12 @@ const dateFormats = {
 /** A `YYYY-MM-DD` date for display: `Aug 1, 2026`, or `8/1/26` when short. */
 export function formatDate(date: string, style: keyof typeof dateFormats = 'long'): string {
 	return dateFormats[style].format(new Date(`${date}T00:00:00Z`));
+}
+
+/** `1st`, `2nd`, `3rd`, `4th`, … `31st`. */
+export function ordinal(day: number): string {
+	const tens = day % 100;
+	if (tens >= 11 && tens <= 13) return `${String(day)}th`;
+	const suffix = { 1: 'st', 2: 'nd', 3: 'rd' }[day % 10] ?? 'th';
+	return `${String(day)}${suffix}`;
 }
