@@ -218,6 +218,9 @@
 				<p class="text-muted-foreground">
 					No Categories yet. Add a Category Group, then Categories to assign money to.
 				</p>
+			{:else if view.upcoming.length > 0}
+				<!-- Every Category is hidden, but their Targets still come due. -->
+				<UpcomingList upcoming={view.upcoming} />
 			{/if}
 		</section>
 
