@@ -1,5 +1,6 @@
 import { v, type Infer } from 'convex/values';
 
+import { isRepeatInterval, MAX_REPEAT_MONTHS } from '../../src/lib/domain/budget';
 import { isIsoDate } from '../../src/lib/domain/dates';
 import { requireCents } from './input';
 import { publicError } from './publicError';
@@ -23,9 +24,6 @@ export const targetValidator = v.union(
 
 export type StoredTarget = Infer<typeof targetValidator>;
 
-// Ten years between repeats is already far beyond any bill.
-const MAX_EVERY_MONTHS = 120;
-
 /** A Target the budget can work with: a positive amount, a real due day or date, whole months. */
 export function requireTarget(target: StoredTarget): StoredTarget {
 	const amount = requireCents(target.amount);
@@ -41,11 +39,8 @@ export function requireTarget(target: StoredTarget): StoredTarget {
 	}
 	if (!isIsoDate(target.firstDate)) throw publicError('INVALID_INPUT', 'Pick a date.');
 	const { everyMonths } = target;
-	if (
-		everyMonths !== undefined &&
-		!(Number.isInteger(everyMonths) && everyMonths >= 1 && everyMonths <= MAX_EVERY_MONTHS)
-	) {
-		throw publicError('INVALID_INPUT', 'Repeat every 1 to 120 months.');
+	if (everyMonths !== undefined && !isRepeatInterval(everyMonths)) {
+		throw publicError('INVALID_INPUT', `Repeat every 1 to ${String(MAX_REPEAT_MONTHS)} months.`);
 	}
 	return everyMonths === undefined
 		? { kind: 'byDate', amount, firstDate: target.firstDate }

@@ -7,6 +7,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
+	import { isRepeatInterval, MAX_REPEAT_MONTHS } from '$lib/domain/budget';
 	import { isIsoDate, ordinal } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
 	import { readPublicError } from '$lib/publicError';
@@ -63,9 +64,7 @@
 		if (!isIsoDate(date)) return 'Pick a date.';
 		if (!repeats) return { kind, amount: cents, firstDate: date };
 		const every = Number(everyMonths);
-		if (!Number.isInteger(every) || every < 1 || every > 120) {
-			return 'Repeat every 1 to 120 months.';
-		}
+		if (!isRepeatInterval(every)) return `Repeat every 1 to ${String(MAX_REPEAT_MONTHS)} months.`;
 		return { kind, amount: cents, firstDate: date, everyMonths: every };
 	}
 

@@ -593,7 +593,7 @@ describe('the Upcoming list', () => {
 		}
 	});
 
-	test('leaves out Targets due later, Monthly Targets with no due day, and hidden Categories', () => {
+	test('lists hidden Categories too, and leaves out Targets due later and Monthly Targets with no due day', () => {
 		const categories: BudgetInput<string, GroupId>['categories'] = [
 			...budget().categories,
 			{ id: 'prime', groupId: 'everyday', name: 'Prime', position: 2, kind: 'normal' },
@@ -611,7 +611,7 @@ describe('the Upcoming list', () => {
 			{ categories }
 		);
 
-		expect(result.upcoming.map((row) => row.name)).toEqual(['Prime']);
+		expect(result.upcoming.map((row) => row.name)).toEqual(['Old', 'Prime']);
 	});
 
 	test('takes the next date of a repeating By date Target once its date has passed', () => {

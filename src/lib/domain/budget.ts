@@ -14,6 +14,14 @@ export type Target =
 	| { kind: 'monthly'; amount: number; mode: 'refill' | 'setAside'; dueDay?: number }
 	| { kind: 'byDate'; amount: number; firstDate: string; everyMonths?: number };
 
+/** The longest a By date Target may wait between repeats: ten years is already beyond any bill. */
+export const MAX_REPEAT_MONTHS = 120;
+
+/** Whether `months` is a repeat interval a By date Target accepts: whole months, 1 to the max. */
+export function isRepeatInterval(months: number): boolean {
+	return Number.isInteger(months) && months >= 1 && months <= MAX_REPEAT_MONTHS;
+}
+
 export interface TargetProgress {
 	definition: Target;
 	/** What the Target still needs Assigned this month. */
@@ -282,7 +290,7 @@ export function computeBudget<C extends string, G extends string>(
 			const isHidden = group.hidden === true || c.hidden === true;
 			(isHidden ? hidden : shown).push(row);
 			const dueDate = c.target === undefined ? null : nextDue(c.target, input.today);
-			if (!isHidden && c.target !== undefined && dueDate !== null && dueDate < windowEnd) {
+			if (c.target !== undefined && dueDate !== null && dueDate < windowEnd) {
 				const due = budgetOf(c, monthOf(dueDate));
 				upcoming.push({
 					id: c.id,
