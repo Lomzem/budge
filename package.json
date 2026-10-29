@@ -22,7 +22,8 @@
 		"format:check": "prettier --check .",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"test:e2e:local": "bun e2e/run-local.ts"
 	},
 	"dependencies": {
 		"convex": "1.48.0",

@@ -23,7 +23,7 @@ Before exploring the codebase, read `docs/agents/domain.md` for the single-conte
 
 ### Authentication
 
-Before changing Clerk setup, sign-in, or CI authentication, read `docs/agents/authentication.md`.
+Before running Playwright E2E or changing Clerk setup, sign-in, or CI authentication, read `docs/agents/authentication.md`.
 
 ## Pull requests
 

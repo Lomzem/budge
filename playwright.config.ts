@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-// Smoke tests run only in CI, against an anonymous local Convex backend and the Clerk
-// development instance.
+// Smoke tests run against an anonymous local Convex backend and the Clerk development instance: in
+// CI, and locally only through `bun run test:e2e:local`, which sets up the same backend.
 export default defineConfig({
 	testDir: 'e2e',
 	globalSetup: './e2e/global.setup.ts',
