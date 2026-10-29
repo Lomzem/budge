@@ -1,13 +1,17 @@
 <script lang="ts">
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import { tick } from 'svelte';
+	import { MediaQuery } from 'svelte/reactivity';
 
 	import { resolve } from '$app/paths';
+	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
 	import { getBudgetMonth } from '$lib/budget.svelte';
 	import AccountDialog from '$lib/components/accounts/account-dialog.svelte';
 	import AddCategoryDialog from '$lib/components/budget/add-category-dialog.svelte';
 	import BudgetTable from '$lib/components/budget/budget-table.svelte';
+	import CategoryInspector from '$lib/components/budget/category-inspector.svelte';
 	import CutoverDate from '$lib/components/settings/cutover-date.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { formatMonth } from '$lib/domain/dates';
@@ -25,6 +29,33 @@
 	const view = $derived(budget.view);
 	const readyToAssign = $derived(budget.readyToAssign);
 	const groups = $derived(view?.groups.map((group) => ({ id: group.id, name: group.name })) ?? []);
+
+	// At 1024 px and wider the inspector is a column beside the table; below, a row under the
+	// selected Category.
+	const wide = new MediaQuery('(min-width: 1024px)');
+	let selectedId: Id<'categories'> | null = $state(null);
+	// The selection survives moving between months, and clears if its Category leaves the table.
+	const selected = $derived(
+		view?.groups.flatMap((group) => group.categories).find((c) => c.id === selectedId)
+	);
+
+	async function select(id: Id<'categories'>) {
+		selectedId = selectedId === id ? null : id;
+		// The column sits after the whole table, so focus follows the selection there.
+		if (selectedId !== null && wide.current) {
+			await tick();
+			document.getElementById('category-inspector')?.focus();
+		}
+	}
+
+	async function closeInspector() {
+		const id = selectedId;
+		selectedId = null;
+		await tick();
+		if (id !== null) {
+			document.querySelector<HTMLElement>(`[data-category-id="${id}"]`)?.focus();
+		}
+	}
 
 	function add(kind: 'group' | 'category') {
 		adding = kind;
@@ -160,7 +191,21 @@
 				<Button variant="ghost" size="sm" href={resolve('/categories')}>Manage Categories</Button>
 			</div>
 			{#if groups.length > 0}
-				<BudgetTable groups={view.groups} />
+				<div class="lg:flex lg:items-start lg:gap-6">
+					<div class="min-w-0 lg:flex-1">
+						<BudgetTable
+							groups={view.groups}
+							selectedId={selected?.id ?? null}
+							onselect={select}
+							inline={selected && !wide.current ? inspector : undefined}
+						/>
+					</div>
+					{#if selected && wide.current}
+						<aside class="sticky top-6 w-72 shrink-0 rounded-lg border p-4">
+							{@render inspector()}
+						</aside>
+					{/if}
+				</div>
 			{:else if view.hidden.length === 0}
 				<p class="text-muted-foreground">
 					No Categories yet. Add a Category Group, then Categories to assign money to.
@@ -186,6 +231,14 @@
 		{/if}
 	{/if}
 </div>
+
+{#snippet inspector()}
+	{#if view && selected}
+		{#key selected.id}
+			<CategoryInspector category={selected} {view} onclose={closeInspector} />
+		{/key}
+	{/if}
+{/snippet}
 
 <AccountDialog bind:open={addAccountOpen} />
 <AddCategoryDialog

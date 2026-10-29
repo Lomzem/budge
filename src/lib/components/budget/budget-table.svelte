@@ -1,22 +1,30 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
+
+	import type { Id } from '$convex/_generated/dataModel';
 	import { getBudgetMonth, type BudgetView } from '$lib/budget.svelte';
 	import * as Table from '$lib/components/ui/table';
-	import type { AvailableStatus } from '$lib/domain/budget';
 	import { formatCents } from '$lib/domain/money';
 
 	import AssignedInput from './assigned-input.svelte';
+	import { AVAILABLE_STATUS } from './status';
 
-	let { groups }: { groups: BudgetView['groups'] } = $props();
+	let {
+		groups,
+		selectedId,
+		onselect,
+		inline
+	}: {
+		groups: BudgetView['groups'];
+		/** The Category the inspector shows, if any. */
+		selectedId: Id<'categories'> | null;
+		/** Selects a Category, or clears the selection when it is already selected. */
+		onselect: (id: Id<'categories'>) => void;
+		/** The inspector, shown in a row under the selected Category on narrow screens. */
+		inline?: Snippet | undefined;
+	} = $props();
 
 	const budget = getBudgetMonth();
-
-	// Color is never the only signal: every colored amount has its status in words beside it.
-	const STATUS: Record<AvailableStatus, { text: string; class: string } | undefined> = {
-		funded: { text: 'Funded', class: 'text-funded' },
-		underfunded: { text: 'Underfunded', class: 'text-warning' },
-		overspent: { text: 'Overspent', class: 'text-destructive' },
-		empty: undefined
-	};
 </script>
 
 <Table.Root>
@@ -45,10 +53,22 @@
 				</Table.Cell>
 			</Table.Row>
 			{#each group.categories as category (category.id)}
-				{@const status = STATUS[category.status]}
-				<Table.Row>
+				{@const status = AVAILABLE_STATUS[category.status]}
+				{@const selected = category.id === selectedId}
+				<Table.Row data-state={selected ? 'selected' : undefined}>
 					<Table.Cell width="fill">
-						<span class="block truncate pl-3">{category.name}</span>
+						<button
+							type="button"
+							class="block w-full truncate rounded-sm pl-3 text-left underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+							aria-expanded={selected}
+							aria-controls={selected ? 'category-inspector' : undefined}
+							data-category-id={category.id}
+							onclick={() => {
+								onselect(category.id);
+							}}
+						>
+							{category.name}
+						</button>
 					</Table.Cell>
 					<Table.Cell align="end">
 						<AssignedInput
@@ -67,6 +87,13 @@
 						{/if}
 					</Table.Cell>
 				</Table.Row>
+				{#if selected && inline}
+					<Table.Row>
+						<Table.Cell colspan={4}>
+							<div class="px-1 py-2 whitespace-normal">{@render inline()}</div>
+						</Table.Cell>
+					</Table.Row>
+				{/if}
 			{:else}
 				<Table.Row>
 					<Table.Cell colspan={4}>

@@ -47,7 +47,14 @@ function sampleArgs(ids: {
 		'categories:remove': { categoryId, destinationId: categoryId },
 		'categories:removeGroup': { groupId },
 		'budget:month': { month: '2026-08', today: '2026-08-14' },
-		'budget:setAssigned': { month: '2026-08', categoryId, amount: 500 }
+		'budget:setAssigned': { month: '2026-08', categoryId, amount: 500 },
+		'budget:moveMoney': {
+			month: '2026-08',
+			fromCategoryId: categoryId,
+			toCategoryId: categoryId,
+			amount: 500
+		},
+		'budget:cover': { month: '2026-08', categoryId }
 	};
 	return args;
 }

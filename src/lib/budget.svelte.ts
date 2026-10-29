@@ -19,6 +19,8 @@ export class BudgetMonth {
 	today = $state(localToday());
 	readonly #query: UseQueryReturn<typeof api.budget.month>;
 	readonly #setAssigned = useMutation(api.budget.setAssigned);
+	readonly #moveMoney = useMutation(api.budget.moveMoney);
+	readonly #cover = useMutation(api.budget.cover);
 	/** The selected month's budget, once it has loaded. */
 	readonly view: BudgetView | undefined = $derived.by(() => {
 		const data = this.#query.data;
@@ -71,6 +73,20 @@ export class BudgetMonth {
 
 	async setAssigned(categoryId: Id<'categories'>, amount: number) {
 		await this.#setAssigned({ month: this.month, categoryId, amount });
+	}
+
+	/** Moves `amount` cents between two Categories in the selected month. */
+	async moveMoney(
+		fromCategoryId: Id<'categories'>,
+		toCategoryId: Id<'categories'>,
+		amount: number
+	) {
+		await this.#moveMoney({ month: this.month, fromCategoryId, toCategoryId, amount });
+	}
+
+	/** Covers an overspent Category in the selected month from Ready to Assign. */
+	async cover(categoryId: Id<'categories'>) {
+		await this.#cover({ month: this.month, categoryId });
 	}
 }
 

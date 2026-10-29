@@ -74,6 +74,7 @@ describe('the budget query', () => {
 						{
 							id: b.groceries,
 							name: 'Groceries',
+							priorAvailable: -10_000,
 							assigned: 30_000,
 							activity: 2_000,
 							available: 22_000,
@@ -82,6 +83,7 @@ describe('the budget query', () => {
 						{
 							id: b.rent,
 							name: 'Rent',
+							priorAvailable: 0,
 							assigned: 0,
 							activity: 0,
 							available: 0,
@@ -140,6 +142,104 @@ describe('the budget query', () => {
 		expect(
 			await publicErrorCode(
 				b.owner.mutation(api.budget.setAssigned, { categoryId, amount: 5_000, ...change })
+			)
+		).toBe('INVALID_INPUT');
+	});
+});
+
+describe('moving money', () => {
+	test('shifts Available between two Categories and leaves Ready to Assign unchanged', async () => {
+		const b = await budgetWithCategories();
+		await b.assign('2026-10', b.groceries, 40_000);
+		await b.spend('2026-10-03', -35_000, b.groceries);
+		const before = await b.view('2026-10');
+
+		await b.owner.mutation(api.budget.moveMoney, {
+			month: '2026-10',
+			fromCategoryId: b.groceries,
+			toCategoryId: b.rent,
+			amount: 10_000
+		});
+
+		const after = await b.view('2026-10');
+		expect(after.readyToAssign).toEqual(before.readyToAssign);
+		expect(after.groups[0]?.categories).toMatchObject([
+			{ name: 'Groceries', assigned: 30_000, available: -5_000 },
+			{ name: 'Rent', assigned: 10_000, available: 10_000 }
+		]);
+	});
+
+	interface Move {
+		fromCategoryId: Id<'categories'>;
+		toCategoryId: Id<'categories'>;
+	}
+	test.each([
+		['to the same Category', (m: Move) => ({ toCategoryId: m.fromCategoryId })],
+		['to Ready to Assign', (_: Move, rta: Id<'categories'>) => ({ toCategoryId: rta })],
+		['from Ready to Assign', (_: Move, rta: Id<'categories'>) => ({ fromCategoryId: rta })],
+		['of a zero amount', () => ({ amount: 0 })],
+		['of a negative amount', () => ({ amount: -1_000 })],
+		['before the cutover month', () => ({ month: '2026-07' })]
+	])('refuses a move %s', async (_, change) => {
+		const b = await budgetWithCategories();
+		const move = { fromCategoryId: b.groceries, toCategoryId: b.rent };
+
+		expect(
+			await publicErrorCode(
+				b.owner.mutation(api.budget.moveMoney, {
+					month: '2026-10',
+					amount: 1_000,
+					...move,
+					...change(move, b.readyToAssignId)
+				})
+			)
+		).toBe('INVALID_INPUT');
+	});
+});
+
+describe('Cover', () => {
+	test('assigns exactly what brings Available back to zero, taken from Ready to Assign', async () => {
+		const b = await budgetWithCategories();
+		// September's overspending carries into October, which overspends again.
+		await b.spend('2026-09-20', -20_000, b.groceries);
+		await b.assign('2026-10', b.groceries, 5_000);
+		await b.spend('2026-10-03', -2_000, b.groceries);
+		const before = await b.view('2026-10');
+
+		const covered = await b.owner.mutation(api.budget.cover, {
+			month: '2026-10',
+			categoryId: b.groceries
+		});
+
+		const after = await b.view('2026-10');
+		expect(covered).toBe(17_000);
+		expect(after.groups[0]?.categories[0]).toMatchObject({
+			name: 'Groceries',
+			assigned: 22_000,
+			available: 0,
+			status: 'empty'
+		});
+		expect(after.readyToAssign.amount).toBe(before.readyToAssign.amount - 17_000);
+		expect(after.overspent).toEqual([]);
+	});
+
+	test('changes nothing once a Category is no longer overspent', async () => {
+		const b = await budgetWithCategories();
+		await b.assign('2026-10', b.groceries, 5_000);
+		const before = await b.view('2026-10');
+
+		expect(
+			await b.owner.mutation(api.budget.cover, { month: '2026-10', categoryId: b.groceries })
+		).toBe(0);
+		expect(await b.view('2026-10')).toEqual(before);
+	});
+
+	test('refuses Ready to Assign', async () => {
+		const b = await budgetWithCategories();
+
+		expect(
+			await publicErrorCode(
+				b.owner.mutation(api.budget.cover, { month: '2026-10', categoryId: b.readyToAssignId })
 			)
 		).toBe('INVALID_INPUT');
 	});

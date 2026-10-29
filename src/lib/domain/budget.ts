@@ -50,6 +50,8 @@ export type AvailableStatus = 'funded' | 'underfunded' | 'overspent' | 'empty';
 export interface CategoryBudget<C extends string> {
 	id: C;
 	name: string;
+	/** Available at the end of last month, left over into this one. */
+	priorAvailable: number;
 	assigned: number;
 	activity: number;
 	available: number;
@@ -140,6 +142,7 @@ export function computeBudget<C extends string, G extends string>(
 		return {
 			id: c.id,
 			name: c.name,
+			priorAvailable: available - a.now - t.now,
 			assigned: a.now,
 			activity: t.now,
 			available,
