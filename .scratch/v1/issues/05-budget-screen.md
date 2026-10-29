@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 (Manual Accounts and Transactions)
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** [Budge v1](../../v1-spec/spec.md): stories 13, 18–31, 55–57; Domain module (budget rules); Convex function surface (budget query)
 
@@ -27,7 +27,7 @@
 
 ## Comments
 
-- Implemented on branch `05-budget-screen`. No PR is open yet; Status changes to done after it merges.
+- Implemented on branch `05-budget-screen`.
 - Decisions:
   - `computeBudget` in `src/lib/domain/budget.ts` is the one entry point. Available with nothing in it shows no status. `underfunded` (amber) needs Targets and arrives in ticket 08.
   - `monthlyTotals` buckets by Category (or `uncategorized`) and gained a `count`, so the budget query reports the Uncategorized count without reading Transactions. Rows are deleted when their count reaches 0. A deployment whose old rows lack `count` fails schema validation on push. Production isn't live and previews start empty, but a local dev backend holding old data has to be cleared.
@@ -39,4 +39,5 @@
   - Green (`--funded`) and amber (`--warning`) theme tokens meet 4.5:1 on the background and muted colors in both themes. Every colored amount has its status in words beside it.
 - Verification: `bun run typecheck`, `lint`, `lint:ui`, `format:check`, and `bun run test` (110 tests) pass. The Playwright smoke tests (3, including `e2e/budget.test.ts`) passed against a throwaway anonymous local backend seeded with `seed:run`. Screenshots at 1280 px (light) and 375 px (dark) were checked by eye.
 - Review (GPT-6.1-Sol, standards and spec): fixed a duplicated accumulator, unclear names in the seed and the budget test, a stale `today` after midnight, and the cash invariant checking only the final state (it now checks after every edit). The index-name and future-outflow findings were kept as described above. The seeded random generator is duplicated between `budget.test.ts` and `monthlyTotals.test.ts`, which run in different Vitest projects. It's left as is.
-- Remaining: open the PR and get CodeRabbit's approval.
+- Shipped in https://github.com/Lomzem/budge/pull/4, squash-merged to `main` as fcded0c. CodeRabbit approved head 3f1a348, and all six checks passed. CodeRabbit raised 7 findings over four review rounds: 6 fixed (Previous disabled while a month loads; the midnight timer and the Add Category dialog reset moved out of component effects; then three follow-ups on the dialog's pending save: no duplicate submit after reopening, no trapping the modal while a save is pending, and no switching kind mid-save), and 1 declined with a reason it accepted (staging `monthlyTotals.count`, since production has no `monthlyTotals` rows).
+- Follow-up: production has one Transaction but no `monthlyTotals` rows, so its cached totals are stale. Running `monthlyTotals:rebuild` on production once fixes that; it needs the owner's go-ahead.
