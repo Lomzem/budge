@@ -67,13 +67,14 @@ test('a Target shows its progress, "Assign $X" funds it, and it is listed as Upc
 		// Leave the seeded budget as it was, even when an assertion above failed.
 		await page.setViewportSize({ width: 1280, height: 800 });
 		if (await dialog.isVisible()) await page.keyboard.press('Escape');
-		// A pending "Assign $25.00" could land after the restore below, so let it settle first. If it
-		// failed instead, Assigned is still `before` and the poll gives up.
+		// A pending "Assign $25.00" could land after the restore below, so wait until it settles: the
+		// button stays disabled while the write is in flight, then goes away once the Target is
+		// funded, or comes back enabled with an alert if the write failed.
 		if (assigning) {
+			const assign = inspector.getByRole('button', { name: /^Assign \$/ });
 			await expect
-				.poll(() => assigned(page, name))
-				.toBe(before + 2_500)
-				.catch(() => undefined);
+				.poll(async () => (await assign.count()) === 0 || (await assign.isEnabled()))
+				.toBe(true);
 		}
 		const edit = inspector.getByRole('button', { name: 'Edit Target' });
 		if (await edit.isVisible()) {
