@@ -1,8 +1,9 @@
 // CSV as RFC 4180 describes it: CRLF line ends, and a field quoted when it holds a comma, a quote,
-// or a line break.
+// or a line break. A string a spreadsheet would run as a formula gets a leading `'`, so it opens
+// as text; numbers are left alone, so a negative amount stays a number.
 
 function text(value: unknown): string {
-	if (typeof value === 'string') return value;
+	if (typeof value === 'string') return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 	if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
 		return String(value);
 	}

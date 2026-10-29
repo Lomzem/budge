@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { useConvexClient } from 'convex-svelte';
 
-	import { api } from '$convex/_generated/api';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { localToday } from '$lib/domain/dates';
-	import { downloadCsv, downloadJson, type BudgetExport } from '$lib/export';
+	import { downloadCsv, downloadJson, fetchExport, type BudgetExport } from '$lib/export';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
@@ -17,7 +16,7 @@
 		busy = true;
 		error = '';
 		try {
-			save(await client.query(api.export.all, {}), localToday());
+			save(await fetchExport(client), localToday());
 		} catch {
 			error = "Budge couldn't export. Try again.";
 		} finally {

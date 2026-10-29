@@ -1,3 +1,4 @@
+import type { PaginationResult } from 'convex/server';
 import { describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
@@ -66,12 +67,34 @@ function keysAnywhere(value: unknown): string[] {
 	return [];
 }
 
+type Owner = ReturnType<typeof newBackend>['owner'];
+
+// What the export dialog does: every page of every exportable table, a few rows at a time.
+async function exportAll(owner: Owner, numItems = 2) {
+	const exported: Record<string, unknown[]> = {};
+	for (const table of await owner.query(api.export.tables, {})) {
+		const rows: unknown[] = [];
+		let cursor: string | null = null;
+		for (;;) {
+			const result: PaginationResult<unknown> = await owner.query(api.export.page, {
+				table,
+				paginationOpts: { numItems, cursor }
+			});
+			rows.push(...result.page);
+			if (result.isDone) break;
+			cursor = result.continueCursor;
+		}
+		exported[table] = rows;
+	}
+	return exported;
+}
+
 describe('the export', () => {
 	test('covers every table but the rebuildable monthly totals', async () => {
 		const { t, owner } = newBackend();
 		await t.run(seedEveryTable);
 
-		const exported = await owner.query(api.export.all, {});
+		const exported = await exportAll(owner);
 
 		expect([...seededTables, 'monthlyTotals'].sort()).toEqual(Object.keys(schema.tables).sort());
 		expect(Object.keys(exported).sort()).toEqual([...seededTables].sort());
@@ -89,11 +112,42 @@ describe('the export', () => {
 		});
 	});
 
+	test('reads a table across pages without losing or repeating a row', async () => {
+		const { t, owner } = newBackend();
+		await t.run(async (ctx) => {
+			for (const name of ['Grocer', 'Landlord', 'Utility', 'Cafe', 'Gym']) {
+				await ctx.db.insert('payees', { name });
+			}
+		});
+
+		const exported = await exportAll(owner, 2);
+
+		expect((exported.payees as { name: string }[]).map((payee) => payee.name).sort()).toEqual([
+			'Cafe',
+			'Grocer',
+			'Gym',
+			'Landlord',
+			'Utility'
+		]);
+	});
+
+	test('refuses the rebuildable monthly totals', async () => {
+		const { owner } = newBackend();
+
+		await expect(
+			owner.query(api.export.page, {
+				// @ts-expect-error `monthlyTotals` is not an exportable table.
+				table: 'monthlyTotals',
+				paginationOpts: { numItems: 10, cursor: null }
+			})
+		).rejects.toThrow();
+	});
+
 	test('holds no Bank Connection provider field or token', async () => {
 		const { t, owner } = newBackend();
 		await t.run(seedEveryTable);
 
-		const keys = keysAnywhere(await owner.query(api.export.all, {}));
+		const keys = keysAnywhere(await exportAll(owner));
 
 		expect(keys).not.toContain('provider');
 		expect(keys.filter((key) => /token/i.test(key))).toEqual([]);
@@ -102,7 +156,7 @@ describe('the export', () => {
 	test('lists an empty table as empty', async () => {
 		const { owner } = newBackend();
 
-		const exported = await owner.query(api.export.all, {});
+		const exported = await exportAll(owner);
 
 		expect(exported.accounts).toEqual([]);
 		expect(exported.transactions).toEqual([]);

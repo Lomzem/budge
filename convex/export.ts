@@ -1,3 +1,4 @@
+import { paginationOptsValidator, paginationResultValidator } from 'convex/server';
 import { v } from 'convex/values';
 
 import type { TableNames } from './_generated/dataModel';
@@ -14,24 +15,41 @@ const secretFields: Readonly<Record<string, readonly string[]>> = {
 	bankConnections: ['provider']
 };
 
-/** Every source table in the schema, as documents by table name. A new table joins on its own. */
-export const all = query({
+// Every source table in the schema. A new table joins on its own.
+const exportable = (Object.keys(schema.tables) as TableNames[]).filter(
+	(table) => !rebuildable.includes(table)
+);
+const exportableTable = v.union(...exportable.map((table) => v.literal(table)));
+
+/** The tables an export holds, in schema order. */
+export const tables = query({
 	args: {},
-	returns: v.record(v.string(), v.array(v.any())),
+	returns: v.array(exportableTable),
 	handler: async (ctx) => {
 		await requireOwner(ctx);
-		const tables = (Object.keys(schema.tables) as TableNames[]).filter(
-			(table) => !rebuildable.includes(table)
-		);
-		const exported: Record<string, Record<string, unknown>[]> = {};
-		for (const table of tables) {
-			const omitted = secretFields[table] ?? [];
-			// The owner asked for everything, and one owner's budget fits in one read.
-			const documents = await ctx.db.query(table).collect();
-			exported[table] = documents.map((document) =>
+		return exportable;
+	}
+});
+
+/**
+ * One page of one exportable table's documents. The export reads every page of every table, so
+ * no single read meets Convex's per-query limits however large the budget grows.
+ */
+export const page = query({
+	args: {
+		table: exportableTable,
+		paginationOpts: paginationOptsValidator
+	},
+	returns: paginationResultValidator(v.any()),
+	handler: async (ctx, args) => {
+		await requireOwner(ctx);
+		const omitted = secretFields[args.table] ?? [];
+		const result = await ctx.db.query(args.table).paginate(args.paginationOpts);
+		return {
+			...result,
+			page: result.page.map((document) =>
 				Object.fromEntries(Object.entries(document).filter(([key]) => !omitted.includes(key)))
-			);
-		}
-		return exported;
+			)
+		};
 	}
 });

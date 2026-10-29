@@ -28,6 +28,27 @@ describe('toCsv', () => {
 		expect(csv).toBe('target\r\n"{""kind"":""monthly"",""amount"":5000}"\r\n');
 	});
 
+	test('keeps a string a spreadsheet would run as a formula as text', () => {
+		const csv = toCsv([
+			{ name: '=HYPERLINK("https://example.test")' },
+			{ name: '+1' },
+			{ name: '-1' },
+			{ name: '@SUM(A1)' },
+			{ name: '\tTab' },
+			{ name: '\rReturn' },
+			{ name: 'Grocer = food' }
+		]);
+
+		expect(csv).toBe(
+			'name\r\n"\'=HYPERLINK(""https://example.test"")"\r\n\'+1\r\n\'-1\r\n\'@SUM(A1)\r\n' +
+				'\'\tTab\r\n"\'\rReturn"\r\nGrocer = food\r\n'
+		);
+	});
+
+	test('leaves a negative amount a number', () => {
+		expect(toCsv([{ amount: -120_000 }])).toBe('amount\r\n-120000\r\n');
+	});
+
 	test('writes nothing for no rows', () => {
 		expect(toCsv([])).toBe('');
 	});
