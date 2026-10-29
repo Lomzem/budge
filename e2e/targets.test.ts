@@ -34,10 +34,12 @@ test('a Target shows its progress, "Assign $X" funds it, and it is listed as Upc
 	// Set aside $25 more than is Assigned, due today, so it needs exactly $25.00.
 	await inspector.getByRole('button', { name: 'Add Target' }).click();
 	const dialog = page.getByRole('dialog');
-	await dialog.getByLabel('Amount').fill(formatCents(before + 2_500).replace('$', ''));
-	await dialog.getByLabel('Set aside the amount').check();
 	await dialog
-		.getByLabel('Due day')
+		.getByLabel('Amount', { exact: true })
+		.fill(formatCents(before + 2_500).replace('$', ''));
+	await dialog.getByLabel('Set aside the amount', { exact: true }).check();
+	await dialog
+		.getByLabel('Due day', { exact: true })
 		.selectOption({ label: `The ${ordinal(new Date().getDate())}` });
 	await dialog.getByRole('button', { name: 'Save' }).click();
 	await expect(dialog).toBeHidden();
