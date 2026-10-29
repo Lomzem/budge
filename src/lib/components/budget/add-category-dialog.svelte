@@ -51,7 +51,15 @@
 	}
 </script>
 
-<Dialog.Root bind:open>
+<!-- It stays open while saving: reopening mounts a fresh dialog, which could submit it twice. -->
+<Dialog.Root
+	bind:open={
+		() => open,
+		(next: boolean) => {
+			if (!saving) open = next;
+		}
+	}
+>
 	<Dialog.Content>
 		<Dialog.Header>
 			<Dialog.Title>{title}</Dialog.Title>
