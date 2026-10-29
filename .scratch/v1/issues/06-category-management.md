@@ -4,16 +4,16 @@
 
 **Blocked by:** 05 (Budget screen)
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** [Budge v1](../../v1-spec/spec.md): stories 111–114; Convex data model (Category management)
 
-- [ ] Create, rename, reorder (integer `position` rewritten per sibling list), and hide or unhide Categories and Category Groups. Hidden Categories leave the budget table but still count in every total.
-- [ ] Deleting a Category requires a destination Category. Its Transactions (and later its split lines) and Assigned rows move there, with Assigned summing into existing rows. The affected `monthlyTotals` are rebuilt, then the Category is hard-deleted.
-- [ ] Deleting a Category Group requires a destination group for its Categories.
-- [ ] System Categories and system groups can't be renamed, deleted, or moved by the owner. Attempts return `INVALID_INPUT`.
-- [ ] `convex-test`: after deleting a Category with history across several months, every month's Available for the destination and Ready to Assign equals what it would have been had the Transactions and Assigned amounts been there all along. The `monthlyTotals` rebuild still equals the incrementally kept rows.
-- [ ] The management UI is keyboard reachable, has visible labels, and works down to 320 px.
+- [x] Create, rename, reorder (integer `position` rewritten per sibling list), and hide or unhide Categories and Category Groups. Hidden Categories leave the budget table but still count in every total.
+- [x] Deleting a Category requires a destination Category. Its Transactions (and later its split lines) and Assigned rows move there, with Assigned summing into existing rows. The affected `monthlyTotals` are rebuilt, then the Category is hard-deleted.
+- [x] Deleting a Category Group requires a destination group for its Categories.
+- [x] System Categories and system groups can't be renamed, deleted, or moved by the owner. Attempts return `INVALID_INPUT`.
+- [x] `convex-test`: after deleting a Category with history across several months, every month's Available for the destination and Ready to Assign equals what it would have been had the Transactions and Assigned amounts been there all along. The `monthlyTotals` rebuild still equals the incrementally kept rows.
+- [x] The management UI is keyboard reachable, has visible labels, and works down to 320 px.
 
 ## Comments
 
@@ -27,3 +27,4 @@
   - The management screen is `/categories`, linked from the nav and the budget screen. Each group and Category has an actions menu (Rename, Move up, Move down, Move to group, Hide or Show, Delete…), reachable by Tab and Enter. Its trigger is a plain button, so long names truncate at 320 px.
 - Verification: `bun run typecheck`, `lint`, `lint:ui`, `format:check`, and `bun run test` pass. Playwright (4 tests, including the new `e2e/categories.test.ts` at 320 px) passed against a throwaway anonymous local backend seeded with `seed:run`.
 - Review (GPT-6.1-Sol, standards and spec): fixed group totals that left out hidden Categories, the delete reusing cached totals instead of rebuilding them, the Transaction picker hiding Categories (unasked scope), and the three dialogs acting on a save that finished after another item took the dialog over. Kept: the short index name, and unbatched delete and reorder (see above).
+- Shipped in https://github.com/Lomzem/budge/pull/5, squash-merged to `main` as 48841c1. CodeRabbit approved head 2afb809 with no comments (after one rate-limit wait), and all six checks passed.
