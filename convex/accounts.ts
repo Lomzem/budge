@@ -55,7 +55,7 @@ export const create = mutation({
 			...(args.kind === 'cash' ? { categoryId: await ensureReadyToAssign(ctx) } : {}),
 			memo: ''
 		});
-		await insertTransaction(ctx, { ...fields, cleared: 'cleared' });
+		await insertTransaction(ctx, { ...fields, cleared: 'cleared', approved: true });
 		return accountId;
 	}
 });

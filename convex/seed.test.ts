@@ -47,6 +47,8 @@ describe('seed:run', () => {
 			true
 		);
 		expect(budget.uncategorizedCount).toBeGreaterThan(0);
+		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(3);
+		expect(page.filter((row) => row.bankRows.length > 0)).toHaveLength(3);
 	});
 
 	test('refuses once any Account exists', async () => {

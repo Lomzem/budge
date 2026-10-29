@@ -1,8 +1,10 @@
 <script lang="ts">
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import { useQuery } from 'convex-svelte';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { api } from '$convex/_generated/api';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import AccountDialog from '$lib/components/accounts/account-dialog.svelte';
 	import { formatCents } from '$lib/domain/money';
@@ -11,6 +13,9 @@
 	import AppMenu from './app-menu.svelte';
 
 	const accounts = getAccounts();
+	const unapproved = useQuery(api.transactions.unapprovedCount, () =>
+		accounts.loaded ? {} : 'skip'
+	);
 	let addOpen = $state(false);
 
 	const total = (list: Account[]) => list.reduce((sum, account) => sum + account.balance, 0);
@@ -29,6 +34,11 @@
 					class={linkClass}
 				>
 					{view.label}
+					{#if view.href === '/accounts' && (unapproved.data ?? 0) > 0}
+						<span class="shrink-0 text-xs tabular-nums">
+							{unapproved.data}<span class="sr-only"> Unapproved</span>
+						</span>
+					{/if}
 				</a>
 			</li>
 		{/each}

@@ -33,6 +33,8 @@
 	const create = useMutation(api.transactions.create);
 	const update = useMutation(api.transactions.update);
 	const remove = useMutation(api.transactions.remove);
+	const approve = useMutation(api.transactions.approve);
+	const unmatch = useMutation(api.imports.unmatch);
 	const categories = useQuery(api.categories.list, () => (open ? {} : 'skip'));
 
 	let accountId = $state('');
@@ -111,6 +113,33 @@
 			open = false;
 		} catch (thrown) {
 			error = readPublicError(thrown)?.message ?? "Budge couldn't save the Transaction. Try again.";
+		} finally {
+			saving = false;
+		}
+	}
+
+	async function approveTransaction() {
+		if (!transaction) return;
+		saving = true;
+		try {
+			await approve({ transactionId: transaction._id });
+			open = false;
+		} catch (thrown) {
+			error =
+				readPublicError(thrown)?.message ?? "Budge couldn't approve the Transaction. Try again.";
+		} finally {
+			saving = false;
+		}
+	}
+
+	/** Splits a Matched Bank Row back into its own Transaction. */
+	async function unmatchRow(importId: Id<'imports'>) {
+		saving = true;
+		try {
+			await unmatch({ importId });
+			open = false;
+		} catch (thrown) {
+			error = readPublicError(thrown)?.message ?? "Budge couldn't Unmatch the row. Try again.";
 		} finally {
 			saving = false;
 		}
@@ -213,6 +242,29 @@
 				<Label for="transaction-memo">Memo</Label>
 				<Input id="transaction-memo" bind:value={memo} autocomplete="off" />
 			</div>
+			{#if transaction && transaction.bankRows.length > 0}
+				<section aria-labelledby="transaction-bank-text" class="flex flex-col gap-2">
+					<h3 id="transaction-bank-text" class="text-sm font-medium">Bank Text</h3>
+					<ul class="flex flex-col gap-2">
+						{#each transaction.bankRows as bankRow (bankRow._id)}
+							<li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+								<span class="min-w-0 break-words text-muted-foreground">{bankRow.bankText}</span>
+								{#if bankRow.matched}
+									<Button
+										type="button"
+										size="sm"
+										variant="outline"
+										disabled={saving}
+										onclick={() => unmatchRow(bankRow._id)}
+									>
+										Unmatch
+									</Button>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
 			{#if error}
 				<p role="alert" class="text-sm text-destructive">{error}</p>
 			{/if}
@@ -225,6 +277,11 @@
 						onclick={() => (confirmDelete = true)}
 					>
 						Delete
+					</Button>
+				{/if}
+				{#if transaction && !transaction.approved}
+					<Button type="button" variant="outline" disabled={saving} onclick={approveTransaction}>
+						Approve
 					</Button>
 				{/if}
 				<Button type="submit" disabled={saving}>Save</Button>

@@ -1,11 +1,14 @@
 import type { Doc, Id } from '../_generated/dataModel';
-import type { MutationCtx } from '../_generated/server';
+import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { requireCents } from './input';
 import { countTransaction } from './monthlyTotals';
 import { requireCutoverDate, requireIsoDate } from './settings';
 import { publicError } from './publicError';
 
-export type TransactionFields = Omit<Doc<'transactions'>, '_id' | '_creationTime'>;
+export type TransactionFields = Omit<Doc<'transactions'>, '_id' | '_creationTime' | 'approved'> & {
+	// Every write says whether the Transaction is approved; only old rows leave it out.
+	approved: boolean;
+};
 
 /** What the owner enters for a Transaction; the Payee is a name, blank for none. */
 export interface TransactionInput {
@@ -22,7 +25,7 @@ export interface TransactionInput {
 export async function transactionFields(
 	ctx: MutationCtx,
 	input: TransactionInput
-): Promise<Omit<TransactionFields, 'cleared'>> {
+): Promise<Omit<TransactionFields, 'cleared' | 'approved'>> {
 	if ((await ctx.db.get('accounts', input.accountId)) === null) throw publicError('NOT_FOUND');
 	requireIsoDate(input.date);
 	if (input.date < (await requireCutoverDate(ctx))) {
@@ -46,7 +49,11 @@ export async function transactionFields(
 	};
 }
 
-async function payeeNamed(ctx: MutationCtx, name: string): Promise<Id<'payees'> | undefined> {
+/** The Payee with this exact trimmed name, created on first use; none for a blank name. */
+export async function payeeNamed(
+	ctx: MutationCtx,
+	name: string
+): Promise<Id<'payees'> | undefined> {
 	const trimmed = name.trim();
 	if (trimmed === '') return undefined;
 	const existing = await ctx.db
@@ -77,4 +84,16 @@ export async function replaceTransaction(
 export async function deleteTransaction(ctx: MutationCtx, existing: Doc<'transactions'>) {
 	await countTransaction(ctx, existing, -1);
 	await ctx.db.delete('transactions', existing._id);
+	// Its Bank Rows stay, unlinked, so importing the same file again doesn't bring it back.
+	for (const bankRow of await bankRowsOf(ctx, existing._id)) {
+		await ctx.db.patch('imports', bankRow._id, { transactionId: undefined, matched: false });
+	}
+}
+
+/** The Bank Rows linked to a Transaction: at most one per source. */
+export async function bankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	return await ctx.db
+		.query('imports')
+		.withIndex('by_transactionId', (q) => q.eq('transactionId', transactionId))
+		.take(10);
 }

@@ -54,8 +54,9 @@ type CategoryName = (typeof GROUPS)[number]['categories'][number][0];
 
 /**
  * Writes a small synthetic budget on an empty backend: three Accounts, twelve Categories in three
- * groups with Assigned amounts each month, and about three months of made-up Transactions, from the first of the month two months back through today. Ends by
- * rebuilding the monthly totals, so every seeded deployment exercises the rebuild.
+ * groups with Assigned amounts each month, and about three months of made-up Transactions, from
+ * the first of the month two months back through today, the newest few imported and Unapproved.
+ * Ends by rebuilding the monthly totals, so every seeded deployment exercises the rebuild.
  */
 export const run = internalMutation({
 	args: {},
@@ -169,6 +170,30 @@ export const run = internalMutation({
 			}
 		}
 
+		// Bank Rows from a card statement file, waiting for review: two new Transactions named by
+		// their Bank Text, and one that Matched a coffee entered by hand.
+		const daysAgo = (days: number) =>
+			localIsoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - days));
+		const bankRows: [string, number, string, boolean][] = [
+			[daysAgo(1), -12_40, 'SAMPLE BOOKSHOP 0193', false],
+			[daysAgo(2), -31_75, 'SAMPLE HARDWARE 2208', false],
+			[daysAgo(3), -4_50, 'SAMPLE COFFEE SHOP 0042', true]
+		];
+		for (const [date, amount, bankText, matched] of bankRows) {
+			const payee = matched ? PAYEES.coffee : bankText;
+			const transactionId = await write(card, date, amount, payee, true, undefined, false);
+			await ctx.db.insert('imports', {
+				source: 'csv',
+				accountId: card,
+				date,
+				amount,
+				bankText,
+				transactionId,
+				matched,
+				state: 'linked'
+			});
+		}
+
 		await rebuildMonthlyTotals(ctx);
 		return null;
 	}
@@ -183,20 +208,22 @@ function writer(ctx: MutationCtx) {
 		amount: number,
 		payee: string,
 		cleared: boolean,
-		categoryId?: Id<'categories'>
+		categoryId?: Id<'categories'>,
+		approved = true
 	) => {
 		let payeeId = payees.get(payee);
 		if (payeeId === undefined) {
 			payeeId = await ctx.db.insert('payees', { name: payee });
 			payees.set(payee, payeeId);
 		}
-		await ctx.db.insert('transactions', {
+		return await ctx.db.insert('transactions', {
 			accountId,
 			date,
 			amount,
 			payeeId,
 			...(categoryId === undefined ? {} : { categoryId }),
-			cleared: cleared ? 'cleared' : 'uncleared'
+			cleared: cleared ? 'cleared' : 'uncleared',
+			approved
 		});
 	};
 }

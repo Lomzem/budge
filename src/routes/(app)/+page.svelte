@@ -1,10 +1,12 @@
 <script lang="ts">
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import { useQuery } from 'convex-svelte';
 	import { tick } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 
 	import { resolve } from '$app/paths';
+	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
 	import { getBudgetMonth } from '$lib/budget.svelte';
@@ -20,6 +22,10 @@
 
 	const accounts = getAccounts();
 	const budget = getBudgetMonth();
+	const unapproved = useQuery(api.transactions.unapprovedCount, () =>
+		accounts.loaded ? {} : 'skip'
+	);
+	const unapprovedCount = $derived(unapproved.data ?? 0);
 	let addAccountOpen = $state(false);
 	let adding: 'group' | 'category' = $state('group');
 	let addingOpen = $state(false);
@@ -143,12 +149,20 @@
 				have. Lower an Assigned amount.
 			</p>
 		{/if}
-		{#if view.uncategorizedCount > 0}
-			<p class="text-sm">
-				<a href={resolve('/accounts')} class="underline underline-offset-4 hover:no-underline">
-					{view.uncategorizedCount}
-					{view.uncategorizedCount === 1 ? 'Transaction needs' : 'Transactions need'} a Category
-				</a>
+		{#if view.uncategorizedCount > 0 || unapprovedCount > 0}
+			<p class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+				{#if view.uncategorizedCount > 0}
+					<a href={resolve('/accounts')} class="underline underline-offset-4 hover:no-underline">
+						{view.uncategorizedCount}
+						{view.uncategorizedCount === 1 ? 'Transaction needs' : 'Transactions need'} a Category
+					</a>
+				{/if}
+				{#if unapprovedCount > 0}
+					<a href={resolve('/accounts')} class="underline underline-offset-4 hover:no-underline">
+						{unapprovedCount}
+						{unapprovedCount === 1 ? 'Transaction is' : 'Transactions are'} Unapproved
+					</a>
+				{/if}
 			</p>
 		{/if}
 		{#if view.overspent.length > 0}
