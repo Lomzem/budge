@@ -73,7 +73,12 @@ test('a Target shows its progress, "Assign $X" funds it, and it is listed as Upc
 		if (assigning) {
 			const assign = inspector.getByRole('button', { name: /^Assign \$/ });
 			await expect
-				.poll(async () => (await assign.count()) === 0 || (await assign.isEnabled()))
+				.poll(() =>
+					assign.evaluateAll(
+						(buttons) =>
+							buttons.length === 0 || buttons.some((button) => !button.matches(':disabled'))
+					)
+				)
 				.toBe(true);
 		}
 		const edit = inspector.getByRole('button', { name: 'Edit Target' });
