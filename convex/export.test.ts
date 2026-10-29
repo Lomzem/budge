@@ -136,7 +136,6 @@ describe('the export', () => {
 
 		await expect(
 			owner.query(api.export.page, {
-				// @ts-expect-error `monthlyTotals` is not an exportable table.
 				table: 'monthlyTotals',
 				paginationOpts: { numItems: 10, cursor: null }
 			})
