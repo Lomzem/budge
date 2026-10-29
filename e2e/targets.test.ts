@@ -32,6 +32,7 @@ test('a Target shows its progress, "Assign $X" funds it, and it is listed as Upc
 	const inspector = page.getByRole('region', { name });
 
 	const dialog = page.getByRole('dialog');
+	let assigning = false;
 	try {
 		// Set aside $25 more than is Assigned, due today, so it needs exactly $25.00.
 		await inspector.getByRole('button', { name: 'Add Target' }).click();
@@ -52,6 +53,7 @@ test('a Target shows its progress, "Assign $X" funds it, and it is listed as Upc
 		const row = upcoming.getByRole('row').filter({ hasText: name });
 		await expect(row).toContainText('No');
 
+		assigning = true;
 		await inspector.getByRole('button', { name: 'Assign $25.00' }).click();
 		await expect(inspector.getByText('Funded', { exact: true })).toBeVisible();
 		await expect(bar).toHaveAttribute('aria-valuetext', 'Funded');
@@ -65,6 +67,14 @@ test('a Target shows its progress, "Assign $X" funds it, and it is listed as Upc
 		// Leave the seeded budget as it was, even when an assertion above failed.
 		await page.setViewportSize({ width: 1280, height: 800 });
 		if (await dialog.isVisible()) await page.keyboard.press('Escape');
+		// A pending "Assign $25.00" could land after the restore below, so let it settle first. If it
+		// failed instead, Assigned is still `before` and the poll gives up.
+		if (assigning) {
+			await expect
+				.poll(() => assigned(page, name))
+				.toBe(before + 2_500)
+				.catch(() => undefined);
+		}
 		const edit = inspector.getByRole('button', { name: 'Edit Target' });
 		if (await edit.isVisible()) {
 			await edit.click();
