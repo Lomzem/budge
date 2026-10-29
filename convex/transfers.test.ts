@@ -15,6 +15,7 @@ async function budgetWithThreeAccounts() {
 	const checking = await account('Checking', 'cash', 100_000);
 	const savings = await account('Savings', 'cash', 500_000);
 	const card = await account('Card', 'creditCard', -20_000);
+	const wallet = await account('Wallet', 'cash', 10_000);
 	const balances = async () =>
 		Object.fromEntries(
 			(await owner.query(api.accounts.list, {})).map((row) => [row.name, row.balance])
@@ -26,7 +27,7 @@ async function budgetWithThreeAccounts() {
 				paginationOpts: { numItems: 50, cursor: null }
 			})
 		).page.filter((row) => row.payeeName !== 'Starting Balance');
-	return { ...backend, checking, savings, card, balances, rows };
+	return { ...backend, checking, savings, card, wallet, balances, rows };
 }
 
 const toSavings = { date: '2026-08-20', amount: -25_000, payee: '', memo: 'Rainy day' };
@@ -91,7 +92,7 @@ describe('a Transfer', () => {
 
 		expect(await budget()).toEqual(before);
 		// The card's starting debt is still Uncategorized.
-		expect(before.readyToAssign).toEqual({ amount: 550_000, uncategorized: -20_000 });
+		expect(before.readyToAssign).toEqual({ amount: 560_000, uncategorized: -20_000 });
 	});
 
 	test.each([
@@ -111,6 +112,24 @@ describe('a Transfer', () => {
 					transferAccountId: 'transferAccountId' in change ? checking : savings,
 					...('categoryId' in change ? { categoryId: groceries } : {}),
 					...('payee' in change ? { payee: change.payee } : {})
+				})
+			)
+		).toBe('INVALID_INPUT');
+	});
+
+	// Card payments arrive with Credit Card Accounts; until then a Transfer is Cash to Cash only.
+	test.each([
+		['to a Credit Card Account', 'checking', 'card'],
+		['from a Credit Card Account', 'card', 'checking']
+	] as const)('refuses one %s', async (_, from, to) => {
+		const accounts = await budgetWithThreeAccounts();
+
+		expect(
+			await publicErrorCode(
+				accounts.owner.mutation(api.transactions.create, {
+					...toSavings,
+					accountId: accounts[from],
+					transferAccountId: accounts[to]
 				})
 			)
 		).toBe('INVALID_INPUT');
@@ -149,7 +168,7 @@ describe('changing one side of a Transfer', () => {
 	});
 
 	test('moving either side to another Account moves that side, still linked', async () => {
-		const { owner, checking, savings, card, intoSavings, balances, rows } = await transferred();
+		const { owner, checking, savings, wallet, intoSavings, balances, rows } = await transferred();
 		const intoSavingsFrom = (accountId: Id<'accounts'>, transferAccountId: Id<'accounts'>) =>
 			owner.mutation(api.transactions.update, {
 				transactionId: intoSavings,
@@ -159,19 +178,27 @@ describe('changing one side of a Transfer', () => {
 				amount: 25_000
 			});
 
-		// The other side moves from Checking to the Card.
-		await intoSavingsFrom(savings, card);
-		expect(await balances()).toMatchObject({ Checking: 100_000, Savings: 525_000, Card: -45_000 });
+		// The other side moves from Checking to the Wallet.
+		await intoSavingsFrom(savings, wallet);
+		expect(await balances()).toMatchObject({
+			Checking: 100_000,
+			Savings: 525_000,
+			Wallet: -15_000
+		});
 		expect(await rows(checking)).toEqual([]);
-		expect(await rows(card)).toMatchObject([
+		expect(await rows(wallet)).toMatchObject([
 			{ amount: -25_000, transfer: { accountId: savings, accountName: 'Savings' } }
 		]);
 
 		// This side moves from Savings to Checking.
-		await intoSavingsFrom(checking, card);
-		expect(await balances()).toMatchObject({ Checking: 125_000, Savings: 500_000, Card: -45_000 });
+		await intoSavingsFrom(checking, wallet);
+		expect(await balances()).toMatchObject({
+			Checking: 125_000,
+			Savings: 500_000,
+			Wallet: -15_000
+		});
 		expect(await rows(savings)).toEqual([]);
-		expect(await rows(card)).toMatchObject([
+		expect(await rows(wallet)).toMatchObject([
 			{ amount: -25_000, transfer: { accountId: checking, accountName: 'Checking' } }
 		]);
 	});

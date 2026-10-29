@@ -52,7 +52,12 @@
 	const transferAccountId = $derived(
 		categoryId.startsWith(TRANSFER) ? categoryId.slice(TRANSFER.length) : undefined
 	);
-	const transferAccounts = $derived(accounts.all.filter((account) => account._id !== accountId));
+	// A Transfer is Cash to Cash until Credit Card Accounts take card payments.
+	const transferAccounts = $derived(
+		accounts.cash.some((account) => account._id === accountId)
+			? accounts.cash.filter((account) => account._id !== accountId)
+			: []
+	);
 	const isTransfer = $derived(transferAccountId !== undefined);
 
 	// Fill the form each time the dialog opens, and only then: live updates to the Accounts

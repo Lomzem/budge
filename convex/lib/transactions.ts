@@ -83,9 +83,15 @@ export async function saveTransaction(
 		return existing._id;
 	}
 
-	if ((await ctx.db.get('accounts', transferAccountId)) === null) throw publicError('NOT_FOUND');
+	const target = await ctx.db.get('accounts', transferAccountId);
+	if (target === null) throw publicError('NOT_FOUND');
 	if (transferAccountId === fields.accountId) {
 		throw publicError('INVALID_INPUT', 'Pick another Account to transfer with.');
+	}
+	// Card payments arrive with Credit Card Accounts; until then a Transfer is Cash to Cash only.
+	const source = await ctx.db.get('accounts', fields.accountId);
+	if (source?.kind !== 'cash' || target.kind !== 'cash') {
+		throw publicError('INVALID_INPUT', 'A Transfer is between two Cash Accounts.');
 	}
 	if (fields.categoryId !== undefined || fields.payeeId !== undefined) {
 		throw publicError('INVALID_INPUT', 'A Transfer has no Category or Payee.');
