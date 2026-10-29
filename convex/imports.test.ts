@@ -2,8 +2,8 @@ import { Effect } from 'effect';
 import { describe, expect, test } from 'vitest';
 
 import { decodeBankFile } from '../src/lib/domain/bankFiles';
-import checkingCsv from '../src/lib/domain/fixtures/capital-one-checking.csv?raw';
-import checkingQfx from '../src/lib/domain/fixtures/capital-one-checking.qfx?raw';
+import checkingCsv from '../src/lib/domain/fixtures/synthetic/capital-one-checking.csv?raw';
+import checkingQfx from '../src/lib/domain/fixtures/synthetic/capital-one-checking.qfx?raw';
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';

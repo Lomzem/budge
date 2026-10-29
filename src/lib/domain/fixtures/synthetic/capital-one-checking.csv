@@ -1,0 +1,6 @@
+Account Number,Transaction Description,Transaction Date,Transaction Type,Transaction Amount,Balance
+DEMO-CHECKING,Debit Card Purchase - SAMPLE GROCER,08/14/26,Debit,42.50,1957.50
+DEMO-CHECKING,"Deposit from SAMPLE PAYROLL, INC",08/15/26,Credit,"2,310.42",4267.92
+DEMO-CHECKING,Debit Card Purchase - SAMPLE COFFEE,08/16/26,Debit,-4.50,4263.42
+DEMO-CHECKING,Debit Card Purchase - SAMPLE COFFEE,08/16/26,Debit,4.50,4258.92
+DEMO-CHECKING,Debit Card Purchase - OLD SAMPLE SHOP,07/31/26,Debit,10.00,2000.00

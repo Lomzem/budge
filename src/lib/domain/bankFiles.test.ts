@@ -7,7 +7,7 @@ import { decodeBankFile } from './bankFiles';
 
 // Hand-written synthetic files that mirror only the banks' layouts.
 const fixture = (name: string) =>
-	readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
+	readFileSync(new URL(`./fixtures/synthetic/${name}`, import.meta.url), 'utf8');
 
 const cutoverDate = '2026-08-01';
 
