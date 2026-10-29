@@ -18,6 +18,8 @@
 	let addAccountOpen = $state(false);
 	let adding: 'group' | 'category' | undefined = $state();
 	let addingOpen = $state(false);
+	/** Bumped on each open, so the dialog mounts fresh with an empty form. */
+	let addingSession = $state(0);
 
 	const view = $derived(budget.view);
 	const readyToAssign = $derived(budget.readyToAssign);
@@ -25,6 +27,7 @@
 
 	function add(kind: 'group' | 'category') {
 		adding = kind;
+		addingSession += 1;
 		addingOpen = true;
 	}
 </script>
@@ -165,5 +168,7 @@
 
 <AccountDialog bind:open={addAccountOpen} />
 {#if adding}
-	<AddCategoryDialog bind:open={addingOpen} kind={adding} {groups} />
+	{#key addingSession}
+		<AddCategoryDialog bind:open={addingOpen} kind={adding} {groups} />
+	{/key}
 {/if}

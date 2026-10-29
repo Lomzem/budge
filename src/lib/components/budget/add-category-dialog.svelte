@@ -24,22 +24,12 @@
 	const createGroup = useMutation(api.categories.createGroup);
 	const createCategory = useMutation(api.categories.create);
 
+	// The parent mounts a fresh dialog for each open, so this is the reset.
 	let name = $state('');
-	let groupId = $state('');
+	let groupId = $state(untrack(() => groups[0]?.id ?? ''));
 	let error = $state('');
 	let saving = $state(false);
 	const title = $derived(kind === 'group' ? 'Add Category Group' : 'Add Category');
-
-	// Reset each time the dialog opens, and only then, so live updates keep what's typed.
-	$effect(() => {
-		if (open) untrack(reset);
-	});
-
-	function reset() {
-		name = '';
-		error = '';
-		groupId = groups[0]?.id ?? '';
-	}
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();

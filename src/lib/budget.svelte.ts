@@ -27,19 +27,33 @@ export class BudgetMonth {
 	/** The same in every month, so it stays shown while another month loads. */
 	readonly readyToAssign = $derived.by(() => this.#query.data?.readyToAssign);
 	readonly error = $derived.by(() => this.#query.error);
+	/** Also the same in every month, so Previous stays enabled while the next month loads. */
+	readonly #firstMonth = $derived.by(() => this.#query.data?.firstMonth);
 	/** Months before the cutover month have nothing to budget. */
 	readonly canGoBack = $derived.by(() => {
-		const first = this.view?.firstMonth;
+		const first = this.#firstMonth;
 		return first !== null && first !== undefined && this.month > first;
 	});
 
-	/** `enabled` turns the subscription on once the owner is signed in. */
+	/**
+	 * `enabled` turns the subscription on once the owner is signed in. Construct during component
+	 * setup, which owns the midnight refresh timer.
+	 */
 	constructor(enabled: () => boolean) {
 		this.#query = useQuery(
 			api.budget.month,
 			() => (enabled() ? { month: this.month, today: this.today } : 'skip'),
 			{ keepPreviousData: true }
 		);
+		// Income dated today starts counting at midnight, even if Budge stays open and focused.
+		$effect(() => {
+			const timer = setInterval(() => {
+				this.refreshToday();
+			}, 60_000);
+			return () => {
+				clearInterval(timer);
+			};
+		});
 	}
 
 	previous() {
