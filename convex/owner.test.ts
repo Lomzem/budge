@@ -38,6 +38,14 @@ function sampleArgs(ids: {
 		'categories:list': {},
 		'categories:createGroup': { name: 'Bills' },
 		'categories:create': { groupId, name: 'Rent' },
+		'categories:rename': { categoryId, name: 'Rent' },
+		'categories:renameGroup': { groupId, name: 'Bills' },
+		'categories:move': { categoryId, groupId, index: 0 },
+		'categories:moveGroup': { groupId, index: 0 },
+		'categories:setHidden': { categoryId, hidden: true },
+		'categories:setGroupHidden': { groupId, hidden: true },
+		'categories:remove': { categoryId, destinationId: categoryId },
+		'categories:removeGroup': { groupId },
 		'budget:month': { month: '2026-08', today: '2026-08-14' },
 		'budget:setAssigned': { month: '2026-08', categoryId, amount: 500 }
 	};

@@ -173,11 +173,17 @@
 							<option value={categories.data.readyToAssignId}>Ready to Assign</option>
 						{/if}
 						{#each categories.data.groups as group (group._id)}
-							<optgroup label={group.name}>
-								{#each group.categories as category (category._id)}
-									<option value={category._id}>{category.name}</option>
-								{/each}
-							</optgroup>
+							<!-- Hidden Categories stay out of the picker, unless this Transaction has one. -->
+							{@const shown = group.categories.filter(
+								(c) => (!c.hidden && !group.hidden) || c._id === transaction?.categoryId
+							)}
+							{#if shown.length > 0}
+								<optgroup label={group.name}>
+									{#each shown as category (category._id)}
+										<option value={category._id}>{category.name}</option>
+									{/each}
+								</optgroup>
+							{/if}
 						{/each}
 					{:else if transaction?.categoryId}
 						<!-- Keeps the saved Category selected while the list loads. -->

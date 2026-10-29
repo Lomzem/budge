@@ -16,18 +16,22 @@ export default defineSchema({
 	}),
 
 	// Ready to Assign is a system Category in a hidden system group; the budget table shows only
-	// `normal` groups and Categories.
+	// `normal` groups and Categories. Budge manages the system ones, so the owner can't change
+	// them. `position` orders siblings: groups among the normal groups, Categories within a group.
+	// `hidden` takes a group or Category out of the budget table; it still counts in every total.
 	categoryGroups: defineTable({
 		name: v.string(),
 		position: v.number(),
-		kind: v.union(v.literal('normal'), v.literal('readyToAssign'))
+		kind: v.union(v.literal('normal'), v.literal('readyToAssign')),
+		hidden: v.optional(v.boolean())
 	}),
 
 	categories: defineTable({
 		groupId: v.id('categoryGroups'),
 		name: v.string(),
 		position: v.number(),
-		kind: v.union(v.literal('normal'), v.literal('readyToAssign'))
+		kind: v.union(v.literal('normal'), v.literal('readyToAssign')),
+		hidden: v.optional(v.boolean())
 	}).index('by_group_position', ['groupId', 'position']),
 
 	// Assigned per month and Category. Setting Assigned to 0 deletes the row.
@@ -35,7 +39,9 @@ export default defineSchema({
 		month: v.string(),
 		categoryId: v.id('categories'),
 		amount: v.number()
-	}).index('by_month_category', ['month', 'categoryId']),
+	})
+		.index('by_month_category', ['month', 'categoryId'])
+		.index('by_category_month', ['categoryId', 'month']),
 
 	payees: defineTable({
 		name: v.string()

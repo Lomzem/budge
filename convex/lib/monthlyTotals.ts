@@ -62,3 +62,42 @@ export async function accountBalances(ctx: QueryCtx): Promise<Map<Id<'accounts'>
 	}
 	return balances;
 }
+
+/**
+ * Rebuilds the totals a Category's Transactions just left for `to`, once they have moved. Each
+ * (month, Account) total of `from` named in `keys` is summed into `to`'s, which is what the
+ * rebuild would write.
+ */
+export async function moveTotals(
+	ctx: MutationCtx,
+	from: Id<'categories'>,
+	to: Id<'categories'>,
+	keys: Iterable<Pick<Key, 'month' | 'accountId'>>
+) {
+	const totalOf = (key: Pick<Key, 'month' | 'accountId'>, bucket: Key['bucket']) =>
+		ctx.db
+			.query('monthlyTotals')
+			.withIndex('by_month_account_bucket', (q) =>
+				q.eq('month', key.month).eq('accountId', key.accountId).eq('bucket', bucket)
+			)
+			.unique();
+	for (const key of keys) {
+		const source = await totalOf(key, from);
+		if (source === null) continue;
+		await ctx.db.delete('monthlyTotals', source._id);
+		const destination = await totalOf(key, to);
+		if (destination === null) {
+			await ctx.db.insert('monthlyTotals', {
+				...key,
+				bucket: to,
+				amount: source.amount,
+				count: source.count
+			});
+		} else {
+			await ctx.db.patch('monthlyTotals', destination._id, {
+				amount: destination.amount + source.amount,
+				count: destination.count + source.count
+			});
+		}
+	}
+}

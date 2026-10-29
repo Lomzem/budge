@@ -157,15 +157,33 @@
 						}}>Add Category</Button
 					>
 				{/if}
+				<Button variant="ghost" size="sm" href={resolve('/categories')}>Manage Categories</Button>
 			</div>
 			{#if groups.length > 0}
 				<BudgetTable groups={view.groups} />
-			{:else}
+			{:else if view.hidden.length === 0}
 				<p class="text-muted-foreground">
 					No Categories yet. Add a Category Group, then Categories to assign money to.
 				</p>
 			{/if}
 		</section>
+
+		{#if view.hidden.length > 0}
+			<section aria-labelledby="hidden-heading" class="flex flex-col gap-1">
+				<h2 id="hidden-heading" class="font-medium">Hidden Categories</h2>
+				<ul class="flex flex-col gap-0.5 text-sm">
+					{#each view.hidden as category (category.id)}
+						<li class="flex max-w-sm justify-between gap-4">
+							<span class="truncate">{category.name}</span>
+							<span class="tabular-nums">
+								<span class="sr-only">Available</span>
+								{formatCents(category.available)}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/if}
 	{/if}
 </div>
 

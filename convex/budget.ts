@@ -18,6 +18,13 @@ const status = v.union(
 	v.literal('empty')
 );
 
+const categoryBudget = v.object({
+	id: v.id('categories'),
+	name: v.string(),
+	...totals,
+	status
+});
+
 /**
  * Everything the budget screen shows for `month`. `today` comes from the browser, as reading the
  * clock here would defeat query caching. Reads only Categories, groups, Assigned rows, the
@@ -36,11 +43,10 @@ export const month = query({
 				id: v.id('categoryGroups'),
 				name: v.string(),
 				...totals,
-				categories: v.array(
-					v.object({ id: v.id('categories'), name: v.string(), ...totals, status })
-				)
+				categories: v.array(categoryBudget)
 			})
 		),
+		hidden: v.array(categoryBudget),
 		overspent: v.array(
 			v.object({ id: v.id('categories'), name: v.string(), available: v.number() })
 		)
@@ -81,13 +87,20 @@ export const month = query({
 			month: args.month,
 			today: args.today,
 			cutoverDate: await readCutoverDate(ctx),
-			groups: groups.map((g) => ({ id: g._id, name: g.name, position: g.position, kind: g.kind })),
+			groups: groups.map((g) => ({
+				id: g._id,
+				name: g.name,
+				position: g.position,
+				kind: g.kind,
+				hidden: g.hidden
+			})),
 			categories: categories.map((c) => ({
 				id: c._id,
 				groupId: c.groupId,
 				name: c.name,
 				position: c.position,
-				kind: c.kind
+				kind: c.kind,
+				hidden: c.hidden
 			})),
 			assignments,
 			monthlyTotals,
