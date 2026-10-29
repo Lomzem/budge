@@ -47,15 +47,24 @@ test.each([1, 2, 3, 4, 5])(
 		];
 		const live: Id<'transactions'>[] = [];
 		const entry = () => {
-			const categoryId = rand.pick(categories);
-			return {
-				accountId: rand.pick(accounts),
+			const accountId = rand.pick(accounts);
+			const shared = {
+				accountId,
 				date: rand.pick(dates),
 				// Small amounts, so edits often bring a total back to zero.
 				amount: rand.pick([-500, 500, -1_250, 1_250, -99, 0]),
-				payee: rand.pick(payees),
-				...(categoryId === undefined ? {} : { categoryId }),
 				memo: ''
+			};
+			// About one in four is a Transfer to another Account.
+			if (rand.int(4) === 0) {
+				const others = accounts.filter((id) => id !== accountId);
+				return { ...shared, payee: '', transferAccountId: rand.pick(others) };
+			}
+			const categoryId = rand.pick(categories);
+			return {
+				...shared,
+				payee: rand.pick(payees),
+				...(categoryId === undefined ? {} : { categoryId })
 			};
 		};
 
@@ -94,5 +103,6 @@ test.each([1, 2, 3, 4, 5])(
 		await t.mutation(internal.monthlyTotals.rebuild, {});
 		expect(await readTotals()).toEqual(kept);
 		expect(kept.every((row) => row.count > 0)).toBe(true);
+		expect(kept.some((row) => row.bucket === 'transfer')).toBe(true);
 	}
 );

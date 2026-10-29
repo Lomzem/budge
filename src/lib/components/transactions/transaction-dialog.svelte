@@ -38,7 +38,7 @@
 	let accountId = $state('');
 	let date = $state('');
 	let payee = $state('');
-	/** A Category ID, or `''` for Uncategorized. */
+	/** A Category ID, `''` for Uncategorized, or `transfer:` and the other Account's ID. */
 	let categoryId = $state('');
 	let direction: 'outflow' | 'inflow' = $state('outflow');
 	let amount = $state('');
@@ -46,6 +46,14 @@
 	let error = $state('');
 	let saving = $state(false);
 	let confirmDelete = $state(false);
+
+	const TRANSFER = 'transfer:';
+	/** The other Account picked for a Transfer, or `undefined` for an ordinary Transaction. */
+	const transferAccountId = $derived(
+		categoryId.startsWith(TRANSFER) ? categoryId.slice(TRANSFER.length) : undefined
+	);
+	const transferAccounts = $derived(accounts.all.filter((account) => account._id !== accountId));
+	const isTransfer = $derived(transferAccountId !== undefined);
 
 	// Fill the form each time the dialog opens, and only then: live updates to the Accounts
 	// must not wipe what the owner is typing.
@@ -59,7 +67,9 @@
 			accountId = transaction.accountId;
 			date = transaction.date;
 			payee = transaction.payeeName ?? '';
-			categoryId = transaction.categoryId ?? '';
+			categoryId = transaction.transfer
+				? TRANSFER + transaction.transfer.accountId
+				: (transaction.categoryId ?? '');
 			direction = transaction.amount < 0 ? 'outflow' : 'inflow';
 			amount = formatCents(Math.abs(transaction.amount)).replace('$', '');
 			memo = transaction.memo ?? '';
@@ -95,15 +105,25 @@
 			error = 'Enter the amount, such as 12.50.';
 			return;
 		}
-		const category = findCategory(categoryId);
-		const fields = {
+		const shared = {
 			accountId: account._id,
 			date,
 			amount: direction === 'outflow' ? -Math.abs(cents) : Math.abs(cents),
-			payee,
-			...(category === undefined ? {} : { categoryId: category }),
 			memo
 		};
+		let fields;
+		if (transferAccountId === undefined) {
+			const category = findCategory(categoryId);
+			fields = { ...shared, payee, ...(category === undefined ? {} : { categoryId: category }) };
+		} else {
+			const other = transferAccounts.find((a) => a._id === transferAccountId);
+			if (!other) {
+				error = 'Pick another Account to transfer with.';
+				return;
+			}
+			// A Transfer has no Payee or Category.
+			fields = { ...shared, payee: '', transferAccountId: other._id };
+		}
 		saving = true;
 		try {
 			if (transaction) await update({ transactionId: transaction._id, ...fields });
@@ -156,12 +176,14 @@
 				<Label for="transaction-date">Date</Label>
 				<Input id="transaction-date" type="date" bind:value={date} required />
 			</div>
+			{#if !isTransfer}
+				<div class="flex flex-col gap-2">
+					<Label for="transaction-payee">Payee</Label>
+					<Input id="transaction-payee" bind:value={payee} autocomplete="off" />
+				</div>
+			{/if}
 			<div class="flex flex-col gap-2">
-				<Label for="transaction-payee">Payee</Label>
-				<Input id="transaction-payee" bind:value={payee} autocomplete="off" />
-			</div>
-			<div class="flex flex-col gap-2">
-				<Label for="transaction-category">Category</Label>
+				<Label for="transaction-category">Category or Transfer</Label>
 				<select
 					id="transaction-category"
 					bind:value={categoryId}
@@ -183,7 +205,19 @@
 						<!-- Keeps the saved Category selected while the list loads. -->
 						<option value={transaction.categoryId}>{transaction.categoryName}</option>
 					{/if}
+					{#if transferAccounts.length > 0}
+						<optgroup label="Transfer to or from">
+							{#each transferAccounts as account (account._id)}
+								<option value={TRANSFER + account._id}>Transfer: {account.name}</option>
+							{/each}
+						</optgroup>
+					{/if}
 				</select>
+				{#if isTransfer}
+					<p class="text-sm text-muted-foreground">
+						The other side is kept in step: editing or deleting one side changes both.
+					</p>
+				{/if}
 			</div>
 			<fieldset>
 				<legend class="mb-2 text-sm font-medium">Direction</legend>
@@ -236,9 +270,16 @@
 <AlertDialog.Root bind:open={confirmDelete}>
 	<AlertDialog.Content>
 		<AlertDialog.Header>
-			<AlertDialog.Title>Delete this Transaction?</AlertDialog.Title>
+			<AlertDialog.Title>
+				{transaction?.transfer ? 'Delete this Transfer?' : 'Delete this Transaction?'}
+			</AlertDialog.Title>
 			<AlertDialog.Description>
-				Its amount comes out of the Account balance. This can't be undone.
+				{#if transaction?.transfer}
+					Both sides are deleted, here and in {transaction.transfer.accountName}. This can't be
+					undone.
+				{:else}
+					Its amount comes out of the Account balance. This can't be undone.
+				{/if}
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

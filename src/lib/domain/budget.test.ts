@@ -177,6 +177,30 @@ describe('Uncategorized Transactions', () => {
 	});
 });
 
+test('a Transfer between Cash Accounts touches no Category and not Ready to Assign', () => {
+	const without = budget({
+		monthlyTotals: [
+			{ month: '2026-09', bucket: 'readyToAssign', amount: 230_000, count: 1 },
+			{ month: '2026-10', bucket: 'groceries', amount: -6_000, count: 1 }
+		],
+		assignments: [{ month: '2026-10', categoryId: 'groceries', amount: 10_000 }]
+	});
+	const withTransfer = {
+		...without,
+		monthlyTotals: [
+			...without.monthlyTotals,
+			// Both sides of a $500 Transfer, one in each Account.
+			{ month: '2026-10', bucket: 'transfer' as const, amount: -50_000, count: 1 },
+			{ month: '2026-10', bucket: 'transfer' as const, amount: 50_000, count: 1 }
+		]
+	};
+
+	const result = computeBudget(withTransfer);
+	expect(result).toEqual(computeBudget(without));
+	expect(result.readyToAssign).toEqual({ amount: 220_000, uncategorized: 0 });
+	expect(result.uncategorizedCount).toBe(0);
+});
+
 test('groups show their totals, and overspent Categories are listed in table order', () => {
 	const result = computeBudget(
 		budget({
@@ -333,14 +357,23 @@ describe('the cash invariant', () => {
 		(seed) => {
 			const rand = random(seed);
 			const transactions: { date: string; amount: number; categoryId: CategoryId | null }[] = [];
+			// Transfers between two Cash Accounts: each is a pair of sides with opposite amounts.
+			const transfers: { date: string; amount: number }[] = [];
 			const assigned = new Map<string, number>();
 
 			// Every Transaction has happened by now.
 			const today = '2027-01-01';
 			const check = () => {
 				const totals = new Map<string, { amount: number; count: number }>();
-				for (const t of transactions) {
-					const key = `${t.date.slice(0, 7)}|${t.categoryId ?? 'uncategorized'}`;
+				const sides = transfers.flatMap(({ date, amount }) => [
+					{ date, amount, bucket: 'transfer' },
+					{ date, amount: -amount, bucket: 'transfer' }
+				]);
+				for (const t of [
+					...transactions.map((t) => ({ ...t, bucket: t.categoryId ?? 'uncategorized' })),
+					...sides
+				]) {
+					const key = `${t.date.slice(0, 7)}|${t.bucket}`;
 					const row = totals.get(key) ?? { amount: 0, count: 0 };
 					row.amount += t.amount;
 					row.count += 1;
@@ -359,7 +392,7 @@ describe('the cash invariant', () => {
 					}),
 					monthlyTotals: [...totals].map(([key, row]) => {
 						const [month = '', bucket] = key.split('|');
-						return { month, bucket: bucket as CategoryId | 'uncategorized', ...row };
+						return { month, bucket: bucket as CategoryId | 'uncategorized' | 'transfer', ...row };
 					})
 				});
 
@@ -376,7 +409,7 @@ describe('the cash invariant', () => {
 			};
 
 			for (let step = 0; step < 60; step++) {
-				const action = transactions.length === 0 ? 0 : rand.int(4);
+				const action = transactions.length === 0 ? 0 : rand.int(5);
 				const entry = () => ({
 					date: `${rand.pick(months)}-${String(1 + rand.int(28)).padStart(2, '0')}`,
 					amount: rand.int(200_000) - 120_000,
@@ -385,6 +418,11 @@ describe('the cash invariant', () => {
 				if (action === 0) transactions.push(entry());
 				else if (action === 1) transactions[rand.int(transactions.length)] = entry();
 				else if (action === 2) transactions.splice(rand.int(transactions.length), 1);
+				else if (action === 3) {
+					const { date, amount } = entry();
+					if (transfers.length > 0 && rand.int(3) === 0) transfers.pop();
+					else transfers.push({ date, amount });
+				}
 				// Setting Assigned, sometimes back to zero.
 				else
 					assigned.set(
