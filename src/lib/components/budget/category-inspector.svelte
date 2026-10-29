@@ -35,15 +35,24 @@
 	let moveError = $state('');
 	let covering = $state(false);
 	let coverError = $state('');
+	let section: HTMLElement | undefined = $state();
 
-	const others = $derived({
-		groups: view.groups.map((group) => ({
-			id: group.id,
-			name: group.name,
-			categories: group.categories.filter((c) => c.id !== category.id)
-		})),
-		hidden: view.hidden.filter((c) => c.id !== category.id)
-	});
+	// Every other Category money can move to or from, by group, with hidden ones last.
+	const others = $derived(
+		[
+			...view.groups.map((group) => ({
+				key: group.id,
+				label: group.name,
+				categories: group.categories
+			})),
+			{ key: 'hidden', label: 'Hidden', categories: view.hidden }
+		]
+			.map((option) => ({
+				...option,
+				categories: option.categories.filter((c) => c.id !== category.id)
+			}))
+			.filter((option) => option.categories.length > 0)
+	);
 
 	const status = $derived(AVAILABLE_STATUS[category.status]);
 
@@ -54,9 +63,7 @@
 	]);
 
 	function findOther(id: string): Id<'categories'> | undefined {
-		return [...others.groups.flatMap((g) => g.categories), ...others.hidden].find(
-			(c) => c.id === id
-		)?.id;
+		return others.flatMap((group) => group.categories).find((c) => c.id === id)?.id;
 	}
 
 	async function move(event: SubmitEvent) {
@@ -89,6 +96,8 @@
 		covering = true;
 		try {
 			await budget.cover(category.id);
+			// The Cover button goes once Available reaches zero, so keep keyboard focus in the inspector.
+			section?.focus();
 		} catch (thrown) {
 			coverError =
 				readPublicError(thrown)?.message ?? "Budge couldn't cover the Category. Try again.";
@@ -104,6 +113,7 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <section
+	bind:this={section}
 	id="category-inspector"
 	aria-labelledby="inspector-heading"
 	tabindex="-1"
@@ -170,26 +180,13 @@
 				class="h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
 			>
 				<option value="" disabled>Pick a Category</option>
-				{#each others.groups as group (group.id)}
-					{#if group.categories.length > 0}
-						<optgroup label={group.name}>
-							{#each group.categories as other (other.id)}
-								<option value={other.id}>
-									{other.name} ({formatCents(other.available)})
-								</option>
-							{/each}
-						</optgroup>
-					{/if}
-				{/each}
-				{#if others.hidden.length > 0}
-					<optgroup label="Hidden">
-						{#each others.hidden as other (other.id)}
-							<option value={other.id}>
-								{other.name} ({formatCents(other.available)})
-							</option>
+				{#each others as group (group.key)}
+					<optgroup label={group.label}>
+						{#each group.categories as other (other.id)}
+							<option value={other.id}>{other.name} ({formatCents(other.available)})</option>
 						{/each}
 					</optgroup>
-				{/if}
+				{/each}
 			</select>
 		</div>
 		<div class="flex flex-col gap-2">
