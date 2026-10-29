@@ -90,6 +90,7 @@ describe('the budget query', () => {
 					]
 				}
 			],
+			hidden: [],
 			overspent: []
 		});
 		expect((await b.view('2026-09')).overspent).toEqual([
@@ -156,12 +157,18 @@ describe('Categories', () => {
 				{
 					_id: b.everyday,
 					name: 'Everyday',
+					hidden: false,
 					categories: [
-						{ _id: b.groceries, name: 'Groceries' },
-						{ _id: b.rent, name: 'Rent' }
+						{ _id: b.groceries, name: 'Groceries', hidden: false },
+						{ _id: b.rent, name: 'Rent', hidden: false }
 					]
 				},
-				{ _id: bills, name: 'Bills', categories: [{ _id: phone, name: 'Phone' }] }
+				{
+					_id: bills,
+					name: 'Bills',
+					hidden: false,
+					categories: [{ _id: phone, name: 'Phone', hidden: false }]
+				}
 			]
 		});
 	});

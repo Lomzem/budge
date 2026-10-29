@@ -1,4 +1,4 @@
-import { monthOf } from '../../src/lib/domain/dates';
+import { addMonths, monthOf } from '../../src/lib/domain/dates';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
@@ -61,4 +61,43 @@ export async function accountBalances(ctx: QueryCtx): Promise<Map<Id<'accounts'>
 		balances.set(row.accountId, (balances.get(row.accountId) ?? 0) + row.amount);
 	}
 	return balances;
+}
+
+/**
+ * Rebuilds, from the Transactions, the totals of each Category in `buckets` for each (month,
+ * Account) in `keys`. For a change that touches a few Categories, it writes what the full
+ * rebuild would for them, without reading the whole history.
+ */
+export async function rebuildTotals(
+	ctx: MutationCtx,
+	buckets: Iterable<Id<'categories'>>,
+	keys: Iterable<Pick<Key, 'month' | 'accountId'>>
+) {
+	const categories = [...buckets];
+	for (const { month, accountId } of keys) {
+		for (const bucket of categories) {
+			const key = { month, accountId, bucket };
+			const row = await ctx.db
+				.query('monthlyTotals')
+				.withIndex('by_month_account_bucket', (q) =>
+					q.eq('month', month).eq('accountId', accountId).eq('bucket', bucket)
+				)
+				.unique();
+			if (row !== null) await ctx.db.delete('monthlyTotals', row._id);
+			let amount = 0;
+			let count = 0;
+			const transactions = ctx.db.query('transactions').withIndex('by_category_date', (q) =>
+				q
+					.eq('categoryId', bucket)
+					.gte('date', `${month}-01`)
+					.lt('date', `${addMonths(month, 1)}-01`)
+			);
+			for await (const transaction of transactions) {
+				if (transaction.accountId !== accountId) continue;
+				amount += transaction.amount;
+				count += 1;
+			}
+			if (count > 0) await ctx.db.insert('monthlyTotals', { ...key, amount, count });
+		}
+	}
 }

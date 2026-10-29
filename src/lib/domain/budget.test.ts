@@ -199,6 +199,78 @@ test('groups show their totals, and overspent Categories are listed in table ord
 	expect(result.overspent).toEqual([{ id: 'rent', name: 'Rent', available: -5_000 }]);
 });
 
+describe('a hidden Category', () => {
+	const spending = {
+		assignments: [
+			{ month: '2026-10', categoryId: 'rent', amount: 145_000 },
+			{ month: '2026-10', categoryId: 'groceries', amount: 20_000 }
+		],
+		monthlyTotals: [
+			{ month: '2026-10', bucket: 'rent', amount: -150_000, count: 1 },
+			{ month: '2026-10', bucket: 'groceries', amount: -6_000, count: 2 }
+		]
+	} satisfies Partial<BudgetInput<CategoryId, GroupId>>;
+	const shown = budget(spending);
+	const rentHidden = budget({
+		...spending,
+		categories: shown.categories.map((c) => (c.id === 'rent' ? { ...c, hidden: true } : c))
+	});
+
+	test('leaves the budget table but still counts in its group totals, listed with the hidden ones', () => {
+		const result = computeBudget(rentHidden);
+
+		expect(result.groups).toEqual([
+			{
+				id: 'everyday',
+				name: 'Everyday',
+				assigned: 165_000,
+				activity: -156_000,
+				available: 9_000,
+				categories: [
+					{
+						id: 'groceries',
+						name: 'Groceries',
+						assigned: 20_000,
+						activity: -6_000,
+						available: 14_000,
+						status: 'funded'
+					}
+				]
+			}
+		]);
+		expect(result.hidden).toEqual([
+			{
+				id: 'rent',
+				name: 'Rent',
+				assigned: 145_000,
+				activity: -150_000,
+				available: -5_000,
+				status: 'overspent'
+			}
+		]);
+	});
+
+	test('still counts in Ready to Assign and stays listed while overspent', () => {
+		expect(computeBudget(rentHidden).readyToAssign).toEqual(computeBudget(shown).readyToAssign);
+		expect(computeBudget(rentHidden).overspent).toEqual([
+			{ id: 'rent', name: 'Rent', available: -5_000 }
+		]);
+	});
+
+	test('in a hidden group leaves the table with its group', () => {
+		const result = computeBudget(
+			budget({
+				...spending,
+				groups: shown.groups.map((g) => (g.id === 'everyday' ? { ...g, hidden: true } : g))
+			})
+		);
+
+		expect(result.groups).toEqual([]);
+		expect(result.hidden.map((c) => c.name)).toEqual(['Groceries', 'Rent']);
+		expect(result.readyToAssign).toEqual(computeBudget(shown).readyToAssign);
+	});
+});
+
 test('a Category with nothing Available has no funding status', () => {
 	expect(category(computeBudget(budget()), 'Rent').status).toBe('empty');
 });
@@ -227,7 +299,7 @@ describe('the cash invariant', () => {
 
 	// Cash Accounts only; Credit Card Accounts join the invariant with their Payment Categories.
 	test.each([1, 2, 3, 4, 5, 6, 7, 8])(
-		'cash = Ready to Assign + every Available after any edits (sequence %i)',
+		'cash = Ready to Assign + every Available, hidden or not, after any edits (sequence %i)',
 		(seed) => {
 			const rand = random(seed);
 			const transactions: { date: string; amount: number; categoryId: CategoryId | null }[] = [];
@@ -247,6 +319,10 @@ describe('the cash invariant', () => {
 				const input = budget({
 					today,
 					month: '2026-12',
+					// Odd sequences hide Rent, which still holds money.
+					categories: budget().categories.map((c) =>
+						c.id === 'rent' ? { ...c, hidden: seed % 2 === 1 } : c
+					),
 					assignments: [...assigned].map(([key, amount]) => {
 						const [month = '', categoryId] = key.split('|');
 						return { month, categoryId: categoryId as CategoryId, amount };
@@ -259,7 +335,10 @@ describe('the cash invariant', () => {
 
 				const cash = transactions.reduce((total, t) => total + t.amount, 0);
 				const result = computeBudget(input);
-				const available = result.groups.reduce((total, group) => total + group.available, 0);
+				const available = [
+					...result.groups.flatMap((group) => group.categories),
+					...result.hidden
+				].reduce((total, c) => total + c.available, 0);
 				expect(result.readyToAssign.amount + available).toBe(cash);
 				expect(computeBudget({ ...input, month: '2026-09' }).readyToAssign).toEqual(
 					result.readyToAssign

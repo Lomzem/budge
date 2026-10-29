@@ -10,13 +10,21 @@ export interface BudgetInput<C extends string, G extends string> {
 	month: string;
 	today: string;
 	cutoverDate: string | null;
-	groups: readonly { id: G; name: string; position: number; kind: CategoryKind }[];
+	/** A hidden group leaves the budget table with all its Categories. */
+	groups: readonly {
+		id: G;
+		name: string;
+		position: number;
+		kind: CategoryKind;
+		hidden?: boolean | undefined;
+	}[];
 	categories: readonly {
 		id: C;
 		groupId: G;
 		name: string;
 		position: number;
 		kind: CategoryKind;
+		hidden?: boolean | undefined;
 	}[];
 	assignments: readonly { month: string; categoryId: C; amount: number }[];
 	/** Summed Transactions per month and bucket, over every Account. */
@@ -69,8 +77,16 @@ export interface Budget<C extends string, G extends string> {
 	};
 	/** How many Transactions still need a Category. */
 	uncategorizedCount: number;
+	/** The budget table: shown groups with their shown Categories, and totals over those. */
 	groups: GroupBudget<C, G>[];
-	/** Categories with a negative Available, in table order, until they are Covered. */
+	/**
+	 * Hidden Categories, and those in hidden groups, in table order. They leave the table but still
+	 * hold their Available and count in Ready to Assign.
+	 */
+	hidden: CategoryBudget<C>[];
+	/**
+	 * Categories with a negative Available, hidden or not, in table order, until they are Covered.
+	 */
 	overspent: { id: C; name: string; available: number }[];
 }
 
@@ -117,39 +133,47 @@ export function computeBudget<C extends string, G extends string>(
 		)
 	);
 
-	const groups = input.groups
-		.filter((group) => group.kind === 'normal')
-		.toSorted(byPosition)
-		.map((group) => {
-			const categories = input.categories
-				.filter((c) => c.groupId === group.id && c.kind === 'normal')
-				.toSorted(byPosition)
-				.map((c): CategoryBudget<C> => {
-					const a = assigned.get(c.id) ?? { now: 0, through: 0 };
-					const t = activity.get(c.id) ?? { now: 0, through: 0 };
-					const available = a.through + t.through;
-					return {
-						id: c.id,
-						name: c.name,
-						assigned: a.now,
-						activity: t.now,
-						available,
-						status: statusOf(available)
-					};
-				});
-			return {
-				id: group.id,
-				name: group.name,
-				assigned: sum(categories, 'assigned'),
-				activity: sum(categories, 'activity'),
-				available: sum(categories, 'available'),
-				categories
-			};
+	const budgetOf = (c: BudgetInput<C, G>['categories'][number]): CategoryBudget<C> => {
+		const a = assigned.get(c.id) ?? { now: 0, through: 0 };
+		const t = activity.get(c.id) ?? { now: 0, through: 0 };
+		const available = a.through + t.through;
+		return {
+			id: c.id,
+			name: c.name,
+			assigned: a.now,
+			activity: t.now,
+			available,
+			status: statusOf(available)
+		};
+	};
+
+	const groups: GroupBudget<C, G>[] = [];
+	const hidden: CategoryBudget<C>[] = [];
+	const overspent: Budget<C, G>['overspent'] = [];
+	for (const group of input.groups.filter((g) => g.kind === 'normal').toSorted(byPosition)) {
+		// Hidden Categories leave the table but still count in their group's totals.
+		const all: CategoryBudget<C>[] = [];
+		const shown: CategoryBudget<C>[] = [];
+		for (const c of input.categories
+			.filter((c) => c.groupId === group.id && c.kind === 'normal')
+			.toSorted(byPosition)) {
+			const row = budgetOf(c);
+			all.push(row);
+			(group.hidden === true || c.hidden === true ? hidden : shown).push(row);
+			if (row.available < 0) {
+				overspent.push({ id: row.id, name: row.name, available: row.available });
+			}
+		}
+		if (group.hidden === true) continue;
+		groups.push({
+			id: group.id,
+			name: group.name,
+			assigned: sum(all, 'assigned'),
+			activity: sum(all, 'activity'),
+			available: sum(all, 'available'),
+			categories: shown
 		});
-	const overspent = groups
-		.flatMap((group) => group.categories)
-		.filter((c) => c.available < 0)
-		.map(({ id, name, available }) => ({ id, name, available }));
+	}
 
 	const readyToAssignIds = new Set<string>(
 		input.categories.filter((c) => c.kind === 'readyToAssign').map((c) => c.id)
@@ -180,6 +204,7 @@ export function computeBudget<C extends string, G extends string>(
 		readyToAssign: { amount: readyToAssign, uncategorized },
 		uncategorizedCount,
 		groups,
+		hidden,
 		overspent
 	};
 }
