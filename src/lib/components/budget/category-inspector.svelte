@@ -10,7 +10,9 @@
 	import { formatCents, parseCents } from '$lib/domain/money';
 	import { readPublicError } from '$lib/publicError';
 
-	import { AVAILABLE_STATUS } from './status';
+	import { availableStatus, describeTarget } from './status';
+	import TargetBar from './target-bar.svelte';
+	import TargetDialog from './target-dialog.svelte';
 
 	type CategoryBudget = BudgetView['groups'][number]['categories'][number];
 
@@ -35,6 +37,10 @@
 	let moveError = $state('');
 	let covering = $state(false);
 	let coverError = $state('');
+	let assigning = $state(false);
+	let assignError = $state('');
+	let targetOpen = $state(false);
+	let targetDialog: { reset: () => void } | undefined = $state();
 	let section: HTMLElement | undefined = $state();
 
 	// Every other Category money can move to or from, by group, with hidden ones last.
@@ -54,7 +60,7 @@
 			.filter((option) => option.categories.length > 0)
 	);
 
-	const status = $derived(AVAILABLE_STATUS[category.status]);
+	const status = $derived(availableStatus(category));
 
 	const breakdown = $derived([
 		{ label: 'Left over from last month', cents: category.priorAvailable },
@@ -106,6 +112,26 @@
 		}
 	}
 
+	async function assignTarget() {
+		assignError = '';
+		assigning = true;
+		try {
+			await budget.assignTarget(category.id);
+			// The Assign button goes once the Target is funded, so keep keyboard focus in the inspector.
+			section?.focus();
+		} catch (thrown) {
+			assignError =
+				readPublicError(thrown)?.message ?? "Budge couldn't assign the money. Try again.";
+		} finally {
+			assigning = false;
+		}
+	}
+
+	function editTarget() {
+		targetDialog?.reset();
+		targetOpen = true;
+	}
+
 	function keydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') onclose();
 	}
@@ -138,7 +164,8 @@
 			<dt>Available</dt>
 			<dd class={['text-right tabular-nums', status?.class]}>
 				{formatCents(category.available)}
-				{#if status}
+				<!-- With a Target, its section below gives the status. -->
+				{#if status && !category.target}
 					<span class="block text-xs">{status.text}</span>
 				{/if}
 			</dd>
@@ -155,6 +182,34 @@
 			{/if}
 		</div>
 	{/if}
+
+	<section aria-labelledby="target-heading" class="flex flex-col gap-2">
+		<h3 id="target-heading" class="text-sm font-medium">Target</h3>
+		{#if category.target}
+			<p class="text-sm">{describeTarget(category.target)}</p>
+			<TargetBar
+				progress={category.target.progress}
+				label="{category.name} Target"
+				text={status?.text ?? ''}
+			/>
+			{#if status}
+				<p class={['text-sm', status.class]}>{status.text}</p>
+			{/if}
+			{#if category.target.needed > 0}
+				<Button size="wrap" disabled={assigning} onclick={assignTarget}>
+					Assign {formatCents(category.target.needed)}
+				</Button>
+			{/if}
+			{#if assignError}
+				<p role="alert" class="text-sm text-destructive">{assignError}</p>
+			{/if}
+		{:else}
+			<p class="text-sm text-muted-foreground">No Target yet.</p>
+		{/if}
+		<Button variant="outline" size="sm" onclick={editTarget}>
+			{category.target ? 'Edit Target' : 'Add Target'}
+		</Button>
+	</section>
 
 	<form class="flex flex-col gap-3" aria-labelledby="move-heading" onsubmit={move}>
 		<h3 id="move-heading" class="text-sm font-medium">Move money</h3>
@@ -206,3 +261,9 @@
 		<Button type="submit" variant="outline" disabled={moving}>Move money</Button>
 	</form>
 </section>
+
+<TargetDialog
+	bind:this={targetDialog}
+	bind:open={targetOpen}
+	category={{ id: category.id, name: category.name, target: category.target?.definition ?? null }}
+/>

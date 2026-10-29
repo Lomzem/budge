@@ -334,3 +334,76 @@ test('Budge manages Ready to Assign and its group, so the owner cannot change th
 	expect(await layout(b)).toEqual([{ name: 'Everyday', hidden: false, categories: ['Groceries'] }]);
 	expect((await b.owner.query(api.categories.list, {})).readyToAssignId).toBe(rta);
 });
+
+describe('a Target', () => {
+	const groceriesIn = async (b: Budget) =>
+		(await b.owner.query(api.budget.month, { month: '2026-10', today: '2026-10-15' })).groups[0]
+			?.categories[0];
+
+	test('can be set, edited, switched to another kind, and cleared', async () => {
+		const b = await startBudget();
+		const setTarget = (
+			target: Parameters<typeof b.owner.mutation<typeof api.categories.setTarget>>[1]['target']
+		) => b.owner.mutation(api.categories.setTarget, { categoryId: b.groceries, target });
+
+		await setTarget({ kind: 'monthly', amount: 50_000, mode: 'refill', dueDay: 1 });
+		expect(await groceriesIn(b)).toMatchObject({
+			target: { definition: { kind: 'monthly', amount: 50_000, mode: 'refill', dueDay: 1 } }
+		});
+
+		await setTarget({ kind: 'monthly', amount: 20_000, mode: 'setAside' });
+		expect((await groceriesIn(b))?.target?.definition).toEqual({
+			kind: 'monthly',
+			amount: 20_000,
+			mode: 'setAside'
+		});
+
+		await setTarget({ kind: 'byDate', amount: 13_900, firstDate: '2027-03-03' });
+		expect((await groceriesIn(b))?.target?.definition).toEqual({
+			kind: 'byDate',
+			amount: 13_900,
+			firstDate: '2027-03-03'
+		});
+
+		await setTarget(null);
+		expect(await groceriesIn(b)).toMatchObject({ target: null });
+	});
+
+	test.each([
+		['no amount', { kind: 'monthly', amount: 0, mode: 'refill' }],
+		['a fraction of a cent', { kind: 'monthly', amount: 10.5, mode: 'refill' }],
+		['a due day past 31', { kind: 'monthly', amount: 5_000, mode: 'refill', dueDay: 32 }],
+		['a due day of 0', { kind: 'monthly', amount: 5_000, mode: 'refill', dueDay: 0 }],
+		['a date that does not exist', { kind: 'byDate', amount: 5_000, firstDate: '2027-02-30' }],
+		[
+			'a repeat of no months',
+			{ kind: 'byDate', amount: 5_000, firstDate: '2027-02-03', everyMonths: 0 }
+		],
+		[
+			'a repeat of part of a month',
+			{ kind: 'byDate', amount: 5_000, firstDate: '2027-02-03', everyMonths: 1.5 }
+		]
+	] as const)('refuses %s', async (_, target) => {
+		const b = await startBudget();
+
+		expect(
+			await publicErrorCode(
+				b.owner.mutation(api.categories.setTarget, { categoryId: b.groceries, target })
+			)
+		).toBe('INVALID_INPUT');
+		expect(await groceriesIn(b)).toMatchObject({ target: null });
+	});
+
+	test('cannot be given to Ready to Assign', async () => {
+		const b = await startBudget();
+
+		expect(
+			await publicErrorCode(
+				b.owner.mutation(api.categories.setTarget, {
+					categoryId: b.readyToAssignId,
+					target: { kind: 'monthly', amount: 5_000, mode: 'refill' }
+				})
+			)
+		).toBe('INVALID_INPUT');
+	});
+});

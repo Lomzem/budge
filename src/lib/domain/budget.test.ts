@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { computeBudget, type BudgetInput } from './budget';
+import { computeBudget, type BudgetInput, type Target } from './budget';
 
 // A small budget: one Category Group with Groceries and Rent, plus Ready to Assign in its hidden
 // system group. Amounts are cents.
@@ -206,7 +206,8 @@ test('groups show their totals, and overspent Categories are listed in table ord
 					assigned: 20_000,
 					activity: -6_000,
 					available: 14_000,
-					status: 'funded'
+					status: 'funded',
+					target: null
 				},
 				{
 					id: 'rent',
@@ -215,7 +216,8 @@ test('groups show their totals, and overspent Categories are listed in table ord
 					assigned: 145_000,
 					activity: -150_000,
 					available: -5_000,
-					status: 'overspent'
+					status: 'overspent',
+					target: null
 				}
 			]
 		}
@@ -258,7 +260,8 @@ describe('a hidden Category', () => {
 						assigned: 20_000,
 						activity: -6_000,
 						available: 14_000,
-						status: 'funded'
+						status: 'funded',
+						target: null
 					}
 				]
 			}
@@ -271,7 +274,8 @@ describe('a hidden Category', () => {
 				assigned: 145_000,
 				activity: -150_000,
 				available: -5_000,
-				status: 'overspent'
+				status: 'overspent',
+				target: null
 			}
 		]);
 	});
@@ -392,4 +396,231 @@ describe('the cash invariant', () => {
 			}
 		}
 	);
+});
+
+describe('Targets', () => {
+	/** The budget with Groceries given `target`, and Groceries' row from it. */
+	function groceriesWith(target: Target, change: Partial<BudgetInput<CategoryId, GroupId>> = {}) {
+		const input = budget(change);
+		return category(
+			computeBudget({
+				...input,
+				categories: input.categories.map((c) => (c.id === 'groceries' ? { ...c, target } : c))
+			}),
+			'Groceries'
+		);
+	}
+
+	test('a due day never changes what a Monthly Target needs', () => {
+		const leftOver = {
+			assignments: [{ month: '2026-09', categoryId: 'groceries' as const, amount: 10_000 }]
+		};
+		for (const mode of ['refill', 'setAside'] as const) {
+			const without = groceriesWith({ kind: 'monthly', amount: 50_000, mode }, leftOver);
+			const withDay = groceriesWith(
+				{ kind: 'monthly', amount: 50_000, mode, dueDay: 20 },
+				leftOver
+			);
+			expect(withDay.target?.needed).toBe(without.target?.needed);
+		}
+	});
+
+	describe('a refill Monthly Target', () => {
+		const refill: Target = { kind: 'monthly', amount: 50_000, mode: 'refill' };
+
+		test('needs what tops Available up to the amount, counting what was left over', () => {
+			const groceries = groceriesWith(refill, {
+				assignments: [
+					{ month: '2026-09', categoryId: 'groceries', amount: 40_000 },
+					{ month: '2026-10', categoryId: 'groceries', amount: 5_000 }
+				],
+				monthlyTotals: [{ month: '2026-09', bucket: 'groceries', amount: -25_000, count: 2 }]
+			});
+
+			// $150 left over and $50 Assigned leave $300 to reach $500, so the bar is 40% full.
+			expect(groceries).toMatchObject({
+				status: 'underfunded',
+				target: { definition: refill, needed: 30_000, progress: 0.4 }
+			});
+		});
+	});
+
+	describe('a set aside Monthly Target', () => {
+		const setAside: Target = { kind: 'monthly', amount: 20_000, mode: 'setAside' };
+		const leftOver = {
+			assignments: [{ month: '2026-09', categoryId: 'groceries' as const, amount: 100_000 }]
+		};
+
+		test('needs the amount Assigned this month, whatever was left over', () => {
+			expect(groceriesWith(setAside, leftOver)).toMatchObject({
+				status: 'underfunded',
+				target: { needed: 20_000 }
+			});
+		});
+
+		test('reads Funded once the amount is Assigned', () => {
+			const funded = groceriesWith(setAside, {
+				assignments: [
+					...leftOver.assignments,
+					{ month: '2026-10', categoryId: 'groceries', amount: 20_000 }
+				]
+			});
+
+			expect(funded).toMatchObject({ status: 'funded', target: { needed: 0 } });
+		});
+	});
+
+	describe('a By date Target', () => {
+		const prime: Target = { kind: 'byDate', amount: 13_900, firstDate: '2027-03-03' };
+
+		test('spreads the amount evenly over the months left, counting both ends', () => {
+			// November through March is five months: $139 ÷ 5.
+			expect(groceriesWith(prime, { month: '2026-11' })).toMatchObject({
+				status: 'underfunded',
+				target: { needed: 2_780 }
+			});
+		});
+
+		test('rounds each month up to the cent, after what was left over and Assigned', () => {
+			const groceries = groceriesWith(
+				{ kind: 'byDate', amount: 10_000, firstDate: '2027-01-15' },
+				{
+					month: '2026-11',
+					assignments: [
+						{ month: '2026-10', categoryId: 'groceries', amount: 1_000 },
+						{ month: '2026-11', categoryId: 'groceries', amount: 500 }
+					]
+				}
+			);
+
+			// $90 still to save over three months is $30.00 each; $5 is already Assigned.
+			expect(groceries).toMatchObject({ target: { needed: 2_500 } });
+			expect(
+				groceriesWith(
+					{ kind: 'byDate', amount: 10_000, firstDate: '2027-01-15' },
+					{
+						month: '2026-11'
+					}
+				)
+			).toMatchObject({ target: { needed: 3_334 } });
+		});
+
+		test('repeating, uses its date through the due month, then the date N months on', () => {
+			const yearly: Target = { ...prime, everyMonths: 12 };
+			const spentOnTime = {
+				assignments: [{ month: '2027-03', categoryId: 'groceries' as const, amount: 13_900 }],
+				monthlyTotals: [
+					{ month: '2027-03', bucket: 'groceries' as const, amount: -13_900, count: 1 }
+				]
+			};
+
+			expect(groceriesWith(yearly, { ...spentOnTime, month: '2027-03' })).toMatchObject({
+				status: 'funded',
+				target: { dueDate: '2027-03-03', needed: 0 }
+			});
+			// April through next March is twelve months: $139 ÷ 12, rounded up.
+			expect(groceriesWith(yearly, { ...spentOnTime, month: '2027-04' })).toMatchObject({
+				status: 'underfunded',
+				target: { dueDate: '2028-03-03', needed: 1_159 }
+			});
+		});
+
+		test('repeating, is counted from the first date, so a late day of the month stays put', () => {
+			const monthly: Target = {
+				kind: 'byDate',
+				amount: 3_000,
+				firstDate: '2027-01-31',
+				everyMonths: 1
+			};
+
+			expect(groceriesWith(monthly, { month: '2027-02' })).toMatchObject({
+				target: { dueDate: '2027-02-28' }
+			});
+			expect(groceriesWith(monthly, { month: '2027-03' })).toMatchObject({
+				target: { dueDate: '2027-03-31' }
+			});
+		});
+
+		test('not repeating, still wants the whole amount once its date has passed', () => {
+			expect(groceriesWith(prime, { month: '2027-05' })).toMatchObject({
+				target: { dueDate: '2027-03-03', needed: 13_900 }
+			});
+		});
+	});
+});
+
+describe('the Upcoming list', () => {
+	/** The budget with each Category in `targets` given its Target, and maybe more Categories. */
+	function withTargets(
+		targets: Partial<Record<string, Target>>,
+		change: Partial<BudgetInput<string, GroupId>> = {}
+	) {
+		const input: BudgetInput<string, GroupId> = { ...budget(), ...change };
+		return computeBudget({
+			...input,
+			categories: input.categories.map((c) => {
+				const target = targets[c.id];
+				return target === undefined ? c : { ...c, target };
+			})
+		});
+	}
+
+	test('lists Targets due in the next 30 days, soonest first, funded or not', () => {
+		const result = withTargets(
+			{
+				rent: { kind: 'monthly', amount: 145_000, mode: 'refill', dueDay: 1 },
+				groceries: { kind: 'monthly', amount: 20_000, mode: 'setAside', dueDay: 20 }
+			},
+			{ assignments: [{ month: '2026-10', categoryId: 'groceries', amount: 20_000 }] }
+		);
+
+		expect(result.upcoming).toEqual([
+			{ id: 'groceries', name: 'Groceries', dueDate: '2026-10-20', amount: 20_000, funded: true },
+			{ id: 'rent', name: 'Rent', dueDate: '2026-11-01', amount: 145_000, funded: false }
+		]);
+	});
+
+	test('judges each Target funded in its due month, whichever month is viewed', () => {
+		const rent: Target = { kind: 'monthly', amount: 145_000, mode: 'refill', dueDay: 1 };
+		const novemberRent = {
+			assignments: [{ month: '2026-11', categoryId: 'rent' as const, amount: 145_000 }]
+		};
+
+		for (const month of ['2026-09', '2026-10', '2026-12']) {
+			expect(withTargets({ rent }, { ...novemberRent, month }).upcoming).toMatchObject([
+				{ id: 'rent', dueDate: '2026-11-01', funded: true }
+			]);
+		}
+	});
+
+	test('lists hidden Categories too, and leaves out Targets due later and Monthly Targets with no due day', () => {
+		const categories: BudgetInput<string, GroupId>['categories'] = [
+			...budget().categories,
+			{ id: 'prime', groupId: 'everyday', name: 'Prime', position: 2, kind: 'normal' },
+			{ id: 'gift', groupId: 'everyday', name: 'Gift', position: 3, kind: 'normal' },
+			{ id: 'old', groupId: 'everyday', name: 'Old', position: 4, kind: 'normal', hidden: true }
+		];
+		const result = withTargets(
+			{
+				// The last day in the window, and the first day after it.
+				prime: { kind: 'byDate', amount: 13_900, firstDate: '2026-11-13' },
+				gift: { kind: 'byDate', amount: 5_000, firstDate: '2026-11-14' },
+				groceries: { kind: 'monthly', amount: 20_000, mode: 'refill' },
+				old: { kind: 'monthly', amount: 1_000, mode: 'refill', dueDay: 16 }
+			},
+			{ categories }
+		);
+
+		expect(result.upcoming.map((row) => row.name)).toEqual(['Old', 'Prime']);
+	});
+
+	test('takes the next date of a repeating By date Target once its date has passed', () => {
+		const result = withTargets({
+			groceries: { kind: 'byDate', amount: 5_000, firstDate: '2026-09-20', everyMonths: 1 },
+			// Its due month hasn't ended, but its date has passed and it won't repeat.
+			rent: { kind: 'byDate', amount: 5_000, firstDate: '2026-10-01' }
+		});
+
+		expect(result.upcoming).toMatchObject([{ id: 'groceries', dueDate: '2026-10-20' }]);
+	});
 });

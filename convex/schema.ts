@@ -1,6 +1,8 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
+import { targetValidator } from './lib/targets';
+
 // Each deployment is one owner's budget, so no table has an owner column. Amounts are whole
 // cents as safe integers; dates are `YYYY-MM-DD` and months `YYYY-MM`.
 export default defineSchema({
@@ -31,7 +33,8 @@ export default defineSchema({
 		name: v.string(),
 		position: v.number(),
 		kind: v.union(v.literal('normal'), v.literal('readyToAssign')),
-		hidden: v.optional(v.boolean())
+		hidden: v.optional(v.boolean()),
+		target: v.optional(targetValidator)
 	}).index('by_group_position', ['groupId', 'position']),
 
 	// Assigned per month and Category. Setting Assigned to 0 deletes the row.

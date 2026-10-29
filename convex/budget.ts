@@ -8,6 +8,7 @@ import { requireCents } from './lib/input';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { readCutoverDate, requireCutoverDate } from './lib/settings';
+import { targetValidator } from './lib/targets';
 
 const totals = { assigned: v.number(), activity: v.number(), available: v.number() };
 
@@ -23,7 +24,16 @@ const categoryBudget = v.object({
 	name: v.string(),
 	priorAvailable: v.number(),
 	...totals,
-	status
+	status,
+	target: v.union(
+		v.object({
+			definition: targetValidator,
+			needed: v.number(),
+			progress: v.number(),
+			dueDate: v.union(v.string(), v.null())
+		}),
+		v.null()
+	)
 });
 
 /**
@@ -50,6 +60,15 @@ export const month = query({
 		hidden: v.array(categoryBudget),
 		overspent: v.array(
 			v.object({ id: v.id('categories'), name: v.string(), available: v.number() })
+		),
+		upcoming: v.array(
+			v.object({
+				id: v.id('categories'),
+				name: v.string(),
+				dueDate: v.string(),
+				amount: v.number(),
+				funded: v.boolean()
+			})
 		)
 	}),
 	handler: async (ctx, args) => {
@@ -104,12 +123,23 @@ async function readBudget(ctx: QueryCtx, month: string, today: string) {
 			name: c.name,
 			position: c.position,
 			kind: c.kind,
-			hidden: c.hidden
+			hidden: c.hidden,
+			target: c.target
 		})),
 		assignments,
 		monthlyTotals,
 		transactionsAfterToday
 	});
+}
+
+/** One Category's numbers in `month`, through the single budget entry point. */
+async function readCategoryBudget(ctx: QueryCtx, month: string, categoryId: Id<'categories'>) {
+	// A Category's numbers don't depend on today; only Ready to Assign and Upcoming do.
+	const today = new Date().toISOString().slice(0, 10);
+	const budget = await readBudget(ctx, month, today);
+	return [...budget.groups.flatMap((g) => g.categories), ...budget.hidden].find(
+		(c) => c.id === categoryId
+	);
 }
 
 /** A month the owner can assign in: `YYYY-MM`, from the cutover month on. */
@@ -204,16 +234,32 @@ export const cover = mutation({
 		await requireOwner(ctx);
 		await requireBudgetMonth(ctx, args.month);
 		await requireAssignable(ctx, args.categoryId);
-		// Available doesn't depend on today; only Ready to Assign does, and Cover doesn't read it.
-		const today = new Date().toISOString().slice(0, 10);
-		const budget = await readBudget(ctx, args.month, today);
-		const category = [...budget.groups.flatMap((g) => g.categories), ...budget.hidden].find(
-			(c) => c.id === args.categoryId
-		);
+		const category = await readCategoryBudget(ctx, args.month, args.categoryId);
 		const shortfall = Math.max(0, -(category?.available ?? 0));
 		if (shortfall > 0) {
 			await updateAssigned(ctx, args.month, args.categoryId, (assigned) => assigned + shortfall);
 		}
 		return shortfall;
+	}
+});
+
+/**
+ * "Assign $X": adds what a Category's Target still needs in `month` to its Assigned, taken from
+ * Ready to Assign. Returns the amount assigned, which is zero when the Target is already funded or
+ * the Category has none.
+ */
+export const assignTarget = mutation({
+	args: { month: v.string(), categoryId: v.id('categories') },
+	returns: v.number(),
+	handler: async (ctx, args) => {
+		await requireOwner(ctx);
+		await requireBudgetMonth(ctx, args.month);
+		await requireAssignable(ctx, args.categoryId);
+		const needed =
+			(await readCategoryBudget(ctx, args.month, args.categoryId))?.target?.needed ?? 0;
+		if (needed > 0) {
+			await updateAssigned(ctx, args.month, args.categoryId, (assigned) => assigned + needed);
+		}
+		return needed;
 	}
 });
