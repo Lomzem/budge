@@ -1,7 +1,5 @@
 <script lang="ts">
 	import { useMutation } from 'convex-svelte';
-	import { untrack } from 'svelte';
-
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { Button } from '$lib/components/ui/button';
@@ -24,12 +22,22 @@
 	const createGroup = useMutation(api.categories.createGroup);
 	const createCategory = useMutation(api.categories.create);
 
-	// The parent mounts a fresh dialog for each open, so this is the reset.
 	let name = $state('');
-	let groupId = $state(untrack(() => groups[0]?.id ?? ''));
+	let groupId = $state('');
 	let error = $state('');
 	let saving = $state(false);
 	const title = $derived(kind === 'group' ? 'Add Category Group' : 'Add Category');
+
+	/**
+	 * Empties the form; the parent calls it before each open. A save still in flight keeps its
+	 * form, with Add disabled, so closing and reopening can't submit it twice.
+	 */
+	export function reset() {
+		if (saving) return;
+		name = '';
+		error = '';
+		groupId = groups[0]?.id ?? '';
+	}
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
@@ -45,21 +53,15 @@
 			open = false;
 		} catch (thrown) {
 			error = readPublicError(thrown)?.message ?? "Budge couldn't add it. Try again.";
+			// The dialog may have been closed while it saved: reopen it to show what failed.
+			open = true;
 		} finally {
 			saving = false;
 		}
 	}
 </script>
 
-<!-- It stays open while saving: reopening mounts a fresh dialog, which could submit it twice. -->
-<Dialog.Root
-	bind:open={
-		() => open,
-		(next: boolean) => {
-			if (!saving) open = next;
-		}
-	}
->
+<Dialog.Root bind:open>
 	<Dialog.Content>
 		<Dialog.Header>
 			<Dialog.Title>{title}</Dialog.Title>

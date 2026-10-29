@@ -16,10 +16,9 @@
 	const accounts = getAccounts();
 	const budget = getBudgetMonth();
 	let addAccountOpen = $state(false);
-	let adding: 'group' | 'category' | undefined = $state();
+	let adding: 'group' | 'category' = $state('group');
 	let addingOpen = $state(false);
-	/** Bumped on each open, so the dialog mounts fresh with an empty form. */
-	let addingSession = $state(0);
+	let addDialog: { reset: () => void } | undefined = $state();
 
 	const view = $derived(budget.view);
 	const readyToAssign = $derived(budget.readyToAssign);
@@ -27,7 +26,7 @@
 
 	function add(kind: 'group' | 'category') {
 		adding = kind;
-		addingSession += 1;
+		addDialog?.reset();
 		addingOpen = true;
 	}
 </script>
@@ -167,8 +166,4 @@
 </div>
 
 <AccountDialog bind:open={addAccountOpen} />
-{#if adding}
-	{#key addingSession}
-		<AddCategoryDialog bind:open={addingOpen} kind={adding} {groups} />
-	{/key}
-{/if}
+<AddCategoryDialog bind:this={addDialog} bind:open={addingOpen} kind={adding} {groups} />
