@@ -54,7 +54,8 @@ type CategoryName = (typeof GROUPS)[number]['categories'][number][0];
 
 /**
  * Writes a small synthetic budget on an empty backend: three Accounts, twelve Categories in three
- * groups with Assigned amounts each month, and about three months of made-up Transactions, from the first of the month two months back through today. Ends by
+ * groups with Assigned amounts each month, and about three months of made-up Transactions, from
+ * the first of the month two months back through today, with one Transfer. Ends by
  * rebuilding the monthly totals, so every seeded deployment exercises the rebuild.
  */
 export const run = internalMutation({
@@ -168,6 +169,23 @@ export const run = internalMutation({
 				);
 			}
 		}
+
+		// One Transfer: savings set aside the day after the first mid-month paycheck.
+		const transferDate = localIsoDate(new Date(cutover.getFullYear(), cutover.getMonth(), 16));
+		const intoSavings = await ctx.db.insert('transactions', {
+			accountId: savings,
+			date: transferDate,
+			amount: 500_00,
+			cleared: 'cleared'
+		});
+		const fromChecking = await ctx.db.insert('transactions', {
+			accountId: checking,
+			date: transferDate,
+			amount: -500_00,
+			cleared: 'cleared',
+			transferTransactionId: intoSavings
+		});
+		await ctx.db.patch('transactions', intoSavings, { transferTransactionId: fromChecking });
 
 		await rebuildMonthlyTotals(ctx);
 		return null;

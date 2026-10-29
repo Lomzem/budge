@@ -55,16 +55,19 @@ export interface BudgetInput<C extends string, G extends string> {
 		target?: Target | undefined;
 	}[];
 	assignments: readonly { month: string; categoryId: C; amount: number }[];
-	/** Summed Transactions per month and bucket, over every Account. */
+	/**
+	 * Summed Transactions per month and bucket, over every Account. Transfer sides sum in
+	 * `transfer`; between Cash Accounts they touch no Category and not Ready to Assign.
+	 */
 	monthlyTotals: readonly {
 		month: string;
-		bucket: C | 'uncategorized';
+		bucket: C | 'uncategorized' | 'transfer';
 		amount: number;
 		count: number;
 	}[];
 	/**
-	 * Ready to Assign and Uncategorized Transactions dated after `today`. Their inflows wait for
-	 * their date before they count.
+	 * Ready to Assign and Uncategorized Transactions dated after `today`, Transfer sides left out.
+	 * Their inflows wait for their date before they count.
 	 */
 	transactionsAfterToday: readonly { date: string; amount: number; categoryId: C | null }[];
 }
@@ -239,7 +242,9 @@ export function computeBudget<C extends string, G extends string>(
 				activity: sumByCategory(
 					viewed,
 					input.monthlyTotals.flatMap((row) =>
-						row.bucket === 'uncategorized' ? [] : [{ ...row, key: row.bucket }]
+						row.bucket === 'uncategorized' || row.bucket === 'transfer'
+							? []
+							: [{ ...row, key: row.bucket }]
 					)
 				)
 			};
