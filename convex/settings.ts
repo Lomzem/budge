@@ -1,6 +1,7 @@
 import { v } from 'convex/values';
 
 import { mutation, query } from './_generated/server';
+import { ensureReadyToAssign } from './lib/categories';
 import { readCutoverDate, requireIsoDate } from './lib/settings';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
@@ -27,6 +28,7 @@ export const setCutoverDate = mutation({
 			throw publicError('INVALID_INPUT', 'A Transaction is dated before that.');
 		}
 		const settings = await ctx.db.query('settings').first();
+		await ensureReadyToAssign(ctx);
 		if (settings === null) await ctx.db.insert('settings', { cutoverDate });
 		else await ctx.db.patch('settings', settings._id, { cutoverDate });
 		return null;

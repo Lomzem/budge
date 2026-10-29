@@ -38,15 +38,26 @@ test.each([1, 2, 3, 4, 5])(
 				})
 			);
 		}
+		const groupId = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
+		const categories = [
+			undefined,
+			(await owner.query(api.categories.list, {})).readyToAssignId ?? undefined,
+			await owner.mutation(api.categories.create, { groupId, name: 'Groceries' }),
+			await owner.mutation(api.categories.create, { groupId, name: 'Transit' })
+		];
 		const live: Id<'transactions'>[] = [];
-		const entry = () => ({
-			accountId: rand.pick(accounts),
-			date: rand.pick(dates),
-			// Small amounts, so edits often bring a total back to zero.
-			amount: rand.pick([-500, 500, -1_250, 1_250, -99, 0]),
-			payee: rand.pick(payees),
-			memo: ''
-		});
+		const entry = () => {
+			const categoryId = rand.pick(categories);
+			return {
+				accountId: rand.pick(accounts),
+				date: rand.pick(dates),
+				// Small amounts, so edits often bring a total back to zero.
+				amount: rand.pick([-500, 500, -1_250, 1_250, -99, 0]),
+				payee: rand.pick(payees),
+				...(categoryId === undefined ? {} : { categoryId }),
+				memo: ''
+			};
+		};
 
 		for (let step = 0; step < 80; step++) {
 			const action = live.length === 0 ? 0 : rand.int(4);
@@ -66,12 +77,22 @@ test.each([1, 2, 3, 4, 5])(
 		const readTotals = () =>
 			t.run(async (ctx) =>
 				(await ctx.db.query('monthlyTotals').collect())
-					.map(({ month, accountId, bucket, amount }) => ({ month, accountId, bucket, amount }))
-					.sort((a, b) => `${a.month}${a.accountId}`.localeCompare(`${b.month}${b.accountId}`))
+					.map(({ month, accountId, bucket, amount, count }) => ({
+						month,
+						accountId,
+						bucket,
+						amount,
+						count
+					}))
+					.sort((a, b) =>
+						`${a.month}${a.accountId}${a.bucket}`.localeCompare(
+							`${b.month}${b.accountId}${b.bucket}`
+						)
+					)
 			);
 		const kept = await readTotals();
 		await t.mutation(internal.monthlyTotals.rebuild, {});
 		expect(await readTotals()).toEqual(kept);
-		expect(kept.every((row) => row.amount !== 0)).toBe(true);
+		expect(kept.every((row) => row.count > 0)).toBe(true);
 	}
 );

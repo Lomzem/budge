@@ -19,6 +19,9 @@ const transactionRow = v.object({
 	date: v.string(),
 	amount: v.number(),
 	payeeName: v.union(v.string(), v.null()),
+	categoryId: v.union(v.id('categories'), v.null()),
+	/** `null` while Uncategorized. */
+	categoryName: v.union(v.string(), v.null()),
 	memo: v.union(v.string(), v.null()),
 	cleared: v.boolean()
 });
@@ -54,6 +57,8 @@ const transactionInput = {
 	date: v.string(),
 	amount: v.number(),
 	payee: v.string(),
+	// Left out for Uncategorized.
+	categoryId: v.optional(v.id('categories')),
 	memo: v.string()
 };
 
@@ -114,6 +119,10 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 	const account = await ctx.db.get('accounts', transaction.accountId);
 	const payee =
 		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
+	const category =
+		transaction.categoryId === undefined
+			? null
+			: await ctx.db.get('categories', transaction.categoryId);
 	return {
 		_id: transaction._id,
 		accountId: transaction.accountId,
@@ -121,6 +130,8 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		date: transaction.date,
 		amount: transaction.amount,
 		payeeName: payee?.name ?? null,
+		categoryId: transaction.categoryId ?? null,
+		categoryName: category?.name ?? null,
 		memo: transaction.memo ?? null,
 		cleared: transaction.cleared === 'cleared'
 	};

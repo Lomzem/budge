@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'vitest';
 
-import { formatDate, isIsoDate, localIsoDate, monthOf } from './dates';
+import {
+	addMonths,
+	formatDate,
+	formatMonth,
+	isIsoDate,
+	isIsoMonth,
+	localIsoDate,
+	monthOf
+} from './dates';
 
 describe('isIsoDate', () => {
 	test.each(['2026-10-27', '2024-02-29', '2026-01-01'])('accepts %s', (text) => {
@@ -26,4 +34,27 @@ test('today is read on the local calendar', () => {
 test('a date shows as its own calendar day, not shifted by the time zone', () => {
 	expect(formatDate('2026-08-01')).toBe('Aug 1, 2026');
 	expect(formatDate('2026-12-31', 'short')).toBe('12/31/26');
+});
+
+test.each([
+	['2026-10', 1, '2026-11'],
+	['2026-12', 1, '2027-01'],
+	['2026-01', -1, '2025-12'],
+	['2026-03', -14, '2025-01']
+])('%s moved by %i months is %s', (month, by, moved) => {
+	expect(addMonths(month, by)).toBe(moved);
+});
+
+test('a month is written YYYY-MM', () => {
+	expect(isIsoMonth('2026-10')).toBe(true);
+	expect(['2026-13', '2026-1', '2026-10-01', ''].map(isIsoMonth)).toEqual([
+		false,
+		false,
+		false,
+		false
+	]);
+});
+
+test('a month shows by name', () => {
+	expect(formatMonth('2026-01')).toBe('January 2026');
 });

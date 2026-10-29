@@ -3,6 +3,7 @@
 
 	import { api } from '$convex/_generated/api';
 	import { Accounts, setAccounts } from '$lib/accounts.svelte';
+	import { BudgetMonth, setBudgetMonth } from '$lib/budget.svelte';
 	import AccountSidebar from '$lib/components/shell/account-sidebar.svelte';
 	import AppMenu from '$lib/components/shell/app-menu.svelte';
 	import SignOutButton from '$lib/components/shell/sign-out-button.svelte';
@@ -19,6 +20,8 @@
 	// Nothing shows until the backend agrees this is the owner.
 	const whoami = useQuery(api.owner.whoami, () => (auth.isAuthenticated ? {} : 'skip'));
 	setAccounts(new Accounts(() => auth.isAuthenticated));
+	const budget = new BudgetMonth(() => auth.isAuthenticated);
+	setBudgetMonth(budget);
 
 	const access = $derived.by(() => {
 		if (auth.isLoading) return 'loading';
@@ -29,6 +32,12 @@
 		return whoami.isLoading ? 'loading' : 'owner';
 	});
 </script>
+
+<svelte:window
+	onfocus={() => {
+		budget.refreshToday();
+	}}
+/>
 
 {#if access === 'owner'}
 	<a
