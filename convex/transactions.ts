@@ -5,12 +5,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import {
-	deleteTransaction,
-	insertTransaction,
-	replaceTransaction,
-	transactionFields
-} from './lib/transactions';
+import { deleteTransaction, saveTransaction } from './lib/transactions';
 
 const transactionRow = v.object({
 	_id: v.id('transactions'),
@@ -23,7 +18,9 @@ const transactionRow = v.object({
 	/** `null` while Uncategorized. */
 	categoryName: v.union(v.string(), v.null()),
 	memo: v.union(v.string(), v.null()),
-	cleared: v.boolean()
+	cleared: v.boolean(),
+	/** The other side's Account, for a Transfer. */
+	transfer: v.union(v.object({ accountId: v.id('accounts'), accountName: v.string() }), v.null())
 });
 
 /**
@@ -59,33 +56,40 @@ const transactionInput = {
 	payee: v.string(),
 	// Left out for Uncategorized.
 	categoryId: v.optional(v.id('categories')),
-	memo: v.string()
+	memo: v.string(),
+	// The other Account of a Transfer, which then takes no Category and no Payee.
+	transferAccountId: v.optional(v.id('accounts'))
 };
 
-/** Enters a Transaction by hand. It starts uncleared; a new Payee name creates the Payee. */
+/**
+ * Enters a Transaction by hand, or both sides of a Transfer. It starts uncleared; a new Payee name
+ * creates the Payee. Returns the Transaction in `accountId`.
+ */
 export const create = mutation({
 	args: transactionInput,
 	returns: v.id('transactions'),
 	handler: async (ctx, input) => {
 		await requireOwner(ctx);
-		const fields = await transactionFields(ctx, input);
-		return await insertTransaction(ctx, { ...fields, cleared: 'uncleared' });
+		return await saveTransaction(ctx, null, input);
 	}
 });
 
-/** Changes everything the owner entered on a Transaction, keeping whether it is Cleared. */
+/**
+ * Changes everything the owner entered on a Transaction, keeping whether it is Cleared. Editing
+ * either side of a Transfer changes the other side to match; leaving out `transferAccountId`
+ * deletes the other side.
+ */
 export const update = mutation({
 	args: { transactionId: v.id('transactions'), ...transactionInput },
 	returns: v.null(),
 	handler: async (ctx, { transactionId, ...input }) => {
 		await requireOwner(ctx);
-		const existing = await requireTransaction(ctx, transactionId);
-		const fields = await transactionFields(ctx, input);
-		await replaceTransaction(ctx, existing, { ...fields, cleared: existing.cleared });
+		await saveTransaction(ctx, await requireTransaction(ctx, transactionId), input);
 		return null;
 	}
 });
 
+/** Deletes a Transaction, and both sides of a Transfer. */
 export const remove = mutation({
 	args: { transactionId: v.id('transactions') },
 	returns: v.null(),
@@ -133,6 +137,15 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		categoryId: transaction.categoryId ?? null,
 		categoryName: category?.name ?? null,
 		memo: transaction.memo ?? null,
-		cleared: transaction.cleared === 'cleared'
+		cleared: transaction.cleared === 'cleared',
+		transfer: await transferOf(ctx, transaction)
 	};
+}
+
+async function transferOf(ctx: QueryCtx, transaction: Doc<'transactions'>) {
+	if (transaction.transferTransactionId === undefined) return null;
+	const counterpart = await ctx.db.get('transactions', transaction.transferTransactionId);
+	if (counterpart === null) return null;
+	const account = await ctx.db.get('accounts', counterpart.accountId);
+	return { accountId: counterpart.accountId, accountName: account?.name ?? '' };
 }
