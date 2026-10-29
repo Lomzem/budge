@@ -151,11 +151,14 @@ export function computeBudget<C extends string, G extends string>(
 	const hidden: CategoryBudget<C>[] = [];
 	const overspent: Budget<C, G>['overspent'] = [];
 	for (const group of input.groups.filter((g) => g.kind === 'normal').toSorted(byPosition)) {
+		// Hidden Categories leave the table but still count in their group's totals.
+		const all: CategoryBudget<C>[] = [];
 		const shown: CategoryBudget<C>[] = [];
 		for (const c of input.categories
 			.filter((c) => c.groupId === group.id && c.kind === 'normal')
 			.toSorted(byPosition)) {
 			const row = budgetOf(c);
+			all.push(row);
 			(group.hidden === true || c.hidden === true ? hidden : shown).push(row);
 			if (row.available < 0) {
 				overspent.push({ id: row.id, name: row.name, available: row.available });
@@ -165,9 +168,9 @@ export function computeBudget<C extends string, G extends string>(
 		groups.push({
 			id: group.id,
 			name: group.name,
-			assigned: sum(shown, 'assigned'),
-			activity: sum(shown, 'activity'),
-			available: sum(shown, 'available'),
+			assigned: sum(all, 'assigned'),
+			activity: sum(all, 'activity'),
+			available: sum(all, 'available'),
 			categories: shown
 		});
 	}

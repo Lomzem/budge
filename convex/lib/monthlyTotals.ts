@@ -1,4 +1,4 @@
-import { monthOf } from '../../src/lib/domain/dates';
+import { addMonths, monthOf } from '../../src/lib/domain/dates';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
@@ -64,40 +64,40 @@ export async function accountBalances(ctx: QueryCtx): Promise<Map<Id<'accounts'>
 }
 
 /**
- * Rebuilds the totals a Category's Transactions just left for `to`, once they have moved. Each
- * (month, Account) total of `from` named in `keys` is summed into `to`'s, which is what the
- * rebuild would write.
+ * Rebuilds, from the Transactions, the totals of each Category in `buckets` for each (month,
+ * Account) in `keys`. For a change that touches a few Categories, it writes what the full
+ * rebuild would for them, without reading the whole history.
  */
-export async function moveTotals(
+export async function rebuildTotals(
 	ctx: MutationCtx,
-	from: Id<'categories'>,
-	to: Id<'categories'>,
+	buckets: Iterable<Id<'categories'>>,
 	keys: Iterable<Pick<Key, 'month' | 'accountId'>>
 ) {
-	const totalOf = (key: Pick<Key, 'month' | 'accountId'>, bucket: Key['bucket']) =>
-		ctx.db
-			.query('monthlyTotals')
-			.withIndex('by_month_account_bucket', (q) =>
-				q.eq('month', key.month).eq('accountId', key.accountId).eq('bucket', bucket)
-			)
-			.unique();
-	for (const key of keys) {
-		const source = await totalOf(key, from);
-		if (source === null) continue;
-		await ctx.db.delete('monthlyTotals', source._id);
-		const destination = await totalOf(key, to);
-		if (destination === null) {
-			await ctx.db.insert('monthlyTotals', {
-				...key,
-				bucket: to,
-				amount: source.amount,
-				count: source.count
-			});
-		} else {
-			await ctx.db.patch('monthlyTotals', destination._id, {
-				amount: destination.amount + source.amount,
-				count: destination.count + source.count
-			});
+	const categories = [...buckets];
+	for (const { month, accountId } of keys) {
+		for (const bucket of categories) {
+			const key = { month, accountId, bucket };
+			const row = await ctx.db
+				.query('monthlyTotals')
+				.withIndex('by_month_account_bucket', (q) =>
+					q.eq('month', month).eq('accountId', accountId).eq('bucket', bucket)
+				)
+				.unique();
+			if (row !== null) await ctx.db.delete('monthlyTotals', row._id);
+			let amount = 0;
+			let count = 0;
+			const transactions = ctx.db.query('transactions').withIndex('by_category_date', (q) =>
+				q
+					.eq('categoryId', bucket)
+					.gte('date', `${month}-01`)
+					.lt('date', `${addMonths(month, 1)}-01`)
+			);
+			for await (const transaction of transactions) {
+				if (transaction.accountId !== accountId) continue;
+				amount += transaction.amount;
+				count += 1;
+			}
+			if (count > 0) await ctx.db.insert('monthlyTotals', { ...key, amount, count });
 		}
 	}
 }

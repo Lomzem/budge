@@ -149,6 +149,33 @@ describe('deleting a Category', () => {
 		await deleted.t.mutation(internal.monthlyTotals.rebuild, {});
 		expect(await readTotals(deleted)).toEqual(kept);
 	});
+
+	test('rebuilds the totals it touches from the Transactions, not the cache', async () => {
+		const b = await startBudget();
+		const dining = await b.owner.mutation(api.categories.create, {
+			groupId: b.everyday,
+			name: 'Dining Out'
+		});
+		await enterHistory(b, dining);
+		// The cache has drifted for both Categories where Dining Out has history: August in
+		// Checking holds both.
+		await b.t.run(async (ctx) => {
+			for (const row of await ctx.db.query('monthlyTotals').collect()) {
+				const touched =
+					row.bucket === dining ||
+					(row.bucket === b.groceries && row.month === '2026-08' && row.accountId === b.checking);
+				if (touched) await ctx.db.patch('monthlyTotals', row._id, { amount: row.amount + 999 });
+			}
+		});
+		await b.owner.mutation(api.categories.remove, {
+			categoryId: dining,
+			destinationId: b.groceries
+		});
+
+		const kept = await readTotals(b);
+		await b.t.mutation(internal.monthlyTotals.rebuild, {});
+		expect(kept).toEqual(await readTotals(b));
+	});
 });
 
 describe('deleting a Category Group', () => {

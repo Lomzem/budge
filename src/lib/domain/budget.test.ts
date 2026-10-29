@@ -216,16 +216,16 @@ describe('a hidden Category', () => {
 		categories: shown.categories.map((c) => (c.id === 'rent' ? { ...c, hidden: true } : c))
 	});
 
-	test('leaves the budget table and its group totals, and is listed with the hidden ones', () => {
+	test('leaves the budget table but still counts in its group totals, listed with the hidden ones', () => {
 		const result = computeBudget(rentHidden);
 
 		expect(result.groups).toEqual([
 			{
 				id: 'everyday',
 				name: 'Everyday',
-				assigned: 20_000,
-				activity: -6_000,
-				available: 14_000,
+				assigned: 165_000,
+				activity: -156_000,
+				available: 9_000,
 				categories: [
 					{
 						id: 'groceries',
@@ -335,9 +335,10 @@ describe('the cash invariant', () => {
 
 				const cash = transactions.reduce((total, t) => total + t.amount, 0);
 				const result = computeBudget(input);
-				const available =
-					result.groups.reduce((total, group) => total + group.available, 0) +
-					result.hidden.reduce((total, c) => total + c.available, 0);
+				const available = [
+					...result.groups.flatMap((group) => group.categories),
+					...result.hidden
+				].reduce((total, c) => total + c.available, 0);
 				expect(result.readyToAssign.amount + available).toBe(cash);
 				expect(computeBudget({ ...input, month: '2026-09' }).readyToAssign).toEqual(
 					result.readyToAssign

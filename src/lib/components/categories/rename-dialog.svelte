@@ -20,6 +20,9 @@
 	let error = $state('');
 	let saving = $state(false);
 
+	/** Which item the dialog is open for now; a save may outlast it. */
+	const openFor = () => target?.id;
+
 	/** Fills the form from `target`; the parent calls it before each open. */
 	export function reset(next: RenameTarget) {
 		name = next.name;
@@ -29,13 +32,17 @@
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (!target) return;
+		const { id } = target;
 		saving = true;
 		try {
 			if (target.kind === 'group') await renameGroup({ groupId: target.id, name });
 			else await renameCategory({ categoryId: target.id, name });
-			open = false;
+			// Another item may have taken the dialog over while this saved; leave that one be.
+			if (openFor() === id) open = false;
 		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't rename it. Try again.";
+			if (openFor() === id) {
+				error = readPublicError(thrown)?.message ?? "Budge couldn't rename it. Try again.";
+			}
 		} finally {
 			saving = false;
 		}

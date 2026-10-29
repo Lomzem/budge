@@ -10,7 +10,7 @@ import {
 	requireOwnGroup
 } from './lib/categories';
 import { requireName } from './lib/input';
-import { moveTotals } from './lib/monthlyTotals';
+import { rebuildTotals } from './lib/monthlyTotals';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 
@@ -210,8 +210,8 @@ export const remove = mutation({
 			throw publicError('INVALID_INPUT', 'Pick another Category to move its history to.');
 		}
 
-		// Each Transaction moves under the same month and Account, so only the totals for those
-		// keys change, and they move whole into the destination's.
+		// Each Transaction moves under the same month and Account, so only both Categories' totals
+		// for those keys change, and they are rebuilt from the Transactions.
 		const keys = new Map<string, { month: string; accountId: Id<'accounts'> }>();
 		const transactions = ctx.db
 			.query('transactions')
@@ -221,7 +221,7 @@ export const remove = mutation({
 			keys.set(`${key.month}|${key.accountId}`, key);
 			await ctx.db.patch('transactions', transaction._id, { categoryId: destination._id });
 		}
-		await moveTotals(ctx, category._id, destination._id, keys.values());
+		await rebuildTotals(ctx, [category._id, destination._id], keys.values());
 
 		const assignments = ctx.db
 			.query('assignments')

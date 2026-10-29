@@ -26,6 +26,9 @@
 	let error = $state('');
 	let saving = $state(false);
 
+	/** Which item the dialog is open for now; a save may outlast it. */
+	const openFor = () => group?._id;
+
 	const choices = $derived(groups.filter((g) => g._id !== group?._id));
 	const count = $derived(group?.categories.length ?? 0);
 
@@ -43,15 +46,19 @@
 			error = 'Pick a group to move its Categories to.';
 			return;
 		}
+		const id = group._id;
 		saving = true;
 		try {
 			await removeGroup({
-				groupId: group._id,
+				groupId: id,
 				...(destination ? { destinationGroupId: destination._id } : {})
 			});
-			open = false;
+			// Another group may have taken the dialog over while this saved; leave that one be.
+			if (openFor() === id) open = false;
 		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't delete the group. Try again.";
+			if (openFor() === id) {
+				error = readPublicError(thrown)?.message ?? "Budge couldn't delete the group. Try again.";
+			}
 		} finally {
 			saving = false;
 		}

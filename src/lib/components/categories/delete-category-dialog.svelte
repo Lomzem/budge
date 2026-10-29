@@ -27,6 +27,9 @@
 	let error = $state('');
 	let saving = $state(false);
 
+	/** Which item the dialog is open for now; a save may outlast it. */
+	const openFor = () => category?.id;
+
 	const choices = $derived(
 		groups
 			.map((group) => ({
@@ -51,12 +54,17 @@
 			error = 'Pick a Category to move its history to.';
 			return;
 		}
+		const { id } = category;
 		saving = true;
 		try {
-			await remove({ categoryId: category.id, destinationId: destination._id });
-			open = false;
+			await remove({ categoryId: id, destinationId: destination._id });
+			// Another Category may have taken the dialog over while this saved; leave that one be.
+			if (openFor() === id) open = false;
 		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't delete the Category. Try again.";
+			if (openFor() === id) {
+				error =
+					readPublicError(thrown)?.message ?? "Budge couldn't delete the Category. Try again.";
+			}
 		} finally {
 			saving = false;
 		}
