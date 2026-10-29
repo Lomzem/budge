@@ -1,34 +1,23 @@
 import type { ConvexClient } from 'convex/browser';
-import type { PaginationResult } from 'convex/server';
 
 import { api } from '$convex/_generated/api';
 import { toCsv } from '$lib/domain/csv';
+import { readAllPages } from '$lib/domain/pages';
 
 /** Every exportable table's documents, by table name. */
 export type BudgetExport = Record<string, Record<string, unknown>[]>;
 
-// Rows per page: small enough that one page stays well inside Convex's per-query limits.
+// Rows per page. A page of unusually large rows splits, so this bounds only the common case.
 const pageSize = 500;
 
 /** Reads every page of every exportable table. */
 export async function fetchExport(client: ConvexClient): Promise<BudgetExport> {
 	const data: BudgetExport = {};
 	for (const table of await client.query(api.export.tables, {})) {
-		const rows: Record<string, unknown>[] = [];
-		let cursor: string | null = null;
-		for (;;) {
-			const result: PaginationResult<Record<string, unknown>> = await client.query(
-				api.export.page,
-				{
-					table,
-					paginationOpts: { numItems: pageSize, cursor }
-				}
-			);
-			rows.push(...result.page);
-			if (result.isDone) break;
-			cursor = result.continueCursor;
-		}
-		data[table] = rows;
+		data[table] = await readAllPages(
+			(paginationOpts) => client.query(api.export.page, { table, paginationOpts }),
+			{ numItems: pageSize }
+		);
 	}
 	return data;
 }

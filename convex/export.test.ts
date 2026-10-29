@@ -1,6 +1,6 @@
-import type { PaginationResult } from 'convex/server';
 import { describe, expect, test } from 'vitest';
 
+import { readAllPages } from '../src/lib/domain/pages';
 import { api } from './_generated/api';
 import type { MutationCtx } from './_generated/server';
 import schema from './schema';
@@ -73,18 +73,10 @@ type Owner = ReturnType<typeof newBackend>['owner'];
 async function exportAll(owner: Owner, numItems = 2) {
 	const exported: Record<string, unknown[]> = {};
 	for (const table of await owner.query(api.export.tables, {})) {
-		const rows: unknown[] = [];
-		let cursor: string | null = null;
-		for (;;) {
-			const result: PaginationResult<unknown> = await owner.query(api.export.page, {
-				table,
-				paginationOpts: { numItems, cursor }
-			});
-			rows.push(...result.page);
-			if (result.isDone) break;
-			cursor = result.continueCursor;
-		}
-		exported[table] = rows;
+		exported[table] = await readAllPages(
+			(paginationOpts) => owner.query(api.export.page, { table, paginationOpts }),
+			{ numItems }
+		);
 	}
 	return exported;
 }
@@ -128,6 +120,34 @@ describe('the export', () => {
 			'Gym',
 			'Landlord',
 			'Utility'
+		]);
+	});
+
+	test('splits a page too large to read at once, losing and repeating no row', async () => {
+		const { t, owner } = newBackend();
+		// Six memos near a document's size limit outweigh one page's byte limit.
+		const memo = 'x'.repeat(800_000);
+		await t.run(async (ctx) => {
+			const accountId = await ctx.db.insert('accounts', {
+				name: 'Checking',
+				kind: 'cash',
+				position: 0
+			});
+			for (let day = 1; day <= 6; day++) {
+				await ctx.db.insert('transactions', {
+					accountId,
+					date: `2026-08-0${String(day)}`,
+					amount: -day,
+					memo,
+					cleared: 'uncleared'
+				});
+			}
+		});
+
+		const exported = await exportAll(owner, 500);
+
+		expect((exported.transactions as { amount: number }[]).map((row) => row.amount)).toEqual([
+			-1, -2, -3, -4, -5, -6
 		]);
 	});
 
