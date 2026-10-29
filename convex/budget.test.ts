@@ -67,6 +67,7 @@ describe('the budget query', () => {
 				{
 					id: b.everyday,
 					name: 'Everyday',
+					kind: 'normal',
 					assigned: 30_000,
 					activity: 2_000,
 					available: 22_000,
@@ -79,7 +80,8 @@ describe('the budget query', () => {
 							activity: 2_000,
 							available: 22_000,
 							status: 'funded',
-							target: null
+							target: null,
+							payment: null
 						},
 						{
 							id: b.rent,
@@ -89,7 +91,8 @@ describe('the budget query', () => {
 							activity: 0,
 							available: 0,
 							status: 'empty',
-							target: null
+							target: null,
+							payment: null
 						}
 					]
 				}

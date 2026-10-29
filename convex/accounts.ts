@@ -2,7 +2,7 @@ import { v } from 'convex/values';
 
 import { mutation, query } from './_generated/server';
 import { requireCents, requireName } from './lib/input';
-import { ensureReadyToAssign } from './lib/categories';
+import { createPaymentCategory, ensureReadyToAssign, readPaymentCategory } from './lib/categories';
 import { accountBalances } from './lib/monthlyTotals';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
@@ -50,9 +50,12 @@ export const create = mutation({
 			date: cutoverDate,
 			amount,
 			payee: 'Starting Balance',
-			// A Cash Account's starting balance is money to budget. A card's debt touches no
-			// Category (Credit Card Accounts arrive in full later), so it stays Uncategorized.
-			...(args.kind === 'cash' ? { categoryId: await ensureReadyToAssign(ctx) } : {}),
+			// A Cash Account's starting balance is money to budget. A card's debt sits in its own
+			// Payment Category, where the card's move cancels it, so it touches no Category.
+			categoryId:
+				args.kind === 'cash'
+					? await ensureReadyToAssign(ctx)
+					: await createPaymentCategory(ctx, { _id: accountId, name }),
 			memo: ''
 		});
 		await insertTransaction(ctx, { ...fields, cleared: 'cleared' });
@@ -68,6 +71,9 @@ export const rename = mutation({
 		const name = requireName(args.name);
 		if ((await ctx.db.get('accounts', args.accountId)) === null) throw publicError('NOT_FOUND');
 		await ctx.db.patch('accounts', args.accountId, { name });
+		// A card's Payment Category goes by the card's name.
+		const payment = await readPaymentCategory(ctx, args.accountId);
+		if (payment !== null) await ctx.db.patch('categories', payment._id, { name });
 		return null;
 	}
 });

@@ -30,11 +30,13 @@ export async function transactionFields(
 	if (input.date < (await requireCutoverDate(ctx))) {
 		throw publicError('INVALID_INPUT', 'Budge starts on the cutover date; pick a later date.');
 	}
-	if (
-		input.categoryId !== undefined &&
-		(await ctx.db.get('categories', input.categoryId)) === null
-	) {
-		throw publicError('NOT_FOUND');
+	if (input.categoryId !== undefined) {
+		const category = await ctx.db.get('categories', input.categoryId);
+		if (category === null) throw publicError('NOT_FOUND');
+		// Only a card's starting debt sits in its Payment Category, where the card's move cancels it.
+		if (category.kind === 'creditCardPayment' && category.accountId !== input.accountId) {
+			throw publicError('INVALID_INPUT', "A Payment Category takes only its card's starting debt.");
+		}
 	}
 	const payeeId = await payeeNamed(ctx, input.payee);
 	const memo = input.memo.trim();
@@ -88,10 +90,15 @@ export async function saveTransaction(
 	if (transferAccountId === fields.accountId) {
 		throw publicError('INVALID_INPUT', 'Pick another Account to transfer with.');
 	}
-	// Card payments arrive with Credit Card Accounts; until then a Transfer is Cash to Cash only.
+	// A Transfer is between two Cash Accounts, or a card payment: money from a Cash Account into
+	// a Credit Card Account, entered from either side.
 	const source = await ctx.db.get('accounts', fields.accountId);
-	if (source?.kind !== 'cash' || target.kind !== 'cash') {
-		throw publicError('INVALID_INPUT', 'A Transfer is between two Cash Accounts.');
+	if (source?.kind !== 'cash' && target.kind !== 'cash') {
+		throw publicError('INVALID_INPUT', 'A Transfer needs a Cash Account on one side.');
+	}
+	const cashSideAmount = source?.kind === 'cash' ? fields.amount : -fields.amount;
+	if ((source?.kind !== 'cash' || target.kind !== 'cash') && cashSideAmount > 0) {
+		throw publicError('INVALID_INPUT', 'A card payment moves money from a Cash Account.');
 	}
 	if (fields.categoryId !== undefined || fields.payeeId !== undefined) {
 		throw publicError('INVALID_INPUT', 'A Transfer has no Category or Payee.');

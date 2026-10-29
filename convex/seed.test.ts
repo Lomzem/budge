@@ -40,11 +40,13 @@ describe('seed:run', () => {
 			expect(account.balance, account.name).toBe(sum);
 		}
 
-		// One Transfer, Checking to Savings, with both sides in the list.
+		// One Transfer, Checking to Savings, and one card payment, with both sides in the list.
 		const transfers = page.filter((row) => row.transfer !== null);
 		expect(
 			transfers.map((row) => [row.accountName, row.transfer?.accountName, row.amount]).sort()
 		).toEqual([
+			['Card', 'Checking', 400_00],
+			['Checking', 'Card', -400_00],
 			['Checking', 'Savings', -500_00],
 			['Savings', 'Checking', 500_00]
 		]);
@@ -52,10 +54,13 @@ describe('seed:run', () => {
 		const { groups } = await owner.query(api.categories.list, {});
 		expect(groups.map((group) => group.categories.length)).toEqual([4, 4, 4]);
 		const budget = await owner.query(api.budget.month, { month: '2026-10', today: '2026-10-27' });
-		expect(budget.groups.flatMap((group) => group.categories).every((c) => c.assigned > 0)).toBe(
-			true
-		);
+		const normal = budget.groups.filter((group) => group.kind === 'normal');
+		expect(normal.flatMap((group) => group.categories).every((c) => c.assigned > 0)).toBe(true);
 		expect(budget.uncategorizedCount).toBeGreaterThan(0);
+		// The card's purchases moved money into its Payment Category, and the payment took some out.
+		const payment = budget.groups.find((group) => group.kind === 'creditCardPayments');
+		expect(payment?.categories.map((c) => c.name)).toEqual(['Card']);
+		expect(payment?.categories[0]?.payment?.uncovered).toBeGreaterThan(0);
 	});
 
 	test('refuses once any Account exists', async () => {
