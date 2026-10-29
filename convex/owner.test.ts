@@ -24,6 +24,7 @@ function sampleArgs(ids: {
 	const entry = { accountId, date: '2026-08-14', amount: -500, payee: 'Corner Grocer', memo: '' };
 	const args: Record<string, Record<string, unknown>> = {
 		'owner:whoami': {},
+		'export:all': {},
 		'settings:get': {},
 		'settings:setCutoverDate': { cutoverDate: '2026-08-01' },
 		'accounts:list': {},
