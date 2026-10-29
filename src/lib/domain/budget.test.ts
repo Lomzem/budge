@@ -70,6 +70,28 @@ describe('Available', () => {
 	});
 });
 
+test('a Category is left over from last month with what it had Available then', () => {
+	const input = budget({
+		assignments: [
+			{ month: '2026-08', categoryId: 'groceries', amount: 30_000 },
+			{ month: '2026-10', categoryId: 'groceries', amount: 10_000 },
+			{ month: '2026-10', categoryId: 'rent', amount: 145_000 }
+		],
+		monthlyTotals: [
+			{ month: '2026-08', bucket: 'groceries', amount: -45_000, count: 2 },
+			{ month: '2026-10', bucket: 'groceries', amount: -2_000, count: 1 }
+		]
+	});
+
+	expect(category(computeBudget(input), 'Groceries')).toMatchObject({
+		priorAvailable: -15_000,
+		assigned: 10_000,
+		activity: -2_000,
+		available: -7_000
+	});
+	expect(category(computeBudget(input), 'Rent')).toMatchObject({ priorAvailable: 0 });
+});
+
 describe('Ready to Assign', () => {
 	test('is the same in every month, and Assigned in a future month reduces it now', () => {
 		const input = budget({
@@ -180,6 +202,7 @@ test('groups show their totals, and overspent Categories are listed in table ord
 				{
 					id: 'groceries',
 					name: 'Groceries',
+					priorAvailable: 0,
 					assigned: 20_000,
 					activity: -6_000,
 					available: 14_000,
@@ -188,6 +211,7 @@ test('groups show their totals, and overspent Categories are listed in table ord
 				{
 					id: 'rent',
 					name: 'Rent',
+					priorAvailable: 0,
 					assigned: 145_000,
 					activity: -150_000,
 					available: -5_000,
@@ -230,6 +254,7 @@ describe('a hidden Category', () => {
 					{
 						id: 'groceries',
 						name: 'Groceries',
+						priorAvailable: 0,
 						assigned: 20_000,
 						activity: -6_000,
 						available: 14_000,
@@ -242,6 +267,7 @@ describe('a hidden Category', () => {
 			{
 				id: 'rent',
 				name: 'Rent',
+				priorAvailable: 0,
 				assigned: 145_000,
 				activity: -150_000,
 				available: -5_000,
