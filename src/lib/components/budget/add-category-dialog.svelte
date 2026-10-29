@@ -10,10 +10,13 @@
 
 	let {
 		open = $bindable(false),
+		saving = $bindable(false),
 		kind,
 		groups
 	}: {
 		open?: boolean;
+		/** True while a save is in flight; the parent keeps `kind` fixed until it settles. */
+		saving?: boolean;
 		/** A Category Group, or a Category within one of `groups`. */
 		kind: 'group' | 'category';
 		groups: readonly { id: Id<'categoryGroups'>; name: string }[];
@@ -25,7 +28,6 @@
 	let name = $state('');
 	let groupId = $state('');
 	let error = $state('');
-	let saving = $state(false);
 	const title = $derived(kind === 'group' ? 'Add Category Group' : 'Add Category');
 
 	/**

@@ -18,6 +18,8 @@
 	let addAccountOpen = $state(false);
 	let adding: 'group' | 'category' = $state('group');
 	let addingOpen = $state(false);
+	// A pending save keeps its form, so the other kind can't open until it settles.
+	let addingSaving = $state(false);
 	let addDialog: { reset: () => void } | undefined = $state();
 
 	const view = $derived(budget.view);
@@ -138,6 +140,7 @@
 				<Button
 					variant="outline"
 					size="sm"
+					disabled={addingSaving && adding !== 'group'}
 					onclick={() => {
 						add('group');
 					}}
@@ -148,6 +151,7 @@
 					<Button
 						variant="outline"
 						size="sm"
+						disabled={addingSaving && adding !== 'category'}
 						onclick={() => {
 							add('category');
 						}}>Add Category</Button
@@ -166,4 +170,10 @@
 </div>
 
 <AccountDialog bind:open={addAccountOpen} />
-<AddCategoryDialog bind:this={addDialog} bind:open={addingOpen} kind={adding} {groups} />
+<AddCategoryDialog
+	bind:this={addDialog}
+	bind:open={addingOpen}
+	bind:saving={addingSaving}
+	kind={adding}
+	{groups}
+/>
