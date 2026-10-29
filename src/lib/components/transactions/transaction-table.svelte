@@ -122,9 +122,13 @@
 			</Table.Header>
 			<Table.Body>
 				{#each rows as row (row._id)}
-					{@const payee = row.payeeName ?? 'No Payee'}
-					{@const category = row.categoryName ?? 'Uncategorized'}
-					{@const categoryClass = row.categoryName === null ? 'text-warning' : undefined}
+					{@const payee = row.payeeName ?? (row.transfer ? 'Transfer' : 'No Payee')}
+					<!-- A Transfer shows the other Account in place of a Category. -->
+					{@const category = row.transfer
+						? `${row.amount < 0 ? 'To' : 'From'} ${row.transfer.accountName}`
+						: (row.categoryName ?? 'Uncategorized')}
+					{@const categoryClass =
+						row.categoryName === null && !row.transfer ? 'text-warning' : undefined}
 					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
 						<Table.Cell numeric>
 							<time datetime={row.date}>
@@ -142,7 +146,11 @@
 									edit(row);
 								}}
 							>
-								<span class={row.payeeName === null ? 'text-muted-foreground' : undefined}>
+								<span
+									class={row.payeeName === null && !row.transfer
+										? 'text-muted-foreground'
+										: undefined}
+								>
 									{payee}
 								</span>
 								<span class="sr-only">

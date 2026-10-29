@@ -61,7 +61,10 @@ export default defineSchema({
 		cleared: v.union(v.literal('uncleared'), v.literal('cleared')),
 		// Imported Transactions arrive Unapproved (`false`). Left out on Transactions written before
 		// imports existed, which read as approved.
-		approved: v.optional(v.boolean())
+		approved: v.optional(v.boolean()),
+		// Set on each side of a Transfer, pointing at the other side. The two sides have opposite
+		// amounts, the same date, and no Category; there is no Transfer table.
+		transferTransactionId: v.optional(v.id('transactions'))
 	})
 		.index('by_account_date', ['accountId', 'date'])
 		.index('by_date', ['date'])
@@ -104,7 +107,7 @@ export default defineSchema({
 	monthlyTotals: defineTable({
 		month: v.string(),
 		accountId: v.id('accounts'),
-		bucket: v.union(v.id('categories'), v.literal('uncategorized')),
+		bucket: v.union(v.id('categories'), v.literal('uncategorized'), v.literal('transfer')),
 		amount: v.number(),
 		count: v.number()
 	}).index('by_month_account_bucket', ['month', 'accountId', 'bucket'])

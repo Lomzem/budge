@@ -40,6 +40,15 @@ describe('seed:run', () => {
 			expect(account.balance, account.name).toBe(sum);
 		}
 
+		// One Transfer, Checking to Savings, with both sides in the list.
+		const transfers = page.filter((row) => row.transfer !== null);
+		expect(
+			transfers.map((row) => [row.accountName, row.transfer?.accountName, row.amount]).sort()
+		).toEqual([
+			['Checking', 'Savings', -500_00],
+			['Savings', 'Checking', 500_00]
+		]);
+
 		const { groups } = await owner.query(api.categories.list, {});
 		expect(groups.map((group) => group.categories.length)).toEqual([4, 4, 4]);
 		const budget = await owner.query(api.budget.month, { month: '2026-10', today: '2026-10-27' });

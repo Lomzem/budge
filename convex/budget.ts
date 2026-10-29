@@ -98,6 +98,8 @@ async function readBudget(ctx: QueryCtx, month: string, today: string) {
 			.query('transactions')
 			.withIndex('by_category_date', (q) => q.eq('categoryId', categoryId).gt('date', today));
 		for await (const transaction of later) {
+			// A Transfer side has no Category but is never Uncategorized.
+			if (transaction.transferTransactionId !== undefined) continue;
 			transactionsAfterToday.push({
 				date: transaction.date,
 				amount: transaction.amount,
