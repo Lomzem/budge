@@ -41,6 +41,11 @@ function sampleArgs(ids: {
 		'transactions:approve': { transactionId },
 		'transactions:approveAll': {},
 		'transactions:unapprovedCount': {},
+		'transactions:transferCandidates': {
+			transferAccountId: accountId,
+			date: '2026-08-01',
+			amount: 0
+		},
 		'imports:preview': { accountId, source: 'csv', rows: [] },
 		'imports:commit': { accountId, source: 'csv', rows: [] },
 		'imports:unmatch': { importId },

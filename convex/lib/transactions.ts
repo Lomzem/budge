@@ -1,5 +1,7 @@
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
+import { addDays } from '../../src/lib/domain/dates';
+import { MATCH_WINDOW_DAYS } from '../../src/lib/domain/matcher';
 import { requireCents } from './input';
 import { countTransaction } from './monthlyTotals';
 import { payeeNamed, rememberCategory, rememberRename } from './payees';
@@ -22,12 +24,17 @@ export interface TransactionInput {
 	memo: string;
 	/** The other Account, which makes this a Transfer; it then has no Category and no Payee. */
 	transferAccountId?: Id<'accounts'> | undefined;
+	/**
+	 * An imported Transaction in `transferAccountId` to link as the other side, in place of
+	 * creating one. It must be one of `transferCandidatesOf`.
+	 */
+	transferTransactionId?: Id<'transactions'> | undefined;
 }
 
 /** Checks a hand-entered Transaction and resolves its Payee, creating it on first use. */
 export async function transactionFields(
 	ctx: MutationCtx,
-	input: Omit<TransactionInput, 'transferAccountId'>
+	input: Omit<TransactionInput, 'transferAccountId' | 'transferTransactionId'>
 ): Promise<Omit<TransactionFields, 'cleared' | 'approved'>> {
 	if ((await ctx.db.get('accounts', input.accountId)) === null) throw publicError('NOT_FOUND');
 	requireIsoDate(input.date);
@@ -58,14 +65,16 @@ export async function transactionFields(
  * Saves what the owner entered, as a new Transaction or over `existing`, which keeps whether it
  * is Cleared. Saving approves it. With `transferAccountId` it saves both sides of a Transfer,
  * creating the other side uncleared and approved if there is none yet; an existing other side keeps
- * whether it is Cleared and approved. Without it, an existing Transfer's other side is deleted.
- * Giving the Payee a Category updates Payee memory, and renaming the Payee of an imported
- * Transaction updates rename memory for each of its Bank Texts.
+ * whether it is Cleared and approved. With `transferTransactionId` as well, that imported
+ * Transaction becomes the other side, approved, in place of any other side there was. Without
+ * `transferAccountId`, an existing Transfer's other side is deleted. Giving the Payee a Category
+ * updates Payee memory, and renaming the Payee of an imported Transaction updates rename memory
+ * for each of its Bank Texts.
  */
 export async function saveTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'> | null,
-	{ transferAccountId, ...input }: TransactionInput
+	{ transferAccountId, transferTransactionId, ...input }: TransactionInput
 ): Promise<Id<'transactions'>> {
 	const fields = {
 		...(await transactionFields(ctx, input)),
@@ -87,6 +96,9 @@ export async function saveTransaction(
 			? null
 			: await ctx.db.get('transactions', existing.transferTransactionId);
 	if (transferAccountId === undefined) {
+		if (transferTransactionId !== undefined) {
+			throw publicError('INVALID_INPUT', 'Pick the Account to transfer with.');
+		}
 		if (counterpart !== null) await deleteOne(ctx, counterpart);
 		if (existing === null) return await insertTransaction(ctx, fields);
 		await replaceTransaction(ctx, existing, fields);
@@ -111,15 +123,63 @@ export async function saveTransaction(
 	if (fields.categoryId !== undefined || fields.payeeId !== undefined) {
 		throw publicError('INVALID_INPUT', 'A Transfer has no Category or Payee.');
 	}
+	let otherSide = counterpart;
+	let linking = false;
+	if (transferTransactionId !== undefined && transferTransactionId !== counterpart?._id) {
+		const candidates = await transferCandidatesOf(
+			ctx,
+			transferAccountId,
+			fields.date,
+			fields.amount
+		);
+		const linked = candidates.find((candidate) => candidate._id === transferTransactionId);
+		if (linked === undefined) {
+			throw publicError(
+				'INVALID_INPUT',
+				'Link an imported Transaction with the opposite amount, within 10 days.'
+			);
+		}
+		if (counterpart !== null) await deleteOne(ctx, counterpart);
+		otherSide = linked;
+		linking = true;
+	}
 	const other: TransactionFields = {
 		accountId: transferAccountId,
 		date: fields.date,
 		amount: -fields.amount,
 		...(fields.memo === undefined ? {} : { memo: fields.memo }),
-		cleared: counterpart?.cleared ?? 'uncleared',
-		approved: counterpart?.approved !== false
+		cleared: otherSide?.cleared ?? 'uncleared',
+		// Picking the import to link reviews it.
+		approved: linking || otherSide?.approved !== false
 	};
-	return await writeTransfer(ctx, { existing, fields }, { existing: counterpart, fields: other });
+	return await writeTransfer(ctx, { existing, fields }, { existing: otherSide, fields: other });
+}
+
+/**
+ * The imported Transactions in `accountId` that could be the other side of a Transfer of `amount`
+ * on `date`: not yet a Transfer side, with the opposite amount, dated within the match window.
+ */
+export async function transferCandidatesOf(
+	ctx: QueryCtx,
+	accountId: Id<'accounts'>,
+	date: string,
+	amount: number
+) {
+	const candidates: Doc<'transactions'>[] = [];
+	const nearby = ctx.db
+		.query('transactions')
+		.withIndex('by_account_date', (q) =>
+			q
+				.eq('accountId', accountId)
+				.gte('date', addDays(date, -MATCH_WINDOW_DAYS))
+				.lte('date', addDays(date, MATCH_WINDOW_DAYS))
+		);
+	for await (const transaction of nearby) {
+		if (transaction.amount !== -amount || transaction.transferTransactionId !== undefined) continue;
+		if ((await bankRowsOf(ctx, transaction._id)).length === 0) continue;
+		candidates.push(transaction);
+	}
+	return candidates;
 }
 
 interface Side {
