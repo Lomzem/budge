@@ -5,7 +5,8 @@ import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/s
 import { fileRow, fileSource, planImport } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import { bankRowsOf, insertTransaction, payeeNamed } from './lib/transactions';
+import { importedPayee } from './lib/payees';
+import { bankRowsOf, insertTransaction } from './lib/transactions';
 
 const candidate = v.object({
 	_id: v.id('transactions'),
@@ -73,8 +74,8 @@ export const preview = query({
 
 /**
  * Saves a decoded bank file into an Account in one transaction, checking every row and running the
- * matcher again. New rows become Cleared, Unapproved Transactions, Payee from Bank Text and
- * Uncategorized. Matched Transactions keep what the owner entered, become Cleared, and go back to
+ * matcher again. New rows become Cleared, Unapproved Transactions, with the Payee and Category
+ * that rename and Payee memory give their Bank Text. Matched Transactions keep what the owner entered, become Cleared, and go back to
  * Unapproved. Refused while any row still needs a pick.
  */
 export const commit = mutation({
@@ -147,18 +148,20 @@ export const unmatch = mutation({
 	}
 });
 
-/** A Transaction for a Bank Row of its own: Cleared, Unapproved, Uncategorized. */
+/**
+ * A Transaction for a Bank Row of its own: Cleared and Unapproved, with the Payee and Category that
+ * rename and Payee memory give its Bank Text.
+ */
 async function insertImported(
 	ctx: MutationCtx,
 	accountId: Id<'accounts'>,
 	row: { date: string; amount: number; bankText: string }
 ) {
-	const payeeId = await payeeNamed(ctx, row.bankText);
 	return await insertTransaction(ctx, {
 		accountId,
 		date: row.date,
 		amount: row.amount,
-		...(payeeId === undefined ? {} : { payeeId }),
+		...(await importedPayee(ctx, row)),
 		cleared: 'cleared',
 		approved: false
 	});

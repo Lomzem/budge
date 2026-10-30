@@ -44,6 +44,7 @@ function sampleArgs(ids: {
 		'imports:preview': { accountId, source: 'csv', rows: [] },
 		'imports:commit': { accountId, source: 'csv', rows: [] },
 		'imports:unmatch': { importId },
+		'payees:lastCategory': { name: 'Corner Grocer' },
 		'categories:list': {},
 		'categories:createGroup': { name: 'Bills' },
 		'categories:create': { groupId, name: 'Rent' },

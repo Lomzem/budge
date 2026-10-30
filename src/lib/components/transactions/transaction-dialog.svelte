@@ -48,6 +48,11 @@
 	let error = $state('');
 	let saving = $state(false);
 	let confirmDelete = $state(false);
+	/** The Payee and Category the form opened with. */
+	let filledPayee = $state('');
+	let filledCategoryId = $state('');
+	/** Whether the owner has picked a Category since the form opened. */
+	let categoryPicked = $state(false);
 
 	const TRANSFER = 'transfer:';
 	/** The other Account picked for a Transfer, or `undefined` for an ordinary Transaction. */
@@ -66,6 +71,24 @@
 	// must not wipe what the owner is typing.
 	$effect(() => {
 		if (open) untrack(fill);
+	});
+
+	// Payee memory: typing a Payee fills in the Category it was last given, until the owner picks
+	// one. A Transaction that already has a Category keeps it.
+	const prefillsCategory = $derived(
+		open && !categoryPicked && !isTransfer && filledCategoryId === ''
+	);
+	const payeeName = $derived(payee.trim());
+	const payeeEdited = $derived(payeeName !== '' && payeeName !== filledPayee);
+	const payeeMemory = useQuery(api.payees.lastCategory, () =>
+		prefillsCategory && payeeEdited ? { name: payeeName } : 'skip'
+	);
+	$effect(() => {
+		if (!prefillsCategory) return;
+		if (!payeeEdited) categoryId = '';
+		else if (!payeeMemory.isStale && payeeMemory.data !== undefined) {
+			categoryId = payeeMemory.data ?? '';
+		}
 	});
 
 	function fill() {
@@ -89,6 +112,9 @@
 			amount = '';
 			memo = '';
 		}
+		filledPayee = payee.trim();
+		filledCategoryId = categoryId;
+		categoryPicked = false;
 	}
 
 	/** The Category picked, or `undefined` for Uncategorized. */
@@ -221,6 +247,7 @@
 				<select
 					id="transaction-category"
 					bind:value={categoryId}
+					onchange={() => (categoryPicked = true)}
 					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
 				>
 					<option value="">Uncategorized</option>
