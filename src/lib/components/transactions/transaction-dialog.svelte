@@ -71,10 +71,19 @@
 		recallsCategory &&
 			(payeeMemory.isLoading ||
 				payeeMemory.isStale ||
-				(Boolean(payeeMemory.data) && categories.data === undefined))
+				(Boolean(payeeMemory.data) &&
+					categories.data === undefined &&
+					categories.error === undefined))
 	);
+	/** Why the typed Payee's last Category can't be shown, if it can't. */
 	const recallFailed = $derived(
-		recallsCategory && !recallingCategory && payeeMemory.error !== undefined
+		!recallsCategory || recallingCategory
+			? undefined
+			: payeeMemory.error !== undefined
+				? "Budge couldn't look up this Payee's last Category. Pick one to save."
+				: payeeMemory.data && categories.error !== undefined
+					? "Budge couldn't load the Categories. Pick Uncategorized or a Transfer to save."
+					: undefined
 	);
 	/** Stands in for a Category until the typed Payee's memory arrives or the owner picks one. */
 	const UNRESOLVED = 'unresolved';
@@ -83,7 +92,7 @@
 	const rememberedCategoryId = $derived(
 		!recallsCategory
 			? ''
-			: recallingCategory || recallFailed
+			: recallingCategory || recallFailed !== undefined
 				? UNRESOLVED
 				: payeeMemory.data
 					? (findCategory(payeeMemory.data) ?? '')
@@ -343,7 +352,7 @@
 				>
 					{#if categoryId === UNRESOLVED}
 						<option value={UNRESOLVED} disabled>
-							{recallFailed ? 'Pick a Category' : 'Looking up the last Category…'}
+							{recallFailed === undefined ? 'Looking up the last Category…' : 'Pick a Category'}
 						</option>
 					{/if}
 					<option value="">Uncategorized</option>
@@ -373,10 +382,8 @@
 						</optgroup>
 					{/if}
 				</select>
-				{#if recallFailed}
-					<p class="text-sm text-destructive" role="alert">
-						Budge couldn't look up this Payee's last Category. Pick one to save.
-					</p>
+				{#if recallFailed !== undefined}
+					<p class="text-sm text-destructive" role="alert">{recallFailed}</p>
 				{/if}
 				{#if isTransfer}
 					<p class="text-sm text-muted-foreground">
