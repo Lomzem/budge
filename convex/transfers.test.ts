@@ -91,8 +91,8 @@ describe('a Transfer', () => {
 		});
 
 		expect(await budget()).toEqual(before);
-		// The card's starting debt is still Uncategorized.
-		expect(before.readyToAssign).toEqual({ amount: 560_000, uncategorized: -20_000 });
+		// The card's starting debt touches no Category and not Ready to Assign.
+		expect(before.readyToAssign).toEqual({ amount: 580_000, uncategorized: 0 });
 	});
 
 	test.each([
@@ -117,19 +117,44 @@ describe('a Transfer', () => {
 		).toBe('INVALID_INPUT');
 	});
 
-	// Card payments arrive with Credit Card Accounts; until then a Transfer is Cash to Cash only.
+	// With a Credit Card Account, a Transfer is a card payment: money from a Cash Account into the
+	// card, entered from either side.
 	test.each([
-		['to a Credit Card Account', 'checking', 'card'],
-		['from a Credit Card Account', 'card', 'checking']
-	] as const)('refuses one %s', async (_, from, to) => {
+		['from the Cash Account', 'checking', 'card', -25_000],
+		['from the card', 'card', 'checking', 25_000]
+	] as const)('pays a card, entered %s', async (_, accountId, transferAccountId, amount) => {
 		const accounts = await budgetWithThreeAccounts();
+
+		await accounts.owner.mutation(api.transactions.create, {
+			...toSavings,
+			amount,
+			accountId: accounts[accountId],
+			transferAccountId: accounts[transferAccountId]
+		});
+
+		expect(await accounts.balances()).toMatchObject({ Checking: 75_000, Card: 5_000 });
+	});
+
+	test.each([
+		['moving money from a card into a Cash Account', 'card', 'checking', -25_000],
+		['moving money from a Cash Account out of a card', 'checking', 'card', 25_000],
+		['between two cards', 'card', 'otherCard', -25_000]
+	] as const)('refuses one %s', async (_, accountId, transferAccountId, amount) => {
+		const accounts = await budgetWithThreeAccounts();
+		const otherCard = await accounts.owner.mutation(api.accounts.create, {
+			name: 'Other Card',
+			kind: 'creditCard',
+			startingBalance: 0
+		});
+		const ids = { ...accounts, otherCard };
 
 		expect(
 			await publicErrorCode(
 				accounts.owner.mutation(api.transactions.create, {
 					...toSavings,
-					accountId: accounts[from],
-					transferAccountId: accounts[to]
+					amount,
+					accountId: ids[accountId],
+					transferAccountId: ids[transferAccountId]
 				})
 			)
 		).toBe('INVALID_INPUT');

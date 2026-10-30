@@ -10,7 +10,7 @@
 	import { formatCents, parseCents } from '$lib/domain/money';
 	import { readPublicError } from '$lib/publicError';
 
-	import { availableStatus, describeTarget } from './status';
+	import { availableStatus, describeTarget, paymentNotes } from './status';
 	import TargetBar from './target-bar.svelte';
 	import TargetDialog from './target-dialog.svelte';
 
@@ -183,33 +183,44 @@
 		</div>
 	{/if}
 
-	<section aria-labelledby="target-heading" class="flex flex-col gap-2">
-		<h3 id="target-heading" class="text-sm font-medium">Target</h3>
-		{#if category.target}
-			<p class="text-sm">{describeTarget(category.target)}</p>
-			<TargetBar
-				progress={category.target.progress}
-				label="{category.name} Target"
-				text={status?.text ?? ''}
-			/>
-			{#if status}
-				<p class={['text-sm', status.class]}>{status.text}</p>
+	{#if category.payment}
+		<section aria-labelledby="payment-heading" class="flex flex-col gap-2">
+			<h3 id="payment-heading" class="text-sm font-medium">Card payment</h3>
+			{#each paymentNotes(category) as note (note)}
+				<p class="text-sm">{note}</p>
+			{:else}
+				<p class="text-sm text-muted-foreground">Available covers the card's debt.</p>
+			{/each}
+		</section>
+	{:else}
+		<section aria-labelledby="target-heading" class="flex flex-col gap-2">
+			<h3 id="target-heading" class="text-sm font-medium">Target</h3>
+			{#if category.target}
+				<p class="text-sm">{describeTarget(category.target)}</p>
+				<TargetBar
+					progress={category.target.progress}
+					label="{category.name} Target"
+					text={status?.text ?? ''}
+				/>
+				{#if status}
+					<p class={['text-sm', status.class]}>{status.text}</p>
+				{/if}
+				{#if category.target.needed > 0}
+					<Button size="wrap" disabled={assigning} onclick={assignTarget}>
+						Assign {formatCents(category.target.needed)}
+					</Button>
+				{/if}
+				{#if assignError}
+					<p role="alert" class="text-sm text-destructive">{assignError}</p>
+				{/if}
+			{:else}
+				<p class="text-sm text-muted-foreground">No Target yet.</p>
 			{/if}
-			{#if category.target.needed > 0}
-				<Button size="wrap" disabled={assigning} onclick={assignTarget}>
-					Assign {formatCents(category.target.needed)}
-				</Button>
-			{/if}
-			{#if assignError}
-				<p role="alert" class="text-sm text-destructive">{assignError}</p>
-			{/if}
-		{:else}
-			<p class="text-sm text-muted-foreground">No Target yet.</p>
-		{/if}
-		<Button variant="outline" size="sm" onclick={editTarget}>
-			{category.target ? 'Edit Target' : 'Add Target'}
-		</Button>
-	</section>
+			<Button variant="outline" size="sm" onclick={editTarget}>
+				{category.target ? 'Edit Target' : 'Add Target'}
+			</Button>
+		</section>
+	{/if}
 
 	<form class="flex flex-col gap-3" aria-labelledby="move-heading" onsubmit={move}>
 		<h3 id="move-heading" class="text-sm font-medium">Move money</h3>

@@ -7,7 +7,7 @@
 	import { formatCents } from '$lib/domain/money';
 
 	import AssignedInput from './assigned-input.svelte';
-	import { availableStatus } from './status';
+	import { availableStatus, paymentNotes } from './status';
 	import TargetBar from './target-bar.svelte';
 
 	let {
@@ -82,6 +82,9 @@
 						{#if status}
 							<span class="block truncate pl-3 text-xs {status.class}">{status.text}</span>
 						{/if}
+						{#each paymentNotes(category) as note (note)}
+							<span class="block pl-3 text-xs whitespace-normal text-muted-foreground">{note}</span>
+						{/each}
 					</Table.Cell>
 					<Table.Cell align="end">
 						<AssignedInput

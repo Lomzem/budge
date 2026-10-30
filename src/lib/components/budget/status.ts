@@ -31,6 +31,19 @@ export function availableStatus(
 	}
 }
 
+/**
+ * A Payment Category's notes in words: what it still waits on from each overspent Category, then
+ * the card debt not yet covered. Empty for any other Category.
+ */
+export function paymentNotes(category: Pick<CategoryBudget, 'payment'>): string[] {
+	const { payment } = category;
+	if (payment === null) return [];
+	const notes = payment.waitingOn.map((w) => `${formatCents(w.amount)} waiting on ${w.name}`);
+	if (payment.uncovered > 0)
+		notes.push(`${formatCents(payment.uncovered)} of card debt not yet covered`);
+	return notes;
+}
+
 /** A Target in words, with a repeating By date Target's date as of the viewed month. */
 export function describeTarget(target: TargetProgress): string {
 	const { definition } = target;

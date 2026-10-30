@@ -3,13 +3,13 @@ import { describe, expect, test } from 'vitest';
 import { computeBudget, type BudgetInput, type Target } from './budget';
 
 // A small budget: one Category Group with Groceries and Rent, plus Ready to Assign in its hidden
-// system group. Amounts are cents.
-type CategoryId = 'groceries' | 'rent' | 'readyToAssign';
-type GroupId = 'everyday' | 'system';
+// system group, and a Checking Account. Amounts are cents.
+type CategoryId = 'groceries' | 'rent' | 'readyToAssign' | 'discoverPayment' | 'visaPayment';
+type GroupId = 'everyday' | 'system' | 'cards';
+type AccountId = 'checking' | 'savings' | 'discover' | 'visa';
+type Input = BudgetInput<CategoryId, GroupId, AccountId>;
 
-function budget(
-	change: Partial<BudgetInput<CategoryId, GroupId>> = {}
-): BudgetInput<CategoryId, GroupId> {
+function budget(change: Partial<Input> = {}): Input {
 	return {
 		month: '2026-10',
 		today: '2026-10-15',
@@ -50,10 +50,10 @@ describe('Available', () => {
 				{ month: '2026-10', categoryId: 'groceries', amount: 10_000 }
 			],
 			monthlyTotals: [
-				{ month: '2026-08', bucket: 'groceries', amount: -20_000, count: 3 },
+				{ month: '2026-08', accountId: 'checking', bucket: 'groceries', amount: -20_000, count: 3 },
 				// September overspends Groceries by $150; nothing resets it at month-end.
-				{ month: '2026-09', bucket: 'groceries', amount: -25_000, count: 4 },
-				{ month: '2026-10', bucket: 'groceries', amount: -2_000, count: 1 }
+				{ month: '2026-09', accountId: 'checking', bucket: 'groceries', amount: -25_000, count: 4 },
+				{ month: '2026-10', accountId: 'checking', bucket: 'groceries', amount: -2_000, count: 1 }
 			]
 		});
 
@@ -78,8 +78,8 @@ test('a Category is left over from last month with what it had Available then', 
 			{ month: '2026-10', categoryId: 'rent', amount: 145_000 }
 		],
 		monthlyTotals: [
-			{ month: '2026-08', bucket: 'groceries', amount: -45_000, count: 2 },
-			{ month: '2026-10', bucket: 'groceries', amount: -2_000, count: 1 }
+			{ month: '2026-08', accountId: 'checking', bucket: 'groceries', amount: -45_000, count: 2 },
+			{ month: '2026-10', accountId: 'checking', bucket: 'groceries', amount: -2_000, count: 1 }
 		]
 	});
 
@@ -95,7 +95,15 @@ test('a Category is left over from last month with what it had Available then', 
 describe('Ready to Assign', () => {
 	test('is the same in every month, and Assigned in a future month reduces it now', () => {
 		const input = budget({
-			monthlyTotals: [{ month: '2026-08', bucket: 'readyToAssign', amount: 300_000, count: 1 }],
+			monthlyTotals: [
+				{
+					month: '2026-08',
+					accountId: 'checking',
+					bucket: 'readyToAssign',
+					amount: 300_000,
+					count: 1
+				}
+			],
 			assignments: [
 				{ month: '2026-08', categoryId: 'rent', amount: 145_000 },
 				{ month: '2026-12', categoryId: 'groceries', amount: 20_000 }
@@ -113,9 +121,27 @@ describe('Ready to Assign', () => {
 		const bill = { date: '2026-10-20', amount: -5_000, categoryId: null };
 		const input = budget({
 			monthlyTotals: [
-				{ month: '2026-08', bucket: 'readyToAssign', amount: 100_000, count: 1 },
-				{ month: '2026-10', bucket: 'readyToAssign', amount: 230_000, count: 1 },
-				{ month: '2026-10', bucket: 'uncategorized', amount: -5_000, count: 1 }
+				{
+					month: '2026-08',
+					accountId: 'checking',
+					bucket: 'readyToAssign',
+					amount: 100_000,
+					count: 1
+				},
+				{
+					month: '2026-10',
+					accountId: 'checking',
+					bucket: 'readyToAssign',
+					amount: 230_000,
+					count: 1
+				},
+				{
+					month: '2026-10',
+					accountId: 'checking',
+					bucket: 'uncategorized',
+					amount: -5_000,
+					count: 1
+				}
 			],
 			transactionsAfterToday: [paycheck, bill]
 		});
@@ -129,8 +155,14 @@ test('a refund to a normal Category adds to that Category, not to Ready to Assig
 	const result = computeBudget(
 		budget({
 			monthlyTotals: [
-				{ month: '2026-08', bucket: 'readyToAssign', amount: 100_000, count: 1 },
-				{ month: '2026-10', bucket: 'groceries', amount: 1_250, count: 1 }
+				{
+					month: '2026-08',
+					accountId: 'checking',
+					bucket: 'readyToAssign',
+					amount: 100_000,
+					count: 1
+				},
+				{ month: '2026-10', accountId: 'checking', bucket: 'groceries', amount: 1_250, count: 1 }
 			],
 			transactionsAfterToday: []
 		})
@@ -143,17 +175,41 @@ test('a refund to a normal Category adds to that Category, not to Ready to Assig
 describe('Uncategorized Transactions', () => {
 	const categorized = budget({
 		monthlyTotals: [
-			{ month: '2026-09', bucket: 'readyToAssign', amount: 230_000, count: 1 },
-			{ month: '2026-10', bucket: 'readyToAssign', amount: -4_000, count: 1 },
-			{ month: '2026-10', bucket: 'readyToAssign', amount: 50_000, count: 1 }
+			{
+				month: '2026-09',
+				accountId: 'checking',
+				bucket: 'readyToAssign',
+				amount: 230_000,
+				count: 1
+			},
+			{
+				month: '2026-10',
+				accountId: 'checking',
+				bucket: 'readyToAssign',
+				amount: -4_000,
+				count: 1
+			},
+			{ month: '2026-10', accountId: 'checking', bucket: 'readyToAssign', amount: 50_000, count: 1 }
 		],
 		transactionsAfterToday: [{ date: '2026-10-28', amount: 50_000, categoryId: 'readyToAssign' }]
 	});
 	const uncategorized = budget({
 		monthlyTotals: [
-			{ month: '2026-09', bucket: 'readyToAssign', amount: 230_000, count: 1 },
-			{ month: '2026-10', bucket: 'uncategorized', amount: -4_000, count: 1 },
-			{ month: '2026-10', bucket: 'uncategorized', amount: 50_000, count: 1 }
+			{
+				month: '2026-09',
+				accountId: 'checking',
+				bucket: 'readyToAssign',
+				amount: 230_000,
+				count: 1
+			},
+			{
+				month: '2026-10',
+				accountId: 'checking',
+				bucket: 'uncategorized',
+				amount: -4_000,
+				count: 1
+			},
+			{ month: '2026-10', accountId: 'checking', bucket: 'uncategorized', amount: 50_000, count: 1 }
 		],
 		transactionsAfterToday: [{ date: '2026-10-28', amount: 50_000, categoryId: null }]
 	});
@@ -180,8 +236,14 @@ describe('Uncategorized Transactions', () => {
 test('a Transfer between Cash Accounts touches no Category and not Ready to Assign', () => {
 	const without = budget({
 		monthlyTotals: [
-			{ month: '2026-09', bucket: 'readyToAssign', amount: 230_000, count: 1 },
-			{ month: '2026-10', bucket: 'groceries', amount: -6_000, count: 1 }
+			{
+				month: '2026-09',
+				accountId: 'checking',
+				bucket: 'readyToAssign',
+				amount: 230_000,
+				count: 1
+			},
+			{ month: '2026-10', accountId: 'checking', bucket: 'groceries', amount: -6_000, count: 1 }
 		],
 		assignments: [{ month: '2026-10', categoryId: 'groceries', amount: 10_000 }]
 	});
@@ -190,8 +252,20 @@ test('a Transfer between Cash Accounts touches no Category and not Ready to Assi
 		monthlyTotals: [
 			...without.monthlyTotals,
 			// Both sides of a $500 Transfer, one in each Account.
-			{ month: '2026-10', bucket: 'transfer' as const, amount: -50_000, count: 1 },
-			{ month: '2026-10', bucket: 'transfer' as const, amount: 50_000, count: 1 }
+			{
+				month: '2026-10',
+				accountId: 'checking',
+				bucket: 'transfer' as const,
+				amount: -50_000,
+				count: 1
+			},
+			{
+				month: '2026-10',
+				accountId: 'checking',
+				bucket: 'transfer' as const,
+				amount: 50_000,
+				count: 1
+			}
 		]
 	};
 
@@ -209,8 +283,8 @@ test('groups show their totals, and overspent Categories are listed in table ord
 				{ month: '2026-10', categoryId: 'groceries', amount: 20_000 }
 			],
 			monthlyTotals: [
-				{ month: '2026-10', bucket: 'rent', amount: -150_000, count: 1 },
-				{ month: '2026-10', bucket: 'groceries', amount: -6_000, count: 2 }
+				{ month: '2026-10', accountId: 'checking', bucket: 'rent', amount: -150_000, count: 1 },
+				{ month: '2026-10', accountId: 'checking', bucket: 'groceries', amount: -6_000, count: 2 }
 			]
 		})
 	);
@@ -219,6 +293,7 @@ test('groups show their totals, and overspent Categories are listed in table ord
 		{
 			id: 'everyday',
 			name: 'Everyday',
+			kind: 'normal',
 			assigned: 165_000,
 			activity: -156_000,
 			available: 9_000,
@@ -231,7 +306,8 @@ test('groups show their totals, and overspent Categories are listed in table ord
 					activity: -6_000,
 					available: 14_000,
 					status: 'funded',
-					target: null
+					target: null,
+					payment: null
 				},
 				{
 					id: 'rent',
@@ -241,7 +317,8 @@ test('groups show their totals, and overspent Categories are listed in table ord
 					activity: -150_000,
 					available: -5_000,
 					status: 'overspent',
-					target: null
+					target: null,
+					payment: null
 				}
 			]
 		}
@@ -256,10 +333,10 @@ describe('a hidden Category', () => {
 			{ month: '2026-10', categoryId: 'groceries', amount: 20_000 }
 		],
 		monthlyTotals: [
-			{ month: '2026-10', bucket: 'rent', amount: -150_000, count: 1 },
-			{ month: '2026-10', bucket: 'groceries', amount: -6_000, count: 2 }
+			{ month: '2026-10', accountId: 'checking', bucket: 'rent', amount: -150_000, count: 1 },
+			{ month: '2026-10', accountId: 'checking', bucket: 'groceries', amount: -6_000, count: 2 }
 		]
-	} satisfies Partial<BudgetInput<CategoryId, GroupId>>;
+	} satisfies Partial<Input>;
 	const shown = budget(spending);
 	const rentHidden = budget({
 		...spending,
@@ -273,6 +350,7 @@ describe('a hidden Category', () => {
 			{
 				id: 'everyday',
 				name: 'Everyday',
+				kind: 'normal',
 				assigned: 165_000,
 				activity: -156_000,
 				available: 9_000,
@@ -285,7 +363,8 @@ describe('a hidden Category', () => {
 						activity: -6_000,
 						available: 14_000,
 						status: 'funded',
-						target: null
+						target: null,
+						payment: null
 					}
 				]
 			}
@@ -299,7 +378,8 @@ describe('a hidden Category', () => {
 				activity: -150_000,
 				available: -5_000,
 				status: 'overspent',
-				target: null
+				target: null,
+				payment: null
 			}
 		]);
 	});
@@ -322,6 +402,180 @@ describe('a hidden Category', () => {
 		expect(result.groups).toEqual([]);
 		expect(result.hidden.map((c) => c.name)).toEqual(['Groceries', 'Rent']);
 		expect(result.readyToAssign).toEqual(computeBudget(shown).readyToAssign);
+	});
+});
+
+/**
+ * The small budget with a Discover Credit Card Account, its Payment Category in the system
+ * Credit Card Payments group.
+ */
+function withCard(change: Partial<Input> = {}): Input {
+	const input = budget(change);
+	return {
+		...input,
+		groups: [
+			...input.groups,
+			{ id: 'cards', name: 'Credit Card Payments', position: -1, kind: 'creditCardPayments' }
+		],
+		categories: [
+			...input.categories,
+			{
+				id: 'discoverPayment',
+				groupId: 'cards',
+				name: 'Discover',
+				position: 0,
+				kind: 'creditCardPayment',
+				accountId: 'discover'
+			}
+		]
+	};
+}
+
+describe('a Credit Card Account', () => {
+	const income = {
+		month: '2026-08',
+		accountId: 'checking',
+		bucket: 'readyToAssign',
+		amount: 100_000,
+		count: 1
+	} as const;
+	const groceries30 = { month: '2026-10', categoryId: 'groceries', amount: 3_000 } as const;
+	const purchase = {
+		month: '2026-10',
+		accountId: 'discover',
+		bucket: 'groceries',
+		amount: -5_000,
+		count: 1
+	} as const;
+
+	test('moves a categorized purchase in full to its Payment Category, overspending the Category', () => {
+		const result = computeBudget(
+			withCard({ assignments: [groceries30], monthlyTotals: [income, purchase] })
+		);
+
+		expect(category(result, 'Groceries')).toMatchObject({ activity: -5_000, available: -2_000 });
+		expect(category(result, 'Discover')).toMatchObject({ activity: 5_000, available: 5_000 });
+		expect(result.readyToAssign.amount).toBe(97_000);
+		expect(result.groups.map((g) => g.name)).toEqual(['Credit Card Payments', 'Everyday']);
+	});
+
+	test('reverses the move for a refund', () => {
+		const refund = { ...purchase, amount: 2_000 };
+		const result = computeBudget(
+			withCard({ assignments: [groceries30], monthlyTotals: [income, purchase, refund] })
+		);
+
+		expect(category(result, 'Groceries')).toMatchObject({ available: 0 });
+		expect(category(result, 'Discover')).toMatchObject({ activity: 3_000, available: 3_000 });
+	});
+
+	test('moves an Uncategorized purchase as if categorized to Ready to Assign', () => {
+		const categorized = withCard({
+			monthlyTotals: [income, { ...purchase, bucket: 'readyToAssign' }]
+		});
+		const uncategorized = withCard({
+			monthlyTotals: [income, { ...purchase, bucket: 'uncategorized' }]
+		});
+
+		const result = computeBudget(uncategorized);
+		expect(result.readyToAssign).toEqual({ amount: 95_000, uncategorized: -5_000 });
+		expect(result.uncategorizedCount).toBe(1);
+		expect(category(result, 'Discover').available).toBe(5_000);
+		expect(computeBudget(categorized).readyToAssign.amount).toBe(95_000);
+		expect(category(computeBudget(categorized), 'Discover').available).toBe(5_000);
+	});
+
+	test('counts a card payment, a Transfer from a Cash Account, in the Payment Category only', () => {
+		const without = withCard({ assignments: [groceries30], monthlyTotals: [income, purchase] });
+		const payment = [
+			{ month: '2026-10', accountId: 'checking', bucket: 'transfer', amount: -4_000, count: 1 },
+			{ month: '2026-10', accountId: 'discover', bucket: 'transfer', amount: 4_000, count: 1 }
+		] as const;
+		const result = computeBudget({
+			...without,
+			monthlyTotals: [...without.monthlyTotals, ...payment]
+		});
+
+		expect(category(result, 'Discover')).toMatchObject({ activity: 1_000, available: 1_000 });
+		expect(category(result, 'Groceries')).toEqual(category(computeBudget(without), 'Groceries'));
+		expect(result.readyToAssign).toEqual(computeBudget(without).readyToAssign);
+	});
+
+	test("leaves a card's starting debt out of every Category and Ready to Assign", () => {
+		// The starting balance sits in the card's own Payment Category, where the move cancels it.
+		const startingDebt = {
+			month: '2026-08',
+			accountId: 'discover',
+			bucket: 'discoverPayment',
+			amount: -60_000,
+			count: 1
+		} as const;
+		const result = computeBudget(withCard({ monthlyTotals: [income, startingDebt] }));
+
+		expect(category(result, 'Discover')).toMatchObject({ activity: 0, available: 0 });
+		expect(result.readyToAssign).toEqual({ amount: 100_000, uncategorized: 0 });
+		expect(result.uncategorizedCount).toBe(0);
+	});
+
+	describe('Payment Category', () => {
+		test('says how much is waiting on each overspent Category, and the debt not yet covered', () => {
+			const rentByCash = {
+				month: '2026-10',
+				accountId: 'checking',
+				bucket: 'rent',
+				amount: -1_000,
+				count: 1
+			} as const;
+			const startingDebt = {
+				month: '2026-08',
+				accountId: 'discover',
+				bucket: 'discoverPayment',
+				amount: -60_000,
+				count: 1
+			} as const;
+			const result = computeBudget(
+				withCard({
+					assignments: [groceries30],
+					monthlyTotals: [income, startingDebt, purchase, rentByCash]
+				})
+			);
+
+			// Rent is overspent by cash, so the card waits on nothing there.
+			expect(category(result, 'Discover').payment).toEqual({
+				waitingOn: [{ id: 'groceries', name: 'Groceries', amount: 2_000 }],
+				uncovered: 60_000
+			});
+			expect(category(result, 'Groceries').payment).toBeNull();
+		});
+
+		test('waits on no more than a Category is overspent, shared across cards in order', () => {
+			const input = withCard({
+				assignments: [groceries30],
+				monthlyTotals: [
+					income,
+					{ ...purchase, amount: -2_000 },
+					{ ...purchase, accountId: 'visa', amount: -4_000 }
+				]
+			});
+			const visa = {
+				id: 'visaPayment',
+				groupId: 'cards',
+				name: 'Visa',
+				position: 1,
+				kind: 'creditCardPayment',
+				accountId: 'visa'
+			} as const;
+			const result = computeBudget({ ...input, categories: [...input.categories, visa] });
+
+			// $60 of card purchases against $30 Assigned leaves Groceries overspent by $30.
+			expect(category(result, 'Groceries').available).toBe(-3_000);
+			expect(category(result, 'Discover').payment?.waitingOn).toEqual([
+				{ id: 'groceries', name: 'Groceries', amount: 2_000 }
+			]);
+			expect(category(result, 'Visa').payment?.waitingOn).toEqual([
+				{ id: 'groceries', name: 'Groceries', amount: 1_000 }
+			]);
+		});
 	});
 });
 
@@ -350,36 +604,52 @@ describe('the cash invariant', () => {
 
 	const months = ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12'];
 	const buckets = ['groceries', 'rent', 'readyToAssign', null] as const;
+	const accounts = ['checking', 'savings', 'discover'] as const;
+	const isCash = (accountId: AccountId) => accountId !== 'discover';
 
-	// Cash Accounts only; Credit Card Accounts join the invariant with their Payment Categories.
 	test.each([1, 2, 3, 4, 5, 6, 7, 8])(
 		'cash = Ready to Assign + every Available, hidden or not, after any edits (sequence %i)',
 		(seed) => {
 			const rand = random(seed);
-			const transactions: { date: string; amount: number; categoryId: CategoryId | null }[] = [];
-			// Transfers between two Cash Accounts: each is a pair of sides with opposite amounts.
-			const transfers: { date: string; amount: number }[] = [];
+			const transactions: {
+				accountId: AccountId;
+				date: string;
+				amount: number;
+				categoryId: CategoryId | null;
+			}[] = [
+				// The card's starting debt, which sits in its own Payment Category.
+				{
+					accountId: 'discover',
+					date: '2026-08-01',
+					amount: -60_000,
+					categoryId: 'discoverPayment'
+				}
+			];
+			// Transfers: each is a pair of sides with opposite amounts, `amount` into `to`. With the
+			// card, it is a card payment from a Cash Account.
+			const transfers: { date: string; amount: number; from: AccountId; to: AccountId }[] = [];
 			const assigned = new Map<string, number>();
 
 			// Every Transaction has happened by now.
 			const today = '2027-01-01';
 			const check = () => {
 				const totals = new Map<string, { amount: number; count: number }>();
-				const sides = transfers.flatMap(({ date, amount }) => [
-					{ date, amount, bucket: 'transfer' },
-					{ date, amount: -amount, bucket: 'transfer' }
+				const sides = transfers.flatMap(({ date, amount, from, to }) => [
+					{ accountId: to, date, amount, bucket: 'transfer' },
+					{ accountId: from, date, amount: -amount, bucket: 'transfer' }
 				]);
-				for (const t of [
+				const all = [
 					...transactions.map((t) => ({ ...t, bucket: t.categoryId ?? 'uncategorized' })),
 					...sides
-				]) {
-					const key = `${t.date.slice(0, 7)}|${t.bucket}`;
+				];
+				for (const t of all) {
+					const key = `${t.date.slice(0, 7)}|${t.accountId}|${t.bucket}`;
 					const row = totals.get(key) ?? { amount: 0, count: 0 };
 					row.amount += t.amount;
 					row.count += 1;
 					totals.set(key, row);
 				}
-				const input = budget({
+				const input = withCard({
 					today,
 					month: '2026-12',
 					// Odd sequences hide Rent, which still holds money.
@@ -391,12 +661,17 @@ describe('the cash invariant', () => {
 						return { month, categoryId: categoryId as CategoryId, amount };
 					}),
 					monthlyTotals: [...totals].map(([key, row]) => {
-						const [month = '', bucket] = key.split('|');
-						return { month, bucket: bucket as CategoryId | 'uncategorized' | 'transfer', ...row };
+						const [month = '', accountId, bucket] = key.split('|');
+						return {
+							month,
+							accountId: accountId as AccountId,
+							bucket: bucket as CategoryId | 'uncategorized' | 'transfer',
+							...row
+						};
 					})
 				});
 
-				const cash = transactions.reduce((total, t) => total + t.amount, 0);
+				const cash = all.reduce((total, t) => total + (isCash(t.accountId) ? t.amount : 0), 0);
 				const result = computeBudget(input);
 				const available = [
 					...result.groups.flatMap((group) => group.categories),
@@ -411,6 +686,7 @@ describe('the cash invariant', () => {
 			for (let step = 0; step < 60; step++) {
 				const action = transactions.length === 0 ? 0 : rand.int(5);
 				const entry = () => ({
+					accountId: rand.pick(accounts),
 					date: `${rand.pick(months)}-${String(1 + rand.int(28)).padStart(2, '0')}`,
 					amount: rand.int(200_000) - 120_000,
 					categoryId: rand.pick(buckets)
@@ -421,12 +697,14 @@ describe('the cash invariant', () => {
 				else if (action === 3) {
 					const { date, amount } = entry();
 					if (transfers.length > 0 && rand.int(3) === 0) transfers.pop();
-					else transfers.push({ date, amount });
+					else if (rand.int(2) === 0)
+						transfers.push({ date, amount, from: 'checking', to: 'savings' });
+					else transfers.push({ date, amount: Math.abs(amount), from: 'checking', to: 'discover' });
 				}
 				// Setting Assigned, sometimes back to zero.
 				else
 					assigned.set(
-						`${rand.pick(months)}|${rand.pick(['groceries', 'rent'])}`,
+						`${rand.pick(months)}|${rand.pick(['groceries', 'rent', 'discoverPayment'])}`,
 						rand.pick([0, 5_000, 40_000, 125_000])
 					);
 				// After every edit, not only at the end.
@@ -438,7 +716,7 @@ describe('the cash invariant', () => {
 
 describe('Targets', () => {
 	/** The budget with Groceries given `target`, and Groceries' row from it. */
-	function groceriesWith(target: Target, change: Partial<BudgetInput<CategoryId, GroupId>> = {}) {
+	function groceriesWith(target: Target, change: Partial<Input> = {}) {
 		const input = budget(change);
 		return category(
 			computeBudget({
@@ -472,7 +750,15 @@ describe('Targets', () => {
 					{ month: '2026-09', categoryId: 'groceries', amount: 40_000 },
 					{ month: '2026-10', categoryId: 'groceries', amount: 5_000 }
 				],
-				monthlyTotals: [{ month: '2026-09', bucket: 'groceries', amount: -25_000, count: 2 }]
+				monthlyTotals: [
+					{
+						month: '2026-09',
+						accountId: 'checking',
+						bucket: 'groceries',
+						amount: -25_000,
+						count: 2
+					}
+				]
 			});
 
 			// $150 left over and $50 Assigned leave $300 to reach $500, so the bar is 40% full.
@@ -548,7 +834,13 @@ describe('Targets', () => {
 			const spentOnTime = {
 				assignments: [{ month: '2027-03', categoryId: 'groceries' as const, amount: 13_900 }],
 				monthlyTotals: [
-					{ month: '2027-03', bucket: 'groceries' as const, amount: -13_900, count: 1 }
+					{
+						month: '2027-03',
+						accountId: 'checking' as const,
+						bucket: 'groceries' as const,
+						amount: -13_900,
+						count: 1
+					}
 				]
 			};
 
