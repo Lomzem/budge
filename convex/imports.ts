@@ -15,10 +15,15 @@ const candidate = v.object({
 	memo: v.union(v.string(), v.null())
 });
 
+// A Match or new row that a pick resolved keeps its candidates, so the owner can change the pick.
 const previewRow = v.union(
-	v.object({ kind: v.literal('new') }),
+	v.object({ kind: v.literal('new'), candidates: v.optional(v.array(candidate)) }),
 	v.object({ kind: v.literal('skip') }),
-	v.object({ kind: v.literal('match'), transaction: candidate }),
+	v.object({
+		kind: v.literal('match'),
+		transaction: candidate,
+		candidates: v.optional(v.array(candidate))
+	}),
 	v.object({ kind: v.literal('ask'), candidates: v.array(candidate) })
 );
 
@@ -26,40 +31,38 @@ const fileArgs = { accountId: v.id('accounts'), source: fileSource, rows: v.arra
 
 /**
  * What saving a decoded bank file would do to each row: add it as a new Transaction, skip it as a
- * duplicate, Match it to a Transaction already there, or ask which of several to Match. Picks are
- * ignored here; the commit applies them.
+ * duplicate, Match it to a Transaction already there, or ask which of several to Match. Picks apply
+ * in row order, as they do on commit, so a pick can change what later rows Match.
  */
 export const preview = query({
 	args: fileArgs,
 	returns: v.array(previewRow),
 	handler: async (ctx, { accountId, source, rows }) => {
 		await requireOwner(ctx);
-		const plan = await planImport(
-			ctx,
-			accountId,
-			source,
-			rows.map(({ date, amount, bankText, sourceId }) => ({
-				date,
-				amount,
-				bankText,
-				...(sourceId === undefined ? {} : { sourceId })
-			}))
-		);
+		const plan = await planImport(ctx, accountId, source, rows);
 		const describe = async (transactionId: Id<'transactions'>) => {
 			const transaction = plan.candidates.get(transactionId);
 			if (transaction === undefined) throw publicError('NOT_FOUND');
 			return await describeCandidate(ctx, transaction);
 		};
+		const describeAll = async (candidates: Id<'transactions'>[] | undefined) =>
+			candidates === undefined ? {} : { candidates: await Promise.all(candidates.map(describe)) };
 		return await Promise.all(
 			plan.decisions.map(async (decision) => {
 				switch (decision.kind) {
 					case 'match':
-						return { kind: decision.kind, transaction: await describe(decision.transactionId) };
+						return {
+							kind: decision.kind,
+							transaction: await describe(decision.transactionId),
+							...(await describeAll(decision.candidates))
+						};
 					case 'ask':
 						return {
 							kind: decision.kind,
 							candidates: await Promise.all(decision.candidates.map(describe))
 						};
+					case 'new':
+						return { kind: decision.kind, ...(await describeAll(decision.candidates)) };
 					default:
 						return { kind: decision.kind };
 				}

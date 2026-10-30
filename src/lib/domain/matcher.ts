@@ -38,11 +38,14 @@ export interface MatchContext<T> {
 	candidates: readonly MatchCandidate<T>[];
 }
 
+/**
+ * A Match or new row that a pick resolved keeps its `candidates`, so the owner can change the pick.
+ */
 export type MatchDecision<T> =
 	| { kind: 'skip' }
-	| { kind: 'match'; transactionId: T }
+	| { kind: 'match'; transactionId: T; candidates?: T[] }
 	| { kind: 'ask'; candidates: T[] }
-	| { kind: 'new' };
+	| { kind: 'new'; candidates?: T[] };
 
 /** How far apart, in days, a Bank Row and the Transaction it Matches may be dated. */
 export const MATCH_WINDOW_DAYS = 10;
@@ -91,7 +94,8 @@ export function matchBankRows<T>(
 			.map((candidate) => candidate.id);
 
 		// A row picked as new stays new even when an earlier row took all but one of its candidates.
-		if (row.pick === 'new') return { kind: 'new' };
+		if (row.pick === 'new')
+			return candidates.length > 0 ? { kind: 'new', candidates } : { kind: 'new' };
 		const [only] = candidates;
 		if (only !== undefined && candidates.length === 1) {
 			taken.add(only);
@@ -101,7 +105,7 @@ export function matchBankRows<T>(
 			const picked = candidates.find((id) => id === row.pick);
 			if (picked === undefined) return { kind: 'ask', candidates };
 			taken.add(picked);
-			return { kind: 'match', transactionId: picked };
+			return { kind: 'match', transactionId: picked, candidates };
 		}
 		return { kind: 'new' };
 	});

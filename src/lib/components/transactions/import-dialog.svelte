@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { FunctionArgs } from 'convex/server';
+	import type { FunctionArgs, FunctionReturnType } from 'convex/server';
 	import { useMutation, useQuery } from 'convex-svelte';
 	import { untrack } from 'svelte';
 
@@ -18,6 +18,10 @@
 	import { readPublicError } from '$lib/publicError';
 
 	type FileRows = FunctionArgs<typeof api.imports.commit>['rows'];
+	type PreviewCandidate = Extract<
+		FunctionReturnType<typeof api.imports.preview>[number],
+		{ kind: 'ask' }
+	>['candidates'][number];
 
 	let {
 		open = $bindable(false),
@@ -40,30 +44,26 @@
 
 	const account = $derived(accounts.find(accountId));
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? null);
-	const preview = useQuery(api.imports.preview, () =>
-		open && account && file && file.rows.length > 0
-			? { accountId: account._id, source: file.source, rows: file.rows }
-			: 'skip'
+	// The preview applies the picks as saving does, so a pick can change what later rows Match. It
+	// keeps showing the last plan while a new pick replans, so the row's picker stays put.
+	const preview = useQuery(
+		api.imports.preview,
+		() =>
+			open && account && file && file.rows.length > 0
+				? { accountId: account._id, source: file.source, rows: rowsWithPicks(file) }
+				: 'skip',
+		{ keepPreviousData: true }
 	);
 	const decisions = $derived(preview.data ?? []);
-	// What each row does on save once its pick is applied. A pick counts only while it is still one
-	// of the row's options; a live update or another Account can take its candidate away.
-	const outcomes = $derived(
-		decisions.map((row, index) => {
-			if (row.kind !== 'ask') return row.kind;
-			const pick = picks[index] ?? '';
-			if (pick === 'new') return 'new';
-			return row.candidates.some((candidate) => candidate._id === pick) ? 'match' : 'ask';
-		})
-	);
 	const counts = $derived({
-		new: outcomes.filter((kind) => kind === 'new').length,
-		match: outcomes.filter((kind) => kind === 'match').length,
-		skip: outcomes.filter((kind) => kind === 'skip').length,
-		ask: outcomes.filter((kind) => kind === 'ask').length
+		new: decisions.filter((row) => row.kind === 'new').length,
+		match: decisions.filter((row) => row.kind === 'match').length,
+		skip: decisions.filter((row) => row.kind === 'skip').length,
+		ask: decisions.filter((row) => row.kind === 'ask').length
 	});
 	const ready = $derived(
 		preview.data !== undefined &&
+			!preview.isStale &&
 			preview.data.length === file?.rows.length &&
 			counts.ask === 0 &&
 			counts.new + counts.match > 0
@@ -107,15 +107,12 @@
 		}
 	}
 
-	function rowsWithPicks(): FileRows {
-		if (!file) return [];
-		return file.rows.map((row, index) => {
-			const decision = decisions[index];
+	// A pick that is no longer one of its row's candidates is ignored by the matcher.
+	function rowsWithPicks({ rows }: BankFile): FileRows {
+		return rows.map((row, index) => {
 			const pick = picks[index] ?? '';
-			if (decision?.kind !== 'ask' || pick === '') return row;
-			if (pick === 'new') return { ...row, pick: 'new' as const };
-			const candidate = decision.candidates.find((c) => c._id === pick);
-			return candidate ? { ...row, pick: candidate._id } : row;
+			if (pick === '') return row;
+			return { ...row, pick: pick === 'new' ? 'new' : (pick as Id<'transactions'>) };
 		});
 	}
 
@@ -125,7 +122,7 @@
 		saving = true;
 		error = '';
 		try {
-			await commit({ accountId: account._id, source: file.source, rows: rowsWithPicks() });
+			await commit({ accountId: account._id, source: file.source, rows: rowsWithPicks(file) });
 			open = false;
 		} catch (thrown) {
 			error = readPublicError(thrown)?.message ?? "Budge couldn't save the import. Try again.";
@@ -248,36 +245,39 @@
 	{@const decision = decisions[index]}
 	{#if decision === undefined}
 		<span class="text-muted-foreground">…</span>
+	{:else if decision.kind !== 'skip' && decision.candidates !== undefined}
+		{@render picker(index, decision.candidates)}
 	{:else if decision.kind === 'new'}
 		New
 	{:else if decision.kind === 'skip'}
 		Duplicate, skipped
-	{:else if decision.kind === 'match'}
+	{:else}
 		<span class="text-xs">
 			Matches {decision.transaction.payeeName ?? 'No Payee'}, {formatDate(
 				decision.transaction.date,
 				'short'
 			)}
 		</span>
-	{:else}
-		<label class="flex flex-col gap-1 text-xs">
-			<span>Match with</span>
-			<select
-				bind:value={picks[index]}
-				required
-				class="h-8 max-w-56 rounded-lg border border-input bg-background px-2 text-base md:text-sm"
-			>
-				<option value="">Pick one</option>
-				{#each decision.candidates as candidate (candidate._id)}
-					<option value={candidate._id}>
-						{candidate.payeeName ?? 'No Payee'}, {formatDate(
-							candidate.date,
-							'short'
-						)}{candidate.memo ? `, ${candidate.memo}` : ''}
-					</option>
-				{/each}
-				<option value="new">None, add as new</option>
-			</select>
-		</label>
 	{/if}
+{/snippet}
+
+{#snippet picker(index: number, candidates: PreviewCandidate[])}
+	<label class="flex flex-col gap-1 text-xs">
+		<span>Match with</span>
+		<select
+			bind:value={picks[index]}
+			required
+			class="h-8 max-w-56 rounded-lg border border-input bg-background px-2 text-base md:text-sm"
+		>
+			<option value="">Pick one</option>
+			{#each candidates as candidate (candidate._id)}
+				<option value={candidate._id}>
+					{candidate.payeeName ?? 'No Payee'}, {formatDate(candidate.date, 'short')}{candidate.memo
+						? `, ${candidate.memo}`
+						: ''}
+				</option>
+			{/each}
+			<option value="new">None, add as new</option>
+		</select>
+	</label>
 {/snippet}

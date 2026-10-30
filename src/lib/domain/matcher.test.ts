@@ -104,9 +104,11 @@ describe('the matcher', () => {
 		const candidates = [handEntered('a'), handEntered('b')];
 
 		expect(decide([{ ...coffee, pick: 'b' }], { candidates })).toEqual([
-			{ kind: 'match', transactionId: 'b' }
+			{ kind: 'match', transactionId: 'b', candidates: ['a', 'b'] }
 		]);
-		expect(decide([{ ...coffee, pick: 'new' }], { candidates })).toEqual([{ kind: 'new' }]);
+		expect(decide([{ ...coffee, pick: 'new' }], { candidates })).toEqual([
+			{ kind: 'new', candidates: ['a', 'b'] }
+		]);
 		expect(decide([{ ...coffee, pick: 'elsewhere' }], { candidates })).toEqual([
 			{ kind: 'ask', candidates: ['a', 'b'] }
 		]);
@@ -118,7 +120,7 @@ describe('the matcher', () => {
 				candidates: [handEntered('a'), handEntered('b')]
 			})
 		).toEqual([
-			{ kind: 'match', transactionId: 'b' },
+			{ kind: 'match', transactionId: 'b', candidates: ['a', 'b'] },
 			{ kind: 'match', transactionId: 'a' }
 		]);
 	});
@@ -134,6 +136,9 @@ describe('the matcher', () => {
 					candidates: [handEntered('a'), handEntered('b')]
 				}
 			)
-		).toEqual([{ kind: 'match', transactionId: 'b' }, { kind: 'new' }]);
+		).toEqual([
+			{ kind: 'match', transactionId: 'b', candidates: ['a', 'b'] },
+			{ kind: 'new', candidates: ['a'] }
+		]);
 	});
 });

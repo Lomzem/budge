@@ -184,6 +184,38 @@ describe('importing a bank file', () => {
 		expect(byId.get(near)).toMatchObject({ cleared: false, approved: true });
 	});
 
+	test('the preview applies picks in order, as saving does, and keeps the picked rows options', async () => {
+		const { owner, checking } = await budgetWithChecking();
+		const enter = (date: string) =>
+			owner.mutation(api.transactions.create, {
+				accountId: checking,
+				date,
+				amount: -450,
+				payee: 'Sample Coffee Shop',
+				memo: ''
+			});
+		const near = await enter('2026-08-16');
+		const far = await enter('2026-08-07');
+		const later = { date: '2026-08-22', amount: -450, bankText: 'SAMPLE COFFEE 0099' };
+		const preview = (pick?: Id<'transactions'>) =>
+			owner.query(api.imports.preview, {
+				accountId: checking,
+				source: 'csv',
+				rows: [pick === undefined ? coffee : { ...coffee, pick }, later]
+			});
+
+		expect(await preview()).toMatchObject([
+			{ kind: 'ask', candidates: [{ _id: near }, { _id: far }] },
+			{ kind: 'match', transaction: { _id: near } }
+		]);
+		const picked = await preview(near);
+		expect(picked).toMatchObject([
+			{ kind: 'match', transaction: { _id: near }, candidates: [{ _id: near }, { _id: far }] },
+			{ kind: 'new' }
+		]);
+		expect(picked[1]).toEqual({ kind: 'new' });
+	});
+
 	test('Unmatch splits the Bank Row back into its own Transaction, restoring both', async () => {
 		const { owner, checking, rows, balance } = await budgetWithChecking();
 		const entered = await owner.mutation(api.transactions.create, {
