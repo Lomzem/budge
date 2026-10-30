@@ -40,14 +40,66 @@
 	let accountId = $state('');
 	let date = $state('');
 	let payee = $state('');
-	/** A Category ID, `''` for Uncategorized, or `transfer:` and the other Account's ID. */
-	let categoryId = $state('');
+	/**
+	 * What the form opened with or the owner picked: a Category ID, `''` for Uncategorized, or
+	 * `transfer:` and the other Account's ID. Payee memory can stand in for it until the owner picks.
+	 */
+	let chosenCategoryId = $state('');
 	let direction: 'outflow' | 'inflow' = $state('outflow');
 	let amount = $state('');
 	let memo = $state('');
 	let error = $state('');
 	let saving = $state(false);
 	let confirmDelete = $state(false);
+	/** The Category the form opened with. */
+	let filledCategoryId = $state('');
+	/** Whether the owner has picked a Category since the form opened. */
+	let categoryPicked = $state(false);
+
+	// Payee memory: the Payee's last Category fills in until the owner picks one, whether the Payee
+	// was typed or an Uncategorized Transaction opened with it. A Transaction that already has a
+	// Category keeps it.
+	const prefillsCategory = $derived(open && !categoryPicked && filledCategoryId === '');
+	const payeeName = $derived(payee.trim());
+	const payeeGiven = $derived(payeeName !== '');
+	const payeeMemory = useQuery(api.payees.lastCategory, () =>
+		prefillsCategory && payeeGiven ? { name: payeeName } : 'skip'
+	);
+	const recallsCategory = $derived(prefillsCategory && payeeGiven);
+	/** Whether the Category the typed Payee was last given, or the list it is in, is on its way. */
+	const recallingCategory = $derived(
+		recallsCategory &&
+			(payeeMemory.isLoading ||
+				payeeMemory.isStale ||
+				(Boolean(payeeMemory.data) &&
+					categories.data === undefined &&
+					categories.error === undefined))
+	);
+	/** Why the typed Payee's last Category can't be shown, if it can't. */
+	const recallFailed = $derived(
+		!recallsCategory || recallingCategory
+			? undefined
+			: payeeMemory.error !== undefined
+				? "Budge couldn't look up this Payee's last Category. Pick one to save."
+				: payeeMemory.data && categories.error !== undefined
+					? "Budge couldn't load the Categories. Pick Uncategorized or a Transfer to save."
+					: undefined
+	);
+	/** Stands in for a Category until the typed Payee's memory arrives or the owner picks one. */
+	const UNRESOLVED = 'unresolved';
+	// Neither the previous Payee's Category nor Uncategorized stands in while the typed Payee's own
+	// memory is on its way or failed, so Save waits for it or for the owner's pick.
+	const rememberedCategoryId = $derived(
+		!recallsCategory
+			? ''
+			: recallingCategory || recallFailed !== undefined
+				? UNRESOLVED
+				: payeeMemory.data
+					? (findCategory(payeeMemory.data) ?? '')
+					: ''
+	);
+	/** The Category or Transfer the form saves; see `chosenCategoryId`. */
+	const categoryId = $derived(prefillsCategory ? rememberedCategoryId : chosenCategoryId);
 
 	const TRANSFER = 'transfer:';
 	/** The other Account picked for a Transfer, or `undefined` for an ordinary Transaction. */
@@ -127,7 +179,7 @@
 			accountId = transaction.accountId;
 			date = transaction.date;
 			payee = transaction.payeeName ?? '';
-			categoryId = transaction.transfer
+			chosenCategoryId = transaction.transfer
 				? TRANSFER + transaction.transfer.accountId
 				: (transaction.categoryId ?? '');
 			direction = transaction.amount < 0 ? 'outflow' : 'inflow';
@@ -137,11 +189,13 @@
 			accountId = defaultAccountId ?? accounts.all[0]?._id ?? '';
 			date = localIsoDate(new Date());
 			payee = '';
-			categoryId = '';
+			chosenCategoryId = '';
 			direction = 'outflow';
 			amount = '';
 			memo = '';
 		}
+		filledCategoryId = chosenCategoryId;
+		categoryPicked = false;
 	}
 
 	/** The Category picked, or `undefined` for Uncategorized. */
@@ -156,6 +210,7 @@
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
+		if (categoryId === UNRESOLVED) return;
 		const account = accounts.find(accountId);
 		const cents = parseCents(amount);
 		if (!account) {
@@ -282,12 +337,23 @@
 				<Label for="transaction-category">Category or Transfer</Label>
 				<select
 					id="transaction-category"
-					bind:value={categoryId}
+					bind:value={
+						() => categoryId,
+						(value: string) => {
+							chosenCategoryId = value;
+							categoryPicked = true;
+						}
+					}
 					onchange={() => {
 						if (isCardPayment) direction = isCash ? 'outflow' : 'inflow';
 					}}
 					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
 				>
+					{#if categoryId === UNRESOLVED}
+						<option value={UNRESOLVED} disabled>
+							{recallFailed === undefined ? 'Looking up the last Category…' : 'Pick a Category'}
+						</option>
+					{/if}
 					<option value="">Uncategorized</option>
 					{#if categories.data}
 						{#if savedCategoryUnlisted && transaction?.categoryId}
@@ -315,6 +381,9 @@
 						</optgroup>
 					{/if}
 				</select>
+				{#if recallFailed !== undefined}
+					<p class="text-sm text-destructive" role="alert">{recallFailed}</p>
+				{/if}
 				{#if isTransfer}
 					<p class="text-sm text-muted-foreground">
 						{#if isCardPayment}
@@ -414,7 +483,10 @@
 						Approve
 					</Button>
 				{/if}
-				<Button type="submit" disabled={saving || linkCandidates.isLoading}>Save</Button>
+				<Button
+					type="submit"
+					disabled={saving || linkCandidates.isLoading || categoryId === UNRESOLVED}>Save</Button
+				>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

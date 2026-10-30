@@ -30,7 +30,8 @@ async function seedEveryTable(ctx: MutationCtx) {
 		target: { kind: 'monthly', amount: 120_000, mode: 'refill' }
 	});
 	await ctx.db.insert('assignments', { month: '2026-08', categoryId, amount: 120_000 });
-	const payeeId = await ctx.db.insert('payees', { name: 'Landlord' });
+	const payeeId = await ctx.db.insert('payees', { name: 'Landlord', lastCategoryId: categoryId });
+	await ctx.db.insert('payeeRenames', { bankText: 'SAMPLE LANDLORD RENT', payeeId });
 	const transactionId = await ctx.db.insert('transactions', {
 		accountId,
 		date: '2026-08-02',
@@ -67,6 +68,7 @@ const seededTables = [
 	'categories',
 	'assignments',
 	'payees',
+	'payeeRenames',
 	'transactions',
 	'imports'
 ];

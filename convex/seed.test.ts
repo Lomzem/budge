@@ -53,6 +53,9 @@ describe('seed:run', () => {
 
 		const { groups } = await owner.query(api.categories.list, {});
 		expect(groups.map((group) => group.categories.length)).toEqual([4, 4, 4]);
+		// Each Payee remembers its last Category, so hand entry pre-fills it.
+		const rent = groups.flatMap((group) => group.categories).find((c) => c.name === 'Rent');
+		expect(await owner.query(api.payees.lastCategory, { name: 'Sample Landlord' })).toBe(rent?._id);
 		const budget = await owner.query(api.budget.month, { month: '2026-10', today: '2026-10-27' });
 		const normal = budget.groups.filter((group) => group.kind === 'normal');
 		expect(normal.flatMap((group) => group.categories).every((c) => c.assigned > 0)).toBe(true);
