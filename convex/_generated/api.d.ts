@@ -11,6 +11,7 @@
 import type * as accounts from "../accounts.js";
 import type * as budget from "../budget.js";
 import type * as categories from "../categories.js";
+import type * as export_ from "../export.js";
 import type * as imports from "../imports.js";
 import type * as lib_categories from "../lib/categories.js";
 import type * as lib_imports from "../lib/imports.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
   budget: typeof budget;
   categories: typeof categories;
+  export: typeof export_;
   imports: typeof imports;
   "lib/categories": typeof lib_categories;
   "lib/imports": typeof lib_imports;
