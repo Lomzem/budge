@@ -12,7 +12,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
-	import { localIsoDate } from '$lib/domain/dates';
+	import { formatDate, isIsoDate, localIsoDate } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
 	import { readPublicError } from '$lib/publicError';
 
@@ -75,6 +75,45 @@
 			)
 	);
 
+	const LINK_NONE = 'new';
+	/** What the owner picked for the other side; left unset, Budge picks. */
+	let linkChoice: string | undefined = $state();
+	const signedAmount = $derived.by(() => {
+		const cents = parseCents(amount);
+		if (cents === undefined) return undefined;
+		return direction === 'outflow' ? -Math.abs(cents) : Math.abs(cents);
+	});
+	// An imported Transaction becoming a Transfer may already have its other side imported. Once
+	// the pair is linked to that Account there is nothing more to offer.
+	const linkAccountId = $derived(
+		open &&
+			transaction !== undefined &&
+			transaction.bankRows.length > 0 &&
+			transaction.transfer?.accountId !== transferAccountId
+			? transferAccounts.find((account) => account._id === transferAccountId)?._id
+			: undefined
+	);
+	const linkCandidates = useQuery(api.transactions.transferCandidates, () =>
+		linkAccountId !== undefined && signedAmount !== undefined && isIsoDate(date)
+			? { transferAccountId: linkAccountId, date, amount: signedAmount }
+			: 'skip'
+	);
+	const candidates = $derived(linkAccountId === undefined ? [] : (linkCandidates.data ?? []));
+	/**
+	 * The imported Transaction to link as the other side, or `LINK_NONE` to create one. Budge picks
+	 * the nearest import, so saving doesn't duplicate it; the owner can still pick none.
+	 */
+	const link: string = $derived(
+		linkChoice === LINK_NONE || candidates.some((candidate) => candidate._id === linkChoice)
+			? (linkChoice ?? LINK_NONE)
+			: (candidates[0]?._id ?? LINK_NONE)
+	);
+
+	const getLink = () => link;
+	const setLink = (value: string) => {
+		linkChoice = value;
+	};
+
 	// Fill the form each time the dialog opens, and only then: live updates to the Accounts
 	// must not wipe what the owner is typing.
 	$effect(() => {
@@ -83,6 +122,7 @@
 
 	function fill() {
 		error = '';
+		linkChoice = undefined;
 		if (transaction) {
 			accountId = transaction.accountId;
 			date = transaction.date;
@@ -142,8 +182,16 @@
 				error = 'Pick another Account to transfer with.';
 				return;
 			}
+			// Saving before the other imports load would create a side that duplicates one of them.
+			if (linkCandidates.isLoading) return;
+			const linked = candidates.find((candidate) => candidate._id === link);
 			// A Transfer has no Payee or Category.
-			fields = { ...shared, payee: '', transferAccountId: other._id };
+			fields = {
+				...shared,
+				payee: '',
+				transferAccountId: other._id,
+				...(linked === undefined ? {} : { transferTransactionId: linked._id })
+			};
 		}
 		saving = true;
 		try {
@@ -276,6 +324,26 @@
 					</p>
 				{/if}
 			</div>
+			{#if candidates.length > 0}
+				<fieldset>
+					<legend class="mb-2 text-sm font-medium">Other side</legend>
+					<RadioGroup.Root bind:value={getLink, setLink}>
+						{#each candidates as candidate (candidate._id)}
+							<div class="flex items-center gap-2">
+								<RadioGroup.Item value={candidate._id} id={`transfer-link-${candidate._id}`} />
+								<Label for={`transfer-link-${candidate._id}`}>
+									Link the import {candidate.payeeName ?? ''} on {formatDate(candidate.date)},
+									{formatCents(candidate.amount)}
+								</Label>
+							</div>
+						{/each}
+						<div class="flex items-center gap-2">
+							<RadioGroup.Item value={LINK_NONE} id="transfer-link-new" />
+							<Label for="transfer-link-new">Create a new uncleared side</Label>
+						</div>
+					</RadioGroup.Root>
+				</fieldset>
+			{/if}
 			<fieldset>
 				<legend class="mb-2 text-sm font-medium">Direction</legend>
 				<RadioGroup.Root bind:value={direction}>
@@ -346,7 +414,7 @@
 						Approve
 					</Button>
 				{/if}
-				<Button type="submit" disabled={saving}>Save</Button>
+				<Button type="submit" disabled={saving || linkCandidates.isLoading}>Save</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
