@@ -51,9 +51,19 @@ export default defineSchema({
 		.index('by_month_category', ['month', 'categoryId'])
 		.index('by_category_month', ['categoryId', 'month']),
 
+	// Payee memory: `lastCategoryId` is the Category the Payee's latest categorized Transaction
+	// was given. It may point at a deleted Category, which reads as none.
 	payees: defineTable({
-		name: v.string()
+		name: v.string(),
+		lastCategoryId: v.optional(v.id('categories'))
 	}).index('by_name', ['name']),
+
+	// Rename memory: renaming the Payee on an imported Transaction maps its exact Bank Text to that
+	// Payee, so later imports with the same Bank Text arrive under it.
+	payeeRenames: defineTable({
+		bankText: v.string(),
+		payeeId: v.id('payees')
+	}).index('by_bankText', ['bankText']),
 
 	transactions: defineTable({
 		accountId: v.id('accounts'),

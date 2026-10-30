@@ -259,7 +259,10 @@ export const run = internalMutation({
 	}
 });
 
-/** Inserts Transactions directly, leaving the monthly totals to the final rebuild. */
+/**
+ * Inserts Transactions directly, leaving the monthly totals to the final rebuild. Each Payee
+ * remembers the Category it was last given.
+ */
 function writer(ctx: MutationCtx) {
 	const payees = new Map<string, Id<'payees'>>();
 	return async (
@@ -275,6 +278,9 @@ function writer(ctx: MutationCtx) {
 		if (payeeId === undefined) {
 			payeeId = await ctx.db.insert('payees', { name: payee });
 			payees.set(payee, payeeId);
+		}
+		if (categoryId !== undefined) {
+			await ctx.db.patch('payees', payeeId, { lastCategoryId: categoryId });
 		}
 		return await ctx.db.insert('transactions', {
 			accountId,

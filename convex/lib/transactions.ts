@@ -4,6 +4,7 @@ import { addDays } from '../../src/lib/domain/dates';
 import { MATCH_WINDOW_DAYS } from '../../src/lib/domain/matcher';
 import { requireCents } from './input';
 import { countTransaction, lineCounted } from './monthlyTotals';
+import { payeeNamed, rememberCategory, rememberRename } from './payees';
 import { requireCutoverDate, requireIsoDate } from './settings';
 import { publicError } from './publicError';
 
@@ -114,20 +115,6 @@ async function splitLines(
 	return lines;
 }
 
-/** The Payee with this exact trimmed name, created on first use; none for a blank name. */
-export async function payeeNamed(
-	ctx: MutationCtx,
-	name: string
-): Promise<Id<'payees'> | undefined> {
-	const trimmed = name.trim();
-	if (trimmed === '') return undefined;
-	const existing = await ctx.db
-		.query('payees')
-		.withIndex('by_name', (q) => q.eq('name', trimmed))
-		.first();
-	return existing?._id ?? (await ctx.db.insert('payees', { name: trimmed }));
-}
-
 /**
  * Saves what the owner entered, as a new Transaction or over `existing`, which keeps whether it
  * is Cleared. Saving approves it. With `transferAccountId` it saves both sides of a Transfer,
@@ -135,7 +122,9 @@ export async function payeeNamed(
  * whether it is Cleared and approved. With `transferTransactionId` as well, that imported
  * Transaction becomes the other side, approved, in place of any other side there was. Without
  * `transferAccountId`, an existing Transfer's other side is deleted. With `splits` it saves the
- * lines in place of any it had; without them, an existing split's lines are deleted.
+ * lines in place of any it had; without them, an existing split's lines are deleted. Giving the
+ * Payee a Category updates Payee memory, and renaming the Payee of an imported Transaction updates
+ * rename memory for each of its Bank Texts.
  */
 export async function saveTransaction(
 	ctx: MutationCtx,
@@ -149,6 +138,16 @@ export async function saveTransaction(
 		cleared: existing?.cleared ?? 'uncleared',
 		approved: true
 	};
+	if (fields.payeeId !== undefined) {
+		if (fields.categoryId !== undefined) {
+			await rememberCategory(ctx, fields.payeeId, fields.categoryId);
+		}
+		if (existing !== null && existing.payeeId !== fields.payeeId) {
+			for (const bankRow of await bankRowsOf(ctx, existing._id)) {
+				await rememberRename(ctx, bankRow.bankText, fields.payeeId);
+			}
+		}
+	}
 	const counterpart =
 		existing?.transferTransactionId === undefined
 			? null
