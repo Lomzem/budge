@@ -5,7 +5,7 @@ import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/s
 import { fileRow, fileSource, planImport } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import { importedPayee } from './lib/payees';
+import { importedPayee, type ImportedPayee } from './lib/payees';
 import { bankRowsOf, insertTransaction } from './lib/transactions';
 
 const candidate = v.object({
@@ -88,6 +88,7 @@ export const commit = mutation({
 			throw publicError('INVALID_INPUT', 'Pick a Match for every row that has more than one.');
 		}
 		const counts = { added: 0, matched: 0, skipped: 0 };
+		const payees = new Map<string, ImportedPayee>();
 		for (const [index, decision] of decisions.entries()) {
 			const row = rows[index];
 			if (row === undefined) continue;
@@ -112,7 +113,7 @@ export const commit = mutation({
 				});
 				counts.matched++;
 			} else if (decision.kind === 'new') {
-				const transactionId = await insertImported(ctx, accountId, row);
+				const transactionId = await insertImported(ctx, accountId, row, payees);
 				await ctx.db.insert('imports', { ...bankRow, transactionId, matched: false });
 				counts.added++;
 			} else {
@@ -155,13 +156,14 @@ export const unmatch = mutation({
 async function insertImported(
 	ctx: MutationCtx,
 	accountId: Id<'accounts'>,
-	row: { date: string; amount: number; bankText: string }
+	row: { date: string; amount: number; bankText: string },
+	payees?: Map<string, ImportedPayee>
 ) {
 	return await insertTransaction(ctx, {
 		accountId,
 		date: row.date,
 		amount: row.amount,
-		...(await importedPayee(ctx, row)),
+		...(await importedPayee(ctx, row, payees)),
 		cleared: 'cleared',
 		approved: false
 	});

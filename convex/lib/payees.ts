@@ -22,14 +22,17 @@ export async function payeeNamed(
 	return existing?._id ?? (await ctx.db.insert('payees', { name: trimmed }));
 }
 
-/** The Category a Payee's Transactions were last given, unless it has since been deleted. */
+/**
+ * The Category a Payee's Transactions were last given, unless it has since been deleted. A Payment
+ * Category only holds its own card's starting debt, so it is never offered for another Transaction.
+ */
 export async function lastCategoryOf(
 	ctx: QueryCtx,
 	payee: Doc<'payees'>
 ): Promise<Id<'categories'> | undefined> {
 	if (payee.lastCategoryId === undefined) return undefined;
 	const category = await ctx.db.get('categories', payee.lastCategoryId);
-	return category?._id;
+	return category === null || category.kind === 'creditCardPayment' ? undefined : category._id;
 }
 
 /** Payee memory: a Transaction with this Payee was just given this Category. */
@@ -54,23 +57,46 @@ export async function rememberRename(ctx: MutationCtx, bankText: string, payeeId
 	}
 }
 
+export interface ImportedPayee {
+	payeeId?: Id<'payees'>;
+	categoryId?: Id<'categories'>;
+}
+
 /**
  * The Payee and Category an imported Transaction arrives with. The Payee comes from rename memory
  * for the exact Bank Text, then the bank's merchant name when it has one (file rows never do), then
- * the Bank Text. The Category comes from Payee memory, or is left out for Uncategorized.
+ * the Bank Text. The Category comes from Payee memory, or is left out for Uncategorized. Pass the
+ * same `resolved` map for every row of one import, so rows with the same Bank Text and merchant
+ * name read the Payee only once.
  */
 export async function importedPayee(
 	ctx: MutationCtx,
-	row: { bankText: string; merchantName?: string | undefined }
-): Promise<{ payeeId?: Id<'payees'>; categoryId?: Id<'categories'> }> {
-	const rename = await renameOf(ctx, row.bankText);
+	row: { bankText: string; merchantName?: string | undefined },
+	resolved = new Map<string, ImportedPayee>()
+): Promise<ImportedPayee> {
+	const merchantName = row.merchantName?.trim() ?? '';
+	const key = JSON.stringify([row.bankText, merchantName]);
+	const known = resolved.get(key);
+	if (known !== undefined) return known;
+	const result = await resolveImportedPayee(ctx, row.bankText, merchantName);
+	resolved.set(key, result);
+	return result;
+}
+
+async function resolveImportedPayee(
+	ctx: MutationCtx,
+	bankText: string,
+	merchantName: string
+): Promise<ImportedPayee> {
+	const rename = await renameOf(ctx, bankText);
 	let payee = rename === null ? null : await ctx.db.get('payees', rename.payeeId);
 	if (payee === null) {
-		const merchantName = row.merchantName?.trim() ?? '';
-		const payeeId = await payeeNamed(ctx, merchantName === '' ? row.bankText : merchantName);
-		payee = payeeId === undefined ? null : await ctx.db.get('payees', payeeId);
+		const name = (merchantName === '' ? bankText : merchantName).trim();
+		if (name === '') return {};
+		payee = await findPayeeNamed(ctx, name);
+		// A Payee new to Budge has no Category to remember.
+		if (payee === null) return { payeeId: await ctx.db.insert('payees', { name }) };
 	}
-	if (payee === null) return {};
 	const categoryId = await lastCategoryOf(ctx, payee);
 	return { payeeId: payee._id, ...(categoryId === undefined ? {} : { categoryId }) };
 }

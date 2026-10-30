@@ -40,8 +40,11 @@
 	let accountId = $state('');
 	let date = $state('');
 	let payee = $state('');
-	/** A Category ID, `''` for Uncategorized, or `transfer:` and the other Account's ID. */
-	let categoryId = $state('');
+	/**
+	 * What the form opened with or the owner picked: a Category ID, `''` for Uncategorized, or
+	 * `transfer:` and the other Account's ID. Payee memory can stand in for it until the owner picks.
+	 */
+	let chosenCategoryId = $state('');
 	let direction: 'outflow' | 'inflow' = $state('outflow');
 	let amount = $state('');
 	let memo = $state('');
@@ -53,6 +56,28 @@
 	let filledCategoryId = $state('');
 	/** Whether the owner has picked a Category since the form opened. */
 	let categoryPicked = $state(false);
+
+	// Payee memory: typing a Payee fills in the Category it was last given, until the owner picks
+	// one. A Transaction that already has a Category keeps it.
+	const prefillsCategory = $derived(open && !categoryPicked && filledCategoryId === '');
+	const payeeName = $derived(payee.trim());
+	const payeeEdited = $derived(payeeName !== '' && payeeName !== filledPayee);
+	const payeeMemory = useQuery(api.payees.lastCategory, () =>
+		prefillsCategory && payeeEdited ? { name: payeeName } : 'skip'
+	);
+	/** Whether the Category the typed Payee was last given is still on its way. */
+	const recallingCategory = $derived(
+		prefillsCategory && payeeEdited && (payeeMemory.isLoading || payeeMemory.isStale)
+	);
+	// Uncategorized until the typed Payee's own memory arrives, so the previous Payee's Category
+	// can't be saved under the new one.
+	const rememberedCategoryId = $derived(
+		!payeeEdited || recallingCategory || !payeeMemory.data
+			? ''
+			: (findCategory(payeeMemory.data) ?? '')
+	);
+	/** The Category or Transfer the form saves; see `chosenCategoryId`. */
+	const categoryId = $derived(prefillsCategory ? rememberedCategoryId : chosenCategoryId);
 
 	const TRANSFER = 'transfer:';
 	/** The other Account picked for a Transfer, or `undefined` for an ordinary Transaction. */
@@ -125,24 +150,6 @@
 		if (open) untrack(fill);
 	});
 
-	// Payee memory: typing a Payee fills in the Category it was last given, until the owner picks
-	// one. A Transaction that already has a Category keeps it.
-	const prefillsCategory = $derived(
-		open && !categoryPicked && !isTransfer && filledCategoryId === ''
-	);
-	const payeeName = $derived(payee.trim());
-	const payeeEdited = $derived(payeeName !== '' && payeeName !== filledPayee);
-	const payeeMemory = useQuery(api.payees.lastCategory, () =>
-		prefillsCategory && payeeEdited ? { name: payeeName } : 'skip'
-	);
-	$effect(() => {
-		if (!prefillsCategory) return;
-		if (!payeeEdited) categoryId = '';
-		else if (!payeeMemory.isStale && payeeMemory.data !== undefined) {
-			categoryId = payeeMemory.data ?? '';
-		}
-	});
-
 	function fill() {
 		error = '';
 		linkChoice = undefined;
@@ -150,7 +157,7 @@
 			accountId = transaction.accountId;
 			date = transaction.date;
 			payee = transaction.payeeName ?? '';
-			categoryId = transaction.transfer
+			chosenCategoryId = transaction.transfer
 				? TRANSFER + transaction.transfer.accountId
 				: (transaction.categoryId ?? '');
 			direction = transaction.amount < 0 ? 'outflow' : 'inflow';
@@ -160,13 +167,13 @@
 			accountId = defaultAccountId ?? accounts.all[0]?._id ?? '';
 			date = localIsoDate(new Date());
 			payee = '';
-			categoryId = '';
+			chosenCategoryId = '';
 			direction = 'outflow';
 			amount = '';
 			memo = '';
 		}
 		filledPayee = payee.trim();
-		filledCategoryId = categoryId;
+		filledCategoryId = chosenCategoryId;
 		categoryPicked = false;
 	}
 
@@ -182,6 +189,7 @@
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
+		if (recallingCategory) return;
 		const account = accounts.find(accountId);
 		const cents = parseCents(amount);
 		if (!account) {
@@ -308,9 +316,14 @@
 				<Label for="transaction-category">Category or Transfer</Label>
 				<select
 					id="transaction-category"
-					bind:value={categoryId}
+					bind:value={
+						() => categoryId,
+						(value: string) => {
+							chosenCategoryId = value;
+							categoryPicked = true;
+						}
+					}
 					onchange={() => {
-						categoryPicked = true;
 						if (isCardPayment) direction = isCash ? 'outflow' : 'inflow';
 					}}
 					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
@@ -441,7 +454,9 @@
 						Approve
 					</Button>
 				{/if}
-				<Button type="submit" disabled={saving || linkCandidates.isLoading}>Save</Button>
+				<Button type="submit" disabled={saving || linkCandidates.isLoading || recallingCategory}
+					>Save</Button
+				>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

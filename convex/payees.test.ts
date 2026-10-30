@@ -100,6 +100,46 @@ describe('Payee memory', () => {
 			approved: false
 		});
 	});
+
+	test("never offers a card's Payment Category, by hand or on import", async () => {
+		const { owner, checking, importCsv, lastCategory } = await budgetWithChecking();
+		const card = await owner.mutation(api.accounts.create, {
+			name: 'Sample Card',
+			kind: 'creditCard',
+			startingBalance: -20_000
+		});
+		const [startingRow] = (
+			await owner.query(api.transactions.list, {
+				accountId: card,
+				paginationOpts: { numItems: 50, cursor: null }
+			})
+		).page;
+		if (!startingRow?.categoryId) throw new Error('expected a starting row');
+		// Editing the card's starting row keeps its Payment Category, and Budge remembers that.
+		await owner.mutation(api.transactions.update, {
+			transactionId: startingRow._id,
+			accountId: card,
+			date: startingRow.date,
+			amount: startingRow.amount,
+			payee: 'Starting Balance',
+			categoryId: startingRow.categoryId,
+			memo: 'Opening debt'
+		});
+
+		expect(await lastCategory('Starting Balance')).toBeNull();
+		await importCsv([{ date: '2026-08-20', amount: 5_000, bankText: 'Starting Balance' }]);
+		const [imported] = (
+			await owner.query(api.transactions.list, {
+				accountId: checking,
+				paginationOpts: { numItems: 50, cursor: null }
+			})
+		).page.filter((row) => row.amount === 5_000);
+		expect(imported).toMatchObject({
+			payeeName: 'Starting Balance',
+			categoryId: null,
+			approved: false
+		});
+	});
 });
 
 describe('rename memory', () => {
