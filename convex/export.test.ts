@@ -31,7 +31,7 @@ async function seedEveryTable(ctx: MutationCtx) {
 	});
 	await ctx.db.insert('assignments', { month: '2026-08', categoryId, amount: 120_000 });
 	const payeeId = await ctx.db.insert('payees', { name: 'Landlord' });
-	await ctx.db.insert('transactions', {
+	const transactionId = await ctx.db.insert('transactions', {
 		accountId,
 		date: '2026-08-02',
 		amount: -120_000,
@@ -39,6 +39,17 @@ async function seedEveryTable(ctx: MutationCtx) {
 		categoryId,
 		memo: 'August',
 		cleared: 'cleared'
+	});
+	await ctx.db.insert('imports', {
+		source: 'qfx',
+		sourceId: 'SAMPLE-0001',
+		accountId,
+		date: '2026-08-02',
+		amount: -120_000,
+		bankText: 'SAMPLE LANDLORD RENT',
+		transactionId,
+		matched: true,
+		state: 'linked'
 	});
 	await ctx.db.insert('monthlyTotals', {
 		month: '2026-08',
@@ -56,7 +67,8 @@ const seededTables = [
 	'categories',
 	'assignments',
 	'payees',
-	'transactions'
+	'transactions',
+	'imports'
 ];
 
 function keysAnywhere(value: unknown): string[] {

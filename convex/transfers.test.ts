@@ -272,3 +272,120 @@ describe('changing one side of a Transfer', () => {
 		]);
 	});
 });
+
+describe('a Transfer and file imports', () => {
+	// Invented Bank Text.
+	const bankRow = { date: '2026-08-21', amount: 25_000, bankText: 'SAMPLE TRANSFER IN 0007' };
+
+	async function importedIntoSavings() {
+		const backend = await budgetWithThreeAccounts();
+		const { owner, checking, savings } = backend;
+		const fromChecking = await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			transferAccountId: savings,
+			...toSavings
+		});
+		expect(
+			await owner.mutation(api.imports.commit, {
+				accountId: savings,
+				source: 'csv',
+				rows: [bankRow]
+			})
+		).toEqual({ added: 0, matched: 1, skipped: 0 });
+		const [intoSavings] = await backend.rows(savings);
+		if (intoSavings === undefined) throw new Error('The Transfer has no Savings side.');
+		return { ...backend, fromChecking, intoSavings: intoSavings._id };
+	}
+
+	test('an import Matches the other side, which stays linked and Unapproved', async () => {
+		const { owner, checking, savings, balances, rows } = await importedIntoSavings();
+
+		expect(await balances()).toMatchObject({ Checking: 75_000, Savings: 525_000 });
+		expect(await rows(savings)).toMatchObject([
+			{
+				amount: 25_000,
+				cleared: true,
+				approved: false,
+				transfer: { accountId: checking },
+				bankRows: [{ bankText: bankRow.bankText, matched: true }]
+			}
+		]);
+		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(1);
+	});
+
+	test('editing one side approves that side only', async () => {
+		const { owner, checking, savings, fromChecking, intoSavings, rows } =
+			await importedIntoSavings();
+
+		await owner.mutation(api.transactions.update, {
+			transactionId: fromChecking,
+			accountId: checking,
+			transferAccountId: savings,
+			...toSavings,
+			memo: 'Moved early'
+		});
+		expect(await rows(savings)).toMatchObject([
+			{ memo: 'Moved early', cleared: true, approved: false, transfer: { accountId: checking } }
+		]);
+
+		await owner.mutation(api.transactions.update, {
+			transactionId: intoSavings,
+			accountId: savings,
+			transferAccountId: checking,
+			...toSavings,
+			amount: 25_000
+		});
+		expect(await rows(savings)).toMatchObject([{ cleared: true, approved: true }]);
+		expect(await rows(checking)).toMatchObject([{ approved: true }]);
+	});
+
+	test('an imported Transaction can become one, keeping its Bank Row', async () => {
+		const { owner, checking, savings, balances, rows } = await budgetWithThreeAccounts();
+		const outOfChecking = { ...bankRow, amount: -25_000 };
+		await owner.mutation(api.imports.commit, {
+			accountId: checking,
+			source: 'csv',
+			rows: [outOfChecking]
+		});
+		const [imported] = await rows(checking);
+		if (imported === undefined) throw new Error('The import added nothing.');
+
+		await owner.mutation(api.transactions.update, {
+			transactionId: imported._id,
+			accountId: checking,
+			transferAccountId: savings,
+			date: outOfChecking.date,
+			amount: outOfChecking.amount,
+			payee: '',
+			memo: ''
+		});
+
+		expect(await balances()).toMatchObject({ Checking: 75_000, Savings: 525_000 });
+		expect(await rows(checking)).toMatchObject([
+			{
+				cleared: true,
+				approved: true,
+				transfer: { accountId: savings },
+				bankRows: [{ bankText: bankRow.bankText }]
+			}
+		]);
+		expect(await rows(savings)).toMatchObject([
+			{ amount: 25_000, cleared: false, approved: true, bankRows: [] }
+		]);
+	});
+
+	test('deleting it keeps the Bank Row, so importing the file again adds nothing', async () => {
+		const { owner, savings, fromChecking, rows } = await importedIntoSavings();
+
+		await owner.mutation(api.transactions.remove, { transactionId: fromChecking });
+
+		expect(
+			await owner.mutation(api.imports.commit, {
+				accountId: savings,
+				source: 'csv',
+				rows: [bankRow]
+			})
+		).toEqual({ added: 0, matched: 0, skipped: 1 });
+		expect(await rows(savings)).toEqual([]);
+	});
+});
