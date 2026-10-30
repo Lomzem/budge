@@ -44,6 +44,11 @@ function sampleArgs(ids: {
 		'transactions:unapprovedCount': {},
 		'reconciliation:clearedBalance': { accountId },
 		'reconciliation:reconcile': { accountId, balance: 0, date: '2026-08-14' },
+		'transactions:transferCandidates': {
+			transferAccountId: accountId,
+			date: '2026-08-01',
+			amount: 0
+		},
 		'imports:preview': { accountId, source: 'csv', rows: [] },
 		'imports:commit': { accountId, source: 'csv', rows: [] },
 		'imports:unmatch': { importId },

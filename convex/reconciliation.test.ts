@@ -330,4 +330,39 @@ describe('a Reconciled Transaction', () => {
 		}
 		expect((await b.rows(b.discover))[0]).toMatchObject({ amount: 10_000, reconciled: true });
 	});
+
+	test('as an imported card payment, cannot be linked as a Transfer side dated otherwise', async () => {
+		const b = await budgetToReconcile();
+		const importRow = (accountId: Id<'accounts'>, date: string, amount: number) =>
+			b.owner.mutation(api.imports.commit, {
+				accountId,
+				source: 'csv',
+				rows: [{ date, amount, bankText: 'SAMPLE PAYMENT 0007' }]
+			});
+		await importRow(b.discover, '2026-08-22', 10_000);
+		await b.reconcile(b.discover, -10_000);
+		await importRow(b.checking, '2026-08-20', -10_000);
+		const fromChecking = (await b.rows(b.checking)).find((row) => row.amount === -10_000);
+		const intoCard = (await b.rows(b.discover)).find((row) => row.amount === 10_000);
+		if (fromChecking === undefined || intoCard === undefined) throw new Error('No import');
+
+		expect(
+			await publicErrorCode(
+				b.owner.mutation(api.transactions.update, {
+					transactionId: fromChecking._id,
+					accountId: b.checking,
+					transferAccountId: b.discover,
+					transferTransactionId: intoCard._id,
+					date: '2026-08-20',
+					amount: -10_000,
+					payee: '',
+					memo: ''
+				})
+			)
+		).toBe('INVALID_INPUT');
+		expect((await b.rows(b.discover)).find((row) => row._id === intoCard._id)).toMatchObject({
+			date: '2026-08-22',
+			reconciled: true
+		});
+	});
 });
