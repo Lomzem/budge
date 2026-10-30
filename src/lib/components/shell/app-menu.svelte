@@ -7,6 +7,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { THEME_CHOICES, getTheme, type ThemeChoice } from '$lib/theme.svelte';
 
+	import ExportDialog from './export-dialog.svelte';
 	import HomeScreenDialog from './home-screen-dialog.svelte';
 
 	// In the sidebar the trigger spans the column, and the menu takes the trigger's width.
@@ -16,6 +17,7 @@
 	const clerk = useClerkContext();
 	const installed = new MediaQuery('(display-mode: standalone)');
 	let homeScreenOpen = $state(false);
+	let exportOpen = $state(false);
 
 	const themeLabels: Record<ThemeChoice, string> = {
 		system: 'System',
@@ -59,6 +61,7 @@
 			</DropdownMenu.RadioGroup>
 		</DropdownMenu.Group>
 		<DropdownMenu.Separator />
+		<DropdownMenu.Item onSelect={() => (exportOpen = true)}>Export…</DropdownMenu.Item>
 		{#if !installed.current}
 			<DropdownMenu.Item onSelect={() => (homeScreenOpen = true)}>
 				Add to Home Screen
@@ -69,3 +72,4 @@
 </DropdownMenu.Root>
 
 <HomeScreenDialog bind:open={homeScreenOpen} />
+<ExportDialog bind:open={exportOpen} />
