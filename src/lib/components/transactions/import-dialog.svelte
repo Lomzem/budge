@@ -46,26 +46,27 @@
 			: 'skip'
 	);
 	const decisions = $derived(preview.data ?? []);
-	const counts = $derived({
-		new: decisions.filter((row) => row.kind === 'new').length,
-		match: decisions.filter((row) => row.kind === 'match').length,
-		skip: decisions.filter((row) => row.kind === 'skip').length,
-		ask: decisions.filter((row) => row.kind === 'ask').length
-	});
-	// A pick counts only while it is still one of the row's options; a live update or another
-	// Account can take its candidate away.
-	const unpicked = $derived(
-		decisions.filter((row, index) => {
-			if (row.kind !== 'ask') return false;
+	// What each row does on save once its pick is applied. A pick counts only while it is still one
+	// of the row's options; a live update or another Account can take its candidate away.
+	const outcomes = $derived(
+		decisions.map((row, index) => {
+			if (row.kind !== 'ask') return row.kind;
 			const pick = picks[index] ?? '';
-			return pick !== 'new' && !row.candidates.some((candidate) => candidate._id === pick);
-		}).length
+			if (pick === 'new') return 'new';
+			return row.candidates.some((candidate) => candidate._id === pick) ? 'match' : 'ask';
+		})
 	);
+	const counts = $derived({
+		new: outcomes.filter((kind) => kind === 'new').length,
+		match: outcomes.filter((kind) => kind === 'match').length,
+		skip: outcomes.filter((kind) => kind === 'skip').length,
+		ask: outcomes.filter((kind) => kind === 'ask').length
+	});
 	const ready = $derived(
 		preview.data !== undefined &&
 			preview.data.length === file?.rows.length &&
-			unpicked === 0 &&
-			counts.new + counts.match + counts.ask > 0
+			counts.ask === 0 &&
+			counts.new + counts.match > 0
 	);
 
 	// Start over each time the dialog opens.

@@ -122,4 +122,18 @@ describe('the matcher', () => {
 			{ kind: 'match', transactionId: 'a' }
 		]);
 	});
+
+	test('a row picked as new stays new after an earlier pick leaves it one candidate', () => {
+		expect(
+			decide(
+				[
+					{ ...coffee, pick: 'b' },
+					{ ...coffee, pick: 'new' }
+				],
+				{
+					candidates: [handEntered('a'), handEntered('b')]
+				}
+			)
+		).toEqual([{ kind: 'match', transactionId: 'b' }, { kind: 'new' }]);
+	});
 });

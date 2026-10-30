@@ -90,13 +90,14 @@ export function matchBankRows<T>(
 			.sort((a, b) => distance(a.date, row.date) - distance(b.date, row.date))
 			.map((candidate) => candidate.id);
 
+		// A row picked as new stays new even when an earlier row took all but one of its candidates.
+		if (row.pick === 'new') return { kind: 'new' };
 		const [only] = candidates;
 		if (only !== undefined && candidates.length === 1) {
 			taken.add(only);
 			return { kind: 'match', transactionId: only };
 		}
 		if (candidates.length > 1) {
-			if (row.pick === 'new') return { kind: 'new' };
 			const picked = candidates.find((id) => id === row.pick);
 			if (picked === undefined) return { kind: 'ask', candidates };
 			taken.add(picked);
