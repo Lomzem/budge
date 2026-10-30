@@ -182,6 +182,8 @@
 				error = 'Pick another Account to transfer with.';
 				return;
 			}
+			// Saving before the other imports load would create a side that duplicates one of them.
+			if (linkCandidates.isLoading) return;
 			const linked = candidates.find((candidate) => candidate._id === link);
 			// A Transfer has no Payee or Category.
 			fields = {
@@ -412,7 +414,7 @@
 						Approve
 					</Button>
 				{/if}
-				<Button type="submit" disabled={saving}>Save</Button>
+				<Button type="submit" disabled={saving || linkCandidates.isLoading}>Save</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
