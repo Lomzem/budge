@@ -67,6 +67,19 @@ describe('decoding a bank file', () => {
 		})
 	);
 
+	it.effect('keeps a character reference past Unicode as written', () =>
+		Effect.gen(function* () {
+			const text = fixture('capital-one-checking.qfx').replace(
+				'SAMPLE GROCER',
+				'SAMPLE &#x110000; GROCER &#99999999;'
+			);
+
+			const file = yield* decodeBankFile(text, cutoverDate);
+
+			expect(file.rows[0]?.bankText).toBe('SAMPLE &#x110000; GROCER &#99999999;');
+		})
+	);
+
 	it.effect('reads an XML QFX, dated by when the purchase was made', () =>
 		Effect.gen(function* () {
 			const file = yield* decodeBankFile(fixture('capital-one-card.qfx'), cutoverDate);

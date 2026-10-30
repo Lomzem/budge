@@ -50,8 +50,14 @@
 		skip: decisions.filter((row) => row.kind === 'skip').length,
 		ask: decisions.filter((row) => row.kind === 'ask').length
 	});
+	// A pick counts only while it is still one of the row's options; a live update or another
+	// Account can take its candidate away.
 	const unpicked = $derived(
-		decisions.filter((row, index) => row.kind === 'ask' && (picks[index] ?? '') === '').length
+		decisions.filter((row, index) => {
+			if (row.kind !== 'ask') return false;
+			const pick = picks[index] ?? '';
+			return pick !== 'new' && !row.candidates.some((candidate) => candidate._id === pick);
+		}).length
 	);
 	const ready = $derived(
 		preview.data !== undefined &&
@@ -150,6 +156,7 @@
 				<select
 					id="import-account"
 					bind:value={accountId}
+					onchange={() => (picks = [])}
 					required
 					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
 				>

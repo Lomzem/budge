@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import { describe, expect, test } from 'vitest';
 
 import { decodeBankFile } from '../src/lib/domain/bankFiles';
+import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
 import checkingCsv from '../src/lib/domain/fixtures/synthetic/capital-one-checking.csv?raw';
 import checkingQfx from '../src/lib/domain/fixtures/synthetic/capital-one-checking.qfx?raw';
 import { api } from './_generated/api';
@@ -301,5 +302,24 @@ describe('approving', () => {
 		expect(await owner.mutation(api.transactions.approveAll, { accountId: checking })).toBe(2);
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(0);
 		expect(await list('unapproved')).toEqual([]);
+	});
+
+	test('counts Unapproved Transactions to one past the limit, so the count reads as at least', async () => {
+		const { t, owner, checking } = await budgetWithChecking();
+		await t.run(async (ctx) => {
+			for (let index = 0; index <= UNAPPROVED_COUNT_LIMIT + 5; index++) {
+				await ctx.db.insert('transactions', {
+					accountId: checking,
+					date: '2026-08-16',
+					amount: -100,
+					cleared: 'cleared',
+					approved: false
+				});
+			}
+		});
+
+		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(
+			UNAPPROVED_COUNT_LIMIT + 1
+		);
 	});
 });

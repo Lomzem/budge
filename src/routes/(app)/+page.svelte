@@ -19,6 +19,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { formatMonth } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
+	import { formatUnapprovedCount } from '$lib/domain/unapproved';
 
 	const accounts = getAccounts();
 	const budget = getBudgetMonth();
@@ -159,7 +160,7 @@
 				{/if}
 				{#if unapprovedCount > 0}
 					<a href={resolve('/accounts')} class="underline underline-offset-4 hover:no-underline">
-						{unapprovedCount}
+						{formatUnapprovedCount(unapprovedCount)}
 						{unapprovedCount === 1 ? 'Transaction is' : 'Transactions are'} Unapproved
 					</a>
 				{/if}

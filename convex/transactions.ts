@@ -1,6 +1,8 @@
 import { paginationOptsValidator, paginationResultValidator } from 'convex/server';
 import { v } from 'convex/values';
 
+import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
+
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireOwner } from './lib/owner';
@@ -143,16 +145,14 @@ export const approve = mutation({
 	}
 });
 
-// Bounds one call's writes; the rest stay Unapproved for the next "Approve all".
-const APPROVE_ALL_LIMIT = 1_000;
-
 /** Approves an Account's Unapproved Transactions, or All Accounts', and returns how many. */
 export const approveAll = mutation({
 	args: { accountId: v.optional(v.id('accounts')) },
 	returns: v.number(),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
-		const transactions = await unapproved(ctx, accountId).take(APPROVE_ALL_LIMIT);
+		// Bounds one call's writes; the rest stay Unapproved for the next "Approve all".
+		const transactions = await unapproved(ctx, accountId).take(UNAPPROVED_COUNT_LIMIT);
 		for (const transaction of transactions) {
 			await ctx.db.patch('transactions', transaction._id, { approved: true });
 		}
@@ -160,16 +160,16 @@ export const approveAll = mutation({
 	}
 });
 
-// Counting reads each Unapproved Transaction, so the count stops here.
-const UNAPPROVED_COUNT_LIMIT = 1_000;
-
-/** How many Transactions are Unapproved, in one Account or all, up to 1,000. */
+/**
+ * How many Transactions are Unapproved, in one Account or all. The count stops one past the limit,
+ * so a count past it reads as "at least".
+ */
 export const unapprovedCount = query({
 	args: { accountId: v.optional(v.id('accounts')) },
 	returns: v.number(),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
-		return (await unapproved(ctx, accountId).take(UNAPPROVED_COUNT_LIMIT)).length;
+		return (await unapproved(ctx, accountId).take(UNAPPROVED_COUNT_LIMIT + 1)).length;
 	}
 });
 

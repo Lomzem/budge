@@ -9,6 +9,7 @@
 	import * as Table from '$lib/components/ui/table';
 	import { formatDate } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
+	import { formatUnapprovedCount, UNAPPROVED_COUNT_LIMIT } from '$lib/domain/unapproved';
 
 	import ImportDialog from './import-dialog.svelte';
 	import TransactionDialog from './transaction-dialog.svelte';
@@ -96,7 +97,10 @@
 		<Button variant="outline" onclick={() => (importOpen = true)}>Import file</Button>
 		{#if (unapprovedCount.data ?? 0) > 0}
 			<Button variant="outline" disabled={approvingAll} onclick={approveEvery}>
-				Approve all {unapprovedCount.data}
+				<!-- One "Approve all" approves at most the limit; the rest stay for the next. -->
+				{(unapprovedCount.data ?? 0) > UNAPPROVED_COUNT_LIMIT
+					? `Approve ${formatUnapprovedCount(UNAPPROVED_COUNT_LIMIT)}`
+					: `Approve all ${formatUnapprovedCount(unapprovedCount.data ?? 0)}`}
 			</Button>
 		{/if}
 	</div>

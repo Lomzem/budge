@@ -8,6 +8,7 @@
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import AccountDialog from '$lib/components/accounts/account-dialog.svelte';
 	import { formatCents } from '$lib/domain/money';
+	import { formatUnapprovedCount } from '$lib/domain/unapproved';
 	import { VIEWS } from '$lib/views';
 
 	import AppMenu from './app-menu.svelte';
@@ -36,7 +37,7 @@
 					{view.label}
 					{#if view.href === '/accounts' && (unapproved.data ?? 0) > 0}
 						<span class="shrink-0 text-xs tabular-nums">
-							{unapproved.data}<span class="sr-only"> Unapproved</span>
+							{formatUnapprovedCount(unapproved.data ?? 0)} Unapproved
 						</span>
 					{/if}
 				</a>

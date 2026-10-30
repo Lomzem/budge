@@ -298,9 +298,12 @@ const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"'
 
 function decodeEntities(text: string): string {
 	return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
-		if (name.startsWith('#x') || name.startsWith('#X'))
-			return String.fromCodePoint(Number.parseInt(name.slice(2), 16));
-		if (name.startsWith('#')) return String.fromCodePoint(Number(name.slice(1)));
+		if (name.startsWith('#')) {
+			const hex = name.startsWith('#x') || name.startsWith('#X');
+			const code = hex ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1));
+			// Past Unicode's last code point the reference names no character, so it stays as written.
+			return code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+		}
 		return ENTITIES[name.toLowerCase()] ?? entity;
 	});
 }
