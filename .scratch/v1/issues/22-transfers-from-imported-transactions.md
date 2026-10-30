@@ -11,7 +11,7 @@
 - [x] Choosing "Transfer to <Account>" as the Category of an imported Transaction creates the opposite side in that Account, uncleared and linked. A later Bank Row in that Account Matches it through the normal matcher.
 - [x] If an unlinked imported Transaction already exists in the other Account with the opposite amount within 10 days, Budge offers to link it. Linking makes the pair without creating a third Transaction.
 - [x] There is no automatic Transfer detection.
-- [x] `convex-test`: create-then-import gives one linked pair with both sides Cleared. Link-existing gives one pair. The budget is unchanged for Cash-to-Cash, and the card payment rule applies for Cash-to-card. _(The Cash-to-card case waits on ticket 10: Transfers are still Cash to Cash only on `main`, so that test lands with Credit Card Accounts.)_
+- [x] `convex-test`: create-then-import gives one linked pair with both sides Cleared. Link-existing gives one pair. The budget is unchanged for Cash-to-Cash, and the card payment rule applies for Cash-to-card.
 
 ## Comments
 

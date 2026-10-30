@@ -222,3 +222,48 @@ test.each(['create-then-import', 'link-existing'] as const)(
 		expect(await budget()).toEqual(before);
 	}
 );
+
+test.each(['create-then-import', 'link-existing'] as const)(
+	'a card payment by %s gives the budget what a card payment entered by hand gives it',
+	async (path) => {
+		const budgetWithCard = async () => {
+			const backend = await budgetWithTwoCashAccounts();
+			const card = await backend.owner.mutation(api.accounts.create, {
+				name: 'Discover',
+				kind: 'creditCard',
+				startingBalance: -40_000
+			});
+			const budget = () =>
+				backend.owner.query(api.budget.month, { month: '2026-08', today: '2026-08-31' });
+			return { ...backend, card, budget };
+		};
+		const byHand = await budgetWithCard();
+		await byHand.owner.mutation(api.transactions.create, {
+			accountId: byHand.checking,
+			transferAccountId: byHand.card,
+			date: outOfChecking.date,
+			amount: outOfChecking.amount,
+			payee: '',
+			memo: ''
+		});
+
+		const { owner, checking, card, rows, importCsv, balances, budget } = await budgetWithCard();
+		const intoCard = { ...intoSavings, bankText: 'SAMPLE PAYMENT THANK YOU' };
+		await importCsv(checking, outOfChecking);
+		if (path === 'link-existing') await importCsv(card, intoCard);
+		const [fromChecking] = await rows(checking);
+		const [toCard] = await rows(card);
+		if (fromChecking === undefined) throw new Error('The import added nothing.');
+		await owner.mutation(api.transactions.update, {
+			...asTransfer(fromChecking, card),
+			...(path === 'link-existing' && toCard ? { transferTransactionId: toCard._id } : {})
+		});
+		if (path === 'create-then-import') await importCsv(card, intoCard);
+
+		expect(await rows(card)).toMatchObject([
+			{ amount: 25_000, cleared: true, transfer: { accountId: checking } }
+		]);
+		expect(await balances()).toEqual(await byHand.balances());
+		expect(await budget()).toEqual(await byHand.budget());
+	}
+);
