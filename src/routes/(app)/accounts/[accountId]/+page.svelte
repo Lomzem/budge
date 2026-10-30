@@ -3,10 +3,12 @@
 
 	import { resolve } from '$app/paths';
 	import { getAccounts } from '$lib/accounts.svelte';
+	import ReconcileDialog from '$lib/components/accounts/reconcile-dialog.svelte';
 	import RenameAccountDialog from '$lib/components/accounts/rename-account-dialog.svelte';
 	import TransactionTable from '$lib/components/transactions/transaction-table.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { formatDate } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
 
 	import type { PageProps } from './$types';
@@ -16,7 +18,20 @@
 	const accounts = getAccounts();
 	const account = $derived(accounts.find(params.accountId));
 	let renameOpen = $state(false);
+	let reconcileOpen = $state(false);
 	let moveError = $state('');
+	// Kept with its Account, so the message doesn't follow the owner to another.
+	let reconciled: { accountId: string; message: string } | undefined = $state();
+
+	function onReconciled(adjustment: number) {
+		reconciled = {
+			accountId: params.accountId,
+			message:
+				adjustment === 0
+					? 'Reconciled. The balances matched.'
+					: `Reconciled, with a Reconciliation Adjustment of ${formatCents(adjustment)}.`
+		};
+	}
 
 	async function move(direction: -1 | 1) {
 		if (!account) return;
@@ -63,11 +78,26 @@
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</div>
-			<p class="tabular-nums">
-				<span class="text-muted-foreground">Balance</span>
-				<span data-testid="account-balance">{formatCents(account.balance)}</span>
-			</p>
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+				<p class="tabular-nums">
+					<span class="text-muted-foreground">Balance</span>
+					<span data-testid="account-balance">{formatCents(account.balance)}</span>
+				</p>
+				<p class="text-sm text-muted-foreground" data-testid="last-reconciled">
+					{#if account.lastReconciledOn}
+						Reconciled
+						<time datetime={account.lastReconciledOn}>{formatDate(account.lastReconciledOn)}</time>
+					{:else}
+						Not reconciled yet
+					{/if}
+				</p>
+				<Button variant="outline" size="sm" onclick={() => (reconcileOpen = true)}>Reconcile</Button
+				>
+			</div>
 		</header>
+		{#if reconciled?.accountId === account._id}
+			<p role="status" class="text-sm">{reconciled.message}</p>
+		{/if}
 		{#if moveError}
 			<p role="alert" class="text-sm text-destructive">{moveError}</p>
 		{/if}
@@ -76,6 +106,7 @@
 		{/key}
 	</div>
 	<RenameAccountDialog bind:open={renameOpen} accountId={account._id} currentName={account.name} />
+	<ReconcileDialog bind:open={reconcileOpen} {account} {onReconciled} />
 {:else if accounts.loaded}
 	<h1 class="text-xl font-semibold">No such Account</h1>
 	<p class="mt-2 text-muted-foreground">

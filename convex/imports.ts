@@ -5,7 +5,7 @@ import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/s
 import { fileRow, fileSource, planImport } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import { bankRowsOf, insertTransaction, payeeNamed } from './lib/transactions';
+import { bankRowsOf, insertTransaction, payeeNamed, requireUnlocked } from './lib/transactions';
 
 const candidate = v.object({
 	_id: v.id('transactions'),
@@ -82,7 +82,7 @@ export const commit = mutation({
 	returns: v.object({ added: v.number(), matched: v.number(), skipped: v.number() }),
 	handler: async (ctx, { accountId, source, rows: input }) => {
 		await requireOwner(ctx);
-		const { rows, decisions } = await planImport(ctx, accountId, source, input);
+		const { rows, decisions, candidates } = await planImport(ctx, accountId, source, input);
 		if (decisions.some((decision) => decision.kind === 'ask')) {
 			throw publicError('INVALID_INPUT', 'Pick a Match for every row that has more than one.');
 		}
@@ -100,8 +100,10 @@ export const commit = mutation({
 				state: 'linked' as const
 			};
 			if (decision.kind === 'match') {
+				// A file row can Match one sync imported and Reconciled already; it stays locked.
+				const reconciled = candidates.get(decision.transactionId)?.cleared === 'reconciled';
 				await ctx.db.patch('transactions', decision.transactionId, {
-					cleared: 'cleared',
+					cleared: reconciled ? 'reconciled' : 'cleared',
 					approved: false
 				});
 				await ctx.db.insert('imports', {
@@ -137,6 +139,9 @@ export const unmatch = mutation({
 		if (!bankRow.matched || matchedId === undefined) {
 			throw publicError('INVALID_INPUT', 'This bank row is not Matched.');
 		}
+		// Unmatching takes the Transaction back to uncleared, so a Reconciled one is unlocked first.
+		const matchedTransaction = await ctx.db.get('transactions', matchedId);
+		if (matchedTransaction !== null) requireUnlocked(matchedTransaction);
 		const transactionId = await insertImported(ctx, bankRow.accountId, bankRow);
 		await ctx.db.patch('imports', importId, { transactionId, matched: false });
 		const stillLinked = await bankRowsOf(ctx, matchedId);

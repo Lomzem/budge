@@ -25,6 +25,7 @@ import type * as lib_transactions from "../lib/transactions.js";
 import type * as migrations from "../migrations.js";
 import type * as monthlyTotals from "../monthlyTotals.js";
 import type * as owner from "../owner.js";
+import type * as reconciliation from "../reconciliation.js";
 import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
 import type * as transactions from "../transactions.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   monthlyTotals: typeof monthlyTotals;
   owner: typeof owner;
+  reconciliation: typeof reconciliation;
   seed: typeof seed;
   settings: typeof settings;
   transactions: typeof transactions;

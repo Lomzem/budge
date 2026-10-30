@@ -68,8 +68,37 @@ export async function payeeNamed(
 }
 
 /**
+ * Refuses a change to a Reconciled Transaction other than its Category, Payee, or memo, until the
+ * owner unlocks it.
+ */
+export function requireUnlocked(transaction: Pick<Doc<'transactions'>, 'cleared'>) {
+	if (transaction.cleared === 'reconciled') {
+		throw publicError(
+			'INVALID_INPUT',
+			'This Transaction is Reconciled. Unlock it to change its amount, date, or Account.'
+		);
+	}
+}
+
+/** Refuses saving `fields` over a Reconciled Transaction with another amount, date, or Account. */
+function requireLockKept(
+	existing: Doc<'transactions'> | null,
+	fields: Pick<TransactionFields, 'accountId' | 'date' | 'amount'>
+) {
+	if (
+		existing !== null &&
+		(existing.accountId !== fields.accountId ||
+			existing.date !== fields.date ||
+			existing.amount !== fields.amount)
+	) {
+		requireUnlocked(existing);
+	}
+}
+
+/**
  * Saves what the owner entered, as a new Transaction or over `existing`, which keeps whether it
- * is Cleared. Saving approves it. With `transferAccountId` it saves both sides of a Transfer,
+ * is Cleared. A Reconciled one, or the Reconciled other side of a Transfer, keeps its amount, date,
+ * and Account. Saving approves it. With `transferAccountId` it saves both sides of a Transfer,
  * creating the other side uncleared and approved if there is none yet; an existing other side keeps
  * whether it is Cleared and approved. Without it, an existing Transfer's other side is deleted.
  */
@@ -83,6 +112,7 @@ export async function saveTransaction(
 		cleared: existing?.cleared ?? 'uncleared',
 		approved: true
 	};
+	requireLockKept(existing, fields);
 	const counterpart =
 		existing?.transferTransactionId === undefined
 			? null
@@ -120,6 +150,7 @@ export async function saveTransaction(
 		cleared: counterpart?.cleared ?? 'uncleared',
 		approved: counterpart?.approved !== false
 	};
+	requireLockKept(counterpart, other);
 	return await writeTransfer(ctx, { existing, fields }, { existing: counterpart, fields: other });
 }
 
@@ -167,7 +198,7 @@ export async function replaceTransaction(
 	await countTransaction(ctx, fields, 1);
 }
 
-/** Deletes a Transaction, and both sides when it is a Transfer. */
+/** Deletes a Transaction, and both sides when it is a Transfer; neither may be Reconciled. */
 export async function deleteTransaction(ctx: MutationCtx, existing: Doc<'transactions'>) {
 	if (existing.transferTransactionId !== undefined) {
 		const counterpart = await ctx.db.get('transactions', existing.transferTransactionId);
@@ -177,6 +208,7 @@ export async function deleteTransaction(ctx: MutationCtx, existing: Doc<'transac
 }
 
 async function deleteOne(ctx: MutationCtx, existing: Doc<'transactions'>) {
+	requireUnlocked(existing);
 	await countTransaction(ctx, existing, -1);
 	await ctx.db.delete('transactions', existing._id);
 	// Its Bank Rows stay, unlinked, so importing the same file again doesn't bring it back.
