@@ -17,14 +17,15 @@ export default defineSchema({
 		position: v.number()
 	}),
 
-	// Ready to Assign is a system Category in a hidden system group; the budget table shows only
-	// `normal` groups and Categories. Budge manages the system ones, so the owner can't change
-	// them. `position` orders siblings: groups among the normal groups, Categories within a group.
+	// Ready to Assign is a system Category in a hidden system group, and each Credit Card Account
+	// has a Payment Category in the system Credit Card Payments group. Budge manages the system
+	// ones, so the owner can't change them. `position` orders siblings: groups among the normal
+	// groups, Categories within a group.
 	// `hidden` takes a group or Category out of the budget table; it still counts in every total.
 	categoryGroups: defineTable({
 		name: v.string(),
 		position: v.number(),
-		kind: v.union(v.literal('normal'), v.literal('readyToAssign')),
+		kind: v.union(v.literal('normal'), v.literal('readyToAssign'), v.literal('creditCardPayments')),
 		hidden: v.optional(v.boolean())
 	}),
 
@@ -32,10 +33,14 @@ export default defineSchema({
 		groupId: v.id('categoryGroups'),
 		name: v.string(),
 		position: v.number(),
-		kind: v.union(v.literal('normal'), v.literal('readyToAssign')),
+		kind: v.union(v.literal('normal'), v.literal('readyToAssign'), v.literal('creditCardPayment')),
 		hidden: v.optional(v.boolean()),
-		target: v.optional(targetValidator)
-	}).index('by_group_position', ['groupId', 'position']),
+		target: v.optional(targetValidator),
+		// A Payment Category's Credit Card Account.
+		accountId: v.optional(v.id('accounts'))
+	})
+		.index('by_group_position', ['groupId', 'position'])
+		.index('by_account', ['accountId']),
 
 	// Assigned per month and Category. Setting Assigned to 0 deletes the row.
 	assignments: defineTable({

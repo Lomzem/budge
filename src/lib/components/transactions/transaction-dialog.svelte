@@ -54,13 +54,26 @@
 	const transferAccountId = $derived(
 		categoryId.startsWith(TRANSFER) ? categoryId.slice(TRANSFER.length) : undefined
 	);
-	// A Transfer is Cash to Cash until Credit Card Accounts take card payments.
+	const isCash = $derived(accounts.cash.some((account) => account._id === accountId));
+	// A Transfer is between two Cash Accounts, or a card payment from a Cash Account into a card.
 	const transferAccounts = $derived(
-		accounts.cash.some((account) => account._id === accountId)
-			? accounts.cash.filter((account) => account._id !== accountId)
-			: []
+		isCash ? accounts.all.filter((account) => account._id !== accountId) : accounts.cash
 	);
 	const isTransfer = $derived(transferAccountId !== undefined);
+	/** A card payment: money leaves the Cash Account and goes into the card. */
+	const isCardPayment = $derived(
+		transferAccountId !== undefined &&
+			!(isCash && accounts.cash.some((account) => account._id === transferAccountId))
+	);
+	// A Payment Category isn't offered, so keep a card's starting debt in the one it sits in.
+	const savedCategoryUnlisted = $derived(
+		transaction?.categoryId !== undefined &&
+			categories.data !== undefined &&
+			transaction.categoryId !== categories.data.readyToAssignId &&
+			!categories.data.groups.some((group) =>
+				group.categories.some((c) => c._id === transaction.categoryId)
+			)
+	);
 
 	// Fill the form each time the dialog opens, and only then: live updates to the Accounts
 	// must not wipe what the owner is typing.
@@ -95,7 +108,8 @@
 	function findCategory(id: string): Id<'categories'> | undefined {
 		if (id === '') return undefined;
 		const list = categories.data;
-		if (!list) return id === transaction?.categoryId ? transaction.categoryId : undefined;
+		if (id === transaction?.categoryId) return transaction.categoryId;
+		if (!list) return undefined;
 		if (id === list.readyToAssignId) return list.readyToAssignId;
 		return list.groups.flatMap((group) => group.categories).find((c) => c._id === id)?._id;
 	}
@@ -221,10 +235,16 @@
 				<select
 					id="transaction-category"
 					bind:value={categoryId}
+					onchange={() => {
+						if (isCardPayment) direction = isCash ? 'outflow' : 'inflow';
+					}}
 					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
 				>
 					<option value="">Uncategorized</option>
 					{#if categories.data}
+						{#if savedCategoryUnlisted && transaction?.categoryId}
+							<option value={transaction.categoryId}>{transaction.categoryName}</option>
+						{/if}
 						{#if categories.data.readyToAssignId !== null}
 							<option value={categories.data.readyToAssignId}>Ready to Assign</option>
 						{/if}
@@ -249,6 +269,9 @@
 				</select>
 				{#if isTransfer}
 					<p class="text-sm text-muted-foreground">
+						{#if isCardPayment}
+							A card payment moves money from the Cash Account into the card.
+						{/if}
 						The other side is kept in step: editing or deleting one side changes both.
 					</p>
 				{/if}

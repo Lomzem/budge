@@ -33,6 +33,15 @@ const categoryBudget = v.object({
 			dueDate: v.union(v.string(), v.null())
 		}),
 		v.null()
+	),
+	payment: v.union(
+		v.object({
+			waitingOn: v.array(
+				v.object({ id: v.id('categories'), name: v.string(), amount: v.number() })
+			),
+			uncovered: v.number()
+		}),
+		v.null()
 	)
 });
 
@@ -53,6 +62,7 @@ export const month = query({
 			v.object({
 				id: v.id('categoryGroups'),
 				name: v.string(),
+				kind: v.union(v.literal('normal'), v.literal('creditCardPayments')),
 				...totals,
 				categories: v.array(categoryBudget)
 			})
@@ -108,7 +118,7 @@ async function readBudget(ctx: QueryCtx, month: string, today: string) {
 		}
 	}
 
-	return computeBudget<Id<'categories'>, Id<'categoryGroups'>>({
+	return computeBudget<Id<'categories'>, Id<'categoryGroups'>, Id<'accounts'>>({
 		month,
 		today,
 		cutoverDate: await readCutoverDate(ctx),
@@ -126,7 +136,8 @@ async function readBudget(ctx: QueryCtx, month: string, today: string) {
 			position: c.position,
 			kind: c.kind,
 			hidden: c.hidden,
-			target: c.target
+			target: c.target,
+			accountId: c.accountId
 		})),
 		assignments,
 		monthlyTotals,
@@ -152,11 +163,11 @@ async function requireBudgetMonth(ctx: QueryCtx, month: string) {
 	}
 }
 
-/** A Category the owner can assign to, which excludes Ready to Assign. */
+/** A Category the owner can assign to: any but Ready to Assign, Payment Categories included. */
 async function requireAssignable(ctx: QueryCtx, categoryId: Id<'categories'>) {
 	const category = await ctx.db.get('categories', categoryId);
 	if (category === null) throw publicError('NOT_FOUND');
-	if (category.kind !== 'normal') {
+	if (category.kind === 'readyToAssign') {
 		throw publicError('INVALID_INPUT', 'Ready to Assign takes no Assigned amount.');
 	}
 }

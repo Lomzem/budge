@@ -55,11 +55,20 @@ test.each([1, 2, 3, 4, 5])(
 				amount: rand.pick([-500, 500, -1_250, 1_250, -99, 0]),
 				memo: ''
 			};
-			// About one in four is a Transfer, which is between the two Cash Accounts.
-			const [checking, savings] = accounts;
+			// About one in four is a Transfer: between the two Cash Accounts, or on the card a card
+			// payment from Checking.
+			const [checking, savings, card] = accounts;
 			if (rand.int(4) === 0 && checking !== undefined && savings !== undefined) {
 				if (accountId === checking) return { ...shared, payee: '', transferAccountId: savings };
 				if (accountId === savings) return { ...shared, payee: '', transferAccountId: checking };
+				if (accountId === card) {
+					return {
+						...shared,
+						amount: Math.abs(shared.amount),
+						payee: '',
+						transferAccountId: checking
+					};
+				}
 			}
 			const categoryId = rand.pick(categories);
 			return {
