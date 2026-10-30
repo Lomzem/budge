@@ -64,13 +64,47 @@ export default defineSchema({
 		categoryId: v.optional(v.id('categories')),
 		memo: v.optional(v.string()),
 		cleared: v.union(v.literal('uncleared'), v.literal('cleared')),
+		// Imported Transactions arrive Unapproved (`false`). Left out on Transactions written before
+		// imports existed, which read as approved.
+		approved: v.optional(v.boolean()),
 		// Set on each side of a Transfer, pointing at the other side. The two sides have opposite
 		// amounts, the same date, and no Category; there is no Transfer table.
 		transferTransactionId: v.optional(v.id('transactions'))
 	})
 		.index('by_account_date', ['accountId', 'date'])
 		.index('by_date', ['date'])
-		.index('by_category_date', ['categoryId', 'date']),
+		.index('by_category_date', ['categoryId', 'date'])
+		// Unapproved first: `approved: false` ranges for the review list.
+		.index('by_approved_date', ['approved', 'date'])
+		.index('by_account_approved_date', ['accountId', 'approved', 'date']),
+
+	// Bank Rows: what a bank reported, kept apart from what the owner entered. A Bank Row links to
+	// the Transaction it created or Matched. Rows are never deleted, so a known import ID (or, for
+	// CSV rows without one, an identical row) is skipped when the same file comes back.
+	imports: defineTable({
+		source: v.union(v.literal('plaid'), v.literal('qfx'), v.literal('csv')),
+		// The bank's import ID, unique within the Account and source. CSV rows have none.
+		sourceId: v.optional(v.string()),
+		accountId: v.id('accounts'),
+		// Bank sync's Plaid Account the row arrived through; ticket 17 narrows it to an ID.
+		connectionAccountId: v.optional(v.string()),
+		date: v.string(),
+		amount: v.number(),
+		bankText: v.string(),
+		// Left out once the Transaction is deleted, so the row still blocks a re-import.
+		transactionId: v.optional(v.id('transactions')),
+		// Whether the row Matched a Transaction already there, rather than creating its own.
+		matched: v.boolean(),
+		state: v.union(
+			v.literal('linked'),
+			v.literal('held'),
+			v.literal('changed'),
+			v.literal('removed')
+		)
+	})
+		.index('by_account_source_sourceId_date', ['accountId', 'source', 'sourceId', 'date'])
+		.index('by_transactionId', ['transactionId'])
+		.index('by_connectionAccountId_state', ['connectionAccountId', 'state']),
 
 	// A rebuildable cache of summed Transactions per month, Account, and bucket (ADR 0002). Every
 	// Transaction write keeps it in the same mutation; no rule reads it as a source of truth.

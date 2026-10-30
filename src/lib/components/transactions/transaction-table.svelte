@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { FunctionReturnType } from 'convex/server';
-	import { useMutation, usePaginatedQuery } from 'convex-svelte';
+	import { useMutation, usePaginatedQuery, useQuery } from 'convex-svelte';
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -9,7 +9,9 @@
 	import * as Table from '$lib/components/ui/table';
 	import { formatDate } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
+	import { formatUnapprovedCount, UNAPPROVED_COUNT_LIMIT } from '$lib/domain/unapproved';
 
+	import ImportDialog from './import-dialog.svelte';
 	import TransactionDialog from './transaction-dialog.svelte';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
@@ -18,17 +20,35 @@
 	let { accountId }: { accountId?: Id<'accounts'> | undefined } = $props();
 
 	const PAGE_SIZE = 50;
-	const transactions = usePaginatedQuery(
+	const scope = $derived(accountId === undefined ? {} : { accountId });
+	// Unapproved first: the approved list starts once every Unapproved row is on screen.
+	const unapproved = usePaginatedQuery(
 		api.transactions.list,
-		() => (accountId === undefined ? {} : { accountId }),
+		() => ({ ...scope, approval: 'unapproved' as const }),
 		{ initialNumItems: PAGE_SIZE }
 	);
+	const approved = usePaginatedQuery(
+		api.transactions.list,
+		() =>
+			unapproved.status === 'Exhausted' ? { ...scope, approval: 'approved' as const } : 'skip',
+		{ initialNumItems: PAGE_SIZE }
+	);
+	const unapprovedCount = useQuery(api.transactions.unapprovedCount, () => scope);
 	const setCleared = useMutation(api.transactions.setCleared);
+	const approve = useMutation(api.transactions.approve);
+	const approveAll = useMutation(api.transactions.approveAll);
 
 	const allAccounts = $derived(accountId === undefined);
+	const rows = $derived([...unapproved.results, ...approved.results]);
+	const loading = $derived(
+		unapproved.isLoading || (unapproved.status === 'Exhausted' && approved.isLoading)
+	);
+	const more = $derived(unapproved.status === 'Exhausted' ? approved : unapproved);
 	let dialogOpen = $state(false);
+	let importOpen = $state(false);
 	let editing: Row | undefined = $state();
-	let clearedError = $state('');
+	let rowError = $state('');
+	let approvingAll = $state(false);
 
 	function add() {
 		editing = undefined;
@@ -41,21 +61,51 @@
 	}
 
 	async function toggleCleared(row: Row, cleared: boolean) {
-		clearedError = '';
+		rowError = '';
 		try {
 			await setCleared({ transactionId: row._id, cleared });
 		} catch {
-			clearedError = "Budge couldn't change Cleared. Try again.";
+			rowError = "Budge couldn't change Cleared. Try again.";
+		}
+	}
+
+	async function approveRow(row: Row) {
+		rowError = '';
+		try {
+			await approve({ transactionId: row._id });
+		} catch {
+			rowError = "Budge couldn't approve the Transaction. Try again.";
+		}
+	}
+
+	async function approveEvery() {
+		rowError = '';
+		approvingAll = true;
+		try {
+			await approveAll(scope);
+		} catch {
+			rowError = "Budge couldn't approve the Transactions. Try again.";
+		} finally {
+			approvingAll = false;
 		}
 	}
 </script>
 
 <div class="flex flex-col gap-3">
-	<div>
+	<div class="flex flex-wrap items-center gap-2">
 		<Button onclick={add}>Add Transaction</Button>
+		<Button variant="outline" onclick={() => (importOpen = true)}>Import file</Button>
+		{#if (unapprovedCount.data ?? 0) > 0}
+			<Button variant="outline" disabled={approvingAll} onclick={approveEvery}>
+				<!-- One "Approve all" approves at most the limit; the rest stay for the next. -->
+				{(unapprovedCount.data ?? 0) > UNAPPROVED_COUNT_LIMIT
+					? `Approve ${formatUnapprovedCount(UNAPPROVED_COUNT_LIMIT)}`
+					: `Approve all ${formatUnapprovedCount(unapprovedCount.data ?? 0)}`}
+			</Button>
+		{/if}
 	</div>
-	{#if clearedError}
-		<p role="alert" class="text-sm text-destructive">{clearedError}</p>
+	{#if rowError}
+		<p role="alert" class="text-sm text-destructive">{rowError}</p>
 	{/if}
 	<!-- Columns drop as the list narrows; what they held moves under the Payee. -->
 	<div class="@container">
@@ -71,10 +121,11 @@
 					<Table.Head showFrom="xl">Memo</Table.Head>
 					<Table.Head width="fit" align="end">Amount</Table.Head>
 					<Table.Head width="fit" align="center">Cleared</Table.Head>
+					<Table.Head width="fit"><span class="sr-only">Approval</span></Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#each transactions.results as row (row._id)}
+				{#each rows as row (row._id)}
 					{@const payee = row.payeeName ?? (row.transfer ? 'Transfer' : 'No Payee')}
 					<!-- A Transfer shows the other Account in place of a Category. -->
 					{@const category = row.transfer
@@ -82,7 +133,7 @@
 						: (row.categoryName ?? 'Uncategorized')}
 					{@const categoryClass =
 						row.categoryName === null && !row.transfer ? 'text-warning' : undefined}
-					<Table.Row>
+					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
 						<Table.Cell numeric>
 							<time datetime={row.date}>
 								<span class="@md:hidden">{formatDate(row.date, 'short')}</span>
@@ -106,18 +157,20 @@
 								>
 									{payee}
 								</span>
-								<span class="sr-only">, edit Transaction on {formatDate(row.date)}</span>
+								<span class="sr-only">
+									, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(row.date)}
+								</span>
 							</button>
-							<span class="block truncate text-xs text-muted-foreground @lg:hidden">
+							<span class="block truncate text-xs font-normal text-muted-foreground @lg:hidden">
 								<span class={categoryClass}>{category}</span>
 							</span>
 							{#if allAccounts}
-								<span class="block truncate text-xs text-muted-foreground @2xl:hidden">
+								<span class="block truncate text-xs font-normal text-muted-foreground @2xl:hidden">
 									{row.accountName}
 								</span>
 							{/if}
 							{#if row.memo}
-								<span class="block truncate text-xs text-muted-foreground @xl:hidden">
+								<span class="block truncate text-xs font-normal text-muted-foreground @xl:hidden">
 									{row.memo}
 								</span>
 							{/if}
@@ -137,12 +190,24 @@
 								aria-label="Cleared: {payee}, {formatDate(row.date)}"
 							/>
 						</Table.Cell>
+						<Table.Cell>
+							{#if !row.approved}
+								<Button
+									size="sm"
+									variant="outline"
+									onclick={() => approveRow(row)}
+									aria-label="Approve {payee}, {formatDate(row.date)}"
+								>
+									Approve
+								</Button>
+							{/if}
+						</Table.Cell>
 					</Table.Row>
 				{:else}
 					<Table.Row>
-						<Table.Cell colspan={allAccounts ? 7 : 6}>
+						<Table.Cell colspan={allAccounts ? 8 : 7}>
 							<span class="text-muted-foreground">
-								{transactions.isLoading ? 'Loading…' : 'No Transactions yet.'}
+								{loading ? 'Loading…' : 'No Transactions yet.'}
 							</span>
 						</Table.Cell>
 					</Table.Row>
@@ -150,18 +215,18 @@
 			</Table.Body>
 		</Table.Root>
 	</div>
-	{#if transactions.status === 'CanLoadMore' || transactions.status === 'LoadingMore'}
+	{#if more.status === 'CanLoadMore' || more.status === 'LoadingMore'}
 		<div>
 			<Button
 				variant="outline"
-				disabled={transactions.status === 'LoadingMore'}
-				onclick={() => transactions.loadMore(PAGE_SIZE)}
+				disabled={more.status === 'LoadingMore'}
+				onclick={() => more.loadMore(PAGE_SIZE)}
 			>
-				{transactions.status === 'LoadingMore' ? 'Loading…' : 'Show more'}
+				{more.status === 'LoadingMore' ? 'Loading…' : 'Show more'}
 			</Button>
 		</div>
 	{/if}
-	{#if transactions.error}
+	{#if unapproved.error ?? approved.error}
 		<p role="alert" class="text-sm text-destructive">
 			Budge couldn't load Transactions. Try reloading the page.
 		</p>
@@ -169,3 +234,4 @@
 </div>
 
 <TransactionDialog bind:open={dialogOpen} transaction={editing} defaultAccountId={accountId} />
+<ImportDialog bind:open={importOpen} defaultAccountId={accountId} />

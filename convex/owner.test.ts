@@ -19,11 +19,14 @@ function sampleArgs(ids: {
 	transactionId: Id<'transactions'>;
 	groupId: Id<'categoryGroups'>;
 	categoryId: Id<'categories'>;
+	importId: Id<'imports'>;
 }) {
-	const { accountId, transactionId, groupId, categoryId } = ids;
+	const { accountId, transactionId, groupId, categoryId, importId } = ids;
 	const entry = { accountId, date: '2026-08-14', amount: -500, payee: 'Corner Grocer', memo: '' };
 	const args: Record<string, Record<string, unknown>> = {
 		'owner:whoami': {},
+		'export:tables': {},
+		'export:page': { table: 'accounts', paginationOpts: { numItems: 10, cursor: null } },
 		'settings:get': {},
 		'settings:setCutoverDate': { cutoverDate: '2026-08-01' },
 		'accounts:list': {},
@@ -35,6 +38,12 @@ function sampleArgs(ids: {
 		'transactions:update': { transactionId, ...entry },
 		'transactions:remove': { transactionId },
 		'transactions:setCleared': { transactionId, cleared: true },
+		'transactions:approve': { transactionId },
+		'transactions:approveAll': {},
+		'transactions:unapprovedCount': {},
+		'imports:preview': { accountId, source: 'csv', rows: [] },
+		'imports:commit': { accountId, source: 'csv', rows: [] },
+		'imports:unmatch': { importId },
 		'categories:list': {},
 		'categories:createGroup': { name: 'Bills' },
 		'categories:create': { groupId, name: 'Rent' },
@@ -122,7 +131,8 @@ describe('the owner guard', () => {
 				accountId,
 				date: '2026-08-01',
 				amount: 0,
-				cleared: 'uncleared'
+				cleared: 'uncleared',
+				approved: true
 			});
 			const groupId = await ctx.db.insert('categoryGroups', {
 				name: 'Bills',
@@ -135,7 +145,17 @@ describe('the owner guard', () => {
 				position: 0,
 				kind: 'normal'
 			});
-			return { accountId, transactionId, groupId, categoryId };
+			const importId = await ctx.db.insert('imports', {
+				source: 'csv',
+				accountId,
+				date: '2026-08-01',
+				amount: 0,
+				bankText: 'SAMPLE',
+				transactionId,
+				matched: true,
+				state: 'linked'
+			});
+			return { accountId, transactionId, groupId, categoryId, importId };
 		});
 		const sample = sampleArgs(ids);
 		const callers = {

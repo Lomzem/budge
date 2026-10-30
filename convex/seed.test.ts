@@ -61,6 +61,8 @@ describe('seed:run', () => {
 		const payment = budget.groups.find((group) => group.kind === 'creditCardPayments');
 		expect(payment?.categories.map((c) => c.name)).toEqual(['Card']);
 		expect(payment?.categories[0]?.payment?.uncovered).toBeGreaterThan(0);
+		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(3);
+		expect(page.filter((row) => row.bankRows.length > 0)).toHaveLength(3);
 	});
 
 	test('refuses once any Account exists', async () => {

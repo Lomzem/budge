@@ -58,7 +58,7 @@ export const create = mutation({
 					: await createPaymentCategory(ctx, { _id: accountId, name }),
 			memo: ''
 		});
-		await insertTransaction(ctx, { ...fields, cleared: 'cleared' });
+		await insertTransaction(ctx, { ...fields, cleared: 'cleared', approved: true });
 		return accountId;
 	}
 });
