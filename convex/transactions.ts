@@ -7,7 +7,14 @@ import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import { bankRowsOf, deleteTransaction, saveTransaction, splitLinesOf } from './lib/transactions';
+import { requireIsoDate } from './lib/settings';
+import {
+	bankRowsOf,
+	deleteTransaction,
+	saveTransaction,
+	splitLinesOf,
+	transferCandidatesOf
+} from './lib/transactions';
 
 const transactionRow = v.object({
 	_id: v.id('transactions'),
@@ -96,7 +103,9 @@ const transactionInput = {
 		v.array(v.object({ categoryId: v.id('categories'), amount: v.number(), memo: v.string() }))
 	),
 	// The other Account of a Transfer, which then takes no Category and no Payee.
-	transferAccountId: v.optional(v.id('accounts'))
+	transferAccountId: v.optional(v.id('accounts')),
+	// An imported Transaction in that Account to link as the other side, in place of creating one.
+	transferTransactionId: v.optional(v.id('transactions'))
 };
 
 /**
@@ -124,6 +133,47 @@ export const update = mutation({
 		await requireOwner(ctx);
 		await saveTransaction(ctx, await requireTransaction(ctx, transactionId), input);
 		return null;
+	}
+});
+
+/**
+ * The imported Transactions in `transferAccountId` that a Transfer of `amount` on `date` could link
+ * as its other side, nearest date first: not yet a Transfer side, with the opposite amount, dated
+ * within 10 days. There is no automatic Transfer detection; the owner picks one or none.
+ */
+export const transferCandidates = query({
+	args: { transferAccountId: v.id('accounts'), date: v.string(), amount: v.number() },
+	returns: v.array(
+		v.object({
+			_id: v.id('transactions'),
+			date: v.string(),
+			amount: v.number(),
+			payeeName: v.union(v.string(), v.null()),
+			memo: v.union(v.string(), v.null())
+		})
+	),
+	handler: async (ctx, { transferAccountId, date, amount }) => {
+		await requireOwner(ctx);
+		if ((await ctx.db.get('accounts', transferAccountId)) === null) throw publicError('NOT_FOUND');
+		requireIsoDate(date);
+		const candidates = await transferCandidatesOf(ctx, transferAccountId, date, amount);
+		const distance = (other: string) => Math.abs(Date.parse(other) - Date.parse(date));
+		candidates.sort((a, b) => distance(a.date) - distance(b.date));
+		return await Promise.all(
+			candidates.map(async (transaction) => {
+				const payee =
+					transaction.payeeId === undefined
+						? null
+						: await ctx.db.get('payees', transaction.payeeId);
+				return {
+					_id: transaction._id,
+					date: transaction.date,
+					amount: transaction.amount,
+					payeeName: payee?.name ?? null,
+					memo: transaction.memo ?? null
+				};
+			})
+		);
 	}
 });
 
