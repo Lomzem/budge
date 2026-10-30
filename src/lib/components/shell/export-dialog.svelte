@@ -12,11 +12,11 @@
 	let busy = $state(false);
 	let error = $state('');
 
-	async function exportAs(save: (data: BudgetExport, date: string) => void) {
+	async function exportAs(save: (data: BudgetExport, date: string) => void | Promise<void>) {
 		busy = true;
 		error = '';
 		try {
-			save(await fetchExport(client), localToday());
+			await save(await fetchExport(client), localToday());
 		} catch {
 			error = "Budge couldn't export. Try again.";
 		} finally {

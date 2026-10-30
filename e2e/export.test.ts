@@ -34,7 +34,9 @@ test('the owner exports the budget as JSON and as CSV', async ({ page }) => {
 	page.on('download', (download) => csvDownloads.push(download));
 	await dialog.getByRole('button', { name: 'Download CSV' }).click();
 	await expect
-		.poll(() => csvDownloads.map((download) => download.suggestedFilename()).sort())
+		.poll(() => csvDownloads.map((download) => download.suggestedFilename()).sort(), {
+			timeout: 15_000
+		})
 		.toEqual(
 			Object.keys(exported)
 				.map((table) => `budge-${date}-${table}.csv`)
