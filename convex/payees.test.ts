@@ -161,7 +161,8 @@ describe('rename memory', () => {
 		return { ...budget, imported };
 	}
 
-	const byDate = (rows: { date: string }[], date: string) => rows.find((row) => row.date === date);
+	const byDate = <Row extends { date: string }>(rows: Row[], date: string) =>
+		rows.find((row) => row.date === date);
 
 	test('a second file with the same Bank Text arrives with the renamed Payee and its last Category', async () => {
 		const { dining, rows, importCsv } = await renameFirstImport();
@@ -175,6 +176,35 @@ describe('rename memory', () => {
 			approved: false,
 			bankRows: [{ bankText: 'SQ *SAMPLE NOODLE 0042' }]
 		});
+	});
+
+	test('one file with several Bank Texts for the same Payee gives each its rename and Category', async () => {
+		const { owner, checking, dining, rows, importCsv } = await renameFirstImport();
+		await importCsv([{ date: '2026-08-14', amount: -900, bankText: 'SAMPLE NOODLE ONLINE' }]);
+		const online = byDate(await rows(), '2026-08-14');
+		if (online === undefined) throw new Error('no import');
+		await owner.mutation(api.transactions.update, {
+			transactionId: online._id,
+			accountId: checking,
+			date: online.date,
+			amount: online.amount,
+			payee: 'Sample Noodle Bar',
+			memo: ''
+		});
+
+		await importCsv([
+			{ date: '2026-08-21', amount: -1_100, bankText: 'SQ *SAMPLE NOODLE 0042' },
+			{ date: '2026-08-22', amount: -1_400, bankText: 'SAMPLE NOODLE ONLINE' },
+			{ date: '2026-08-23', amount: -1_500, bankText: 'SQ *SAMPLE NOODLE 0042' }
+		]);
+
+		const after = await rows();
+		for (const date of ['2026-08-21', '2026-08-22', '2026-08-23']) {
+			expect(byDate(after, date)).toMatchObject({
+				payeeName: 'Sample Noodle Bar',
+				categoryId: dining
+			});
+		}
 	});
 
 	test('a Bank Text one character off gets no rename', async () => {
