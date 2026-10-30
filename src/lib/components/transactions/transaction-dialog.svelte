@@ -65,16 +65,29 @@
 	const payeeMemory = useQuery(api.payees.lastCategory, () =>
 		prefillsCategory && payeeEdited ? { name: payeeName } : 'skip'
 	);
-	/** Whether the Category the typed Payee was last given is still on its way. */
+	const recallsCategory = $derived(prefillsCategory && payeeEdited);
+	/** Whether the Category the typed Payee was last given, or the list it is in, is on its way. */
 	const recallingCategory = $derived(
-		prefillsCategory && payeeEdited && (payeeMemory.isLoading || payeeMemory.isStale)
+		recallsCategory &&
+			(payeeMemory.isLoading ||
+				payeeMemory.isStale ||
+				(Boolean(payeeMemory.data) && categories.data === undefined))
 	);
-	// Uncategorized until the typed Payee's own memory arrives, so the previous Payee's Category
-	// can't be saved under the new one.
+	const recallFailed = $derived(
+		recallsCategory && !recallingCategory && payeeMemory.error !== undefined
+	);
+	/** Stands in for a Category until the typed Payee's memory arrives or the owner picks one. */
+	const UNRESOLVED = 'unresolved';
+	// Neither the previous Payee's Category nor Uncategorized stands in while the typed Payee's own
+	// memory is on its way or failed, so Save waits for it or for the owner's pick.
 	const rememberedCategoryId = $derived(
-		!payeeEdited || recallingCategory || !payeeMemory.data
+		!recallsCategory
 			? ''
-			: (findCategory(payeeMemory.data) ?? '')
+			: recallingCategory || recallFailed
+				? UNRESOLVED
+				: payeeMemory.data
+					? (findCategory(payeeMemory.data) ?? '')
+					: ''
 	);
 	/** The Category or Transfer the form saves; see `chosenCategoryId`. */
 	const categoryId = $derived(prefillsCategory ? rememberedCategoryId : chosenCategoryId);
@@ -189,7 +202,7 @@
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		if (recallingCategory) return;
+		if (categoryId === UNRESOLVED) return;
 		const account = accounts.find(accountId);
 		const cents = parseCents(amount);
 		if (!account) {
@@ -328,6 +341,11 @@
 					}}
 					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
 				>
+					{#if categoryId === UNRESOLVED}
+						<option value={UNRESOLVED} disabled>
+							{recallFailed ? 'Pick a Category' : 'Looking up the last Category…'}
+						</option>
+					{/if}
 					<option value="">Uncategorized</option>
 					{#if categories.data}
 						{#if savedCategoryUnlisted && transaction?.categoryId}
@@ -355,6 +373,11 @@
 						</optgroup>
 					{/if}
 				</select>
+				{#if recallFailed}
+					<p class="text-sm text-destructive" role="alert">
+						Budge couldn't look up this Payee's last Category. Pick one to save.
+					</p>
+				{/if}
 				{#if isTransfer}
 					<p class="text-sm text-muted-foreground">
 						{#if isCardPayment}
@@ -454,8 +477,9 @@
 						Approve
 					</Button>
 				{/if}
-				<Button type="submit" disabled={saving || linkCandidates.isLoading || recallingCategory}
-					>Save</Button
+				<Button
+					type="submit"
+					disabled={saving || linkCandidates.isLoading || categoryId === UNRESOLVED}>Save</Button
 				>
 			</Dialog.Footer>
 		</form>
