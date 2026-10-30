@@ -51,6 +51,16 @@ describe('seed:run', () => {
 			['Savings', 'Checking', 500_00]
 		]);
 
+		// One split card purchase, across Groceries and Gifts.
+		const splits = page.filter((row) => row.splits !== null);
+		expect(splits.map((row) => [row.accountName, row.categoryName, row.amount])).toEqual([
+			['Card', null, -86_40]
+		]);
+		expect(splits[0]?.splits?.map((line) => [line.categoryName, line.amount])).toEqual([
+			['Groceries', -54_15],
+			['Gifts', -32_25]
+		]);
+
 		const { groups } = await owner.query(api.categories.list, {});
 		expect(groups.map((group) => group.categories.length)).toEqual([4, 4, 4]);
 		const budget = await owner.query(api.budget.month, { month: '2026-10', today: '2026-10-27' });

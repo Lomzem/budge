@@ -43,7 +43,8 @@ async function layout(b: Budget) {
 }
 
 /**
- * Months of Assigned amounts and Transactions, some for `dining` and some for Groceries. When
+ * Months of Assigned amounts and Transactions, some for `dining`, some for Groceries, and a split
+ * across both. When
  * `dining` is Groceries, its Assigned amounts are added to Groceries' in the same month.
  */
 async function enterHistory(b: Budget, dining: Id<'categories'>) {
@@ -89,6 +90,18 @@ async function enterHistory(b: Budget, dining: Id<'categories'>) {
 	await spend(b.checking, '2026-09-15', -2_000, b.groceries);
 	await spend(b.checking, '2026-10-01', 1_200, dining);
 	await spend(b.checking, '2026-11-20', -4_400, dining);
+	// A split with a line in each moves its `dining` line alone.
+	await b.owner.mutation(api.transactions.create, {
+		accountId: b.savings,
+		date: '2026-09-21',
+		amount: -5_000,
+		payee: 'Sample Market Hall',
+		memo: '',
+		splits: [
+			{ categoryId: dining, amount: -3_000, memo: 'Lunch' },
+			{ categoryId: b.groceries, amount: -2_000, memo: '' }
+		]
+	});
 }
 
 /** Groceries and Ready to Assign in each month from August to January. */

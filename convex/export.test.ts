@@ -36,9 +36,16 @@ async function seedEveryTable(ctx: MutationCtx) {
 		date: '2026-08-02',
 		amount: -120_000,
 		payeeId,
-		categoryId,
+		split: true,
 		memo: 'August',
 		cleared: 'cleared'
+	});
+	await ctx.db.insert('transactionSplits', {
+		transactionId,
+		categoryId,
+		amount: -120_000,
+		memo: 'Rent',
+		date: '2026-08-02'
 	});
 	await ctx.db.insert('imports', {
 		source: 'qfx',
@@ -68,6 +75,7 @@ const seededTables = [
 	'assignments',
 	'payees',
 	'transactions',
+	'transactionSplits',
 	'imports'
 ];
 

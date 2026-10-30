@@ -48,8 +48,8 @@ const categoryBudget = v.object({
 /**
  * Everything the budget screen shows for `month`. `today` comes from the browser, as reading the
  * clock here would defeat query caching. Reads only Categories, groups, Assigned rows, the
- * monthly totals, and settings, plus the Ready to Assign and Uncategorized Transactions dated
- * after `today`.
+ * monthly totals, and settings, plus the Ready to Assign and Uncategorized Transactions and split
+ * lines dated after `today`.
  */
 export const month = query({
 	args: { month: v.string(), today: v.string() },
@@ -108,13 +108,22 @@ async function readBudget(ctx: QueryCtx, month: string, today: string) {
 			.query('transactions')
 			.withIndex('by_category_date', (q) => q.eq('categoryId', categoryId).gt('date', today));
 		for await (const transaction of later) {
-			// A Transfer side has no Category but is never Uncategorized.
-			if (transaction.transferTransactionId !== undefined) continue;
+			// A Transfer side or a split has no Category but is never Uncategorized.
+			if (transaction.transferTransactionId !== undefined || transaction.split === true) continue;
 			transactionsAfterToday.push({
 				date: transaction.date,
 				amount: transaction.amount,
 				categoryId: transaction.categoryId ?? null
 			});
+		}
+	}
+	// Each split line counts on its own, so a Ready to Assign line waits for its date too.
+	for (const categoryId of readyToAssign) {
+		const later = ctx.db
+			.query('transactionSplits')
+			.withIndex('by_category_date', (q) => q.eq('categoryId', categoryId).gt('date', today));
+		for await (const line of later) {
+			transactionsAfterToday.push({ date: line.date, amount: line.amount, categoryId });
 		}
 	}
 

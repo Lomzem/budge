@@ -16,6 +16,7 @@ const PAYEES = {
 	coffee: 'Sample Coffee Shop',
 	dining: ['Sample Noodle Bar', 'Sample Taco Stand'],
 	utilities: 'Sample Utility Co',
+	warehouse: 'Sample Warehouse Club',
 	interest: 'Savings Interest'
 } as const;
 
@@ -225,6 +226,33 @@ export const run = internalMutation({
 			localIsoDate(new Date(cutover.getFullYear(), cutover.getMonth() + monthsLater, day));
 		await transfer(checking, savings, dayOf(0, 16), 500_00);
 		await transfer(checking, card, dayOf(1, 3), 400_00);
+
+		// One split card purchase: a warehouse trip that is part groceries and part a gift.
+		const splitDate = dayOf(1, 10);
+		const warehouse = await ctx.db.insert('transactions', {
+			accountId: card,
+			date: splitDate,
+			amount: -86_40,
+			payeeId: await ctx.db.insert('payees', { name: PAYEES.warehouse }),
+			split: true,
+			cleared: 'cleared',
+			approved: true
+		});
+		const lines: [CategoryName, number, string][] = [
+			['Groceries', -54_15, 'Pantry restock'],
+			['Gifts', -32_25, 'Birthday present']
+		];
+		for (const [name, amount, memo] of lines) {
+			const categoryId = to(name);
+			if (categoryId === undefined) continue;
+			await ctx.db.insert('transactionSplits', {
+				transactionId: warehouse,
+				categoryId,
+				amount,
+				memo,
+				date: splitDate
+			});
+		}
 
 		await rebuildMonthlyTotals(ctx);
 		return null;

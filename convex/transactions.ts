@@ -7,7 +7,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import { bankRowsOf, deleteTransaction, saveTransaction } from './lib/transactions';
+import { bankRowsOf, deleteTransaction, saveTransaction, splitLinesOf } from './lib/transactions';
 
 const transactionRow = v.object({
 	_id: v.id('transactions'),
@@ -17,7 +17,7 @@ const transactionRow = v.object({
 	amount: v.number(),
 	payeeName: v.union(v.string(), v.null()),
 	categoryId: v.union(v.id('categories'), v.null()),
-	/** `null` while Uncategorized. */
+	/** `null` while Uncategorized, and for a split or a Transfer. */
 	categoryName: v.union(v.string(), v.null()),
 	memo: v.union(v.string(), v.null()),
 	cleared: v.boolean(),
@@ -25,7 +25,19 @@ const transactionRow = v.object({
 	/** What the bank reported for it, read-only. */
 	bankRows: v.array(v.object({ _id: v.id('imports'), bankText: v.string(), matched: v.boolean() })),
 	/** The other side's Account, for a Transfer. */
-	transfer: v.union(v.object({ accountId: v.id('accounts'), accountName: v.string() }), v.null())
+	transfer: v.union(v.object({ accountId: v.id('accounts'), accountName: v.string() }), v.null()),
+	/** A split's lines, in the order entered; `null` when it isn't split. */
+	splits: v.union(
+		v.array(
+			v.object({
+				categoryId: v.id('categories'),
+				categoryName: v.string(),
+				amount: v.number(),
+				memo: v.union(v.string(), v.null())
+			})
+		),
+		v.null()
+	)
 });
 
 const approval = v.union(v.literal('unapproved'), v.literal('approved'));
@@ -78,6 +90,11 @@ const transactionInput = {
 	// Left out for Uncategorized.
 	categoryId: v.optional(v.id('categories')),
 	memo: v.string(),
+	// Two or more lines summing to `amount`, each with its own Category; the Transaction then takes
+	// no `categoryId`.
+	splits: v.optional(
+		v.array(v.object({ categoryId: v.id('categories'), amount: v.number(), memo: v.string() }))
+	),
 	// The other Account of a Transfer, which then takes no Category and no Payee.
 	transferAccountId: v.optional(v.id('accounts'))
 };
@@ -214,8 +231,21 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 			bankText: bankRow.bankText,
 			matched: bankRow.matched
 		})),
-		transfer: await transferOf(ctx, transaction)
+		transfer: await transferOf(ctx, transaction),
+		splits: await splitsOf(ctx, transaction)
 	};
+}
+
+async function splitsOf(ctx: QueryCtx, transaction: Doc<'transactions'>) {
+	if (transaction.split !== true) return null;
+	return await Promise.all(
+		(await splitLinesOf(ctx, transaction._id)).map(async (line) => ({
+			categoryId: line.categoryId,
+			categoryName: (await ctx.db.get('categories', line.categoryId))?.name ?? '',
+			amount: line.amount,
+			memo: line.memo ?? null
+		}))
+	);
 }
 
 async function transferOf(ctx: QueryCtx, transaction: Doc<'transactions'>) {
