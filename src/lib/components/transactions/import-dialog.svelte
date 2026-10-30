@@ -33,6 +33,8 @@
 	/** Per row with several candidates: a Transaction ID, `'new'`, or `''` until picked. */
 	let picks: string[] = $state([]);
 	let reading = $state(false);
+	/** Counts file reads, so a read that a newer read or a reopen replaced drops its result. */
+	let reads = 0;
 	let saving = $state(false);
 	let error = $state('');
 
@@ -72,6 +74,8 @@
 	});
 
 	function reset() {
+		reads += 1;
+		reading = false;
 		accountId = defaultAccountId ?? accounts.all[0]?._id ?? '';
 		file = undefined;
 		picks = [];
@@ -88,15 +92,17 @@
 			error = 'Set the cutover date before importing.';
 			return;
 		}
+		const read = ++reads;
 		reading = true;
 		try {
 			const result = await readBankFile(chosen, cutoverDate);
+			if (read !== reads) return;
 			if (result.ok) file = result.file;
 			else error = result.message;
 		} catch {
-			error = "Budge couldn't read this file.";
+			if (read === reads) error = "Budge couldn't read this file.";
 		} finally {
-			reading = false;
+			if (read === reads) reading = false;
 		}
 	}
 
