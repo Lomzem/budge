@@ -51,21 +51,21 @@
 	let error = $state('');
 	let saving = $state(false);
 	let confirmDelete = $state(false);
-	/** The Payee and Category the form opened with. */
-	let filledPayee = $state('');
+	/** The Category the form opened with. */
 	let filledCategoryId = $state('');
 	/** Whether the owner has picked a Category since the form opened. */
 	let categoryPicked = $state(false);
 
-	// Payee memory: typing a Payee fills in the Category it was last given, until the owner picks
-	// one. A Transaction that already has a Category keeps it.
+	// Payee memory: the Payee's last Category fills in until the owner picks one, whether the Payee
+	// was typed or an Uncategorized Transaction opened with it. A Transaction that already has a
+	// Category keeps it.
 	const prefillsCategory = $derived(open && !categoryPicked && filledCategoryId === '');
 	const payeeName = $derived(payee.trim());
-	const payeeEdited = $derived(payeeName !== '' && payeeName !== filledPayee);
+	const payeeGiven = $derived(payeeName !== '');
 	const payeeMemory = useQuery(api.payees.lastCategory, () =>
-		prefillsCategory && payeeEdited ? { name: payeeName } : 'skip'
+		prefillsCategory && payeeGiven ? { name: payeeName } : 'skip'
 	);
-	const recallsCategory = $derived(prefillsCategory && payeeEdited);
+	const recallsCategory = $derived(prefillsCategory && payeeGiven);
 	/** Whether the Category the typed Payee was last given, or the list it is in, is on its way. */
 	const recallingCategory = $derived(
 		recallsCategory &&
@@ -194,7 +194,6 @@
 			amount = '';
 			memo = '';
 		}
-		filledPayee = payee.trim();
 		filledCategoryId = chosenCategoryId;
 		categoryPicked = false;
 	}
