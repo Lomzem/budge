@@ -23,6 +23,7 @@ import type * as lib_publicError from "../lib/publicError.js";
 import type * as lib_runEffect from "../lib/runEffect.js";
 import type * as lib_settings from "../lib/settings.js";
 import type * as lib_transactions from "../lib/transactions.js";
+import type * as migrations from "../migrations.js";
 import type * as monthlyTotals from "../monthlyTotals.js";
 import type * as owner from "../owner.js";
 import type * as payees from "../payees.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   "lib/runEffect": typeof lib_runEffect;
   "lib/settings": typeof lib_settings;
   "lib/transactions": typeof lib_transactions;
+  migrations: typeof migrations;
   monthlyTotals: typeof monthlyTotals;
   owner: typeof owner;
   payees: typeof payees;

@@ -3,7 +3,7 @@ import { v } from 'convex/values';
 import { localIsoDate, monthOf } from '../src/lib/domain/dates';
 import type { Id } from './_generated/dataModel';
 import { env, internalMutation, type MutationCtx } from './_generated/server';
-import { ensureReadyToAssign } from './lib/categories';
+import { createPaymentCategory, ensureReadyToAssign } from './lib/categories';
 import { rebuildMonthlyTotals } from './lib/monthlyTotals';
 
 // Invented Payees and amounts that mirror only the shape of a real budget. The repo is public:
@@ -55,9 +55,9 @@ type CategoryName = (typeof GROUPS)[number]['categories'][number][0];
 /**
  * Writes a small synthetic budget on an empty backend: three Accounts, twelve Categories in three
  * groups with Assigned amounts each month, and about three months of made-up Transactions, from
- * the first of the month two months back through today, with one Transfer and the newest few
- * imported and Unapproved. Ends by rebuilding the monthly totals, so every seeded deployment
- * exercises the rebuild.
+ * the first of the month two months back through today, with one Transfer, one card payment, and
+ * the newest few imported and Unapproved. Ends by rebuilding the monthly totals, so every seeded
+ * deployment exercises the rebuild.
  */
 export const run = internalMutation({
 	args: {},
@@ -112,13 +112,14 @@ export const run = internalMutation({
 		});
 		const savings = await ctx.db.insert('accounts', { name: 'Savings', kind: 'cash', position: 1 });
 		const card = await ctx.db.insert('accounts', { name: 'Card', kind: 'creditCard', position: 2 });
+		const cardPayment = await createPaymentCategory(ctx, { _id: card, name: 'Card' });
 
 		// Amounts are cents, written with a separator before the cents: 2_418_37 is $2,418.37.
 		const write = writer(ctx);
 		await write(checking, cutoverDate, 2_418_37, 'Starting Balance', true, readyToAssign);
 		await write(savings, cutoverDate, 8_150_00, 'Starting Balance', true, readyToAssign);
-		// A card's starting debt touches no Category.
-		await write(card, cutoverDate, -612_48, 'Starting Balance', true);
+		// A card's starting debt sits in its Payment Category, so it touches no Category.
+		await write(card, cutoverDate, -612_48, 'Starting Balance', true, cardPayment);
 
 		// A fixed pseudo-random sequence, so every seeded backend looks the same on the same day.
 		let state = 7;
@@ -195,24 +196,35 @@ export const run = internalMutation({
 			});
 		}
 
-		// One Transfer: savings set aside the day after the first mid-month paycheck.
-		const transferDate = localIsoDate(new Date(cutover.getFullYear(), cutover.getMonth(), 16));
-		const intoSavings = await ctx.db.insert('transactions', {
-			accountId: savings,
-			date: transferDate,
-			amount: 500_00,
-			cleared: 'cleared',
-			approved: true
-		});
-		const fromChecking = await ctx.db.insert('transactions', {
-			accountId: checking,
-			date: transferDate,
-			amount: -500_00,
-			cleared: 'cleared',
-			approved: true,
-			transferTransactionId: intoSavings
-		});
-		await ctx.db.patch('transactions', intoSavings, { transferTransactionId: fromChecking });
+		// One Transfer: savings set aside the day after the first mid-month paycheck. And one card
+		// payment from Checking, early the next month.
+		const transfer = async (
+			from: Id<'accounts'>,
+			into: Id<'accounts'>,
+			date: string,
+			amount: number
+		) => {
+			const intoSide = await ctx.db.insert('transactions', {
+				accountId: into,
+				date,
+				amount,
+				cleared: 'cleared',
+				approved: true
+			});
+			const fromSide = await ctx.db.insert('transactions', {
+				accountId: from,
+				date,
+				amount: -amount,
+				cleared: 'cleared',
+				approved: true,
+				transferTransactionId: intoSide
+			});
+			await ctx.db.patch('transactions', intoSide, { transferTransactionId: fromSide });
+		};
+		const dayOf = (monthsLater: number, day: number) =>
+			localIsoDate(new Date(cutover.getFullYear(), cutover.getMonth() + monthsLater, day));
+		await transfer(checking, savings, dayOf(0, 16), 500_00);
+		await transfer(checking, card, dayOf(1, 3), 400_00);
 
 		await rebuildMonthlyTotals(ctx);
 		return null;

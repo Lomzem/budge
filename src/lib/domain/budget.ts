@@ -3,7 +3,12 @@
 
 import { addDays, addMonths, addMonthsToDate, dayOfMonth, monthOf, monthsBetween } from './dates';
 
-export type CategoryKind = 'normal' | 'readyToAssign';
+/**
+ * Ready to Assign and each Credit Card Account's Payment Category are system Categories, each in
+ * its own system group; Budge manages them.
+ */
+export type CategoryKind = 'normal' | 'readyToAssign' | 'creditCardPayment';
+export type GroupKind = 'normal' | 'readyToAssign' | 'creditCardPayments';
 
 /**
  * How much a Category needs and by when. A Monthly Target either refills Available up to `amount`
@@ -32,7 +37,7 @@ export interface TargetProgress {
 	dueDate: string | null;
 }
 
-export interface BudgetInput<C extends string, G extends string> {
+export interface BudgetInput<C extends string, G extends string, A extends string = string> {
 	/** The viewed month, `YYYY-MM`. */
 	month: string;
 	today: string;
@@ -42,7 +47,7 @@ export interface BudgetInput<C extends string, G extends string> {
 		id: G;
 		name: string;
 		position: number;
-		kind: CategoryKind;
+		kind: GroupKind;
 		hidden?: boolean | undefined;
 	}[];
 	categories: readonly {
@@ -53,14 +58,18 @@ export interface BudgetInput<C extends string, G extends string> {
 		kind: CategoryKind;
 		hidden?: boolean | undefined;
 		target?: Target | undefined;
+		/** A Payment Category's Credit Card Account. */
+		accountId?: A | undefined;
 	}[];
 	assignments: readonly { month: string; categoryId: C; amount: number }[];
 	/**
-	 * Summed Transactions per month and bucket, over every Account. Transfer sides sum in
-	 * `transfer`; between Cash Accounts they touch no Category and not Ready to Assign.
+	 * Summed Transactions per month, Account, and bucket. Transfer sides sum in `transfer`; between
+	 * Cash Accounts they touch no Category and not Ready to Assign. On a Credit Card Account, every
+	 * total also moves its amount, reversed, into that card's Payment Category.
 	 */
 	monthlyTotals: readonly {
 		month: string;
+		accountId: A;
 		bucket: C | 'uncategorized' | 'transfer';
 		amount: number;
 		count: number;
@@ -88,11 +97,25 @@ export interface CategoryBudget<C extends string> {
 	available: number;
 	status: AvailableStatus;
 	target: TargetProgress | null;
+	/** What a Payment Category still waits on, or `null` for any other Category. */
+	payment: PaymentBudget<C> | null;
+}
+
+export interface PaymentBudget<C extends string> {
+	/**
+	 * Overspent Categories whose card purchases this Payment Category holds money for that isn't
+	 * there yet, in table order. A Category is waited on for at most what it is overspent by,
+	 * shared out across cards in table order.
+	 */
+	waitingOn: { id: C; name: string; amount: number }[];
+	/** Card debt Available doesn't cover yet: the debt minus Available, never below zero. */
+	uncovered: number;
 }
 
 export interface GroupBudget<C extends string, G extends string> {
 	id: G;
 	name: string;
+	kind: 'normal' | 'creditCardPayments';
 	assigned: number;
 	activity: number;
 	available: number;
@@ -225,10 +248,27 @@ function sumByCategory<C extends string>(
 
 const byPosition = (a: { position: number }, b: { position: number }) => a.position - b.position;
 
-export function computeBudget<C extends string, G extends string>(
-	input: BudgetInput<C, G>
+export function computeBudget<C extends string, G extends string, A extends string>(
+	input: BudgetInput<C, G, A>
 ): Budget<C, G> {
 	const { month } = input;
+	const paymentCategoryOf = new Map<A, C>();
+	for (const c of input.categories) {
+		if (c.kind === 'creditCardPayment' && c.accountId !== undefined) {
+			paymentCategoryOf.set(c.accountId, c.id);
+		}
+	}
+	// Each total counts in its own Category, and a card's also moves into its Payment Category:
+	// a purchase in full, even past what the Category has, and a refund back out.
+	const activityRows = input.monthlyTotals.flatMap((row) => {
+		const rows: { month: string; key: C; amount: number }[] = [];
+		if (row.bucket !== 'uncategorized' && row.bucket !== 'transfer') {
+			rows.push({ month: row.month, key: row.bucket, amount: row.amount });
+		}
+		const payment = paymentCategoryOf.get(row.accountId);
+		if (payment !== undefined) rows.push({ month: row.month, key: payment, amount: -row.amount });
+		return rows;
+	});
 	type Sums = Map<C, { now: number; through: number }>;
 	const sumsByMonth = new Map<string, { assigned: Sums; activity: Sums }>();
 	const sumsIn = (viewed: string) => {
@@ -239,14 +279,7 @@ export function computeBudget<C extends string, G extends string>(
 					viewed,
 					input.assignments.map((row) => ({ ...row, key: row.categoryId }))
 				),
-				activity: sumByCategory(
-					viewed,
-					input.monthlyTotals.flatMap((row) =>
-						row.bucket === 'uncategorized' || row.bucket === 'transfer'
-							? []
-							: [{ ...row, key: row.bucket }]
-					)
-				)
+				activity: sumByCategory(viewed, activityRows)
 			};
 			sumsByMonth.set(viewed, sums);
 		}
@@ -254,7 +287,7 @@ export function computeBudget<C extends string, G extends string>(
 	};
 
 	const budgetOf = (
-		c: BudgetInput<C, G>['categories'][number],
+		c: BudgetInput<C, G, A>['categories'][number],
 		viewed = month
 	): CategoryBudget<C> => {
 		const sums = sumsIn(viewed);
@@ -274,8 +307,39 @@ export function computeBudget<C extends string, G extends string>(
 			activity: t.now,
 			available,
 			status: statusOf(available, target),
-			target
+			target,
+			payment: null
 		};
+	};
+
+	const groupPosition = new Map<G, number>(input.groups.map((g) => [g.id, g.position]));
+	const byTableOrder = (a: { groupId: G; position: number }, b: typeof a) =>
+		(groupPosition.get(a.groupId) ?? 0) - (groupPosition.get(b.groupId) ?? 0) ||
+		a.position - b.position;
+	// What each overspent Category is still short, shared out to the cards that waited on it.
+	const shortOf = new Map<C, number>();
+	for (const c of input.categories) {
+		if (c.kind !== 'normal') continue;
+		const { available } = budgetOf(c);
+		if (available < 0) shortOf.set(c.id, -available);
+	}
+	const paymentOf = (accountId: A, available: number): PaymentBudget<C> => {
+		let balance = 0;
+		const spentIn = new Map<string, number>();
+		for (const row of input.monthlyTotals) {
+			if (row.accountId !== accountId || row.month > month) continue;
+			balance += row.amount;
+			spentIn.set(row.bucket, (spentIn.get(row.bucket) ?? 0) - row.amount);
+		}
+		const waitingOn: PaymentBudget<C>['waitingOn'] = [];
+		for (const c of input.categories.filter((c) => c.kind === 'normal').toSorted(byTableOrder)) {
+			const short = shortOf.get(c.id) ?? 0;
+			const amount = Math.min(short, spentIn.get(c.id) ?? 0);
+			if (amount <= 0) continue;
+			shortOf.set(c.id, short - amount);
+			waitingOn.push({ id: c.id, name: c.name, amount });
+		}
+		return { waitingOn, uncovered: Math.max(0, -balance - available) };
 	};
 
 	const groups: GroupBudget<C, G>[] = [];
@@ -283,14 +347,18 @@ export function computeBudget<C extends string, G extends string>(
 	const upcoming: Budget<C, G>['upcoming'] = [];
 	const windowEnd = addDays(input.today, UPCOMING_DAYS);
 	const overspent: Budget<C, G>['overspent'] = [];
-	for (const group of input.groups.filter((g) => g.kind === 'normal').toSorted(byPosition)) {
+	for (const group of input.groups.toSorted(byPosition)) {
+		if (group.kind === 'readyToAssign') continue;
 		// Hidden Categories leave the table but still count in their group's totals.
 		const all: CategoryBudget<C>[] = [];
 		const shown: CategoryBudget<C>[] = [];
 		for (const c of input.categories
-			.filter((c) => c.groupId === group.id && c.kind === 'normal')
+			.filter((c) => c.groupId === group.id && c.kind !== 'readyToAssign')
 			.toSorted(byPosition)) {
 			const row = budgetOf(c);
+			if (c.kind === 'creditCardPayment' && c.accountId !== undefined) {
+				row.payment = paymentOf(c.accountId, row.available);
+			}
 			all.push(row);
 			const isHidden = group.hidden === true || c.hidden === true;
 			(isHidden ? hidden : shown).push(row);
@@ -313,6 +381,7 @@ export function computeBudget<C extends string, G extends string>(
 		groups.push({
 			id: group.id,
 			name: group.name,
+			kind: group.kind,
 			assigned: sum(all, 'assigned'),
 			activity: sum(all, 'activity'),
 			available: sum(all, 'available'),
