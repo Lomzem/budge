@@ -44,3 +44,39 @@ test('adding a Transaction changes the Account balance', async ({ page }) => {
 	});
 	expect(fits).toBe(true);
 });
+
+test("a Payee's last Category fills in, and picking another Category keeps it", async ({
+	page
+}) => {
+	if (!ownerEmail) throw new Error('E2E_CLERK_USER_EMAIL is not set.');
+
+	await page.goto('/sign-in');
+	await clerk.signIn({ page, emailAddress: ownerEmail });
+	await page.goto('/');
+
+	await page
+		.getByRole('navigation', { name: 'Budget and Accounts' })
+		.getByRole('link', { name: /^Checking/ })
+		.click();
+	await page.getByRole('button', { name: 'Add Transaction' }).click();
+	const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
+	const category = dialog.getByLabel('Category or Transfer');
+	const picked = category.locator('option:checked');
+
+	// The seed pays Rent to Sample Landlord.
+	await dialog.getByLabel('Payee').fill('Sample Landlord');
+	await expect(picked).toHaveText('Rent');
+	await dialog.getByLabel('Payee').fill('Smoke Test Florist');
+	await expect(picked).toHaveText('Uncategorized');
+
+	await dialog.getByLabel('Payee').fill('Sample Landlord');
+	await expect(picked).toHaveText('Rent');
+	await category.selectOption({ label: 'Groceries' });
+	await dialog.getByLabel('Payee').fill('Sample Landlor');
+	await dialog.getByLabel('Payee').fill('Sample Landlord');
+	await expect(picked).toHaveText('Groceries');
+
+	// Nothing is saved, so the seeded budget stays as it was.
+	await page.keyboard.press('Escape');
+	await expect(dialog).toBeHidden();
+});
