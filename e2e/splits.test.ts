@@ -38,7 +38,7 @@ test('a split shows "Split" in the list, and its lines can be added, edited, and
 		// The first line starts with the whole amount; moving some to the second keeps the total.
 		await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('50.00');
 		// An empty second line isn't a finished split.
-		await expect(remainder).toHaveText('Nothing left to split; remove the empty line');
+		await expect(remainder).toHaveText('Nothing left for the empty line');
 		await dialog.getByLabel('Line 1 Category').selectOption({ label: 'Groceries' });
 		await dialog.getByLabel('Line 1 amount').fill('30.00');
 		await expect(remainder).toHaveText('$20.00 left to split');

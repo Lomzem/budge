@@ -467,7 +467,7 @@
 				{#if remainder === undefined}
 					Enter amounts such as 12.50 to see what is left.
 				{:else if remainder === 0 && blankLine}
-					Nothing left to split; remove the empty line
+					Nothing left for the empty line
 				{:else if remainder === 0}
 					Fully split
 				{:else if remainder > 0}
