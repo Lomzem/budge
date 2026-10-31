@@ -120,7 +120,7 @@ describe('backfilling Payment Categories', () => {
 			ctx.db
 				.query('transactions')
 				.withIndex('by_account_date', (q) => q.eq('accountId', card).eq('date', '2026-08-01'))
-				.first()
+				.unique()
 		);
 		if (startingRow === null) throw new Error('No starting row.');
 		await owner.mutation(api.transactions.update, {
