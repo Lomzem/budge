@@ -2,14 +2,12 @@ import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { addDays } from '../../src/lib/domain/dates';
 import { MATCH_WINDOW_DAYS } from '../../src/lib/domain/matcher';
+import { SPLIT_LINE_LIMIT } from '../../src/lib/domain/splits';
 import { requireCents } from './input';
 import { countTransaction, lineCounted } from './monthlyTotals';
 import { payeeNamed, rememberCategory, rememberRename } from './payees';
 import { requireCutoverDate, requireIsoDate } from './settings';
 import { publicError } from './publicError';
-
-/** The most lines one split takes. */
-export const SPLIT_LINE_LIMIT = 50;
 
 export type TransactionFields = Omit<Doc<'transactions'>, '_id' | '_creationTime' | 'approved'> & {
 	// Every write says whether the Transaction is approved; only old rows leave it out.

@@ -14,6 +14,7 @@
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { formatDate, isIsoDate, localIsoDate } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
+	import { SPLIT_LINE_LIMIT } from '$lib/domain/splits';
 	import { readPublicError } from '$lib/publicError';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
@@ -226,6 +227,7 @@
 	}
 
 	function addLine(lineAmount = '') {
+		if (lines.length >= SPLIT_LINE_LIMIT) return;
 		lines.push({ key: nextLineKey++, categoryId: '', amount: lineAmount, memo: '' });
 	}
 
@@ -452,6 +454,7 @@
 				type="button"
 				variant="outline"
 				size="sm"
+				disabled={lines.length >= SPLIT_LINE_LIMIT}
 				onclick={() => {
 					addLine();
 				}}>Add line</Button
