@@ -23,7 +23,9 @@ test('a split shows "Split" in the list, and its lines can be added, edited, and
 
 	const row = page.getByRole('row').filter({ hasText: memo });
 	const dialog = page.getByRole('dialog');
-	const remainder = dialog.getByText(/left to split|over the amount|Fully split/);
+	const remainder = dialog.getByText(
+		/left to split|left for the empty line|over the amount|Fully split/
+	);
 
 	try {
 		await page.getByRole('button', { name: 'Add Transaction' }).click();
