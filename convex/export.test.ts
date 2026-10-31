@@ -8,6 +8,9 @@ import { newBackend, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
+// An invented stand-in for a sealed token; the export must never hold it.
+const sealedToken = 'v1.synthetic-iv.synthetic-sealed-token';
+
 // One row in every table the export must cover. A table added to the schema fails the coverage
 // test until it gets a row here, so its export (and any secret it holds) is checked.
 async function seedEveryTable(ctx: MutationCtx) {
@@ -41,6 +44,23 @@ async function seedEveryTable(ctx: MutationCtx) {
 		memo: 'August',
 		cleared: 'cleared'
 	});
+	const connectionId = await ctx.db.insert('bankConnections', {
+		name: 'Sample Bank',
+		status: 'ok',
+		lastSyncedAt: Date.parse('2026-08-03T12:00:00Z'),
+		provider: {
+			kind: 'plaid',
+			itemId: 'item-synthetic-1',
+			encryptedToken: sealedToken,
+			cursor: 'cursor-synthetic-1'
+		}
+	});
+	await ctx.db.insert('connectionAccounts', {
+		connectionId,
+		externalId: 'account-synthetic-checking',
+		state: 'mapped',
+		accountId
+	});
 	await ctx.db.insert('imports', {
 		source: 'qfx',
 		sourceId: 'SAMPLE-0001',
@@ -70,7 +90,9 @@ const seededTables = [
 	'payees',
 	'payeeRenames',
 	'transactions',
-	'imports'
+	'imports',
+	'bankConnections',
+	'connectionAccounts'
 ];
 
 function keysAnywhere(value: unknown): string[] {
@@ -184,6 +206,7 @@ describe('the export', () => {
 
 		expect(keys).not.toContain('provider');
 		expect(keys.filter((key) => /token/i.test(key))).toEqual([]);
+		expect(JSON.stringify(await exportAll(owner))).not.toContain(sealedToken);
 	});
 
 	test('lists an empty table as empty', async () => {

@@ -20,8 +20,9 @@ function sampleArgs(ids: {
 	groupId: Id<'categoryGroups'>;
 	categoryId: Id<'categories'>;
 	importId: Id<'imports'>;
+	connectionId: Id<'bankConnections'>;
 }) {
-	const { accountId, transactionId, groupId, categoryId, importId } = ids;
+	const { accountId, transactionId, groupId, categoryId, importId, connectionId } = ids;
 	const entry = { accountId, date: '2026-08-14', amount: -500, payee: 'Corner Grocer', memo: '' };
 	const args: Record<string, Record<string, unknown>> = {
 		'owner:whoami': {},
@@ -49,6 +50,8 @@ function sampleArgs(ids: {
 		'imports:preview': { accountId, source: 'csv', rows: [] },
 		'imports:commit': { accountId, source: 'csv', rows: [] },
 		'imports:unmatch': { importId },
+		'bankConnections:list': {},
+		'bankConnections:syncNow': { connectionId },
 		'payees:lastCategory': { name: 'Corner Grocer' },
 		'categories:list': {},
 		'categories:createGroup': { name: 'Bills' },
@@ -161,7 +164,12 @@ describe('the owner guard', () => {
 				matched: true,
 				state: 'linked'
 			});
-			return { accountId, transactionId, groupId, categoryId, importId };
+			const connectionId = await ctx.db.insert('bankConnections', {
+				name: 'Sample Bank (Sandbox)',
+				status: 'ok',
+				provider: { kind: 'sandbox' }
+			});
+			return { accountId, transactionId, groupId, categoryId, importId, connectionId };
 		});
 		const sample = sampleArgs(ids);
 		const callers = {

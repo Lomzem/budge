@@ -12,6 +12,7 @@
 	import { VIEWS } from '$lib/views';
 
 	import AppMenu from './app-menu.svelte';
+	import BankConnections from './bank-connections.svelte';
 
 	const accounts = getAccounts();
 	const unapproved = useQuery(api.transactions.unapprovedCount, () =>
@@ -78,7 +79,8 @@
 		Add Account
 	</button>
 </nav>
-<div class="border-t border-sidebar-border p-3">
+<div class="flex flex-col gap-2 border-t border-sidebar-border p-3">
+	<BankConnections />
 	<AppMenu wide />
 </div>
 

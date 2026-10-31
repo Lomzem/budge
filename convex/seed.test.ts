@@ -66,6 +66,14 @@ describe('seed:run', () => {
 		expect(payment?.categories[0]?.payment?.uncovered).toBeGreaterThan(0);
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(3);
 		expect(page.filter((row) => row.bankRows.length > 0)).toHaveLength(3);
+		expect(await owner.query(api.bankConnections.list, {})).toMatchObject([
+			{
+				name: 'Sample Bank (Sandbox)',
+				status: 'ok',
+				lastSyncedAt: Date.parse('2026-10-27T10:00:00Z'),
+				lastError: null
+			}
+		]);
 	});
 
 	test('refuses once any Account exists', async () => {

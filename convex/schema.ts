@@ -96,8 +96,8 @@ export default defineSchema({
 		// The bank's import ID, unique within the Account and source. CSV rows have none.
 		sourceId: v.optional(v.string()),
 		accountId: v.id('accounts'),
-		// Bank sync's Plaid Account the row arrived through; ticket 17 narrows it to an ID.
-		connectionAccountId: v.optional(v.string()),
+		// The bank's Account the row arrived through, for synced rows.
+		connectionAccountId: v.optional(v.id('connectionAccounts')),
 		date: v.string(),
 		amount: v.number(),
 		bankText: v.string(),
@@ -115,6 +115,49 @@ export default defineSchema({
 		.index('by_account_source_sourceId_date', ['accountId', 'source', 'sourceId', 'date'])
 		.index('by_transactionId', ['transactionId'])
 		.index('by_connectionAccountId_state', ['connectionAccountId', 'state']),
+
+	// A Bank Connection: one login at one bank, synced through a provider. `status` and the fields
+	// beside it are provider-neutral; `provider` holds what only that provider understands. The
+	// access token is stored sealed (TokenCipher) and `provider` never leaves the server. The
+	// `sandbox` kind is the synthetic seed's connection: it has no token and never syncs.
+	bankConnections: defineTable({
+		name: v.string(),
+		status: v.union(v.literal('ok'), v.literal('needsAttention')),
+		lastSyncedAt: v.optional(v.number()),
+		// The last sync's failure, worded for the owner; cleared by the next sync that succeeds.
+		lastError: v.optional(v.object({ at: v.number(), message: v.string() })),
+		// While in the future, a sync holds this connection and any other sync request is ignored.
+		syncLeaseUntil: v.optional(v.number()),
+		consentExpiresAt: v.optional(v.number()),
+		provider: v.union(
+			v.object({
+				kind: v.literal('plaid'),
+				itemId: v.string(),
+				encryptedToken: v.string(),
+				// Where the last committed sync stopped; left out before the first.
+				cursor: v.optional(v.string())
+			}),
+			v.object({ kind: v.literal('sandbox') })
+		)
+	}),
+
+	// The bank's Accounts under a Bank Connection. A mapped one feeds a Budge Account; rows from a
+	// held one wait for the owner to map it, and an ignored one's rows are dropped.
+	connectionAccounts: defineTable(
+		v.union(
+			v.object({
+				connectionId: v.id('bankConnections'),
+				externalId: v.string(),
+				state: v.literal('mapped'),
+				accountId: v.id('accounts')
+			}),
+			v.object({
+				connectionId: v.id('bankConnections'),
+				externalId: v.string(),
+				state: v.union(v.literal('held'), v.literal('ignored'))
+			})
+		)
+	).index('by_connection_externalId', ['connectionId', 'externalId']),
 
 	// A rebuildable cache of summed Transactions per month, Account, and bucket (ADR 0002). Every
 	// Transaction write keeps it in the same mutation; no rule reads it as a source of truth.
