@@ -104,4 +104,56 @@ describe('backfilling Payment Categories', () => {
 			.find((category) => category.name === 'Discover');
 		expect(payment?.payment ?? null).not.toBeNull();
 	});
+
+	test('leaves a starting debt the owner has since split, and names its card', async () => {
+		const legacy = await budgetWithCard();
+		await makeLegacy(legacy);
+		const { owner, t, card } = legacy;
+		const everyday = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
+		const [groceries, dining] = await Promise.all(
+			['Groceries', 'Dining Out'].map((name) =>
+				owner.mutation(api.categories.create, { groupId: everyday, name })
+			)
+		);
+		if (groceries === undefined || dining === undefined) throw new Error('No Categories.');
+		const startingRow = await t.run(async (ctx) =>
+			ctx.db
+				.query('transactions')
+				.withIndex('by_account_date', (q) => q.eq('accountId', card).eq('date', '2026-08-01'))
+				.unique()
+		);
+		if (startingRow === null) throw new Error('No starting row.');
+		await owner.mutation(api.transactions.update, {
+			transactionId: startingRow._id,
+			accountId: card,
+			date: '2026-08-01',
+			amount: -20_000,
+			payee: 'Starting Balance',
+			memo: '',
+			splits: [
+				{ categoryId: groceries, amount: -15_000, memo: '' },
+				{ categoryId: dining, amount: -5_000, memo: '' }
+			]
+		});
+		const before = await legacy.view();
+
+		expect(await t.mutation(internal.migrations.backfillPaymentCategories, {})).toEqual({
+			repaired: 1,
+			unmatched: [card]
+		});
+
+		const after = await t.run(async (ctx) => ({
+			row: await ctx.db.get('transactions', startingRow._id),
+			lines: await ctx.db
+				.query('transactionSplits')
+				.withIndex('by_transaction', (q) => q.eq('transactionId', startingRow._id))
+				.collect()
+		}));
+		expect(after.row).toMatchObject({ split: true });
+		expect(after.row?.categoryId).toBeUndefined();
+		expect(after.lines.map((line) => line.amount).sort()).toEqual([-15_000, -5_000]);
+		const spending = (view: typeof before) =>
+			view.groups.flatMap((group) => group.categories).filter((c) => c.payment === null);
+		expect(spending(await legacy.view())).toEqual(spending(before));
+	});
 });
