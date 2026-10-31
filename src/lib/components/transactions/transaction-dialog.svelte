@@ -234,7 +234,9 @@
 	/** Picking Split starts two lines, the first holding the whole amount and any Category. */
 	function startSplit(previous: string) {
 		if (lines.length > 0) return;
-		addLine(amount);
+		// The amount's Direction is set apart, so the first line takes its size alone.
+		const total = parseCents(amount);
+		addLine(total === undefined ? amount : formatCents(Math.abs(total)).replace('$', ''));
 		addLine();
 		const first = lines[0];
 		if (first && previous !== '' && !previous.startsWith(TRANSFER)) first.categoryId = previous;

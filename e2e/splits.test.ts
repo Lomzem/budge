@@ -28,13 +28,15 @@ test('a split shows "Split" in the list, and its lines can be added, edited, and
 	try {
 		await page.getByRole('button', { name: 'Add Transaction' }).click();
 		await dialog.getByLabel('Payee').fill('Smoke Test Warehouse');
-		await dialog.getByLabel('Amount').fill('50.00');
+		// A minus sign typed in the amount doesn't carry into the lines; the Direction sets the sign.
+		await dialog.getByLabel('Amount').fill('-50.00');
 		await dialog.getByLabel('Memo', { exact: true }).fill(memo);
 		await dialog
 			.getByLabel('Category or Transfer')
 			.selectOption({ label: 'Split across Categories' });
 
 		// The first line starts with the whole amount; moving some to the second keeps the total.
+		await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('50.00');
 		await dialog.getByLabel('Line 1 Category').selectOption({ label: 'Groceries' });
 		await dialog.getByLabel('Line 1 amount').fill('30.00');
 		await expect(remainder).toHaveText('$20.00 left to split');
