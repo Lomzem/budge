@@ -122,6 +122,8 @@
 		}
 		return left;
 	});
+	/** Whether a line has no amount yet, so a zero remainder isn't a finished split. */
+	const blankLine = $derived(lines.some((line) => line.amount.trim() === ''));
 	/** The other Account picked for a Transfer, or `undefined` for an ordinary Transaction. */
 	const transferAccountId = $derived(
 		categoryId.startsWith(TRANSFER) ? categoryId.slice(TRANSFER.length) : undefined
@@ -464,6 +466,8 @@
 			<p aria-live="polite" class="text-sm font-medium">
 				{#if remainder === undefined}
 					Enter amounts such as 12.50 to see what is left.
+				{:else if remainder === 0 && blankLine}
+					Nothing left to split; remove the empty line
 				{:else if remainder === 0}
 					Fully split
 				{:else if remainder > 0}
