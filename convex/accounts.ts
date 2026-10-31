@@ -11,11 +11,17 @@ import { insertTransaction, transactionFields } from './lib/transactions';
 
 const accountKind = v.union(v.literal('cash'), v.literal('creditCard'));
 
-/** Every Account in sidebar order, with its balance. */
+/** Every Account in sidebar order, with its balance and when it was last Reconciled. */
 export const list = query({
 	args: {},
 	returns: v.array(
-		v.object({ _id: v.id('accounts'), name: v.string(), kind: accountKind, balance: v.number() })
+		v.object({
+			_id: v.id('accounts'),
+			name: v.string(),
+			kind: accountKind,
+			balance: v.number(),
+			lastReconciledOn: v.union(v.string(), v.null())
+		})
 	),
 	handler: async (ctx) => {
 		await requireOwner(ctx);
@@ -24,7 +30,13 @@ export const list = query({
 		for await (const account of ctx.db.query('accounts')) accounts.push(account);
 		return accounts
 			.sort((a, b) => a.position - b.position)
-			.map(({ _id, name, kind }) => ({ _id, name, kind, balance: balances.get(_id) ?? 0 }));
+			.map(({ _id, name, kind, lastReconciledOn }) => ({
+				_id,
+				name,
+				kind,
+				balance: balances.get(_id) ?? 0,
+				lastReconciledOn: lastReconciledOn ?? null
+			}));
 	}
 });
 

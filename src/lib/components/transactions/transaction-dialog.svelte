@@ -35,6 +35,7 @@
 	const remove = useMutation(api.transactions.remove);
 	const approve = useMutation(api.transactions.approve);
 	const unmatch = useMutation(api.imports.unmatch);
+	const unlock = useMutation(api.transactions.unlock);
 	const categories = useQuery(api.categories.list, () => (open ? {} : 'skip'));
 
 	let accountId = $state('');
@@ -51,6 +52,9 @@
 	let error = $state('');
 	let saving = $state(false);
 	let confirmDelete = $state(false);
+	let unlocked = $state(false);
+	/** A Reconciled Transaction keeps its Account, date, and amount, and stays, until unlocked. */
+	const locked = $derived(transaction?.reconciled === true && !unlocked);
 	/** The Category the form opened with. */
 	let filledCategoryId = $state('');
 	/** Whether the owner has picked a Category since the form opened. */
@@ -174,6 +178,7 @@
 
 	function fill() {
 		error = '';
+		unlocked = false;
 		linkChoice = undefined;
 		if (transaction) {
 			accountId = transaction.accountId;
@@ -287,6 +292,21 @@
 		}
 	}
 
+	async function unlockTransaction() {
+		if (!transaction) return;
+		saving = true;
+		try {
+			await unlock({ transactionId: transaction._id });
+			unlocked = true;
+			error = '';
+		} catch (thrown) {
+			error =
+				readPublicError(thrown)?.message ?? "Budge couldn't unlock the Transaction. Try again.";
+		} finally {
+			saving = false;
+		}
+	}
+
 	async function deleteTransaction() {
 		if (!transaction) return;
 		saving = true;
@@ -310,11 +330,28 @@
 			<Dialog.Title>{transaction ? 'Edit Transaction' : 'Add Transaction'}</Dialog.Title>
 		</Dialog.Header>
 		<form class="flex flex-col gap-4" onsubmit={submit}>
+			{#if locked}
+				<div class="flex flex-wrap items-center justify-between gap-2 text-sm">
+					<p class="text-muted-foreground">
+						Reconciled: its Account, date, and amount are locked, and it can't be deleted.
+					</p>
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						disabled={saving}
+						onclick={unlockTransaction}
+					>
+						Unlock
+					</Button>
+				</div>
+			{/if}
 			<div class="flex flex-col gap-2">
 				<Label for="transaction-account">Account</Label>
 				<select
 					id="transaction-account"
 					bind:value={accountId}
+					disabled={locked}
 					required
 					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
 				>
@@ -325,7 +362,7 @@
 			</div>
 			<div class="flex flex-col gap-2">
 				<Label for="transaction-date">Date</Label>
-				<Input id="transaction-date" type="date" bind:value={date} required />
+				<Input id="transaction-date" type="date" bind:value={date} disabled={locked} required />
 			</div>
 			{#if !isTransfer}
 				<div class="flex flex-col gap-2">
@@ -415,7 +452,7 @@
 			{/if}
 			<fieldset>
 				<legend class="mb-2 text-sm font-medium">Direction</legend>
-				<RadioGroup.Root bind:value={direction}>
+				<RadioGroup.Root bind:value={direction} disabled={locked}>
 					<div class="flex items-center gap-2">
 						<RadioGroup.Item value="outflow" id="transaction-outflow" />
 						<Label for="transaction-outflow">Outflow</Label>
@@ -434,6 +471,7 @@
 					inputmode="decimal"
 					placeholder="0.00"
 					autocomplete="off"
+					disabled={locked}
 					required
 				/>
 			</div>
@@ -468,7 +506,7 @@
 				<p role="alert" class="text-sm text-destructive">{error}</p>
 			{/if}
 			<Dialog.Footer>
-				{#if transaction}
+				{#if transaction && !locked}
 					<Button
 						type="button"
 						variant="outline"

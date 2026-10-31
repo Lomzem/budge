@@ -14,7 +14,9 @@ export default defineSchema({
 	accounts: defineTable({
 		name: v.string(),
 		kind: v.union(v.literal('cash'), v.literal('creditCard')),
-		position: v.number()
+		position: v.number(),
+		// The date of the last Reconciliation; left out until the first.
+		lastReconciledOn: v.optional(v.string())
 	}),
 
 	// Ready to Assign is a system Category in a hidden system group, and each Credit Card Account
@@ -73,7 +75,9 @@ export default defineSchema({
 		// No Category means Uncategorized.
 		categoryId: v.optional(v.id('categories')),
 		memo: v.optional(v.string()),
-		cleared: v.union(v.literal('uncleared'), v.literal('cleared')),
+		// A Reconciled Transaction is Cleared and locked: its amount, date, and Account can't
+		// change, and it can't be deleted, until the owner unlocks it back to Cleared.
+		cleared: v.union(v.literal('uncleared'), v.literal('cleared'), v.literal('reconciled')),
 		// Imported Transactions arrive Unapproved (`false`). Left out on Transactions written before
 		// imports existed, which read as approved.
 		approved: v.optional(v.boolean()),
@@ -82,6 +86,8 @@ export default defineSchema({
 		transferTransactionId: v.optional(v.id('transactions'))
 	})
 		.index('by_account_date', ['accountId', 'date'])
+		// Reconciliation reads only the uncleared and Cleared ones, never the Reconciled history.
+		.index('by_account_cleared_date', ['accountId', 'cleared', 'date'])
 		.index('by_date', ['date'])
 		.index('by_category_date', ['categoryId', 'date'])
 		// Unapproved first: `approved: false` ranges for the review list.

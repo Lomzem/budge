@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LockIcon from '@lucide/svelte/icons/lock';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useMutation, usePaginatedQuery, useQuery } from 'convex-svelte';
 
@@ -183,12 +184,18 @@
 						</Table.Cell>
 						<Table.Cell align="end" numeric>{formatCents(row.amount)}</Table.Cell>
 						<Table.Cell align="center">
-							<Checkbox
-								bind:checked={
-									() => row.cleared, (checked: boolean) => void toggleCleared(row, checked)
-								}
-								aria-label="Cleared: {payee}, {formatDate(row.date)}"
-							/>
+							{#if row.reconciled}
+								<!-- Locked: the Transaction's dialog unlocks it. -->
+								<LockIcon aria-hidden="true" class="mx-auto size-4 text-muted-foreground" />
+								<span class="sr-only">Reconciled</span>
+							{:else}
+								<Checkbox
+									bind:checked={
+										() => row.cleared, (checked: boolean) => void toggleCleared(row, checked)
+									}
+									aria-label="Cleared: {payee}, {formatDate(row.date)}"
+								/>
+							{/if}
 						</Table.Cell>
 						<Table.Cell>
 							{#if !row.approved}
