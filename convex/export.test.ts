@@ -123,10 +123,12 @@ describe('the export', () => {
 			cleared: 'cleared',
 			split: true
 		});
-		// A backup rebuilds a split's totals from its lines, found by their Transaction.
+		// A backup rebuilds a split's totals from its lines, found by their Transaction, in their Categories.
 		const [transaction] = exported.transactions as Doc<'transactions'>[];
 		const [line] = exported.transactionSplits as Doc<'transactionSplits'>[];
 		expect(line?.transactionId).toBe(transaction?._id);
+		const [category] = exported.categories as Doc<'categories'>[];
+		expect(line?.categoryId).toBe(category?._id);
 		expect(exported.categories?.[0]).toMatchObject({
 			target: { kind: 'monthly', amount: 120_000, mode: 'refill' }
 		});
