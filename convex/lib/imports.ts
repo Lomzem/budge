@@ -4,14 +4,17 @@ import { addDays } from '../../src/lib/domain/dates';
 import {
 	MATCH_WINDOW_DAYS,
 	matchBankRows,
+	type BankRow,
+	type BankSource,
 	type MatchCandidate,
 	type MatchDecision
 } from '../../src/lib/domain/matcher';
 import type { Doc, Id } from '../_generated/dataModel';
-import type { QueryCtx } from '../_generated/server';
+import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { requireCents } from './input';
+import { importedPayee, ImportedPayees } from './payees';
 import { publicError } from './publicError';
-import { bankRowsOf } from './transactions';
+import { bankRowsOf, insertTransaction } from './transactions';
 import { requireCutoverDate, requireIsoDate } from './settings';
 
 export const fileSource = v.union(v.literal('qfx'), v.literal('csv'));
@@ -32,8 +35,15 @@ export const MAX_FILE_ROWS = 1_000;
 
 const MAX_BANK_TEXT = 500;
 
-export interface ImportPlan {
-	rows: FileRow[];
+/** A checked Bank Row on its way into an Account, from a file or a bank sync. */
+export interface IncomingRow extends BankRow {
+	/** The bank's merchant name, which names the Payee when there is no rename for the Bank Text. */
+	merchantName?: string | undefined;
+	pick?: Id<'transactions'> | 'new' | undefined;
+}
+
+export interface ImportPlan<R extends IncomingRow = FileRow> {
+	rows: R[];
 	decisions: MatchDecision<Id<'transactions'>>[];
 	candidates: Map<Id<'transactions'>, Doc<'transactions'>>;
 }
@@ -57,11 +67,24 @@ export async function planImport(
 	}
 	const cutoverDate = await requireCutoverDate(ctx);
 	const rows = input.map((row) => requireFileRow(row, source, cutoverDate));
+	return await planBankRows(ctx, accountId, source, rows);
+}
+
+/**
+ * Runs the matcher for checked Bank Rows against what the Account already holds: known import IDs,
+ * identical rows without one, and the Transactions dated near each row.
+ */
+export async function planBankRows<R extends IncomingRow>(
+	ctx: QueryCtx,
+	accountId: Id<'accounts'>,
+	source: BankSource,
+	rows: R[]
+): Promise<ImportPlan<R>> {
 	if (rows.length === 0) return { rows, decisions: [], candidates: new Map() };
 
 	const dates = rows.map((row) => row.date).sort();
-	const first = dates[0] ?? cutoverDate;
-	const last = dates.at(-1) ?? cutoverDate;
+	const first = dates[0] ?? '';
+	const last = dates.at(-1) ?? '';
 
 	const knownImportIds = new Set<string>();
 	for (const sourceId of new Set(rows.flatMap((row) => row.sourceId ?? []))) {
@@ -118,7 +141,84 @@ export async function planImport(
 	return { rows, decisions, candidates };
 }
 
-function requireFileRow(row: FileRow, source: FileSource, cutoverDate: string): FileRow {
+export interface ImportCounts {
+	added: number;
+	matched: number;
+	skipped: number;
+}
+
+/**
+ * Applies the matcher's decisions: a Match makes the Transaction Cleared and Unapproved, keeping
+ * what the owner entered; a new row becomes its own Transaction. Each row that isn't skipped gets
+ * its Bank Row. An "ask" row, which only a bank sync applies, becomes a new Transaction rather than
+ * a guessed Match. Pass the same `payees` for every row of one import.
+ */
+export async function applyBankRows(
+	ctx: MutationCtx,
+	accountId: Id<'accounts'>,
+	source: BankSource,
+	{ rows, decisions }: Pick<ImportPlan<IncomingRow>, 'rows' | 'decisions'>,
+	payees: ImportedPayees,
+	connectionAccountId?: Id<'connectionAccounts'>
+): Promise<ImportCounts> {
+	const counts = { added: 0, matched: 0, skipped: 0 };
+	for (const [index, decision] of decisions.entries()) {
+		const row = rows[index];
+		if (row === undefined) continue;
+		const bankRow = {
+			source,
+			...(row.sourceId === undefined ? {} : { sourceId: row.sourceId }),
+			accountId,
+			...(connectionAccountId === undefined ? {} : { connectionAccountId }),
+			date: row.date,
+			amount: row.amount,
+			bankText: row.bankText,
+			state: 'linked' as const
+		};
+		if (decision.kind === 'match') {
+			await ctx.db.patch('transactions', decision.transactionId, {
+				cleared: 'cleared',
+				approved: false
+			});
+			await ctx.db.insert('imports', {
+				...bankRow,
+				transactionId: decision.transactionId,
+				matched: true
+			});
+			counts.matched++;
+		} else if (decision.kind === 'skip') {
+			counts.skipped++;
+		} else {
+			const transactionId = await insertImported(ctx, accountId, row, payees);
+			await ctx.db.insert('imports', { ...bankRow, transactionId, matched: false });
+			counts.added++;
+		}
+	}
+	return counts;
+}
+
+/**
+ * A Transaction for a Bank Row of its own: Cleared and Unapproved, with the Payee and Category that
+ * rename memory, the merchant name, and Payee memory give it.
+ */
+export async function insertImported(
+	ctx: MutationCtx,
+	accountId: Id<'accounts'>,
+	row: { date: string; amount: number; bankText: string; merchantName?: string | undefined },
+	payees?: ImportedPayees
+) {
+	return await insertTransaction(ctx, {
+		accountId,
+		date: row.date,
+		amount: row.amount,
+		...(await importedPayee(ctx, row, payees)),
+		cleared: 'cleared',
+		approved: false
+	});
+}
+
+/** A Bank Row's date, amount, and Bank Text, checked again on the server; never trusts the caller. */
+export function requireBankRow<R extends BankRow>(row: R, cutoverDate: string): R {
 	requireIsoDate(row.date);
 	if (row.date < cutoverDate) {
 		throw publicError('INVALID_INPUT', 'Budge starts on the cutover date; drop earlier rows.');
@@ -127,6 +227,11 @@ function requireFileRow(row: FileRow, source: FileSource, cutoverDate: string): 
 	if (bankText === '' || bankText.length > MAX_BANK_TEXT) {
 		throw publicError('INVALID_INPUT', 'Each row needs a bank description.');
 	}
+	return { ...row, amount: requireCents(row.amount), bankText };
+}
+
+function requireFileRow(input: FileRow, source: FileSource, cutoverDate: string): FileRow {
+	const row = requireBankRow(input, cutoverDate);
 	const sourceId = row.sourceId?.trim();
 	if (source === 'qfx' && (sourceId === undefined || sourceId === '')) {
 		throw publicError('INVALID_INPUT', 'Each QFX row needs its import ID.');
@@ -136,8 +241,8 @@ function requireFileRow(row: FileRow, source: FileSource, cutoverDate: string): 
 	}
 	return {
 		date: row.date,
-		amount: requireCents(row.amount),
-		bankText,
+		amount: row.amount,
+		bankText: row.bankText,
 		...(sourceId === undefined ? {} : { sourceId }),
 		...(row.pick === undefined ? {} : { pick: row.pick })
 	};

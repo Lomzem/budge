@@ -32,7 +32,10 @@ type Env = {
   readonly CONVEX_SITE_URL: string;
   readonly BUDGE_OWNER_SUBJECT: string;
   readonly BUDGE_PRODUCTION: string | undefined;
+  readonly BUDGE_TOKEN_KEY: string | undefined;
   readonly CLERK_JWT_ISSUER_DOMAIN: string;
+  readonly PLAID_CLIENT_ID: string | undefined;
+  readonly PLAID_SECRET: string | undefined;
 };
 
 /**
