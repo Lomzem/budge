@@ -91,7 +91,7 @@ export const list = query({
 		}
 		const filters: Filters = {
 			...args,
-			search: args.search?.trim() ?? '',
+			search: searchTerms(args.search ?? ''),
 			splitLines: args.splitLines === true
 		};
 		const filtering =
@@ -134,6 +134,18 @@ interface Filters {
 	from?: string | undefined;
 	to?: string | undefined;
 	splitLines: boolean;
+}
+
+// Convex rejects a search of more than 16 terms.
+const MAX_SEARCH_TERMS = 16;
+
+/** The words of a search as Convex splits them, keeping the first `MAX_SEARCH_TERMS`. */
+function searchTerms(search: string) {
+	return search
+		.split(/[^\p{L}\p{N}]+/u)
+		.filter((term) => term !== '')
+		.slice(0, MAX_SEARCH_TERMS)
+		.join(' ');
 }
 
 // Bounds that every `YYYY-MM-DD` date falls between, for a range left open.
@@ -189,8 +201,12 @@ async function withLinesIn(ctx: QueryCtx, filters: Filters, paginationOpts: Pagi
 		.paginate(paginationOpts);
 	const page: Doc<'transactions'>[] = [];
 	for (const line of lines.page) {
-		// Two lines in the same Category list their Transaction once.
-		if (page.some((transaction) => transaction._id === line.transactionId)) continue;
+		// Two lines in the same Category list their Transaction once, at its first such line, even
+		// when the lines fall on different pages.
+		const first = (await splitLinesOf(ctx, line.transactionId)).find(
+			(other) => other.categoryId === categoryId
+		);
+		if (first?._id !== line._id) continue;
 		const transaction = await ctx.db.get('transactions', line.transactionId);
 		if (transaction === null) continue;
 		if (accountId !== undefined && transaction.accountId !== accountId) continue;

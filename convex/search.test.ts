@@ -1,3 +1,4 @@
+import type { FunctionReturnType } from 'convex/server';
 import { describe, expect, test, vi } from 'vitest';
 
 import { api, internal } from './_generated/api';
@@ -297,6 +298,34 @@ describe('filters', () => {
 			ids.early
 		]);
 		expect(await find({ categoryId: groceries, splitLines: true, from: '2026-08-21' })).toEqual([]);
+	});
+
+	test('a split with two lines in the Category is listed once, even across pages', async () => {
+		const { owner, add, groceries, household } = await budget();
+		const split = await add({
+			amount: -3_000,
+			splits: [
+				{ categoryId: groceries, amount: -1_000, memo: 'bread' },
+				{ categoryId: household, amount: -1_000, memo: 'soap' },
+				{ categoryId: groceries, amount: -1_000, memo: 'apples' }
+			]
+		});
+		const listed = [];
+		let cursor: string | null = null;
+		for (;;) {
+			const result: FunctionReturnType<typeof api.transactions.list> = await owner.query(
+				api.transactions.list,
+				{
+					categoryId: groceries,
+					splitLines: true,
+					paginationOpts: { numItems: 1, cursor }
+				}
+			);
+			listed.push(...result.page.map((row) => row._id));
+			if (result.isDone) break;
+			cursor = result.continueCursor;
+		}
+		expect(listed).toEqual([split]);
 	});
 
 	test('narrow a search, with the date range applied after it', async () => {

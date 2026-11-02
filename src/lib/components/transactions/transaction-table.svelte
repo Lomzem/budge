@@ -258,17 +258,20 @@
 						</Table.Cell>
 					</Table.Row>
 				{:else}
-					<Table.Row>
-						<Table.Cell colspan={allAccounts ? 8 : 7}>
-							<span class="text-muted-foreground">
-								{loading
-									? 'Loading…'
-									: filtering
-										? 'No Transactions match.'
-										: 'No Transactions yet.'}
-							</span>
-						</Table.Cell>
-					</Table.Row>
+					<!-- A filtered page can come back empty with more to read; say so only at the end. -->
+					{#if loading || more.status === 'Exhausted'}
+						<Table.Row>
+							<Table.Cell colspan={allAccounts ? 8 : 7}>
+								<span class="text-muted-foreground">
+									{loading
+										? 'Loading…'
+										: filtering
+											? 'No Transactions match.'
+											: 'No Transactions yet.'}
+								</span>
+							</Table.Cell>
+						</Table.Row>
+					{/if}
 				{/each}
 			</Table.Body>
 		</Table.Root>
