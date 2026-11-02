@@ -6,7 +6,7 @@ import { query } from './_generated/server';
 import { requireOwner } from './lib/owner';
 import schema from './schema';
 
-const rebuildable: readonly string[] = ['monthlyTotals', 'webhookKeys'];
+const rebuildable: readonly string[] = ['monthlyTotals', 'webhookKeys', 'webhookKeyLookups'];
 
 const secretFields: Readonly<Record<string, readonly string[]>> = {
 	bankConnections: ['provider']

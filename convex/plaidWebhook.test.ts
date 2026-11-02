@@ -17,7 +17,7 @@ type Signer = Awaited<ReturnType<typeof webhookSigner>>;
 function fakePlaid(signer: Signer) {
 	const paths: string[] = [];
 	const state = { keyOutage: false };
-	const fetch = (input: RequestInfo | URL) => {
+	const fetch = (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = new URL(input instanceof Request ? input.url : input);
 		assert(url.host === 'sandbox.plaid.com', `Unexpected request to ${url.host}`);
 		paths.push(url.pathname);
@@ -32,9 +32,12 @@ function fakePlaid(signer: Signer) {
 			case '/item/webhook/update':
 				return answer({ item: { item_id: itemId } });
 			case '/webhook_verification_key/get':
-				return state.keyOutage
-					? Promise.resolve(new Response('Service Unavailable', { status: 503 }))
-					: answer({ key: signer.wireKey });
+				if (state.keyOutage) {
+					return Promise.resolve(new Response('Service Unavailable', { status: 503 }));
+				}
+				return requestedKeyId(init).then((keyId) =>
+					keyId === signer.wireKey.kid ? answer({ key: signer.wireKey }) : unknownKeyId()
+				);
 			case '/transactions/sync':
 				return answer(syncPage);
 			default:
@@ -42,6 +45,23 @@ function fakePlaid(signer: Signer) {
 		}
 	};
 	return { paths, state, fetch };
+}
+
+async function requestedKeyId(init: RequestInit | undefined) {
+	const body = (await new Response(init?.body).json()) as { key_id?: unknown };
+	return body.key_id;
+}
+
+function unknownKeyId() {
+	return new Response(
+		JSON.stringify({
+			error_type: 'INVALID_INPUT',
+			error_code: 'INVALID_WEBHOOK_VERIFICATION_KEY_ID',
+			error_message: 'invalid key_id provided',
+			request_id: 'request-synthetic'
+		}),
+		{ status: 400, headers: { 'content-type': 'application/json' } }
+	);
 }
 
 let signer: Signer;
@@ -56,7 +76,9 @@ beforeEach(async () => {
 	);
 	signer = await webhookSigner();
 	plaid = fakePlaid(signer);
-	vi.stubGlobal('fetch', (input: RequestInfo | URL) => plaid.fetch(input));
+	vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) =>
+		plaid.fetch(input, init)
+	);
 });
 
 afterEach(() => {
@@ -259,6 +281,27 @@ describe('the Plaid webhook', () => {
 
 		const other = syncUpdatesBody(otherItemId);
 		expect((await postWebhook(backend, other, await signer.sign(other))).status).toBe(200);
+	});
+
+	test('one forged key sent for two Items in turn still reaches Plaid at most once a minute for each Item', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		const backend = await connectedBudget();
+		const otherItemId = 'item-synthetic-2';
+		await connectAnotherItem(backend, otherItemId);
+		await cancelScheduled(backend);
+		const impostor = await webhookSigner();
+		const forgedFor = async (forItemId: string) => {
+			const body = syncUpdatesBody(forItemId);
+			const token = await impostor.sign(body, { kid: 'key-forged-shared' });
+			return (await postWebhook(backend, body, token)).status;
+		};
+
+		const statuses: number[] = [];
+		for (let i = 0; i < 3; i++) {
+			statuses.push(await forgedFor(itemId), await forgedFor(otherItemId));
+		}
+		expect(statuses).toEqual([401, 401, 429, 429, 429, 429]);
+		expect(keyLookups()).toBe(2);
 	});
 
 	async function webhookDuringHeldLease() {

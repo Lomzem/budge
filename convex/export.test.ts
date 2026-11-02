@@ -129,7 +129,7 @@ describe('the export', () => {
 
 		const exported = await exportAll(owner);
 
-		expect([...seededTables, 'monthlyTotals', 'webhookKeys'].sort()).toEqual(
+		expect([...seededTables, 'monthlyTotals', 'webhookKeys', 'webhookKeyLookups'].sort()).toEqual(
 			Object.keys(schema.tables).sort()
 		);
 		expect(Object.keys(exported).sort()).toEqual([...seededTables].sort());

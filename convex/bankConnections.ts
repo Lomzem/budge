@@ -201,7 +201,7 @@ function keptWebhookKeys(
 
 type WebhookKeyClaim = { kind: 'kept'; key: WebhookKey } | { kind: 'lookup' | 'limited' };
 
-const EXPIRED_KEYS_CLEARED_PER_LOOKUP = 10;
+const EXPIRED_ROWS_CLEARED_PER_LOOKUP = 10;
 
 export const claimWebhookKey = internalMutation({
 	args: { kid: v.string(), itemId: v.string() },
@@ -217,24 +217,33 @@ export const claimWebhookKey = internalMutation({
 			.unique();
 		if (kept?.key && kept.checkedAt > now - KEY_TTL_MS)
 			return { kind: 'kept' as const, key: kept.key };
-		const latestForItem = await ctx.db
-			.query('webhookKeys')
-			.withIndex('by_checkedForItemId_and_checkedAt', (q) =>
-				q.eq('checkedForItemId', itemId).gt('checkedAt', now - KEY_LOOKUP_INTERVAL_MS)
-			)
-			.first();
-		if (latestForItem !== null) return { kind: 'limited' as const };
-		const lookup = { key: null, checkedAt: now, checkedForItemId: itemId };
-		if (kept === null) await ctx.db.insert('webhookKeys', { kid, ...lookup });
-		else await ctx.db.patch('webhookKeys', kept._id, lookup);
-		const expired = await ctx.db
-			.query('webhookKeys')
-			.withIndex('by_checkedAt', (q) => q.lt('checkedAt', now - KEY_TTL_MS))
-			.take(EXPIRED_KEYS_CLEARED_PER_LOOKUP);
-		for (const row of expired) await ctx.db.delete('webhookKeys', row._id);
+		const lastLookup = await ctx.db
+			.query('webhookKeyLookups')
+			.withIndex('by_itemId', (q) => q.eq('itemId', itemId))
+			.unique();
+		if (lastLookup !== null && lastLookup.lookedUpAt > now - KEY_LOOKUP_INTERVAL_MS)
+			return { kind: 'limited' as const };
+		if (lastLookup === null) await ctx.db.insert('webhookKeyLookups', { itemId, lookedUpAt: now });
+		else await ctx.db.patch('webhookKeyLookups', lastLookup._id, { lookedUpAt: now });
+		if (kept === null) await ctx.db.insert('webhookKeys', { kid, key: null, checkedAt: now });
+		else await ctx.db.patch('webhookKeys', kept._id, { key: null, checkedAt: now });
+		await clearExpiredWebhookKeyRows(ctx, now);
 		return { kind: 'lookup' as const };
 	}
 });
+
+async function clearExpiredWebhookKeyRows(ctx: MutationCtx, now: number) {
+	const expiredKeys = await ctx.db
+		.query('webhookKeys')
+		.withIndex('by_checkedAt', (q) => q.lt('checkedAt', now - KEY_TTL_MS))
+		.take(EXPIRED_ROWS_CLEARED_PER_LOOKUP);
+	for (const row of expiredKeys) await ctx.db.delete('webhookKeys', row._id);
+	const expiredLookups = await ctx.db
+		.query('webhookKeyLookups')
+		.withIndex('by_lookedUpAt', (q) => q.lt('lookedUpAt', now - KEY_LOOKUP_INTERVAL_MS))
+		.take(EXPIRED_ROWS_CLEARED_PER_LOOKUP);
+	for (const row of expiredLookups) await ctx.db.delete('webhookKeyLookups', row._id);
+}
 
 export const saveWebhookKey = internalMutation({
 	args: { kid: v.string(), key: webhookKeyValidator },
