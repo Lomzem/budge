@@ -3,7 +3,7 @@
 
 import type { GenericActionCtx } from 'convex/server';
 import { v, type Infer } from 'convex/values';
-import { Cause, Context, Effect, Layer, Option } from 'effect';
+import { Cause, Context, Effect, Layer, Option, Result } from 'effect';
 
 import { syncRowsOf, type SyncRow } from '../../src/lib/domain/plaid';
 import { internal } from '../_generated/api';
@@ -11,7 +11,7 @@ import type { DataModel, Id } from '../_generated/dataModel';
 import { PlaidClient, type PlaidError } from './plaidClient';
 import { TokenCipher, TokenCipherError } from './tokenCipher';
 
-/** How long a sync holds its Bank Connection; each applied batch extends it. */
+/** How long a sync holds its Bank Connection; each applied batch, and each restart, extends it. */
 export const LEASE_MS = 2 * 60_000;
 
 // One batch is at most three pages of a hundred rows, and one mutation applies it. Each row costs
@@ -24,7 +24,9 @@ export const MAX_SYNC_ROWS = PAGE_SIZE * PAGES_PER_BATCH;
 // A sync applies at most this many batches, then stops at a committed cursor and leaves the rest
 // to the next sync, so one action stays inside Convex's time limit.
 export const MAX_BATCHES = 4;
-// Plaid's answer when the bank changed while sync paged; the batch starts over from its cursor.
+// Plaid's answer when the bank changed while sync paged. The whole update, not just the batch,
+// starts over from the cursor before its first page; batches applied since then are applied again,
+// which adds nothing twice.
 const MUTATION_DURING_PAGINATION = 'TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION';
 const PAGINATION_RESTARTS = 2;
 
@@ -47,6 +49,8 @@ export const leaseResult = v.union(
 		itemId: v.string(),
 		encryptedToken: v.string(),
 		cursor: v.union(v.string(), v.null()),
+		/** Where the update being paged began; the committed cursor between updates. */
+		updateStart: v.union(v.string(), v.null()),
 		cutoverDate: v.string()
 	})
 );
@@ -58,6 +62,8 @@ export const applyArgs = {
 	/** The cursor the batch was fetched from; it must still be the committed one. */
 	fromCursor: v.union(v.string(), v.null()),
 	nextCursor: v.string(),
+	/** Plaid has more pages of this update past `nextCursor`. */
+	hasMore: v.boolean(),
 	rows: v.array(syncRow),
 	/** The sync's last batch: records it as synced and releases the lease. */
 	release: v.boolean()
@@ -96,9 +102,15 @@ interface SyncStoreShape {
 		lease: number;
 		fromCursor: string | null;
 		nextCursor: string;
+		hasMore: boolean;
 		rows: SyncRow[];
 		release: boolean;
 	}) => Effect.Effect<ApplyResult>;
+	/** Extends a held lease; `null` once another sync has taken over. */
+	readonly renewLease: (args: {
+		connectionId: Id<'bankConnections'>;
+		lease: number;
+	}) => Effect.Effect<number | null>;
 	readonly fail: (args: {
 		connectionId: Id<'bankConnections'>;
 		lease: number;
@@ -123,6 +135,8 @@ export class SyncStore extends Context.Service<SyncStore, SyncStoreShape>()('bud
 			takeLease: (connectionId) =>
 				Effect.promise(() => runMutation(internal.bankConnections.takeLease, { connectionId })),
 			apply: (args) => Effect.promise(() => runMutation(internal.bankConnections.apply, args)),
+			renewLease: (args) =>
+				Effect.promise(() => runMutation(internal.bankConnections.renewLease, args)),
 			fail: (args) => Effect.promise(() => runMutation(internal.bankConnections.fail, args)),
 			save: (args) => Effect.promise(() => runMutation(internal.bankConnections.save, args))
 		});
@@ -160,13 +174,33 @@ export const syncConnection = Effect.fnUntraced(function* (
 		let committed = taken.cursor;
 		const totals = { added: 0, matched: 0, held: 0 };
 		for (let batch = 1; ; batch++) {
-			const fetched = yield* fetchBatch(plaid, accessToken, committed, taken.cutoverDate);
+			let from = committed;
+			let fetched: Batch;
+			for (let restarts = 0; ; restarts++) {
+				const result = yield* Effect.result(
+					fetchBatch(plaid, accessToken, from, taken.cutoverDate)
+				);
+				if (Result.isSuccess(result)) {
+					fetched = result.success;
+					break;
+				}
+				const error = result.failure;
+				const bankChanged =
+					error._tag === 'PlaidApi' && error.error_code === MUTATION_DURING_PAGINATION;
+				if (!bankChanged || restarts === PAGINATION_RESTARTS) return yield* error;
+				// Paging again can outlast the lease, so it is renewed first.
+				const renewed = yield* store.renewLease({ connectionId, lease });
+				if (renewed === null) return { kind: 'busy' } as const;
+				lease = renewed;
+				from = taken.updateStart;
+			}
 			const release = !fetched.hasMore || batch === MAX_BATCHES;
 			const applied = yield* store.apply({
 				connectionId,
 				lease,
 				fromCursor: committed,
 				nextCursor: fetched.nextCursor,
+				hasMore: fetched.hasMore,
 				rows: fetched.rows,
 				release
 			});
@@ -189,13 +223,19 @@ export const syncConnection = Effect.fnUntraced(function* (
 	);
 });
 
-/** Up to one batch of pages from `cursor`, started over if the bank changes mid-way. */
+interface Batch {
+	rows: SyncRow[];
+	nextCursor: string;
+	hasMore: boolean;
+}
+
+/** Up to one batch of pages from `cursor`. */
 function fetchBatch(
 	plaid: PlaidClient['Service'],
 	accessToken: string,
 	cursor: string | null,
 	cutoverDate: string
-): Effect.Effect<{ rows: SyncRow[]; nextCursor: string; hasMore: boolean }, PlaidError> {
+): Effect.Effect<Batch, PlaidError> {
 	return Effect.gen(function* () {
 		const rows: SyncRow[] = [];
 		let page = yield* plaid.transactionsSync({ accessToken, cursor, count: PAGE_SIZE });
@@ -209,12 +249,7 @@ function fetchBatch(
 			rows.push(...syncRowsOf(page, cutoverDate));
 		}
 		return { rows, nextCursor: page.nextCursor, hasMore: page.hasMore };
-	}).pipe(
-		Effect.retry({
-			times: PAGINATION_RESTARTS,
-			while: (error) => error._tag === 'PlaidApi' && error.error_code === MUTATION_DURING_PAGINATION
-		})
-	);
+	});
 }
 
 /** What the owner sees about a failed sync. Fixed wording: no token, body, or bank data. */

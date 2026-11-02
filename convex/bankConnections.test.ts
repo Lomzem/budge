@@ -283,6 +283,7 @@ describe('syncing a Bank Connection', () => {
 		const batch = {
 			connectionId,
 			nextCursor: 'cursor-synthetic-2',
+			hasMore: false,
 			rows: [
 				{
 					externalAccountId: externalId,
@@ -381,6 +382,81 @@ describe('syncing a Bank Connection', () => {
 
 		expect(synced(await sync({ transactionsSync }))).toMatchObject({ added: 2 });
 		expect(calls).toBe(3);
+	});
+
+	const bankChanged = () =>
+		Effect.fail(
+			new PlaidApi({
+				error_code: 'TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION',
+				status: 400,
+				request_id: 'request-synthetic-2'
+			})
+		);
+	const morePage = (n: number): SyncPage => ({
+		added: [],
+		nextCursor: `cursor-synthetic-page-${String(n)}`,
+		hasMore: true
+	});
+
+	test('a bank change in a later batch restarts the whole update from its first cursor', async () => {
+		const { sync, connection } = await connectedBudget();
+		const cursors: (string | null)[] = [];
+		const transactionsSync = (request: SyncRequest) => {
+			cursors.push(request.cursor);
+			const call = cursors.length;
+			if (call <= PAGES_PER_BATCH) return Effect.succeed(morePage(call));
+			if (call === PAGES_PER_BATCH + 1) return bankChanged();
+			return Effect.succeed(page);
+		};
+
+		expect(synced(await sync({ transactionsSync }))).toMatchObject({ added: 2 });
+		// The batch after the first starts from where the first stopped, then, once the bank
+		// changes, the update starts over from the cursor before its first page.
+		expect(cursors.slice(PAGES_PER_BATCH)).toEqual([
+			`cursor-synthetic-page-${String(PAGES_PER_BATCH)}`,
+			null
+		]);
+		const saved = await connection();
+		expect(saved?.provider).toMatchObject({ cursor: page.nextCursor });
+		expect(saved?.provider).not.toHaveProperty('updateStart');
+	});
+
+	test('an update left unfinished by one sync restarts from its first cursor in the next', async () => {
+		const { sync, connection } = await connectedBudget();
+		const pages = Array.from({ length: MAX_BATCHES * PAGES_PER_BATCH }, (_, n) => morePage(n + 1));
+		await sync(plaidPages(...pages));
+		expect((await connection())?.provider).toMatchObject({ updateStart: null });
+
+		const cursors: (string | null)[] = [];
+		const transactionsSync = (request: SyncRequest) => {
+			cursors.push(request.cursor);
+			return cursors.length === 1 ? bankChanged() : Effect.succeed(page);
+		};
+
+		expect(synced(await sync({ transactionsSync }))).toMatchObject({ added: 2 });
+		expect(cursors).toEqual([
+			`cursor-synthetic-page-${String(MAX_BATCHES * PAGES_PER_BATCH)}`,
+			null
+		]);
+		expect((await connection())?.provider).not.toHaveProperty('updateStart');
+	});
+
+	test('renews the lease before starting an update over, and stops if it was lost', async () => {
+		const { t, sync, connectionId } = await connectedBudget();
+		let calls = 0;
+		const transactionsSync = () => {
+			calls++;
+			if (calls === 1) return Effect.succeed(morePage(1));
+			// Another sync takes over while this one is paging.
+			return Effect.promise(() =>
+				t.run((ctx) =>
+					ctx.db.patch('bankConnections', connectionId, { syncLeaseUntil: Date.now() + 60_000 })
+				)
+			).pipe(Effect.andThen(bankChanged));
+		};
+
+		expect(synced(await sync({ transactionsSync }))).toEqual({ kind: 'busy' });
+		expect(calls).toBe(2);
 	});
 
 	test('a failure records a message for the owner and releases the lease', async () => {

@@ -156,7 +156,10 @@ export default defineSchema({
 				itemId: v.string(),
 				encryptedToken: v.string(),
 				// Where the last committed sync stopped; left out before the first.
-				cursor: v.optional(v.string())
+				cursor: v.optional(v.string()),
+				// While Plaid is still paging an update, the cursor from before its first page (`null`:
+				// the first sync's). Plaid restarts an update from here if the bank changes mid-way.
+				updateStart: v.optional(v.union(v.string(), v.null()))
 			}),
 			v.object({ kind: v.literal('sandbox') })
 		)

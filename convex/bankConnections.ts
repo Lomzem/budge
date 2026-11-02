@@ -153,6 +153,8 @@ export const takeLease = internalMutation({
 			itemId: provider.itemId,
 			encryptedToken: provider.encryptedToken,
 			cursor: provider.cursor ?? null,
+			updateStart:
+				provider.updateStart === undefined ? (provider.cursor ?? null) : provider.updateStart,
 			cutoverDate
 		};
 	}
@@ -167,7 +169,7 @@ export const takeLease = internalMutation({
 export const apply = internalMutation({
 	args: applyArgs,
 	returns: applyResult,
-	handler: async (ctx, { connectionId, lease, fromCursor, nextCursor, rows, release }) => {
+	handler: async (ctx, { connectionId, lease, fromCursor, nextCursor, hasMore, rows, release }) => {
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (
 			connection?.provider.kind !== 'plaid' ||
@@ -205,12 +207,31 @@ export const apply = internalMutation({
 
 		const now = Date.now();
 		const nextLease = release ? undefined : now + LEASE_MS;
+		// An update keeps its start until Plaid has no more pages of it.
+		const { updateStart, ...provider } = connection.provider;
 		await ctx.db.patch('bankConnections', connectionId, {
-			provider: { ...connection.provider, cursor: nextCursor },
+			provider: {
+				...provider,
+				cursor: nextCursor,
+				...(hasMore ? { updateStart: updateStart === undefined ? fromCursor : updateStart } : {})
+			},
 			syncLeaseUntil: nextLease,
 			...(release ? { lastSyncedAt: now, lastError: undefined, status: 'ok' as const } : {})
 		});
 		return { kind: 'applied' as const, lease: nextLease ?? null, ...totals };
+	}
+});
+
+/** Extends the sync lease it was given, unless a newer sync has taken over. */
+export const renewLease = internalMutation({
+	args: { connectionId: v.id('bankConnections'), lease: v.number() },
+	returns: v.union(v.number(), v.null()),
+	handler: async (ctx, { connectionId, lease }) => {
+		const connection = await ctx.db.get('bankConnections', connectionId);
+		if (connection?.syncLeaseUntil !== lease) return null;
+		const renewed = Date.now() + LEASE_MS;
+		await ctx.db.patch('bankConnections', connectionId, { syncLeaseUntil: renewed });
+		return renewed;
 	}
 });
 
