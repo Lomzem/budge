@@ -294,6 +294,37 @@ describe('the daily sync', () => {
 		expect(await backend.rows()).toHaveLength(2);
 	});
 
+	test('schedules a sync for every Bank Connection with a token, however many there are', async () => {
+		const backend = newBackend();
+		const connections = 45;
+		await backend.t.run(async (ctx) => {
+			for (let i = 0; i < connections; i++) {
+				await ctx.db.insert('bankConnections', {
+					name: `Bank ${String(i)}`,
+					status: 'ok',
+					provider: {
+						kind: 'plaid',
+						itemId: `item-synthetic-${String(i)}`,
+						encryptedToken: 'sealed-token-synthetic'
+					}
+				});
+			}
+			await ctx.db.insert('bankConnections', {
+				name: 'Sample Bank',
+				status: 'ok',
+				provider: { kind: 'sandbox' }
+			});
+		});
+
+		await backend.t.mutation(internal.bankConnections.syncAll, {});
+		await runScheduled(backend);
+
+		const syncs = (await scheduled(backend)).filter((job) => job.name === 'bankConnections:sync');
+		expect(
+			new Set(syncs.map((job) => (job.args[0] as { connectionId: string }).connectionId)).size
+		).toBe(connections);
+	});
+
 	test('makes no Plaid call for the seeded Bank Connection, which has no token', async () => {
 		const backend = newBackend();
 		await backend.t.mutation(internal.seed.run, {});

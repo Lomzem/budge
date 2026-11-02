@@ -107,15 +107,24 @@ export const sync = internalAction({
 	}
 });
 
+const CONNECTIONS_SCHEDULED_PER_MUTATION = 20;
+
 export const syncAll = internalMutation({
-	args: {},
+	args: { cursor: v.optional(v.union(v.string(), v.null())) },
 	returns: v.null(),
-	handler: async (ctx) => {
-		const connections = await ctx.db.query('bankConnections').take(MAX_CONNECTIONS);
-		for (const connection of connections) {
+	handler: async (ctx, { cursor }) => {
+		const { page, isDone, continueCursor } = await ctx.db
+			.query('bankConnections')
+			.paginate({ numItems: CONNECTIONS_SCHEDULED_PER_MUTATION, cursor: cursor ?? null });
+		for (const connection of page) {
 			if (connection.provider.kind !== 'plaid') continue;
 			await ctx.scheduler.runAfter(0, internal.bankConnections.sync, {
 				connectionId: connection._id
+			});
+		}
+		if (!isDone) {
+			await ctx.scheduler.runAfter(0, internal.bankConnections.syncAll, {
+				cursor: continueCursor
 			});
 		}
 		return null;
