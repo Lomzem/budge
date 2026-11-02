@@ -38,6 +38,14 @@
 	const bankBalance = $derived(
 		entered === undefined ? undefined : isCard && entered !== 0 ? -entered : entered
 	);
+	// Shown in the same terms as the input, so a card's cleared balance reads as an amount owed.
+	const clearedShown = $derived(
+		cleared.data === undefined
+			? undefined
+			: isCard && cleared.data !== 0
+				? -cleared.data
+				: cleared.data
+	);
 	const difference = $derived(
 		bankBalance === undefined || cleared.data === undefined ? undefined : bankBalance - cleared.data
 	);
@@ -81,9 +89,11 @@
 		</Dialog.Header>
 		<form class="flex flex-col gap-4" onsubmit={submit}>
 			<p class="text-sm tabular-nums">
-				<span class="text-muted-foreground">Cleared balance</span>
+				<span class="text-muted-foreground">
+					{isCard ? 'Cleared amount owed' : 'Cleared balance'}
+				</span>
 				<span data-testid="cleared-balance">
-					{cleared.data === undefined ? '…' : formatCents(cleared.data)}
+					{clearedShown === undefined ? '…' : formatCents(clearedShown)}
 				</span>
 			</p>
 			<div class="flex flex-col gap-2">

@@ -33,12 +33,14 @@ test('reconciling the Card from the keyboard records the difference and locks it
 	const dialog = page.getByRole('dialog');
 	const clearedText = dialog.getByTestId('cleared-balance');
 	await expect(clearedText).toHaveText(/\$/);
-	const cleared = parseCents((await clearedText.textContent())?.trim() ?? '');
-	if (cleared === undefined) throw new Error('The cleared balance is not an amount.');
+	// A card's cleared balance shows as an amount owed, in the same terms as the input.
+	await expect(dialog.getByText('Cleared amount owed')).toBeVisible();
+	const owed = parseCents((await clearedText.textContent())?.trim() ?? '');
+	if (owed === undefined) throw new Error('The cleared amount owed is not an amount.');
 
 	// The bank says the card owes $1.00 more than Budge has cleared.
 	await expect(dialog.getByLabel('Amount owed, per the bank')).toBeFocused();
-	await page.keyboard.type(formatCents(-cleared + 100).replace('$', ''));
+	await page.keyboard.type(formatCents(owed + 100).replace('$', ''));
 	await expect(dialog.getByRole('status')).toContainText('differs by −$1.00');
 	await page.keyboard.press('Enter');
 	await expect(dialog).toBeHidden();
