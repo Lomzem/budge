@@ -2,12 +2,15 @@ import { v } from 'convex/values';
 import { Effect, Layer } from 'effect';
 
 import type { PublicError } from '../src/lib/domain/publicError';
+import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import {
 	action,
 	env,
+	httpAction,
 	internalAction,
 	internalMutation,
+	internalQuery,
 	query,
 	type ActionCtx,
 	type MutationCtx
@@ -16,6 +19,7 @@ import { applyBankRows, planBankRows, requireBankRow, type IncomingRow } from '.
 import { requireOwner } from './lib/owner';
 import { ImportedPayees } from './lib/payees';
 import { PlaidClient } from './lib/plaidClient';
+import { readWebhook, verifyWebhook } from './lib/plaidWebhook';
 import { publicError } from './lib/publicError';
 import { runEffect } from './lib/runEffect';
 import { requireCutoverDate } from './lib/settings';
@@ -89,6 +93,81 @@ export const syncNow = action({
 });
 
 /**
+ * The sync the webhook and the daily cron schedule: Sync now without the refresh. A failure is
+ * already recorded on the Bank Connection for the owner, so it ends here.
+ */
+export const sync = internalAction({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.null(),
+	handler: async (ctx, { connectionId }) => {
+		await Effect.runPromise(
+			syncConnection(connectionId, { refresh: false }).pipe(
+				Effect.ignore,
+				Effect.provide(liveLayer(ctx))
+			)
+		);
+		return null;
+	}
+});
+
+/** The daily backup sync: schedules a sync of every Bank Connection with a stored token. */
+export const syncAll = internalMutation({
+	args: {},
+	returns: v.null(),
+	handler: async (ctx) => {
+		const connections = await ctx.db.query('bankConnections').take(MAX_CONNECTIONS);
+		for (const connection of connections) {
+			if (connection.provider.kind !== 'plaid') continue;
+			await ctx.scheduler.runAfter(0, internal.bankConnections.sync, {
+				connectionId: connection._id
+			});
+		}
+		return null;
+	}
+});
+
+/** The Bank Connection with a stored token for a Plaid Item, if there is one. */
+export const webhookTarget = internalQuery({
+	args: { itemId: v.string() },
+	returns: v.union(v.id('bankConnections'), v.null()),
+	handler: async (ctx, { itemId }) => {
+		const connection = await ctx.db
+			.query('bankConnections')
+			.withIndex('by_itemId', (q) => q.eq('provider.itemId', itemId))
+			.first();
+		return connection?.provider.kind === 'plaid' ? connection._id : null;
+	}
+});
+
+/**
+ * Plaid's webhook. A webhook for an Item with no stored token is acknowledged at once, without
+ * calling Plaid; any other is refused unless Plaid signed it. `SYNC_UPDATES_AVAILABLE` schedules a
+ * sync, which a sync already running makes a no-op.
+ */
+export const webhook = httpAction(async (ctx, request) => {
+	const body = new Uint8Array(await request.arrayBuffer());
+	const webhook = readWebhook(body);
+	if (webhook === null) return new Response(null, { status: 400 });
+	const connectionId: Id<'bankConnections'> | null = await ctx.runQuery(
+		internal.bankConnections.webhookTarget,
+		{ itemId: webhook.itemId }
+	);
+	if (connectionId === null) return new Response(null, { status: 200 });
+	const verified = await Effect.runPromise(
+		verifyWebhook({
+			body,
+			token: request.headers.get('plaid-verification'),
+			now: Date.now()
+		}).pipe(Effect.provide(livePlaid()))
+	);
+	if (!verified) return new Response(null, { status: 401 });
+	if (webhook.type === 'TRANSACTIONS' && webhook.code === 'SYNC_UPDATES_AVAILABLE') {
+		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
+	}
+	return new Response(null, { status: 200 });
+});
+
+/**
  * Connects Budge to an existing Plaid Item, run by the owner from the Convex dashboard or CLI. It
  * seals the access token, maps the bank's Accounts to Budge Accounts, and points the Item's webhook
  * at this deployment. It never creates or deletes a Plaid Item.
@@ -112,16 +191,16 @@ export const setup = internalAction({
 		)
 });
 
+function livePlaid() {
+	return PlaidClient.layerLive({
+		clientId: env.PLAID_CLIENT_ID,
+		secret: env.PLAID_SECRET,
+		environment: env.BUDGE_PRODUCTION === undefined ? 'sandbox' : 'production'
+	});
+}
+
 function liveLayer(ctx: ActionCtx) {
-	return Layer.mergeAll(
-		PlaidClient.layerLive({
-			clientId: env.PLAID_CLIENT_ID,
-			secret: env.PLAID_SECRET,
-			environment: env.BUDGE_PRODUCTION === undefined ? 'sandbox' : 'production'
-		}),
-		TokenCipher.layer(env.BUDGE_TOKEN_KEY),
-		SyncStore.layer(ctx)
-	);
+	return Layer.mergeAll(livePlaid(), TokenCipher.layer(env.BUDGE_TOKEN_KEY), SyncStore.layer(ctx));
 }
 
 function toPublicError(error: SyncError): PublicError {

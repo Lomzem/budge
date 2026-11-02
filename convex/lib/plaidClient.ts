@@ -51,6 +51,18 @@ interface PlaidClientShape {
 	readonly transactionsRefresh: (accessToken: string) => Effect.Effect<void, PlaidError>;
 	/** Points the Item's webhook at `webhook` (`/item/webhook/update`). */
 	readonly setWebhook: (accessToken: string, webhook: string) => Effect.Effect<void, PlaidError>;
+	/** The public key that signed a webhook, by its `kid` (`/webhook_verification_key/get`). */
+	readonly webhookVerificationKey: (keyId: string) => Effect.Effect<WebhookKey, PlaidError>;
+}
+
+/** One of Plaid's webhook signing keys: a P-256 public JWK. */
+export interface WebhookKey {
+	kty: string;
+	crv: string;
+	x: string;
+	y: string;
+	/** When Plaid retired the key, in seconds since the epoch; `null` while it is current. */
+	expiredAt: number | null;
 }
 
 export interface PlaidConfig {
@@ -93,10 +105,21 @@ export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>(
 		return Layer.succeed(PlaidClient, {
 			transactionsSync: fake.transactionsSync ?? unexpected('transactionsSync'),
 			transactionsRefresh: fake.transactionsRefresh ?? unexpected('transactionsRefresh'),
-			setWebhook: fake.setWebhook ?? unexpected('setWebhook')
+			setWebhook: fake.setWebhook ?? unexpected('setWebhook'),
+			webhookVerificationKey: fake.webhookVerificationKey ?? unexpected('webhookVerificationKey')
 		});
 	}
 }
+
+const WebhookKeyBody = Schema.Struct({
+	key: Schema.Struct({
+		kty: Schema.String,
+		crv: Schema.String,
+		x: Schema.String,
+		y: Schema.String,
+		expired_at: Schema.NullOr(Schema.Finite)
+	})
+});
 
 const PlaidErrorBody = Schema.Struct({ error_code: Schema.String, request_id: Schema.String });
 
@@ -168,7 +191,19 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 		transactionsRefresh: (accessToken) =>
 			post('/transactions/refresh', { access_token: accessToken }, ignoreBody),
 		setWebhook: (accessToken, webhook) =>
-			post('/item/webhook/update', { access_token: accessToken, webhook }, ignoreBody)
+			post('/item/webhook/update', { access_token: accessToken, webhook }, ignoreBody),
+		webhookVerificationKey: (keyId) =>
+			post('/webhook_verification_key/get', { key_id: keyId }, (body) =>
+				Schema.decodeUnknownEffect(WebhookKeyBody)(body).pipe(
+					Effect.map(({ key }) => ({
+						kty: key.kty,
+						crv: key.crv,
+						x: key.x,
+						y: key.y,
+						expiredAt: key.expired_at
+					}))
+				)
+			)
 	};
 }
 
