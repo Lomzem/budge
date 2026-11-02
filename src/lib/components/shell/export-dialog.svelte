@@ -12,7 +12,7 @@
 	const client = useConvexClient();
 	let busy = $state(false);
 	let error = $state('');
-	/** CSV files start one at a time, so leaving the page partway would drop the rest. */
+
 	let downloading = $state(false);
 
 	async function exportAs(save: (data: BudgetExport, date: string) => void | Promise<void>) {
@@ -27,6 +27,10 @@
 		downloading = false;
 		if (!exported.ok) error = "Budge couldn't export. Try again.";
 	}
+
+	function setOpen(next: boolean) {
+		if (!downloading) open = next;
+	}
 </script>
 
 <svelte:window
@@ -35,16 +39,7 @@
 	}}
 />
 
-<Dialog.Root
-	bind:open={
-		() => open,
-		(next: boolean) => {
-			// The dialog stays open until every file has started.
-			if (!downloading) open = next;
-		}
-	}
-	onOpenChange={() => (error = '')}
->
+<Dialog.Root bind:open={() => open, setOpen} onOpenChange={() => (error = '')}>
 	<Dialog.Content>
 		<Dialog.Header>
 			<Dialog.Title>Export</Dialog.Title>

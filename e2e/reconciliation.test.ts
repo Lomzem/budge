@@ -3,11 +3,9 @@ import { expect, test } from '@playwright/test';
 
 import { formatCents, parseCents } from '../src/lib/domain/money';
 
-// Runs on the local backend after CI's `seed:run`, so the Card exists with Cleared Transactions.
-// Reconciling can't be undone, so this reconciles the Card, which no later test edits.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 
-test('reconciling the Card from the keyboard records the difference and locks it', async ({
+test('reconciles the seeded Card that later tests leave untouched, recording and locking the difference', async ({
 	page
 }) => {
 	if (!ownerEmail) throw new Error('E2E_CLERK_USER_EMAIL is not set.');
@@ -24,23 +22,24 @@ test('reconciling the Card from the keyboard records the difference and locks it
 	await expect(page.getByRole('heading', { level: 1, name: 'Card' })).toBeVisible();
 	await expect(page.getByTestId('last-reconciled')).toHaveText('Not reconciled yet');
 
-	// Reconcile follows the Account's actions in tab order.
-	await page.getByRole('button', { name: 'Card actions' }).focus();
-	await page.keyboard.press('Tab');
-	await expect(page.getByRole('button', { name: 'Reconcile' })).toBeFocused();
+	await test.step("Reconcile follows the Account's actions in tab order", async () => {
+		await page.getByRole('button', { name: 'Card actions' }).focus();
+		await page.keyboard.press('Tab');
+		await expect(page.getByRole('button', { name: 'Reconcile' })).toBeFocused();
+	});
 	await page.keyboard.press('Enter');
 
 	const dialog = page.getByRole('dialog');
 	const clearedText = dialog.getByTestId('cleared-balance');
 	await expect(clearedText).toHaveText(/\$/);
-	// A card's cleared balance shows as an amount owed, in the same terms as the input.
-	await expect(dialog.getByText('Cleared amount owed')).toBeVisible();
+	const cardsClearedBalanceInTheInputsTerms = 'Cleared amount owed';
+	await expect(dialog.getByText(cardsClearedBalanceInTheInputsTerms)).toBeVisible();
 	const owed = parseCents((await clearedText.textContent())?.trim() ?? '');
 	if (owed === undefined) throw new Error('The cleared amount owed is not an amount.');
 
-	// The bank says the card owes $1.00 more than Budge has cleared.
 	await expect(dialog.getByLabel('Amount owed, per the bank')).toBeFocused();
-	await page.keyboard.type(formatCents(owed + 100).replace('$', ''));
+	const bankOwedOneDollarMoreThanCleared = owed + 100;
+	await page.keyboard.type(formatCents(bankOwedOneDollarMoreThanCleared).replace('$', ''));
 	await expect(dialog.getByRole('status')).toContainText('differs by −$1.00');
 	await page.keyboard.press('Enter');
 	await expect(dialog).toBeHidden();
@@ -54,12 +53,13 @@ test('reconciling the Card from the keyboard records the difference and locks it
 	await expect(adjustment.getByText('Reconciled', { exact: true })).toBeAttached();
 	await expect(adjustment.getByText('Ready to Assign').filter({ visible: true })).toBeVisible();
 
-	// Opening it shows the lock; its amount can't be edited until it's unlocked.
-	await adjustment.getByRole('button', { name: /^Reconciliation Adjustment/ }).click();
-	await expect(dialog.getByLabel('Amount')).toBeDisabled();
-	await expect(dialog.getByRole('button', { name: 'Delete' })).toHaveCount(0);
-	await dialog.getByRole('button', { name: 'Unlock' }).click();
-	await expect(dialog.getByLabel('Amount')).toBeEnabled();
+	await test.step("opening it shows the lock; its amount can't be edited until it's unlocked", async () => {
+		await adjustment.getByRole('button', { name: /^Reconciliation Adjustment/ }).click();
+		await expect(dialog.getByLabel('Amount')).toBeDisabled();
+		await expect(dialog.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+		await dialog.getByRole('button', { name: 'Unlock' }).click();
+		await expect(dialog.getByLabel('Amount')).toBeEnabled();
+	});
 	await page.keyboard.press('Escape');
 	await expect(dialog).toBeHidden();
 	await expect(adjustment.getByRole('checkbox', { name: /^Cleared/ })).toBeChecked();

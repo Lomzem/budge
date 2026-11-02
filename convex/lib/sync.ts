@@ -1,6 +1,3 @@
-// Bank sync: the workflow that takes a Bank Connection's lease, pulls Plaid's new Transactions a
-// bounded batch at a time, and hands each batch to one mutation that applies it with the cursor.
-
 import type { GenericActionCtx } from 'convex/server';
 import { v, type Infer } from 'convex/values';
 import { Cause, Context, Effect, Layer, Option, Result } from 'effect';
@@ -11,22 +8,14 @@ import type { DataModel, Id } from '../_generated/dataModel';
 import { PlaidClient, type PlaidError } from './plaidClient';
 import { TokenCipher, TokenCipherError } from './tokenCipher';
 
-/** How long a sync holds its Bank Connection; each applied batch, and each restart, extends it. */
 export const LEASE_MS = 2 * 60_000;
 
-// One batch is at most three pages of a hundred rows, and one mutation applies it. Each row costs
-// about a dozen reads (its import ID, rename and Payee memory, the monthly total, the Transactions
-// near it, and its search text), so 300 rows stay inside Convex's 4,096 reads per mutation. Three
-// pages at Plaid's 35-second limit each also fit inside one lease.
 export const PAGE_SIZE = 100;
 export const PAGES_PER_BATCH = 3;
 export const MAX_SYNC_ROWS = PAGE_SIZE * PAGES_PER_BATCH;
-// A sync applies at most this many batches, then stops at a committed cursor and leaves the rest
-// to the next sync, so one action stays inside Convex's time limit.
+
 export const MAX_BATCHES = 4;
-// Plaid's answer when the bank changed while sync paged. The whole update, not just the batch,
-// starts over from the cursor before its first page; batches applied since then are applied again,
-// which adds nothing twice.
+
 const MUTATION_DURING_PAGINATION = 'TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION';
 const PAGINATION_RESTARTS = 2;
 
@@ -49,7 +38,7 @@ export const leaseResult = v.union(
 		itemId: v.string(),
 		encryptedToken: v.string(),
 		cursor: v.union(v.string(), v.null()),
-		/** Where the update being paged began; the committed cursor between updates. */
+
 		updateStart: v.union(v.string(), v.null()),
 		cutoverDate: v.string()
 	})
@@ -59,13 +48,13 @@ export type LeaseResult = Infer<typeof leaseResult>;
 export const applyArgs = {
 	connectionId: v.id('bankConnections'),
 	lease: v.number(),
-	/** The cursor the batch was fetched from; it must still be the committed one. */
+
 	fromCursor: v.union(v.string(), v.null()),
 	nextCursor: v.string(),
-	/** Plaid has more pages of this update past `nextCursor`. */
+
 	hasMore: v.boolean(),
 	rows: v.array(syncRow),
-	/** The sync's last batch: records it as synced and releases the lease. */
+
 	release: v.boolean()
 };
 
@@ -106,7 +95,7 @@ interface SyncStoreShape {
 		rows: SyncRow[];
 		release: boolean;
 	}) => Effect.Effect<ApplyResult>;
-	/** Extends a held lease; `null` once another sync has taken over. */
+
 	readonly renewLease: (args: {
 		connectionId: Id<'bankConnections'>;
 		lease: number;
@@ -125,10 +114,8 @@ interface SyncStoreShape {
 	}) => Effect.Effect<Id<'bankConnections'>>;
 }
 
-/** What sync needs of an action's context. */
 export type MutationRunner = Pick<GenericActionCtx<DataModel>, 'runMutation'>;
 
-/** The mutations sync runs, each its own transaction. A failed one is a defect. */
 export class SyncStore extends Context.Service<SyncStore, SyncStoreShape>()('budge/SyncStore') {
 	static layer({ runMutation }: MutationRunner): Layer.Layer<SyncStore> {
 		return Layer.succeed(SyncStore, {
@@ -151,13 +138,6 @@ export type SyncOutcome =
 
 export type SyncError = PlaidError | TokenCipherError;
 
-/**
- * Syncs one Bank Connection. Another sync holding the lease makes this a no-op, as does a
- * connection with no token. Each batch is applied, with its cursor, by one mutation that first
- * checks the lease and cursor are still this sync's; if not, a newer sync took over and this one
- * stops without writing. A failure records a message for the owner and releases the lease.
- * `refresh` then asks Plaid to check the bank for newer Transactions, ignoring any failure.
- */
 export const syncConnection = Effect.fnUntraced(function* (
 	connectionId: Id<'bankConnections'>,
 	{ refresh }: { refresh: boolean }
@@ -188,10 +168,9 @@ export const syncConnection = Effect.fnUntraced(function* (
 				const bankChanged =
 					error._tag === 'PlaidApi' && error.error_code === MUTATION_DURING_PAGINATION;
 				if (!bankChanged || restarts === PAGINATION_RESTARTS) return yield* error;
-				// Paging again can outlast the lease, so it is renewed first.
-				const renewed = yield* store.renewLease({ connectionId, lease });
-				if (renewed === null) return { kind: 'busy' } as const;
-				lease = renewed;
+				const renewedBeforePagingAgain = yield* store.renewLease({ connectionId, lease });
+				if (renewedBeforePagingAgain === null) return { kind: 'busy' } as const;
+				lease = renewedBeforePagingAgain;
 				from = taken.updateStart;
 			}
 			const release = !fetched.hasMore || batch === MAX_BATCHES;
@@ -229,7 +208,6 @@ interface Batch {
 	hasMore: boolean;
 }
 
-/** Up to one batch of pages from `cursor`. */
 function fetchBatch(
 	plaid: PlaidClient['Service'],
 	accessToken: string,
@@ -252,7 +230,6 @@ function fetchBatch(
 	});
 }
 
-/** What the owner sees about a failed sync. Fixed wording: no token, body, or bank data. */
 function describeFailure(cause: Cause.Cause<SyncError>): { message: string; needsLogin: boolean } {
 	const error = Cause.findErrorOption(cause);
 	if (Option.isNone(error)) return { message: 'The sync stopped unexpectedly.', needsLogin: false };
@@ -273,10 +250,6 @@ function describeFailure(cause: Cause.Cause<SyncError>): { message: string; need
 	}
 }
 
-/**
- * Creates or updates the Bank Connection for an existing Plaid Item: seals its access token, maps
- * its Accounts, and points its webhook at Budge. It never creates or deletes a Plaid Item.
- */
 export const setupConnection = Effect.fnUntraced(function* (input: {
 	name: string;
 	itemId: string;

@@ -20,13 +20,12 @@
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
 
-	/** One Account's Transactions, or All Accounts' when `accountId` is left out. */
 	let { accountId }: { accountId?: Id<'accounts'> | undefined } = $props();
 
 	const PAGE_SIZE = 50;
 	const SEARCH_PAUSE_MS = 300;
 	let filterValues = $state({ ...noFilters });
-	/** The search once typing pauses, so each keystroke doesn't run one. */
+
 	let search = $state('');
 	$effect(() => {
 		const typed = filterValues.search.trim();
@@ -41,7 +40,7 @@
 	});
 
 	const allAccounts = $derived(accountId === undefined);
-	// All Accounts' Account filter narrows it like an Account's own page.
+
 	const scopeAccountId = $derived(
 		accountId ??
 			(filterValues.accountId === '' ? undefined : (filterValues.accountId as Id<'accounts'>))
@@ -57,9 +56,7 @@
 		...(filterValues.to === '' ? {} : { to: filterValues.to })
 	});
 	const filtering = $derived(Object.keys(filters).length > 0);
-	// Unapproved first, then the approved ones once every Unapproved row is on screen. Filtered,
-	// the list is one, newest first (best match first for a search); with a Category, the split
-	// Transactions with a line in it follow the whole ones.
+
 	const first = usePaginatedQuery(
 		api.transactions.list,
 		() => (filtering ? { ...scope, ...filters } : { ...scope, approval: 'unapproved' as const }),
@@ -82,7 +79,7 @@
 	const approveAll = useMutation(api.transactions.approveAll);
 
 	const secondShown = $derived(first.status === 'Exhausted' && hasSecond);
-	// A split with lines in the filtered Category could also be listed whole, so it shows once.
+
 	const rows = $derived(
 		[...first.results, ...(secondShown ? second.results : [])].filter(
 			(row, index, all) => all.findIndex((other) => other._id === row._id) === index
@@ -101,7 +98,6 @@
 		dialogOpen = true;
 	}
 
-	/** A Transfer shows the other Account in place of a Category, and a split "Split". */
 	function categoryOf(row: Row) {
 		if (row.transfer) return `${row.amount < 0 ? 'To' : 'From'} ${row.transfer.accountName}`;
 		if (row.splits) return 'Split';
@@ -141,7 +137,6 @@
 		<Button variant="outline" onclick={() => (importOpen = true)}>Import file</Button>
 		{#if (unapprovedCount.data ?? 0) > 0}
 			<Button variant="outline" disabled={approvingAll} onclick={approveEvery}>
-				<!-- One "Approve all" approves at most the limit; the rest stay for the next. -->
 				{(unapprovedCount.data ?? 0) > UNAPPROVED_COUNT_LIMIT
 					? `Approve ${formatUnapprovedCount(UNAPPROVED_COUNT_LIMIT)}`
 					: `Approve all ${formatUnapprovedCount(unapprovedCount.data ?? 0)}`}
@@ -151,7 +146,7 @@
 	{#if rowError}
 		<p role="alert" class="text-sm text-destructive">{rowError}</p>
 	{/if}
-	<!-- Columns drop as the list narrows; what they held moves under the Payee. -->
+
 	<div class="@container">
 		<Table.Root>
 			<Table.Header>
@@ -225,7 +220,6 @@
 						<Table.Cell align="end" numeric>{formatCents(row.amount)}</Table.Cell>
 						<Table.Cell align="center">
 							{#if row.reconciled}
-								<!-- Locked: the Transaction's dialog unlocks it. -->
 								<LockIcon aria-hidden="true" class="mx-auto size-4 text-muted-foreground" />
 								<span class="sr-only">Reconciled</span>
 							{:else}
@@ -251,7 +245,6 @@
 						</Table.Cell>
 					</Table.Row>
 				{:else}
-					<!-- A filtered page can come back empty with more to read; say so only at the end. -->
 					{#if loading || more.status === 'Exhausted'}
 						<Table.Row>
 							<Table.Cell colspan={allAccounts ? 8 : 7}>

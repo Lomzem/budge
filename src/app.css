@@ -85,6 +85,12 @@
 }
 
 @theme inline {
+	--color-secondary-hover: color-mix(in oklch, var(--secondary), var(--foreground) 5%);
+	--radius-button-xs: min(var(--radius-md), 10px);
+	--radius-button-sm: min(var(--radius-md), 12px);
+	--text-button-sm: 0.8rem;
+	--spacing-dialog-height: calc(100dvh - 2rem);
+	--container-dialog-width: calc(100% - 2rem);
 	--font-sans: 'Inter Variable', sans-serif;
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);

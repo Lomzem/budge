@@ -21,9 +21,8 @@
 		view,
 		onclose
 	}: {
-		/** The selected Category. Key the inspector by its ID, so a new selection starts fresh. */
 		category: CategoryBudget;
-		/** The month's budget, for the Categories money can move to or from. */
+
 		view: BudgetView;
 		onclose: () => void;
 	} = $props();
@@ -43,7 +42,6 @@
 	let targetDialog: { reset: () => void } | undefined = $state();
 	let section: HTMLElement | undefined = $state();
 
-	// Every other Category money can move to or from, by group, with hidden ones last.
 	const others = $derived(
 		[
 			...view.groups.map((group) => ({
@@ -105,7 +103,6 @@
 			coverError = covered.error?.message ?? "Budge couldn't cover the Category. Try again.";
 			return;
 		}
-		// The Cover button goes once Available reaches zero, so keep keyboard focus in the inspector.
 		section?.focus();
 	}
 
@@ -118,7 +115,6 @@
 			assignError = assigned.error?.message ?? "Budge couldn't assign the money. Try again.";
 			return;
 		}
-		// The Assign button goes once the Target is funded, so keep keyboard focus in the inspector.
 		section?.focus();
 	}
 
@@ -159,7 +155,7 @@
 			<dt>Available</dt>
 			<dd class={['text-right tabular-nums', status?.class]}>
 				{formatCents(category.available)}
-				<!-- With a Target, its section below gives the status. -->
+
 				{#if status && !category.target}
 					<span class="block text-xs">{status.text}</span>
 				{/if}

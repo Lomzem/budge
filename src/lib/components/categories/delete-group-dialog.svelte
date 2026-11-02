@@ -16,7 +16,7 @@
 	}: {
 		open?: boolean;
 		group: ManagedGroup | undefined;
-		/** Every group, to pick where this one's Categories go. */
+
 		groups: readonly ManagedGroup[];
 	} = $props();
 
@@ -26,13 +26,11 @@
 	let error = $state('');
 	let saving = $state(false);
 
-	/** Which item the dialog is open for now; a save may outlast it. */
 	const openFor = () => group?._id;
 
 	const choices = $derived(groups.filter((g) => g._id !== group?._id));
 	const count = $derived(group?.categories.length ?? 0);
 
-	/** Empties the form; the parent calls it before each open. */
 	export function reset() {
 		destinationId = '';
 		error = '';
@@ -55,8 +53,8 @@
 			})
 		);
 		saving = false;
-		// Another group may have taken the dialog over while this saved; leave that one be.
-		if (openFor() !== id) return;
+		const anotherGroupTookTheDialogOver = openFor() !== id;
+		if (anotherGroupTookTheDialogOver) return;
 		if (removed.ok) open = false;
 		else error = removed.error?.message ?? "Budge couldn't delete the group. Try again.";
 	}

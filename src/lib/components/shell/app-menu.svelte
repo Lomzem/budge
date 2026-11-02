@@ -10,7 +10,6 @@
 	import ExportDialog from './export-dialog.svelte';
 	import HomeScreenDialog from './home-screen-dialog.svelte';
 
-	// In the sidebar the trigger spans the column, and the menu takes the trigger's width.
 	let { wide = false }: { wide?: boolean } = $props();
 
 	const theme = getTheme();

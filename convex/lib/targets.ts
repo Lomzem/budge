@@ -5,13 +5,12 @@ import { isIsoDate } from '../../src/lib/domain/dates';
 import { requireCents } from './input';
 import { publicError } from './publicError';
 
-/** A Category's Target, stored on the Category: a Monthly Target or a By date Target. */
 export const targetValidator = v.union(
 	v.object({
 		kind: v.literal('monthly'),
 		amount: v.number(),
 		mode: v.union(v.literal('refill'), v.literal('setAside')),
-		// 1–31; a shorter month uses its last day.
+
 		dueDay: v.optional(v.number())
 	}),
 	v.object({
@@ -24,7 +23,6 @@ export const targetValidator = v.union(
 
 export type StoredTarget = Infer<typeof targetValidator>;
 
-/** A Target the budget can work with: a positive amount, a real due day or date, whole months. */
 export function requireTarget(target: StoredTarget): StoredTarget {
 	const amount = requireCents(target.amount);
 	if (amount <= 0) throw publicError('INVALID_INPUT', 'Enter an amount above zero.');

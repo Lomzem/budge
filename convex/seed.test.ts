@@ -40,10 +40,11 @@ describe('seed:run', () => {
 			expect(account.balance, account.name).toBe(sum);
 		}
 
-		// One Transfer, Checking to Savings, and one card payment, with both sides in the list.
-		const transfers = page.filter((row) => row.transfer !== null);
+		const sidesOfOneTransferAndOneCardPayment = page.filter((row) => row.transfer !== null);
 		expect(
-			transfers.map((row) => [row.accountName, row.transfer?.accountName, row.amount]).sort()
+			sidesOfOneTransferAndOneCardPayment
+				.map((row) => [row.accountName, row.transfer?.accountName, row.amount])
+				.sort()
 		).toEqual([
 			['Card', 'Checking', 400_00],
 			['Checking', 'Card', -400_00],
@@ -51,29 +52,29 @@ describe('seed:run', () => {
 			['Savings', 'Checking', 500_00]
 		]);
 
-		// One split card purchase, across Groceries and Gifts.
-		const splits = page.filter((row) => row.splits !== null);
-		expect(splits.map((row) => [row.accountName, row.categoryName, row.amount])).toEqual([
-			['Card', null, -86_40]
-		]);
-		expect(splits[0]?.splits?.map((line) => [line.categoryName, line.amount])).toEqual([
+		const splitCardPurchases = page.filter((row) => row.splits !== null);
+		expect(
+			splitCardPurchases.map((row) => [row.accountName, row.categoryName, row.amount])
+		).toEqual([['Card', null, -86_40]]);
+		expect(splitCardPurchases[0]?.splits?.map((line) => [line.categoryName, line.amount])).toEqual([
 			['Groceries', -54_15],
 			['Gifts', -32_25]
 		]);
 
 		const { groups } = await owner.query(api.categories.list, {});
 		expect(groups.map((group) => group.categories.length)).toEqual([4, 4, 4]);
-		// Each Payee remembers its last Category, so hand entry pre-fills it.
 		const rent = groups.flatMap((group) => group.categories).find((c) => c.name === 'Rent');
-		expect(await owner.query(api.payees.lastCategory, { name: 'Sample Landlord' })).toBe(rent?._id);
+		const landlordsLastCategory = await owner.query(api.payees.lastCategory, {
+			name: 'Sample Landlord'
+		});
+		expect(landlordsLastCategory).toBe(rent?._id);
 		const budget = await owner.query(api.budget.month, { month: '2026-10', today: '2026-10-27' });
 		const normal = budget.groups.filter((group) => group.kind === 'normal');
 		expect(normal.flatMap((group) => group.categories).every((c) => c.assigned > 0)).toBe(true);
 		expect(budget.uncategorizedCount).toBeGreaterThan(0);
-		// The card's purchases moved money into its Payment Category, and the payment took some out.
-		const payment = budget.groups.find((group) => group.kind === 'creditCardPayments');
-		expect(payment?.categories.map((c) => c.name)).toEqual(['Card']);
-		expect(payment?.categories[0]?.payment?.uncovered).toBeGreaterThan(0);
+		const paymentCategories = budget.groups.find((group) => group.kind === 'creditCardPayments');
+		expect(paymentCategories?.categories.map((c) => c.name)).toEqual(['Card']);
+		expect(paymentCategories?.categories[0]?.payment?.uncovered).toBeGreaterThan(0);
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(3);
 		expect(page.filter((row) => row.bankRows.length > 0)).toHaveLength(3);
 		expect(await owner.query(api.bankConnections.list, {})).toMatchObject([

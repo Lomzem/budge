@@ -1,7 +1,6 @@
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
-/** The Payee with this exact trimmed name, if there is one. */
 export async function findPayeeNamed(ctx: QueryCtx, name: string): Promise<Doc<'payees'> | null> {
 	const trimmed = name.trim();
 	if (trimmed === '') return null;
@@ -11,7 +10,6 @@ export async function findPayeeNamed(ctx: QueryCtx, name: string): Promise<Doc<'
 		.first();
 }
 
-/** The Payee with this exact trimmed name, created on first use; none for a blank name. */
 export async function payeeNamed(
 	ctx: MutationCtx,
 	name: string
@@ -22,10 +20,6 @@ export async function payeeNamed(
 	return existing?._id ?? (await ctx.db.insert('payees', { name: trimmed }));
 }
 
-/**
- * The Category a Payee's Transactions were last given, unless it has since been deleted. A Payment
- * Category only holds its own card's starting debt, so it is never offered for another Transaction.
- */
 export async function lastCategoryOf(
 	ctx: QueryCtx,
 	payee: Doc<'payees'>
@@ -35,7 +29,6 @@ export async function lastCategoryOf(
 	return category === null || category.kind === 'creditCardPayment' ? undefined : category._id;
 }
 
-/** Payee memory: a Transaction with this Payee was just given this Category. */
 export async function rememberCategory(
 	ctx: MutationCtx,
 	payeeId: Id<'payees'>,
@@ -47,7 +40,6 @@ export async function rememberCategory(
 	}
 }
 
-/** Rename memory: imports with exactly this Bank Text arrive under this Payee from now on. */
 export async function rememberRename(ctx: MutationCtx, bankText: string, payeeId: Id<'payees'>) {
 	const existing = await renameOf(ctx, bankText);
 	if (existing === null) {
@@ -62,23 +54,12 @@ export interface ImportedPayee {
 	categoryId?: Id<'categories'>;
 }
 
-/**
- * What one import has resolved so far, so rows with the same Bank Text, or Bank Texts that resolve
- * to the same Payee, don't read it again.
- */
 export class ImportedPayees {
-	/** By Bank Text and merchant name. */
 	readonly rows = new Map<string, ImportedPayee>();
-	/** By Payee, with the Category it remembers. */
+
 	readonly payees = new Map<Id<'payees'>, ImportedPayee>();
 }
 
-/**
- * The Payee and Category an imported Transaction arrives with. The Payee comes from rename memory
- * for the exact Bank Text, then the bank's merchant name when it has one (file rows never do), then
- * the Bank Text. The Category comes from Payee memory, or is left out for Uncategorized. Pass the
- * same `resolved` for every row of one import.
- */
 export async function importedPayee(
 	ctx: MutationCtx,
 	row: { bankText: string; merchantName?: string | undefined },
@@ -110,10 +91,11 @@ async function resolveImportedPayee(
 	if (name === '') return {};
 	const payee = await findPayeeNamed(ctx, name);
 	if (payee === null) {
-		// A Payee new to Budge has no Category to remember.
-		const result = { payeeId: await ctx.db.insert('payees', { name }) };
-		resolved.payees.set(result.payeeId, result);
-		return result;
+		const newPayeeWithNoCategoryToRemember = {
+			payeeId: await ctx.db.insert('payees', { name })
+		};
+		resolved.payees.set(newPayeeWithNoCategoryToRemember.payeeId, newPayeeWithNoCategoryToRemember);
+		return newPayeeWithNoCategoryToRemember;
 	}
 	return resolved.payees.get(payee._id) ?? (await withMemory(ctx, payee, resolved));
 }

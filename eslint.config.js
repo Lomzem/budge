@@ -1,3 +1,4 @@
+import { generatedUiIgnores } from './eslint/ui-ownership.js';
 import js from '@eslint/js';
 import convex from '@convex-dev/eslint-plugin';
 import prettier from 'eslint-config-prettier';
@@ -6,10 +7,9 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import ts from 'typescript-eslint';
 
-import svelteConfig from './svelte.config.js';
+import noComments from './eslint/rules/no-comments.js';
+import svelteConfig from './svelte.config.ts';
 
-// Browser globals the domain module must not touch: those Node lacks, plus the
-// browser storage and navigation APIs that recent Node versions also define.
 const browserOnlyGlobals = new Set([
 	...Object.keys(globals.browser).filter(
 		(name) => !(name in globals.node) && !(name in globals.es2025)
@@ -26,8 +26,8 @@ export default defineConfig(
 		'build/',
 		'.vercel/',
 		'convex/_generated/',
-		// shadcn-svelte's generated components; svelte-check still typechecks them.
-		'src/lib/components/ui/',
+
+		...generatedUiIgnores,
 		'test-results/',
 		'playwright-report/'
 	]),
@@ -46,7 +46,6 @@ export default defineConfig(
 			}
 		},
 		rules: {
-			// typescript-eslint recommends leaving undefined-name checks to TypeScript.
 			'no-undef': 'off',
 			'@typescript-eslint/no-floating-promises': 'error',
 			'@typescript-eslint/no-explicit-any': 'error'
@@ -66,8 +65,6 @@ export default defineConfig(
 		extends: [ts.configs.disableTypeChecked]
 	},
 	{
-		// Failures are values: Effect errors, result unions, or a Convex function's public error.
-		// e2e/ and scripts/ are dev orchestration: they keep try/finally cleanup and throw to fail the process.
 		files: ['convex/**', 'src/**'],
 		rules: {
 			'no-restricted-syntax': [
@@ -93,7 +90,6 @@ export default defineConfig(
 					message: 'Return a result or use Effect (`Effect.try`, `Effect.tryPromise`) instead.'
 				},
 				{
-					// Convex rolls back a mutation and sends a typed error only when the handler throws.
 					selector: 'ThrowStatement:not([argument.callee.name="publicError"])',
 					message:
 						'Throw only `publicError(...)` from a Convex function; return failures otherwise.'
@@ -102,7 +98,9 @@ export default defineConfig(
 		}
 	},
 	{
+		plugins: { local: { rules: { 'no-comments': noComments } } },
 		rules: {
+			'local/no-comments': 'error',
 			'max-depth': ['error', 3],
 			complexity: ['error', 15],
 			'no-nested-ternary': 'error',
@@ -114,7 +112,6 @@ export default defineConfig(
 		rules: { 'max-nested-callbacks': 'off' }
 	},
 	{
-		// The domain module is pure: no Convex, SvelteKit, Svelte, or browser APIs.
 		files: ['src/lib/domain/**'],
 		rules: {
 			'no-restricted-imports': [

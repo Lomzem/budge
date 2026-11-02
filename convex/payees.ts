@@ -6,10 +6,8 @@ import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { refreshPayeeSearchText } from './lib/search';
 
-/** More Payees than the filter's picker shows. */
 const PAYEE_LIST_LIMIT = 1_000;
 
-/** The Payees by name, for the Payee filter. */
 export const list = query({
 	args: {},
 	returns: v.array(v.object({ _id: v.id('payees'), name: v.string() })),
@@ -20,10 +18,6 @@ export const list = query({
 	}
 });
 
-/**
- * Payee memory: the Category the Payee with this name was last given, so hand entry can pre-fill
- * it. `null` for a new Payee or one never categorized.
- */
 export const lastCategory = query({
 	args: { name: v.string() },
 	returns: v.union(v.id('categories'), v.null()),
@@ -34,11 +28,6 @@ export const lastCategory = query({
 	}
 });
 
-/**
- * Renames a Payee everywhere it appears. Its Transactions' `searchText` follows in batches: the
- * first in this mutation, the rest scheduled at once after it. Another Payee's name is refused, as
- * merging Payees isn't supported.
- */
 export const rename = mutation({
 	args: { payeeId: v.id('payees'), name: v.string() },
 	returns: v.null(),
@@ -58,7 +47,6 @@ export const rename = mutation({
 	}
 });
 
-/** The next batch of a Payee rename's `searchText` rewrite. */
 export const refreshSearchText = internalMutation({
 	args: { payeeId: v.id('payees'), cursor: v.string() },
 	returns: v.null(),

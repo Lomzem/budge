@@ -5,13 +5,12 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	test: {
-		// Inline projects don't inherit the plugins above, so tests run without SvelteKit.
 		projects: [
 			{
 				test: {
 					name: 'domain',
 					environment: 'node',
-					// West of UTC, so a date shifted by the time zone shows up as the day before.
+
 					env: { TZ: 'America/Los_Angeles' },
 					include: ['src/lib/domain/**/*.test.ts']
 				}
@@ -28,9 +27,16 @@ export default defineConfig({
 					name: 'ssr',
 					environment: 'node',
 					include: ['src/ssr.test.ts'],
-					// Each suite starts the SvelteKit dev server.
+
 					testTimeout: 30_000,
 					hookTimeout: 60_000
+				}
+			},
+			{
+				test: {
+					name: 'eslint',
+					environment: 'node',
+					include: ['eslint/**/*.test.js']
 				}
 			},
 			{

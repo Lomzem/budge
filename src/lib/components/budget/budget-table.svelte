@@ -17,11 +17,11 @@
 		inline
 	}: {
 		groups: BudgetView['groups'];
-		/** The Category the inspector shows, if any. */
+
 		selectedId: Id<'categories'> | null;
-		/** Selects a Category, or clears the selection when it is already selected. */
+
 		onselect: (id: Id<'categories'>) => void;
-		/** The inspector, shown in a row under the selected Category on narrow screens. */
+
 		inline?: Snippet | undefined;
 	} = $props();
 

@@ -1,7 +1,6 @@
 <script lang="ts" module>
 	import { type VariantProps, tv } from 'tailwind-variants';
 
-	// `strong` sets a row in bold, such as an Unapproved Transaction waiting for review.
 	export const tableRowVariants = tv({
 		base: 'border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted',
 		variants: { weight: { normal: '', strong: 'font-semibold' } },

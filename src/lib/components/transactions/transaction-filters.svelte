@@ -13,9 +13,8 @@
 		values = $bindable({ ...noFilters }),
 		showAccount
 	}: {
-		/** The search, as typed; the list waits for typing to pause before it searches. */
 		values?: TransactionFilterValues;
-		/** Whether to offer the Account filter, which only All Accounts has. */
+
 		showAccount: boolean;
 	} = $props();
 
@@ -28,7 +27,6 @@
 		'h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm';
 </script>
 
-<!-- One column at 320 px; more as the list widens. -->
 <form
 	role="search"
 	aria-label="Search and filter Transactions"

@@ -1,19 +1,12 @@
-// Plaid webhooks: reading one, and checking Plaid signed it. Plaid signs each webhook with an ES256
-// JWT in the `Plaid-Verification` header, whose payload holds the SHA-256 of the exact body bytes.
-// https://plaid.com/docs/api/webhooks/webhook-verification/
-
 import { v } from 'convex/values';
 import { Context, Effect, Layer, Option, Result, Schema } from 'effect';
 
 import { PlaidClient, type WebhookKey } from './plaidClient';
 
-/** How old a webhook's token may be, either way, before it is refused as a replay. */
-const MAX_AGE_SECONDS = 5 * 60;
+const TOKEN_REPLAY_WINDOW_SECONDS = 5 * 60;
 
-/** How long a key Plaid gave is kept before it is asked for again. */
 export const KEY_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** How often Plaid may be asked about a key not kept, across the deployment. */
 export const KEY_LOOKUP_INTERVAL_MS = 60 * 1000;
 
 export const webhookKeyValidator = v.object({
@@ -24,23 +17,17 @@ export const webhookKeyValidator = v.object({
 	expiredAt: v.union(v.number(), v.null())
 });
 
-/** A key isn't known yet and can't be looked up until the lookup limit lifts. */
 export class KeyLookupLimited extends Schema.TaggedError<
 	KeyLookupLimited,
 	{ readonly brand: unique symbol }
 >()('KeyLookupLimited', {}) {}
 
-/**
- * Where `verifyWebhook` finds the key a token names. `None` refuses the webhook; `KeyLookupLimited`
- * leaves it undecided.
- */
 export class WebhookKeys extends Context.Service<
 	WebhookKeys,
 	{
 		readonly find: (kid: string) => Effect.Effect<Option.Option<WebhookKey>, KeyLookupLimited>;
 	}
 >()('budge/WebhookKeys') {
-	/** Asks Plaid every time; any failure is `None`. */
 	static readonly layerPlaid: Layer.Layer<WebhookKeys, never, PlaidClient> = Layer.effect(
 		WebhookKeys,
 		Effect.map(PlaidClient, (plaid) => ({
@@ -55,7 +42,6 @@ export interface Webhook {
 	itemId: string;
 }
 
-/** The webhook's type, code, and Item; `null` for a body that isn't a Plaid Item webhook. */
 export function readWebhook(body: Uint8Array): Webhook | null {
 	const parsed = parseJson(new TextDecoder().decode(body));
 	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
@@ -70,16 +56,9 @@ export function readWebhook(body: Uint8Array): Webhook | null {
 	return { type, code, itemId };
 }
 
-/**
- * Whether Plaid signed `body`: the token names an ES256 key Plaid still uses, its signature holds
- * under that key, it was issued within five minutes of `now`, and it carries the body's hash. Any
- * failure, including no key being found, is a refusal. Fails with `KeyLookupLimited` when the key
- * can't be looked up yet, so the webhook is neither accepted nor refused.
- */
 export const verifyWebhook = Effect.fnUntraced(function* (input: {
 	body: Uint8Array<ArrayBuffer>;
 	token: string | null;
-	/** Milliseconds since the epoch. */
 	now: number;
 }): Effect.fn.Return<boolean, KeyLookupLimited, WebhookKeys> {
 	const token = readToken(input.token);
@@ -91,23 +70,20 @@ export const verifyWebhook = Effect.fnUntraced(function* (input: {
 	if (expiredAt !== null && expiredAt * 1000 <= input.now) return false;
 	if (!(yield* signedBy(key.value, token))) return false;
 
-	if (Math.abs(input.now / 1000 - token.iat) > MAX_AGE_SECONDS) return false;
+	if (Math.abs(input.now / 1000 - token.iat) > TOKEN_REPLAY_WINDOW_SECONDS) return false;
 	const digest = yield* attempt(() => crypto.subtle.digest('SHA-256', input.body));
 	if (digest === null) return false;
 	return equalInConstantTime(toHex(new Uint8Array(digest)), token.bodyHash);
 });
 
-/** A Plaid webhook token, split and decoded; not yet checked against any key. */
 interface WebhookToken {
 	kid: string;
 	iat: number;
 	bodyHash: string;
-	/** The bytes the signature covers: the encoded header and payload. */
 	signingInput: Uint8Array<ArrayBuffer>;
 	signature: Uint8Array<ArrayBuffer>;
 }
 
-/** The token's parts, or `null` unless it is a three-part ES256 JWT with Plaid's claims. */
 function readToken(token: string | null): WebhookToken | null {
 	const parts = token?.split('.') ?? [];
 	if (parts.length !== 3) return null;
@@ -122,7 +98,6 @@ function readToken(token: string | null): WebhookToken | null {
 	return { kid: header.kid, iat, bodyHash, signingInput, signature };
 }
 
-/** Whether the token's signature holds under `key`. */
 function signedBy({ kty, crv, x, y }: WebhookKey, token: WebhookToken): Effect.Effect<boolean> {
 	return attempt(async () => {
 		const publicKey = await crypto.subtle.importKey(
@@ -141,7 +116,6 @@ function signedBy({ kty, crv, x, y }: WebhookKey, token: WebhookToken): Effect.E
 	}).pipe(Effect.map((signed) => signed === true));
 }
 
-/** A WebCrypto call; a failure becomes `null`. */
 function attempt<A>(run: () => Promise<A>): Effect.Effect<A | null> {
 	return Effect.tryPromise(run).pipe(Effect.orElseSucceed(() => null));
 }
@@ -172,7 +146,6 @@ function toHex(bytes: Uint8Array): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/** Compares two strings without stopping at the first difference. */
 function equalInConstantTime(a: string, b: string): boolean {
 	if (a.length !== b.length) return false;
 	let difference = 0;

@@ -20,7 +20,6 @@ import { requireCutoverDate, requireIsoDate } from './settings';
 export const fileSource = v.union(v.literal('qfx'), v.literal('csv'));
 export type FileSource = Infer<typeof fileSource>;
 
-/** A Bank Row decoded in the browser, and the owner's pick when it has several candidates. */
 export const fileRow = v.object({
 	date: v.string(),
 	amount: v.number(),
@@ -30,14 +29,11 @@ export const fileRow = v.object({
 });
 export type FileRow = Infer<typeof fileRow>;
 
-/** More rows than a year of one Account's statements; keeps one commit inside Convex's limits. */
 export const MAX_FILE_ROWS = 1_000;
 
 const MAX_BANK_TEXT = 500;
 
-/** A checked Bank Row on its way into an Account, from a file or a bank sync. */
 export interface IncomingRow extends BankRow {
-	/** The bank's merchant name, which names the Payee when there is no rename for the Bank Text. */
 	merchantName?: string | undefined;
 	pick?: Id<'transactions'> | 'new' | undefined;
 }
@@ -48,10 +44,6 @@ export interface ImportPlan<R extends IncomingRow = FileRow> {
 	candidates: Map<Id<'transactions'>, Doc<'transactions'>>;
 }
 
-/**
- * Checks a file's rows again, never trusting the browser, then runs the matcher against what the
- * Account already holds.
- */
 export async function planImport(
 	ctx: QueryCtx,
 	accountId: Id<'accounts'>,
@@ -70,10 +62,6 @@ export async function planImport(
 	return await planBankRows(ctx, accountId, source, rows);
 }
 
-/**
- * Runs the matcher for checked Bank Rows against what the Account already holds: known import IDs,
- * identical rows without one, and the Transactions dated near each row.
- */
 export async function planBankRows<R extends IncomingRow>(
 	ctx: QueryCtx,
 	accountId: Id<'accounts'>,
@@ -147,12 +135,6 @@ export interface ImportCounts {
 	skipped: number;
 }
 
-/**
- * Applies the matcher's decisions: a Match makes the Transaction Cleared and Unapproved, keeping
- * what the owner entered; a new row becomes its own Transaction. Each row that isn't skipped gets
- * its Bank Row. An "ask" row, which only a bank sync applies, becomes a new Transaction rather than
- * a guessed Match. Pass the same `payees` for every row of one import.
- */
 export async function applyBankRows(
 	ctx: MutationCtx,
 	accountId: Id<'accounts'>,
@@ -176,10 +158,10 @@ export async function applyBankRows(
 			state: 'linked' as const
 		};
 		if (decision.kind === 'match') {
-			// A row can Match a Transaction Reconciled already; it stays locked.
-			const reconciled = candidates.get(decision.transactionId)?.cleared === 'reconciled';
+			const matchedStaysLockedIfReconciled =
+				candidates.get(decision.transactionId)?.cleared === 'reconciled';
 			await ctx.db.patch('transactions', decision.transactionId, {
-				cleared: reconciled ? 'reconciled' : 'cleared',
+				cleared: matchedStaysLockedIfReconciled ? 'reconciled' : 'cleared',
 				approved: false
 			});
 			await ctx.db.insert('imports', {
@@ -201,11 +183,6 @@ export async function applyBankRows(
 	return counts;
 }
 
-/**
- * A Transaction for a Bank Row of its own: Cleared and Unapproved, with the Payee and Category that
- * rename memory, the merchant name, and Payee memory give it. Its search text waits for the caller
- * to link the Bank Row, then call `refreshSearchText`.
- */
 export async function insertImported(
 	ctx: MutationCtx,
 	accountId: Id<'accounts'>,
@@ -227,7 +204,6 @@ export async function insertImported(
 	);
 }
 
-/** A Bank Row's date, amount, and Bank Text, checked again on the server; never trusts the caller. */
 export function requireBankRow<R extends BankRow>(row: R, cutoverDate: string): R {
 	requireIsoDate(row.date);
 	if (row.date < cutoverDate) {

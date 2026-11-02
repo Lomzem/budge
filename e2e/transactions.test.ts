@@ -3,7 +3,6 @@ import { expect, test } from '@playwright/test';
 
 import { parseCents } from '../src/lib/domain/money';
 
-// Runs on the local backend after CI's `seed:run`, so Checking exists.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 
 test('adding a Transaction changes the Account balance', async ({ page }) => {
@@ -35,14 +34,15 @@ test('adding a Transaction changes the Account balance', async ({ page }) => {
 		.poll(async () => parseCents((await balance.textContent()) ?? ''))
 		.toBe(before - 1234);
 
-	// Columns drop as the list narrows, so nothing scrolls sideways at the narrowest width.
-	await page.setViewportSize({ width: 320, height: 640 });
-	await expect(page.getByRole('columnheader', { name: 'Memo' })).toBeHidden();
-	const fits = await page.getByRole('table').evaluate((table) => {
-		const box = table.parentElement;
-		return box !== null && box.scrollWidth <= box.clientWidth;
+	await test.step('columns drop as the list narrows, so nothing scrolls sideways at the narrowest width', async () => {
+		await page.setViewportSize({ width: 320, height: 640 });
+		await expect(page.getByRole('columnheader', { name: 'Memo' })).toBeHidden();
+		const fits = await page.getByRole('table').evaluate((table) => {
+			const box = table.parentElement;
+			return box !== null && box.scrollWidth <= box.clientWidth;
+		});
+		expect(fits).toBe(true);
 	});
-	expect(fits).toBe(true);
 });
 
 test("a Payee's last Category fills in, and picking another Category keeps it", async ({
@@ -63,8 +63,8 @@ test("a Payee's last Category fills in, and picking another Category keeps it", 
 	const category = dialog.getByLabel('Category or Transfer');
 	const picked = category.locator('option:checked');
 
-	// The seed pays Rent to Sample Landlord.
-	await dialog.getByLabel('Payee').fill('Sample Landlord');
+	const seedsRentPayee = 'Sample Landlord';
+	await dialog.getByLabel('Payee').fill(seedsRentPayee);
 	await expect(picked).toHaveText('Rent');
 	await dialog.getByLabel('Payee').fill('Smoke Test Florist');
 	await expect(picked).toHaveText('Uncategorized');
@@ -76,7 +76,8 @@ test("a Payee's last Category fills in, and picking another Category keeps it", 
 	await dialog.getByLabel('Payee').fill('Sample Landlord');
 	await expect(picked).toHaveText('Groceries');
 
-	// Nothing is saved, so the seeded budget stays as it was.
-	await page.keyboard.press('Escape');
-	await expect(dialog).toBeHidden();
+	await test.step('close without saving, so the seeded budget stays as it was', async () => {
+		await page.keyboard.press('Escape');
+		await expect(dialog).toBeHidden();
+	});
 });

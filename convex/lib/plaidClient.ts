@@ -3,28 +3,21 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http';
 
 import { decodeSyncPage, type SyncPage } from '../../src/lib/domain/plaid';
 
-// Plaid's failures, typed. None carries the request, the response body, or an underlying cause,
-// because those can hold the access token, client secret, or bank data.
-
-/** Plaid could not be reached. */
 export class PlaidTransport extends Schema.TaggedError<
 	PlaidTransport,
 	{ readonly brand: unique symbol }
 >()('PlaidTransport', {}) {}
 
-/** An attempt, or the whole call, ran out of time. */
 export class PlaidTimeout extends Schema.TaggedError<
 	PlaidTimeout,
 	{ readonly brand: unique symbol }
 >()('PlaidTimeout', {}) {}
 
-/** Plaid answered with something Budge can't read. */
 export class PlaidDecode extends Schema.TaggedError<
 	PlaidDecode,
 	{ readonly brand: unique symbol }
 >()('PlaidDecode', {}) {}
 
-/** Plaid refused the call. Only its error code, HTTP status, and request ID are kept. */
 export class PlaidApi extends Schema.TaggedError<PlaidApi, { readonly brand: unique symbol }>()(
 	'PlaidApi',
 	{
@@ -36,53 +29,49 @@ export class PlaidApi extends Schema.TaggedError<PlaidApi, { readonly brand: uni
 
 export type PlaidError = PlaidTransport | PlaidTimeout | PlaidDecode | PlaidApi;
 
+export const PLAID_MIN_SYNC_COUNT = 1;
+export const PLAID_MAX_SYNC_COUNT = 500;
+
 export interface SyncRequest {
 	accessToken: string;
-	/** Where the last sync stopped; `null` on the first sync. */
+
 	cursor: string | null;
-	/** Transactions per page, 1 to 500. */
+
 	count: number;
 }
 
 interface PlaidClientShape {
-	/** One page of `/transactions/sync`. */
 	readonly transactionsSync: (request: SyncRequest) => Effect.Effect<SyncPage, PlaidError>;
-	/** Asks Plaid to check the bank for new Transactions now (`/transactions/refresh`). */
+
 	readonly transactionsRefresh: (accessToken: string) => Effect.Effect<void, PlaidError>;
-	/** Points the Item's webhook at `webhook` (`/item/webhook/update`). */
+
 	readonly setWebhook: (accessToken: string, webhook: string) => Effect.Effect<void, PlaidError>;
-	/** The public key that signed a webhook, by its `kid` (`/webhook_verification_key/get`). */
 	readonly webhookVerificationKey: (keyId: string) => Effect.Effect<WebhookKey, PlaidError>;
 }
 
-/** One of Plaid's webhook signing keys: a P-256 public JWK. */
 export interface WebhookKey {
 	kty: string;
 	crv: string;
 	x: string;
 	y: string;
-	/** When Plaid retired the key, in seconds since the epoch; `null` while it is current. */
 	expiredAt: number | null;
 }
 
 export interface PlaidConfig {
 	clientId: string | undefined;
 	secret: string | undefined;
-	/** Every deployment but production uses only Plaid Sandbox. */
+
 	environment: 'sandbox' | 'production';
 }
 
-/** Each call: at most three attempts, 10 seconds per attempt, and 35 seconds in total. */
 export const ATTEMPTS = 3;
 const ATTEMPT_TIMEOUT = '10 seconds';
 const CALL_TIMEOUT = '35 seconds';
 const BACKOFF = Schedule.exponential('2 seconds');
 
-/** Plaid's API, over `effect/http`. Every call is limited and retried the same way. */
 export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>()(
 	'budge/PlaidClient'
 ) {
-	/** The client over whichever `HttpClient` is provided. */
 	static layer(config: PlaidConfig): Layer.Layer<PlaidClient, never, HttpClient.HttpClient> {
 		return Layer.effect(
 			PlaidClient,
@@ -90,15 +79,10 @@ export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>(
 		);
 	}
 
-	/** The client over the runtime's `fetch`. */
 	static layerLive(config: PlaidConfig): Layer.Layer<PlaidClient> {
 		return PlaidClient.layer(config).pipe(Layer.provide(FetchHttpClient.layer));
 	}
 
-	/**
-	 * A client that never touches the network. Each call does what `fake` says, and a call it
-	 * leaves out is a defect, so a test sees any call it didn't expect.
-	 */
 	static layerTest(fake: Partial<PlaidClientShape>): Layer.Layer<PlaidClient> {
 		const unexpected = (name: string) => () =>
 			Effect.die(new Error(`Unexpected PlaidClient.${name} call`));
@@ -133,7 +117,6 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 	): Effect.Effect<A, PlaidError> => {
 		const { clientId, secret } = config;
 		if (clientId === undefined || secret === undefined) {
-			// A deployment without Plaid's credentials can't reach Plaid, and another attempt won't help.
 			return Effect.fail(new PlaidTransport());
 		}
 		const request = HttpClientRequest.post(`${baseUrl}${path}`).pipe(
@@ -150,14 +133,13 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 					Effect.mapError(() => new PlaidDecode())
 				);
 			}
-			// An outage or rate limit can answer with HTML or nothing at all; it is still Plaid's
-			// refusal, so its status decides whether to retry.
+			const refusalKnownByStatusAlone = {
+				error_code: `HTTP_${String(response.status)}`,
+				request_id: ''
+			};
 			const error = yield* response.json.pipe(
 				Effect.flatMap(Schema.decodeUnknownEffect(PlaidErrorBody)),
-				Effect.orElseSucceed(() => ({
-					error_code: `HTTP_${String(response.status)}`,
-					request_id: ''
-				}))
+				Effect.orElseSucceed(() => refusalKnownByStatusAlone)
 			);
 			return yield* new PlaidApi({ ...error, status: response.status });
 		});
@@ -207,10 +189,6 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 	};
 }
 
-/**
- * Short-lived failures are worth another attempt: no answer, or Plaid's own outage or rate limit.
- * A refusal such as a needed login, or a response Budge can't read, would only fail again.
- */
 function isRetryable(error: PlaidError): boolean {
 	switch (error._tag) {
 		case 'PlaidTransport':

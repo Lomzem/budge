@@ -50,13 +50,14 @@ describe('the budget query', () => {
 		await b.spend('2026-09-12', -20_000, b.groceries);
 		await b.assign('2026-10', b.groceries, 30_000);
 		await b.spend('2026-10-05', 2_000, b.groceries);
-		// Planning ahead: December's rent, and a paycheck that hasn't arrived.
-		await b.assign('2026-12', b.rent, 150_000);
-		await b.spend('2026-10-31', 230_000, b.readyToAssignId);
+		const decembersRent = 150_000;
+		await b.assign('2026-12', b.rent, decembersRent);
+		const payday = '2026-10-31';
+		await b.spend(payday, 230_000, b.readyToAssignId);
 		const uncategorizedId = await b.spend('2026-10-12', -4_000);
 		await b.spend('2026-10-20', 10_000);
-		// Fixing a past month recalculates every later Available.
-		await b.assign('2026-08', b.groceries, 45_000);
+		const fixedPastMonthAssigned = 45_000;
+		await b.assign('2026-08', b.groceries, fixedPastMonthAssigned);
 
 		expect(await b.view('2026-10')).toEqual({
 			month: '2026-10',
@@ -105,11 +106,12 @@ describe('the budget query', () => {
 			{ id: b.groceries, name: 'Groceries', available: -10_000 }
 		]);
 
-		// Payday: the paycheck and the Uncategorized inflow now count.
-		const payday = await b.view('2026-12', '2026-10-31');
-		expect(payday.readyToAssign).toEqual({ amount: 161_000, uncategorized: 6_000 });
+		const onPaydayWithThePaycheckAndUncategorizedInflow = await b.view('2026-12', payday);
+		expect(onPaydayWithThePaycheckAndUncategorizedInflow.readyToAssign).toEqual({
+			amount: 161_000,
+			uncategorized: 6_000
+		});
 
-		// Categorizing the Uncategorized outflow moves it from Ready to Assign to Groceries.
 		await b.owner.mutation(api.transactions.update, {
 			transactionId: uncategorizedId,
 			accountId: b.checking,
@@ -119,7 +121,7 @@ describe('the budget query', () => {
 			categoryId: b.groceries,
 			memo: ''
 		});
-		const afterCategorizing = await b.view('2026-12', '2026-10-31');
+		const afterCategorizing = await b.view('2026-12', payday);
 		expect(afterCategorizing.readyToAssign).toEqual({ amount: 165_000, uncategorized: 10_000 });
 		expect(afterCategorizing.uncategorizedCount).toBe(1);
 		expect(afterCategorizing.groups[0]?.categories.map((c) => c.available)).toEqual([
@@ -206,8 +208,8 @@ describe('moving money', () => {
 describe('Cover', () => {
 	test('assigns exactly what brings Available back to zero, taken from Ready to Assign', async () => {
 		const b = await budgetWithCategories();
-		// September's overspending carries into October, which overspends again.
-		await b.spend('2026-09-20', -20_000, b.groceries);
+		const septembersOverspendingCarriedIntoOctober = -20_000;
+		await b.spend('2026-09-20', septembersOverspendingCarriedIntoOctober, b.groceries);
 		await b.assign('2026-10', b.groceries, 5_000);
 		await b.spend('2026-10-03', -2_000, b.groceries);
 		const before = await b.view('2026-10');
@@ -285,10 +287,11 @@ describe('Targets', () => {
 		});
 		expect(after.upcoming).toMatchObject([{ id: b.groceries, funded: true }]);
 		expect(after.readyToAssign.amount).toBe(before.readyToAssign.amount - 30_000);
-		// Nothing is left to assign.
-		expect(
-			await b.owner.mutation(api.budget.assignTarget, { month: '2026-10', categoryId: b.groceries })
-		).toBe(0);
+		const assignedOnceNothingIsLeft = await b.owner.mutation(api.budget.assignTarget, {
+			month: '2026-10',
+			categoryId: b.groceries
+		});
+		expect(assignedOnceNothingIsLeft).toBe(0);
 	});
 
 	test('a repeating By date Target rolls to its next date only after its due month ends', async () => {
@@ -302,17 +305,18 @@ describe('Targets', () => {
 		}
 		await b.spend('2026-11-03', -12_000, b.rent);
 
+		const lateNovemberPastTheDate = '2026-11-25';
 		const rentIn = async (month: string) =>
-			(await b.view(month, '2026-11-25')).groups[0]?.categories[1];
-		// Late in November the date has passed, but November is still its due month.
-		expect(await rentIn('2026-11')).toMatchObject({
+			(await b.view(month, lateNovemberPastTheDate)).groups[0]?.categories[1];
+		const stillItsDueMonth = '2026-11';
+		expect(await rentIn(stillItsDueMonth)).toMatchObject({
 			name: 'Rent',
 			assigned: 6_000,
 			target: { dueDate: '2026-11-03', needed: 0 }
 		});
-		// December through February saves for the next date: $120 ÷ 3.
+		const decemberThroughFebruary = 3;
 		expect(await rentIn('2026-12')).toMatchObject({
-			target: { dueDate: '2027-02-03', needed: 4_000 }
+			target: { dueDate: '2027-02-03', needed: 12_000 / decemberThroughFebruary }
 		});
 	});
 });

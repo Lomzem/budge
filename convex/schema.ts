@@ -4,10 +4,7 @@ import { v } from 'convex/values';
 import { webhookKeyValidator } from './lib/plaidWebhook';
 import { targetValidator } from './lib/targets';
 
-// Each deployment is one owner's budget, so no table has an owner column. Amounts are whole
-// cents as safe integers; dates are `YYYY-MM-DD` and months `YYYY-MM`.
 export default defineSchema({
-	// One row.
 	settings: defineTable({
 		cutoverDate: v.string()
 	}),
@@ -16,15 +13,10 @@ export default defineSchema({
 		name: v.string(),
 		kind: v.union(v.literal('cash'), v.literal('creditCard')),
 		position: v.number(),
-		// The date of the last Reconciliation; left out until the first.
+
 		lastReconciledOn: v.optional(v.string())
 	}),
 
-	// Ready to Assign is a system Category in a hidden system group, and each Credit Card Account
-	// has a Payment Category in the system Credit Card Payments group. Budge manages the system
-	// ones, so the owner can't change them. `position` orders siblings: groups among the normal
-	// groups, Categories within a group.
-	// `hidden` takes a group or Category out of the budget table; it still counts in every total.
 	categoryGroups: defineTable({
 		name: v.string(),
 		position: v.number(),
@@ -39,13 +31,12 @@ export default defineSchema({
 		kind: v.union(v.literal('normal'), v.literal('readyToAssign'), v.literal('creditCardPayment')),
 		hidden: v.optional(v.boolean()),
 		target: v.optional(targetValidator),
-		// A Payment Category's Credit Card Account.
+
 		accountId: v.optional(v.id('accounts'))
 	})
 		.index('by_group_position', ['groupId', 'position'])
 		.index('by_account', ['accountId']),
 
-	// Assigned per month and Category. Setting Assigned to 0 deletes the row.
 	assignments: defineTable({
 		month: v.string(),
 		categoryId: v.id('categories'),
@@ -54,15 +45,11 @@ export default defineSchema({
 		.index('by_month_category', ['month', 'categoryId'])
 		.index('by_category_month', ['categoryId', 'month']),
 
-	// Payee memory: `lastCategoryId` is the Category the Payee's latest categorized Transaction
-	// was given. It may point at a deleted Category, which reads as none.
 	payees: defineTable({
 		name: v.string(),
 		lastCategoryId: v.optional(v.id('categories'))
 	}).index('by_name', ['name']),
 
-	// Rename memory: renaming the Payee on an imported Transaction maps its exact Bank Text to that
-	// Payee, so later imports with the same Bank Text arrive under it.
 	payeeRenames: defineTable({
 		bankText: v.string(),
 		payeeId: v.id('payees')
@@ -73,44 +60,35 @@ export default defineSchema({
 		date: v.string(),
 		amount: v.number(),
 		payeeId: v.optional(v.id('payees')),
-		// No Category means Uncategorized, unless it is split.
+
 		categoryId: v.optional(v.id('categories')),
-		// Its amount is split across lines in `transactionSplits`, each with its own Category.
+
 		split: v.optional(v.literal(true)),
 		memo: v.optional(v.string()),
-		// A Reconciled Transaction is Cleared and locked: its amount, date, and Account can't
-		// change, and it can't be deleted, until the owner unlocks it back to Cleared.
+
 		cleared: v.union(v.literal('uncleared'), v.literal('cleared'), v.literal('reconciled')),
-		// Imported Transactions arrive Unapproved (`false`). Left out on Transactions written before
-		// imports existed, which read as approved.
+
 		approved: v.optional(v.boolean()),
-		// Set on each side of a Transfer, pointing at the other side. The two sides have opposite
-		// amounts, the same date, and no Category; there is no Transfer table.
+
 		transferTransactionId: v.optional(v.id('transactions')),
-		// What text search reads: the Payee's name, the memo, split memos, and linked Bank Text.
-		// Every Transaction write, Match, Unmatch, and Payee rename rewrites it. Left out only on
-		// Transactions written before search, until `migrations:backfillSearchText` runs.
+
 		searchText: v.optional(v.string())
 	})
 		.index('by_account_date', ['accountId', 'date'])
-		// Reconciliation reads only the uncleared and Cleared ones, never the Reconciled history.
+
 		.index('by_account_cleared_date', ['accountId', 'cleared', 'date'])
 		.index('by_date', ['date'])
 		.index('by_category_date', ['categoryId', 'date'])
 		.index('by_payee_date', ['payeeId', 'date'])
-		// Unapproved first: `approved: false` ranges for the review list.
+
 		.index('by_approved_date', ['approved', 'date'])
 		.index('by_account_approved_date', ['accountId', 'approved', 'date'])
-		// A split has no Category of its own, so `split` lets a Category filter reach split
-		// Transactions to check their lines.
+
 		.searchIndex('search_text', {
 			searchField: 'searchText',
 			filterFields: ['accountId', 'categoryId', 'payeeId', 'split']
 		}),
 
-	// One line of a split Transaction. The lines sum to the Transaction's amount, and each follows
-	// the budget rules on its own. `date` is the Transaction's, kept in step for the
-	// Category-by-date reads.
 	transactionSplits: defineTable({
 		transactionId: v.id('transactions'),
 		categoryId: v.id('categories'),
@@ -121,22 +99,19 @@ export default defineSchema({
 		.index('by_category_date', ['categoryId', 'date'])
 		.index('by_transaction', ['transactionId']),
 
-	// Bank Rows: what a bank reported, kept apart from what the owner entered. A Bank Row links to
-	// the Transaction it created or Matched. Rows are never deleted, so a known import ID (or, for
-	// CSV rows without one, an identical row) is skipped when the same file comes back.
 	imports: defineTable({
 		source: v.union(v.literal('plaid'), v.literal('qfx'), v.literal('csv')),
-		// The bank's import ID, unique within the Account and source. CSV rows have none.
+
 		sourceId: v.optional(v.string()),
 		accountId: v.id('accounts'),
-		// The bank's Account the row arrived through, for synced rows.
+
 		connectionAccountId: v.optional(v.id('connectionAccounts')),
 		date: v.string(),
 		amount: v.number(),
 		bankText: v.string(),
-		// Left out once the Transaction is deleted, so the row still blocks a re-import.
+
 		transactionId: v.optional(v.id('transactions')),
-		// Whether the row Matched a Transaction already there, rather than creating its own.
+
 		matched: v.boolean(),
 		state: v.union(
 			v.literal('linked'),
@@ -149,17 +124,13 @@ export default defineSchema({
 		.index('by_transactionId', ['transactionId'])
 		.index('by_connectionAccountId_state', ['connectionAccountId', 'state']),
 
-	// A Bank Connection: one login at one bank, synced through a provider. `status` and the fields
-	// beside it are provider-neutral; `provider` holds what only that provider understands. The
-	// access token is stored sealed (TokenCipher) and `provider` never leaves the server. The
-	// `sandbox` kind is the synthetic seed's connection: it has no token and never syncs.
 	bankConnections: defineTable({
 		name: v.string(),
 		status: v.union(v.literal('ok'), v.literal('needsAttention')),
 		lastSyncedAt: v.optional(v.number()),
-		// The last sync's failure, worded for the owner; cleared by the next sync that succeeds.
+
 		lastError: v.optional(v.object({ at: v.number(), message: v.string() })),
-		// While in the future, a sync holds this connection and any other sync request is ignored.
+
 		syncLeaseUntil: v.optional(v.number()),
 		consentExpiresAt: v.optional(v.number()),
 		provider: v.union(
@@ -167,18 +138,15 @@ export default defineSchema({
 				kind: v.literal('plaid'),
 				itemId: v.string(),
 				encryptedToken: v.string(),
-				// Where the last committed sync stopped; left out before the first.
+
 				cursor: v.optional(v.string()),
-				// While Plaid is still paging an update, the cursor from before its first page (`null`:
-				// the first sync's). Plaid restarts an update from here if the bank changes mid-way.
+
 				updateStart: v.optional(v.union(v.string(), v.null()))
 			}),
 			v.object({ kind: v.literal('sandbox') })
 		)
 	}).index('by_itemId', ['provider.itemId']),
 
-	// Plaid's webhook signing keys by key ID, kept a day after each lookup. A lookup that found no
-	// key leaves `key` null; the newest `checkedAt` limits lookups of keys not kept.
 	webhookKeys: defineTable({
 		kid: v.string(),
 		key: v.union(webhookKeyValidator, v.null()),
@@ -187,8 +155,6 @@ export default defineSchema({
 		.index('by_kid', ['kid'])
 		.index('by_checkedAt', ['checkedAt']),
 
-	// The bank's Accounts under a Bank Connection. A mapped one feeds a Budge Account; rows from a
-	// held one wait for the owner to map it, and an ignored one's rows are dropped.
 	connectionAccounts: defineTable(
 		v.union(
 			v.object({
@@ -205,9 +171,6 @@ export default defineSchema({
 		)
 	).index('by_connection_externalId', ['connectionId', 'externalId']),
 
-	// A rebuildable cache of summed Transactions per month, Account, and bucket (ADR 0002). Every
-	// Transaction write keeps it in the same mutation; no rule reads it as a source of truth.
-	// `count` is how many Transactions it sums, so the budget can count Uncategorized ones.
 	monthlyTotals: defineTable({
 		month: v.string(),
 		accountId: v.id('accounts'),

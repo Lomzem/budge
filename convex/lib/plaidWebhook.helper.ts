@@ -1,6 +1,3 @@
-// Signs webhooks the way Plaid does, under a key made up for each test. The bundler skips files
-// with more than one dot, so this never deploys.
-
 import { assert } from 'vitest';
 
 import type { WebhookKey } from './plaidClient';
@@ -22,15 +19,12 @@ export async function sha256Hex(body: string): Promise<string> {
 }
 
 export interface SignOptions {
-	/** Seconds since the epoch; now by default. */
 	iat?: number;
 	alg?: string;
 	kid?: string;
-	/** The body hash to claim; the body's own by default. */
 	bodyHash?: string;
 }
 
-/** A fresh ES256 key pair standing in for Plaid's, and a signer for webhook bodies. */
 export async function webhookSigner(kid = 'key-synthetic-1') {
 	const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
 		'sign',
@@ -39,7 +33,6 @@ export async function webhookSigner(kid = 'key-synthetic-1') {
 	const jwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
 	assert(jwk.x !== undefined && jwk.y !== undefined, 'expected an EC key');
 	const key: WebhookKey = { kty: 'EC', crv: 'P-256', x: jwk.x, y: jwk.y, expiredAt: null };
-	/** The key as `/webhook_verification_key/get` returns it. */
 	const wireKey = {
 		alg: 'ES256',
 		crv: 'P-256',
@@ -69,7 +62,6 @@ export async function webhookSigner(kid = 'key-synthetic-1') {
 	return { kid, key, wireKey, sign };
 }
 
-/** A `SYNC_UPDATES_AVAILABLE` body for `itemId`, laid out as Plaid sends it. */
 export function syncUpdatesBody(itemId: string): string {
 	return JSON.stringify(
 		{

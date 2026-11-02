@@ -11,7 +11,6 @@ import { insertTransaction, transactionFields } from './lib/transactions';
 
 const accountKind = v.union(v.literal('cash'), v.literal('creditCard'));
 
-/** Every Account in sidebar order, with its balance and when it was last Reconciled. */
 export const list = query({
 	args: {},
 	returns: v.array(
@@ -40,10 +39,6 @@ export const list = query({
 	}
 });
 
-/**
- * Creates an Account at the end of the sidebar. Its starting balance is an ordinary Cleared
- * Transaction dated on the cutover date; a card's debt is negative.
- */
 export const create = mutation({
 	args: { name: v.string(), kind: accountKind, startingBalance: v.number() },
 	returns: v.id('accounts'),
@@ -57,17 +52,16 @@ export const create = mutation({
 			position = Math.max(position, account.position + 1);
 		}
 		const accountId = await ctx.db.insert('accounts', { name, kind: args.kind, position });
+		const startingBalanceCategoryId =
+			args.kind === 'cash'
+				? await ensureReadyToAssign(ctx)
+				: await createPaymentCategory(ctx, { _id: accountId, name });
 		const fields = await transactionFields(ctx, {
 			accountId,
 			date: cutoverDate,
 			amount,
 			payee: 'Starting Balance',
-			// A Cash Account's starting balance is money to budget. A card's debt sits in its own
-			// Payment Category, where the card's move cancels it, so it touches no Category.
-			categoryId:
-				args.kind === 'cash'
-					? await ensureReadyToAssign(ctx)
-					: await createPaymentCategory(ctx, { _id: accountId, name }),
+			categoryId: startingBalanceCategoryId,
 			memo: ''
 		});
 		await insertTransaction(ctx, { ...fields, cleared: 'cleared', approved: true });
@@ -83,14 +77,14 @@ export const rename = mutation({
 		const name = requireName(args.name);
 		if ((await ctx.db.get('accounts', args.accountId)) === null) throw publicError('NOT_FOUND');
 		await ctx.db.patch('accounts', args.accountId, { name });
-		// A card's Payment Category goes by the card's name.
-		const payment = await readPaymentCategory(ctx, args.accountId);
-		if (payment !== null) await ctx.db.patch('categories', payment._id, { name });
+		const cardPaymentCategory = await readPaymentCategory(ctx, args.accountId);
+		if (cardPaymentCategory !== null) {
+			await ctx.db.patch('categories', cardPaymentCategory._id, { name });
+		}
 		return null;
 	}
 });
 
-/** Puts the Accounts in the given order, which must name every Account exactly once. */
 export const reorder = mutation({
 	args: { accountIds: v.array(v.id('accounts')) },
 	returns: v.null(),

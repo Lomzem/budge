@@ -2,8 +2,6 @@ import { describe, expect, test } from 'vitest';
 
 import { type PageOptions, type Page, readAllPages } from './pages';
 
-// A paginated source as Convex documents it: a page that reads more than `maximumBytesRead` comes
-// back 'SplitRequired', possibly missing rows, with a `splitCursor` inside its range.
 function source(sizes: number[]) {
 	const reads: PageOptions[] = [];
 	const position = (cursor: string | null | undefined) => (cursor ? Number(cursor) : 0);

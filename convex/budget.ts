@@ -45,12 +45,6 @@ const categoryBudget = v.object({
 	)
 });
 
-/**
- * Everything the budget screen shows for `month`. `today` comes from the browser, as reading the
- * clock here would defeat query caching. Reads only Categories, groups, Assigned rows, the
- * monthly totals, and settings, plus the Ready to Assign and Uncategorized Transactions and split
- * lines dated after `today`.
- */
 export const month = query({
 	args: { month: v.string(), today: v.string() },
 	returns: v.object({
@@ -88,7 +82,6 @@ export const month = query({
 	}
 });
 
-/** The budget for `month` through the single budget entry point, with `today` as the owner's date. */
 async function readBudget(ctx: QueryCtx, month: string, today: string) {
 	const groups = [];
 	for await (const group of ctx.db.query('categoryGroups')) groups.push(group);
@@ -99,8 +92,6 @@ async function readBudget(ctx: QueryCtx, month: string, today: string) {
 	const monthlyTotals = [];
 	for await (const row of ctx.db.query('monthlyTotals')) monthlyTotals.push(row);
 
-	// Only inflows dated after today change the numbers, and the Category-by-date index finds
-	// them without reading older history.
 	const transactionsAfterToday = [];
 	const readyToAssign = categories.filter((c) => c.kind === 'readyToAssign').map((c) => c._id);
 	for (const categoryId of [undefined, ...readyToAssign]) {
@@ -108,8 +99,9 @@ async function readBudget(ctx: QueryCtx, month: string, today: string) {
 			.query('transactions')
 			.withIndex('by_category_date', (q) => q.eq('categoryId', categoryId).gt('date', today));
 		for await (const transaction of later) {
-			// A Transfer side or a split has no Category but is never Uncategorized.
-			if (transaction.transferTransactionId !== undefined || transaction.split === true) continue;
+			const isTransferSideOrSplit =
+				transaction.transferTransactionId !== undefined || transaction.split === true;
+			if (isTransferSideOrSplit) continue;
 			transactionsAfterToday.push({
 				date: transaction.date,
 				amount: transaction.amount,
@@ -117,7 +109,6 @@ async function readBudget(ctx: QueryCtx, month: string, today: string) {
 			});
 		}
 	}
-	// Each split line counts on its own, so a Ready to Assign line waits for its date too.
 	for (const categoryId of readyToAssign) {
 		const later = ctx.db
 			.query('transactionSplits')
@@ -154,9 +145,7 @@ async function readBudget(ctx: QueryCtx, month: string, today: string) {
 	});
 }
 
-/** One Category's numbers in `month`, through the single budget entry point. */
 async function readCategoryBudget(ctx: QueryCtx, month: string, categoryId: Id<'categories'>) {
-	// A Category's numbers don't depend on today; only Ready to Assign and Upcoming do.
 	const today = new Date().toISOString().slice(0, 10);
 	const budget = await readBudget(ctx, month, today);
 	return [...budget.groups.flatMap((g) => g.categories), ...budget.hidden].find(
@@ -164,7 +153,6 @@ async function readCategoryBudget(ctx: QueryCtx, month: string, categoryId: Id<'
 	);
 }
 
-/** A month the owner can assign in: `YYYY-MM`, from the cutover month on. */
 async function requireBudgetMonth(ctx: QueryCtx, month: string) {
 	if (!isIsoMonth(month)) throw publicError('INVALID_INPUT', 'Pick a month.');
 	if (month < monthOf(await requireCutoverDate(ctx))) {
@@ -172,7 +160,6 @@ async function requireBudgetMonth(ctx: QueryCtx, month: string) {
 	}
 }
 
-/** A Category the owner can assign to: any but Ready to Assign, Payment Categories included. */
 async function requireAssignable(ctx: QueryCtx, categoryId: Id<'categories'>) {
 	const category = await ctx.db.get('categories', categoryId);
 	if (category === null) throw publicError('NOT_FOUND');
@@ -181,7 +168,6 @@ async function requireAssignable(ctx: QueryCtx, categoryId: Id<'categories'>) {
 	}
 }
 
-/** Changes a Category's Assigned in `month` with `change`, from what it is now. */
 async function updateAssigned(
 	ctx: MutationCtx,
 	month: string,
@@ -202,7 +188,6 @@ async function updateAssigned(
 	}
 }
 
-/** Sets what a Category is Assigned in a month, past or future. Zero removes the row. */
 export const setAssigned = mutation({
 	args: { month: v.string(), categoryId: v.id('categories'), amount: v.number() },
 	returns: v.null(),
@@ -216,10 +201,6 @@ export const setAssigned = mutation({
 	}
 });
 
-/**
- * Moves `amount` from one Category to another in `month`: two Assigned edits in one mutation, so
- * Ready to Assign never changes. Nothing records the move itself.
- */
 export const moveMoney = mutation({
 	args: {
 		month: v.string(),
@@ -244,11 +225,6 @@ export const moveMoney = mutation({
 	}
 });
 
-/**
- * Covers an overspent Category in `month`: assigns exactly enough to bring its Available back to
- * zero, which lowers Ready to Assign by the same amount. Returns the amount assigned, which is zero
- * when the Category is no longer overspent.
- */
 export const cover = mutation({
 	args: { month: v.string(), categoryId: v.id('categories') },
 	returns: v.number(),
@@ -265,11 +241,6 @@ export const cover = mutation({
 	}
 });
 
-/**
- * "Assign $X": adds what a Category's Target still needs in `month` to its Assigned, taken from
- * Ready to Assign. Returns the amount assigned, which is zero when the Target is already funded or
- * the Category has none.
- */
 export const assignTarget = mutation({
 	args: { month: v.string(), categoryId: v.id('categories') },
 	returns: v.number(),

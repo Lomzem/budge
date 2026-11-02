@@ -6,10 +6,8 @@ import { syncUpdatesBody, webhookSigner, type SignOptions } from './plaidWebhook
 import { readWebhook, verifyWebhook, WebhookKeys } from './plaidWebhook';
 
 const encoder = new TextEncoder();
-// An invented Item ID; nothing here is a real Plaid ID or key.
 const body = syncUpdatesBody('item-synthetic-1');
 
-/** Verifies `body` signed by `sign`, with Plaid's key endpoint answering `key`, and the IDs asked. */
 const verify = Effect.fnUntraced(function* (
 	options: SignOptions & {
 		token?: string | null;
@@ -71,7 +69,6 @@ describe('verifying a Plaid webhook', () => {
 		Effect.gen(function* () {
 			const changed = body.replace('item-synthetic-1', 'item-synthetic-2');
 			expect((yield* verify({ received: changed })).verified).toBe(false);
-			// The hash covers the exact bytes, whitespace included.
 			expect((yield* verify({ received: JSON.stringify(JSON.parse(body)) })).verified).toBe(false);
 		})
 	);

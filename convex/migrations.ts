@@ -7,12 +7,6 @@ import { createPaymentCategory, readPaymentCategory } from './lib/categories';
 import { requireCutoverDate } from './lib/settings';
 import { refreshSearchText, replaceTransaction } from './lib/transactions';
 
-/**
- * Gives each Credit Card Account made before Credit Card Accounts arrived what a new card gets: its
- * Payment Category, holding its starting debt. Returns how many cards it repaired, and the cards whose
- * starting debt it couldn't find because the owner has since changed its date or Payee, or split it; the
- * owner moves those into the Payment Category by hand. Running it again repairs none.
- */
 export const backfillPaymentCategories = internalMutation({
 	args: {},
 	returns: v.object({ repaired: v.number(), unmatched: v.array(v.id('accounts')) }),
@@ -40,7 +34,6 @@ export const backfillPaymentCategories = internalMutation({
 					startingBalance === null ||
 					transaction.payeeId !== startingBalance._id ||
 					transaction.categoryId !== undefined ||
-					// A split's lines hold its Categories, so a split starting debt stays as the owner left it.
 					transaction.split === true
 				) {
 					continue;
@@ -60,13 +53,8 @@ export const backfillPaymentCategories = internalMutation({
 	}
 });
 
-/** How many Transactions one backfill mutation rewrites; see `PAYEE_RENAME_BATCH`. */
 const SEARCH_BACKFILL_BATCH = 50;
 
-/**
- * Gives every Transaction its `searchText`, one batch per mutation from `cursor`, scheduling the
- * next batch until none are left. Start it with `cursor: null`. Running it again changes nothing.
- */
 export const backfillSearchText = internalMutation({
 	args: { cursor: v.union(v.string(), v.null()) },
 	returns: v.null(),

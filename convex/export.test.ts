@@ -9,11 +9,8 @@ import { newBackend, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
-// An invented stand-in for a sealed token; the export must never hold it.
 const sealedToken = 'v1.synthetic-iv.synthetic-sealed-token';
 
-// One row in every table the export must cover. A table added to the schema fails the coverage
-// test until it gets a row here, so its export (and any secret it holds) is checked.
 async function seedEveryTable(ctx: MutationCtx) {
 	await ctx.db.insert('settings', { cutoverDate: '2026-08-01' });
 	const accountId = await ctx.db.insert('accounts', {
@@ -114,7 +111,6 @@ function keysAnywhere(value: unknown): string[] {
 
 type Owner = ReturnType<typeof newBackend>['owner'];
 
-// What the export dialog does: every page of every exportable table, a few rows at a time.
 async function exportAll(owner: Owner, numItems = 2) {
 	const exported: Record<string, unknown[]> = {};
 	for (const table of await owner.query(api.export.tables, {})) {
@@ -127,7 +123,7 @@ async function exportAll(owner: Owner, numItems = 2) {
 }
 
 describe('the export', () => {
-	test('covers every table but the rebuildable monthly totals and webhook keys', async () => {
+	test('covers every table but the monthly totals, which a backup rebuilds from split lines in their Categories, and the webhook keys, which Plaid serves again', async () => {
 		const { t, owner } = newBackend();
 		await t.run(seedEveryTable);
 
@@ -147,12 +143,11 @@ describe('the export', () => {
 			cleared: 'cleared',
 			split: true
 		});
-		// A backup rebuilds a split's totals from its lines, found by their Transaction, in their Categories.
-		const [transaction] = exported.transactions as Doc<'transactions'>[];
-		const [line] = exported.transactionSplits as Doc<'transactionSplits'>[];
-		expect(line?.transactionId).toBe(transaction?._id);
-		const [category] = exported.categories as Doc<'categories'>[];
-		expect(line?.categoryId).toBe(category?._id);
+		const [splitTransaction] = exported.transactions as Doc<'transactions'>[];
+		const [splitLine] = exported.transactionSplits as Doc<'transactionSplits'>[];
+		expect(splitLine?.transactionId).toBe(splitTransaction?._id);
+		const [splitLineCategory] = exported.categories as Doc<'categories'>[];
+		expect(splitLine?.categoryId).toBe(splitLineCategory?._id);
 		expect(exported.categories?.[0]).toMatchObject({
 			target: { kind: 'monthly', amount: 120_000, mode: 'refill' }
 		});
@@ -179,20 +174,20 @@ describe('the export', () => {
 
 	test('splits a page too large to read at once, losing and repeating no row', async () => {
 		const { t, owner } = newBackend();
-		// Six memos near a document's size limit outweigh one page's byte limit.
-		const memo = 'x'.repeat(800_000);
+		const memoNearADocumentsSizeLimit = 'x'.repeat(800_000);
 		await t.run(async (ctx) => {
 			const accountId = await ctx.db.insert('accounts', {
 				name: 'Checking',
 				kind: 'cash',
 				position: 0
 			});
-			for (let day = 1; day <= 6; day++) {
+			const memosOutweighingOnePagesByteLimit = 6;
+			for (let day = 1; day <= memosOutweighingOnePagesByteLimit; day++) {
 				await ctx.db.insert('transactions', {
 					accountId,
 					date: `2026-08-0${String(day)}`,
 					amount: -day,
-					memo,
+					memo: memoNearADocumentsSizeLimit,
 					cleared: 'uncleared'
 				});
 			}

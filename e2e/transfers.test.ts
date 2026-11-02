@@ -3,8 +3,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { parseCents } from '../src/lib/domain/money';
 
-// Runs on the local backend after CI's `seed:run`, so Checking and Savings exist. Pass or fail,
-// it deletes the Transfer it made.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 const memo = 'Smoke test Transfer';
 
@@ -44,8 +42,8 @@ test('a Transfer appears in both Accounts, and deleting one side deletes both', 
 		await dialog.getByRole('button', { name: 'Save' }).click();
 		await expect(dialog).toBeHidden();
 
-		// The other Account shows in place of a Category.
-		await expect(row.getByText('To Savings').filter({ visible: true })).toBeVisible();
+		const otherAccountInPlaceOfACategory = row.getByText('To Savings');
+		await expect(otherAccountInPlaceOfACategory.filter({ visible: true })).toBeVisible();
 		await expect
 			.poll(async () => parseCents((await checking.balance.textContent()) ?? ''))
 			.toBe(checking.amount - 1234);
@@ -54,18 +52,18 @@ test('a Transfer appears in both Accounts, and deleting one side deletes both', 
 		expect(savings.amount).toBe(savingsBefore + 1234);
 		await expect(row.getByText('From Checking').filter({ visible: true })).toBeVisible();
 
-		// Deleting from the Savings side takes both sides out.
-		await row.getByRole('button', { name: /^Transfer/ }).click();
-		await dialog.getByRole('button', { name: 'Delete' }).click();
-		await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
-		await expect(row).toHaveCount(0);
-		await expect
-			.poll(async () => parseCents((await savings.balance.textContent()) ?? ''))
-			.toBe(savingsBefore);
-		await openAccount(page, 'Checking');
-		await expect(row).toHaveCount(0);
+		await test.step('deleting from the Savings side takes both sides out', async () => {
+			await row.getByRole('button', { name: /^Transfer/ }).click();
+			await dialog.getByRole('button', { name: 'Delete' }).click();
+			await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+			await expect(row).toHaveCount(0);
+			await expect
+				.poll(async () => parseCents((await savings.balance.textContent()) ?? ''))
+				.toBe(savingsBefore);
+			await openAccount(page, 'Checking');
+			await expect(row).toHaveCount(0);
+		});
 	} finally {
-		// Leaves no Transfer behind if a step above failed.
 		while ((await row.count()) > 0) {
 			await row
 				.first()

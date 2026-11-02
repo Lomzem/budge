@@ -8,11 +8,10 @@
 		label,
 		onsave
 	}: {
-		/** The stored Assigned, in cents. */
 		amount: number;
-		/** The accessible name, such as "Assigned for Groceries". */
+
 		label: string;
-		/** Saves the new Assigned; rejects when it couldn't. */
+
 		onsave: (cents: number) => Promise<void>;
 	} = $props();
 
@@ -21,7 +20,7 @@
 	let text = $state('');
 	let editing = $state(false);
 	let error = $state('');
-	// Live updates show through, except while the owner is typing.
+
 	const read = () => (editing ? text : shown(amount));
 	const write = (typed: string) => {
 		text = typed;

@@ -18,7 +18,7 @@
 	}: {
 		open?: boolean;
 		account: Account;
-		/** Called with the adjustment's amount, 0 when the balances agreed. */
+
 		onReconciled: (adjustment: number) => void;
 	} = $props();
 
@@ -34,11 +34,10 @@
 
 	const isCard = $derived(account.kind === 'creditCard');
 	const entered = $derived(balance.trim() === '' ? undefined : parseCents(balance));
-	// A card's balance is what is owed, kept as a negative balance. Flipping the sign goes either
-	// way, between a balance and the amount the input shows.
+
 	const owed = (cents: number) => (isCard && cents !== 0 ? -cents : cents);
 	const bankBalance = $derived(entered === undefined ? undefined : owed(entered));
-	// Shown in the same terms as the input, so a card's cleared balance reads as an amount owed.
+
 	const clearedShown = $derived(cleared.data === undefined ? undefined : owed(cleared.data));
 	const difference = $derived(
 		bankBalance === undefined || cleared.data === undefined ? undefined : bankBalance - cleared.data

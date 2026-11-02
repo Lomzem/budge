@@ -19,7 +19,7 @@
 		category
 	}: {
 		open?: boolean;
-		/** The Category whose Target the dialog sets, with its Target if it has one. */
+
 		category: { id: Id<'categories'>; name: string; target: TargetDefinition | null };
 	} = $props();
 
@@ -36,7 +36,6 @@
 	let error = $state('');
 	let saving = $state(false);
 
-	/** Fills the form from the Category's Target, or a blank one; the parent calls it before each open. */
 	export function reset() {
 		const target = category.target;
 		kind = target?.kind ?? 'monthly';
@@ -51,7 +50,6 @@
 		error = '';
 	}
 
-	/** The Target the form describes, or a message saying what to fix. */
 	function read(): TargetDefinition | string {
 		const cents = parseCents(amount);
 		if (cents === undefined || cents <= 0) return 'Enter an amount above zero, such as 50.00.';

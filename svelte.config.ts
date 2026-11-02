@@ -1,7 +1,7 @@
+import type { Config } from '@sveltejs/kit';
 import adapter from '@sveltejs/adapter-vercel';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
-/** @type {import('@sveltejs/kit').Config} */
 const config = {
 	preprocess: vitePreprocess(),
 	compilerOptions: {
@@ -11,12 +11,12 @@ const config = {
 		adapter: adapter({ runtime: 'nodejs24.x' }),
 		alias: { $convex: 'convex' },
 		typescript: {
-			// Typecheck the Playwright config and suite with the app.
 			config: (tsconfig) => {
-				tsconfig.include.push('../playwright.config.ts', '../e2e/**/*.ts');
+				const include = tsconfig.include as string[];
+				include.push('../svelte.config.ts', '../playwright.config.ts', '../e2e/**/*.ts');
 			}
 		}
 	}
-};
+} satisfies Config;
 
 export default config;

@@ -47,13 +47,8 @@ import {
 } from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
 
-// A single owner has a handful of Bank Connections at most.
 const MAX_CONNECTIONS = 20;
 
-/**
- * Each Bank Connection's name and sync health, newest sync first. Never returns `provider`, which
- * holds the sealed token and Plaid's IDs.
- */
 export const list = query({
 	args: {},
 	returns: v.array(
@@ -78,10 +73,6 @@ export const list = query({
 	}
 });
 
-/**
- * Sync now: syncs one Bank Connection, then asks Plaid to check the bank for anything newer. A sync
- * already running makes this a no-op, as does a connection with no bank login.
- */
 export const syncNow = action({
 	args: { connectionId: v.id('bankConnections') },
 	returns: v.union(
@@ -101,10 +92,6 @@ export const syncNow = action({
 	}
 });
 
-/**
- * The sync the webhook and the daily cron schedule: Sync now without the refresh. A failure is
- * already recorded on the Bank Connection for the owner, so it ends here.
- */
 export const sync = internalAction({
 	args: { connectionId: v.id('bankConnections') },
 	returns: v.null(),
@@ -119,7 +106,6 @@ export const sync = internalAction({
 	}
 });
 
-/** The daily backup sync: schedules a sync of every Bank Connection with a stored token. */
 export const syncAll = internalMutation({
 	args: {},
 	returns: v.null(),
@@ -135,7 +121,6 @@ export const syncAll = internalMutation({
 	}
 });
 
-/** The Bank Connection with a stored token for a Plaid Item, if there is one. */
 export const webhookTarget = internalQuery({
 	args: { itemId: v.string() },
 	returns: v.union(v.id('bankConnections'), v.null()),
@@ -148,12 +133,6 @@ export const webhookTarget = internalQuery({
 	}
 });
 
-/**
- * Plaid's webhook. A webhook for an Item with no stored token is acknowledged at once, without
- * calling Plaid; any other is refused unless Plaid signed it, under a key found as
- * `keptWebhookKeys` says, or told to retry while its key can't be looked up yet.
- * `SYNC_UPDATES_AVAILABLE` schedules a sync, which a sync already running makes a no-op.
- */
 export const webhook = httpAction(async (ctx, request) => {
 	const body = new Uint8Array(await request.arrayBuffer());
 	const webhook = readWebhook(body);
@@ -174,7 +153,6 @@ export const webhook = httpAction(async (ctx, request) => {
 		)
 	);
 	if (verified === 'limited') {
-		// Plaid retries a 429, honoring `Retry-After`; any other 4xx it drops.
 		const retryAfter = String(KEY_LOOKUP_INTERVAL_MS / 1000);
 		return new Response(null, { status: 429, headers: { 'retry-after': retryAfter } });
 	}
@@ -185,12 +163,6 @@ export const webhook = httpAction(async (ctx, request) => {
 	return new Response(null, { status: 200 });
 });
 
-/**
- * Plaid's webhook keys, kept a day after each lookup so a webhook rarely costs a Plaid call. A key
- * not kept is looked up at most once a minute across the deployment, so forged tokens naming
- * made-up keys can't each cost a call. A webhook whose key waits on the limit is answered 429, which
- * Plaid retries for up to a day; the daily sync covers any it gives up on.
- */
 function keptWebhookKeys(ctx: Pick<ActionCtx, 'runMutation'>): Layer.Layer<WebhookKeys> {
 	return Layer.effect(
 		WebhookKeys,
@@ -216,13 +188,8 @@ function keptWebhookKeys(ctx: Pick<ActionCtx, 'runMutation'>): Layer.Layer<Webho
 
 type WebhookKeyClaim = { kind: 'kept'; key: WebhookKey } | { kind: 'lookup' | 'limited' };
 
-// A forged kid leaves a row behind; a lookup clears this many expired ones, more than it adds.
-const EXPIRED_KEYS_CLEARED = 10;
+const EXPIRED_KEYS_CLEARED_PER_LOOKUP = 10;
 
-/**
- * The kept key for `kid`, or leave to look it up: given unless another key was looked up within
- * the last minute. Taking it records the lookup and clears expired rows.
- */
 export const claimWebhookKey = internalMutation({
 	args: { kid: v.string() },
 	returns: v.union(
@@ -250,13 +217,12 @@ export const claimWebhookKey = internalMutation({
 		const expired = await ctx.db
 			.query('webhookKeys')
 			.withIndex('by_checkedAt', (q) => q.lt('checkedAt', now - KEY_TTL_MS))
-			.take(EXPIRED_KEYS_CLEARED);
+			.take(EXPIRED_KEYS_CLEARED_PER_LOOKUP);
 		for (const row of expired) await ctx.db.delete('webhookKeys', row._id);
 		return { kind: 'lookup' as const };
 	}
 });
 
-/** Keeps the key Plaid gave for `kid`, after `claimWebhookKey` recorded the lookup. */
 export const saveWebhookKey = internalMutation({
 	args: { kid: v.string(), key: webhookKeyValidator },
 	returns: v.null(),
@@ -270,11 +236,6 @@ export const saveWebhookKey = internalMutation({
 	}
 });
 
-/**
- * Connects Budge to an existing Plaid Item, run by the owner from the Convex dashboard or CLI. It
- * seals the access token, maps the bank's Accounts to Budge Accounts, and points the Item's webhook
- * at this deployment. It never creates or deletes a Plaid Item.
- */
 export const setup = internalAction({
 	args: {
 		name: v.string(),
@@ -313,9 +274,6 @@ function toPublicError(error: SyncError): PublicError {
 	return { code: 'BANK_UNAVAILABLE', message: "Couldn't sync with the bank; try again later." };
 }
 
-// The mutations sync runs (lib/sync.ts). Each checks the lease it was given is still the one held.
-
-/** Takes the sync lease for about two minutes, unless another sync holds it. */
 export const takeLease = internalMutation({
 	args: { connectionId: v.id('bankConnections') },
 	returns: leaseResult,
@@ -342,12 +300,6 @@ export const takeLease = internalMutation({
 	}
 });
 
-/**
- * Applies one batch of synced rows and moves the cursor past it, in one transaction, so a batch is
- * applied once or not at all. Rows from a bank Account not yet mapped to a Budge Account are held:
- * the Account is recorded for the owner to map, and its rows come back when its cursor is reset.
- * Refuses, writing nothing, once the lease or cursor is no longer the sync's.
- */
 export const apply = internalMutation({
 	args: applyArgs,
 	returns: applyResult,
@@ -375,14 +327,12 @@ export const apply = internalMutation({
 
 		const now = Date.now();
 		const nextLease = release ? undefined : now + LEASE_MS;
-		// An update keeps its start until Plaid has no more pages of it.
 		const { updateStart, ...provider } = connection.provider;
+		const updateStartUntilItsLastPage = hasMore
+			? { updateStart: updateStart === undefined ? fromCursor : updateStart }
+			: {};
 		await ctx.db.patch('bankConnections', connectionId, {
-			provider: {
-				...provider,
-				cursor: nextCursor,
-				...(hasMore ? { updateStart: updateStart === undefined ? fromCursor : updateStart } : {})
-			},
+			provider: { ...provider, cursor: nextCursor, ...updateStartUntilItsLastPage },
 			syncLeaseUntil: nextLease,
 			...(release ? { lastSyncedAt: now, lastError: undefined, status: 'ok' as const } : {})
 		});
@@ -390,7 +340,6 @@ export const apply = internalMutation({
 	}
 });
 
-/** The batch's rows, each checked, under the bank Account it came through. */
 function rowsByBankAccount(
 	rows: Infer<typeof syncRow>[],
 	cutoverDate: string
@@ -403,7 +352,6 @@ function rowsByBankAccount(
 	return byExternalId;
 }
 
-/** Applies each bank Account's rows to its mapped Budge Account, and counts the rows held. */
 async function applyByBankAccount(
 	ctx: MutationCtx,
 	connectionId: Id<'bankConnections'>,
@@ -425,7 +373,6 @@ async function applyByBankAccount(
 	return totals;
 }
 
-/** Extends the sync lease it was given, unless a newer sync has taken over. */
 export const renewLease = internalMutation({
 	args: { connectionId: v.id('bankConnections'), lease: v.number() },
 	returns: v.union(v.number(), v.null()),
@@ -438,7 +385,6 @@ export const renewLease = internalMutation({
 	}
 });
 
-/** Records why a sync failed and releases its lease, unless a newer sync has taken over. */
 export const fail = internalMutation({
 	args: failArgs,
 	returns: v.null(),
@@ -454,10 +400,6 @@ export const fail = internalMutation({
 	}
 });
 
-/**
- * Saves the Bank Connection for a Plaid Item, replacing the token of one already saved for it, and
- * maps the given bank Accounts.
- */
 export const save = internalMutation({
 	args: saveArgs,
 	returns: v.id('bankConnections'),
@@ -507,7 +449,6 @@ async function findConnectionAccount(
 		.unique();
 }
 
-/** The bank Account's mapping, held for the owner to map when sync first sees it. */
 async function connectionAccountOf(
 	ctx: MutationCtx,
 	connectionId: Id<'bankConnections'>,

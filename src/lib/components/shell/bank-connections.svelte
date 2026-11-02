@@ -16,10 +16,9 @@
 
 	const client = useConvexClient();
 	const accounts = getAccounts();
-	// Waits, like the rest of the sidebar, until the owner's Accounts load.
+
 	const connections = useQuery(api.bankConnections.list, () => (accounts.loaded ? {} : 'skip'));
 
-	// Ticks once a minute, so "Synced 2 hours ago" stays true while the page is open.
 	let now = $state(Date.now());
 	$effect(() => {
 		const timer = setInterval(() => {
@@ -43,7 +42,6 @@
 		result = '';
 	}
 
-	/** What a finished sync says: one was running, it can't sync, or what it added. */
 	function describeSync(outcome: SyncOutcome): string {
 		if (outcome.kind === 'busy') return 'A sync is already running.';
 		if (outcome.kind === 'noToken') {

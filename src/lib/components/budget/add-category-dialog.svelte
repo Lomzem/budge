@@ -15,9 +15,9 @@
 		groups
 	}: {
 		open?: boolean;
-		/** True while a save is in flight; the parent keeps `kind` fixed until it settles. */
+
 		saving?: boolean;
-		/** A Category Group, or a Category within one of `groups`. */
+
 		kind: 'group' | 'category';
 		groups: readonly { id: Id<'categoryGroups'>; name: string }[];
 	} = $props();
@@ -30,10 +30,6 @@
 	let error = $state('');
 	const title = $derived(kind === 'group' ? 'Add Category Group' : 'Add Category');
 
-	/**
-	 * Empties the form; the parent calls it before each open. A save still in flight keeps its
-	 * form, with Add disabled, so closing and reopening can't submit it twice.
-	 */
 	export function reset() {
 		if (saving) return;
 		name = '';
@@ -59,7 +55,6 @@
 			return;
 		}
 		error = added.error?.message ?? "Budge couldn't add it. Try again.";
-		// The dialog may have been closed while it saved: reopen it to show what failed.
 		open = true;
 	}
 </script>

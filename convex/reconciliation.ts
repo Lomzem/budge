@@ -9,7 +9,6 @@ import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { insertTransaction, transactionFields } from './lib/transactions';
 
-/** What the bank would show for an Account: its Cleared and Reconciled Transactions. */
 export const clearedBalance = query({
 	args: { accountId: v.id('accounts') },
 	returns: v.number(),
@@ -20,12 +19,6 @@ export const clearedBalance = query({
 	}
 });
 
-/**
- * Reconciles an Account against the bank's real balance on `date`. A difference from the
- * cleared balance is recorded as one Cleared "Reconciliation Adjustment" Transaction on that date,
- * in Ready to Assign, which the owner can recategorize. Then every Cleared Transaction in the Account
- * is locked as Reconciled. Returns the adjustment's amount, 0 when the balances agreed.
- */
 export const reconcile = mutation({
 	args: { accountId: v.id('accounts'), balance: v.number(), date: v.string() },
 	returns: v.number(),
@@ -33,7 +26,6 @@ export const reconcile = mutation({
 		await requireOwner(ctx);
 		await requireAccount(ctx, accountId);
 		const adjustment = requireCents(balance) - (await clearedBalanceOf(ctx, accountId));
-		// Checks the date even when the balances agree, since it becomes the last-reconciled date.
 		const fields = await transactionFields(ctx, {
 			accountId,
 			date,
@@ -63,10 +55,6 @@ async function requireAccount(ctx: QueryCtx, accountId: Id<'accounts'>) {
 	return account;
 }
 
-/**
- * The Account's balance less its uncleared Transactions, so it reads only the few uncleared ones
- * and never the Reconciled history.
- */
 async function clearedBalanceOf(ctx: QueryCtx, accountId: Id<'accounts'>) {
 	let balance = (await accountBalances(ctx)).get(accountId) ?? 0;
 	for await (const transaction of byCleared(ctx, accountId, 'uncleared')) {

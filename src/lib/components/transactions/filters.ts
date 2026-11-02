@@ -1,4 +1,3 @@
-/** What the owner narrowed the Transaction list to; `''` means any. */
 export interface TransactionFilterValues {
 	search: string;
 	accountId: string;

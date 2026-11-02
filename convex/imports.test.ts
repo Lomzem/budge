@@ -36,7 +36,6 @@ async function budgetWithChecking() {
 
 const decode = (text: string) => Effect.runSync(decodeBankFile(text, cutoverDate));
 
-// Invented Bank Text and amounts.
 const coffee = { date: '2026-08-16', amount: -450, bankText: 'SAMPLE COFFEE 0042' };
 
 describe('importing a bank file', () => {

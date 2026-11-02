@@ -6,7 +6,6 @@ import { readCutoverDate, requireIsoDate } from './lib/settings';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 
-/** Budge's settings. The cutover date is `null` until the owner sets it. */
 export const get = query({
 	args: {},
 	returns: v.object({ cutoverDate: v.union(v.string(), v.null()) }),
@@ -16,7 +15,6 @@ export const get = query({
 	}
 });
 
-/** Sets the date Budge starts from. No Transaction may be dated before it. */
 export const setCutoverDate = mutation({
 	args: { cutoverDate: v.string() },
 	returns: v.null(),

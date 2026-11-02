@@ -1,6 +1,3 @@
-// Convex 1.48's normal codegen contacts a deployment for component analysis.
-// This app has no components: the system-UDF path generates its API/data model offline.
-// That path omits typed env declarations, so render them with the same pinned CLI template.
 import { spawnSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +6,6 @@ import app from '../convex/convex.config.ts';
 import { version } from '../node_modules/convex/package.json';
 import { serverCodegen } from '../node_modules/convex/src/cli/codegen_templates/server.ts';
 
-// Both the CLI flag and the template import below are Convex internals, checked against this version.
 const CHECKED_CONVEX_VERSION = '1.48.0';
 if (version !== CHECKED_CONVEX_VERSION) {
 	throw new Error(
@@ -25,7 +21,6 @@ if (definition.childComponents.length > 0) {
 	);
 }
 
-// Ignore deployment selection entirely, including any developer deploy key or .env.local.
 const env = Object.fromEntries(
 	Object.entries(process.env).filter(([name]) => !name.startsWith('CONVEX_'))
 );

@@ -3,8 +3,6 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { localToday } from '../src/lib/domain/dates';
 
-// Runs on the local backend after CI's `seed:run`, so Checking and Savings exist and today is past
-// the cutover. Pass or fail, it deletes the Transactions it made.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 const memo = 'Smoke test linked Transfer';
 
@@ -16,7 +14,6 @@ async function openAccount(page: Page, name: string) {
 	await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
 
-/** Imports one invented row, in Capital One's checking and savings layout, into the open Account. */
 async function importRow(page: Page, bankText: string, type: 'Debit' | 'Credit') {
 	const [year, month, day] = localToday().split('-');
 	const csv = [
@@ -36,7 +33,6 @@ async function importRow(page: Page, bankText: string, type: 'Debit' | 'Credit')
 	await expect(dialog).toBeHidden();
 }
 
-/** Deletes each Transaction among `rows` in the open Account, through its dialog. */
 async function deleteRows(page: Page, rows: Locator) {
 	while ((await rows.count()) > 0) {
 		await rows.first().getByRole('button').first().click();
@@ -77,10 +73,11 @@ test('a Transfer from an import links the other import instead of a duplicate', 
 
 		await expect(linked.getByText('To Savings').filter({ visible: true })).toBeVisible();
 		await openAccount(page, 'Savings');
-		// The Savings import became the other side: one row, and no Uncategorized duplicate left.
-		await expect(linked).toHaveCount(1);
-		await expect(linked.getByText('From Checking').filter({ visible: true })).toBeVisible();
-		await expect(leftovers).toHaveCount(0);
+		await test.step('the Savings import became the other side, with no Uncategorized duplicate left', async () => {
+			await expect(linked).toHaveCount(1);
+			await expect(linked.getByText('From Checking').filter({ visible: true })).toBeVisible();
+			await expect(leftovers).toHaveCount(0);
+		});
 	} finally {
 		for (const account of ['Savings', 'Checking']) {
 			await openAccount(page, account);

@@ -1,9 +1,5 @@
 import { type VariantProps, tv } from 'tailwind-variants';
 
-// `align` replaces the obsolete HTML attribute of the same name.
-// Shared by TableHead and TableCell so a column's header and cells always agree.
-// `showFrom` hides a column until the table's @container is at least that wide, or with
-// `screen-sm`, until the viewport is 640px wide.
 export const tableColumnVariants = tv({
 	variants: {
 		align: { start: '', center: 'text-center', end: 'text-right' },

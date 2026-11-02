@@ -1,8 +1,6 @@
 import { clerk } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 
-// Runs on the local backend after CI's `seed:run`, so the Card, Groceries, and Gifts exist. Pass
-// or fail, it deletes the split it made.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 const memo = 'Smoke test split';
 
@@ -30,20 +28,20 @@ test('a split shows "Split" in the list, and its lines can be added, edited, and
 	try {
 		await page.getByRole('button', { name: 'Add Transaction' }).click();
 		await dialog.getByLabel('Payee').fill('Smoke Test Warehouse');
-		// A minus sign typed in the amount doesn't carry into the lines; the Direction sets the sign.
-		await dialog.getByLabel('Amount').fill('-50.00');
+		const minusSignTheDirectionOverridesInTheLines = '-50.00';
+		await dialog.getByLabel('Amount').fill(minusSignTheDirectionOverridesInTheLines);
 		await dialog.getByLabel('Memo', { exact: true }).fill(memo);
 		await dialog
 			.getByLabel('Category or Transfer')
 			.selectOption({ label: 'Split across Categories' });
 
-		// The first line starts with the whole amount; moving some to the second keeps the total.
-		await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('50.00');
-		// An empty second line isn't a finished split.
-		await expect(remainder).toHaveText('Nothing left for the empty line');
-		await dialog.getByLabel('Line 1 Category').selectOption({ label: 'Groceries' });
-		await dialog.getByLabel('Line 1 amount').fill('30.00');
-		await expect(remainder).toHaveText('$20.00 left to split');
+		await test.step("the first line starts with the whole amount, an empty second line isn't a finished split, and moving some to the second keeps the total", async () => {
+			await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('50.00');
+			await expect(remainder).toHaveText('Nothing left for the empty line');
+			await dialog.getByLabel('Line 1 Category').selectOption({ label: 'Groceries' });
+			await dialog.getByLabel('Line 1 amount').fill('30.00');
+			await expect(remainder).toHaveText('$20.00 left to split');
+		});
 		await dialog.getByLabel('Line 2 Category').selectOption({ label: 'Gifts' });
 		await dialog.getByLabel('Line 2 amount').fill('12.00');
 		await dialog.getByRole('button', { name: 'Add line' }).click();
@@ -58,30 +56,32 @@ test('a split shows "Split" in the list, and its lines can be added, edited, and
 		await expect(dialog).toBeHidden();
 		await expect(row.getByText('Split', { exact: true }).filter({ visible: true })).toBeVisible();
 
-		// Editing shows the saved lines; removing one and giving its amount to another saves.
-		await row.getByRole('button', { name: /^Smoke Test Warehouse/ }).click();
-		await expect(dialog.getByLabel('Line 3 amount')).toHaveValue('8.00');
-		await dialog.getByRole('button', { name: 'Remove line 3' }).click();
-		await expect(remainder).toHaveText('$8.00 left to split');
-		await dialog.getByLabel('Line 2 amount').fill('20.00');
-		await dialog.getByRole('button', { name: 'Save' }).click();
-		await expect(dialog).toBeHidden();
-		await row.getByRole('button', { name: /^Smoke Test Warehouse/ }).click();
-		await expect(dialog.getByLabel('Line 2 amount')).toHaveValue('20.00');
-		await expect(dialog.getByLabel('Line 3 amount')).toHaveCount(0);
-		await page.keyboard.press('Escape');
-		await expect(dialog).toBeHidden();
+		await test.step('editing shows the saved lines; removing one and giving its amount to another saves', async () => {
+			await row.getByRole('button', { name: /^Smoke Test Warehouse/ }).click();
+			await expect(dialog.getByLabel('Line 3 amount')).toHaveValue('8.00');
+			await dialog.getByRole('button', { name: 'Remove line 3' }).click();
+			await expect(remainder).toHaveText('$8.00 left to split');
+			await dialog.getByLabel('Line 2 amount').fill('20.00');
+			await dialog.getByRole('button', { name: 'Save' }).click();
+			await expect(dialog).toBeHidden();
+			await row.getByRole('button', { name: /^Smoke Test Warehouse/ }).click();
+			await expect(dialog.getByLabel('Line 2 amount')).toHaveValue('20.00');
+			await expect(dialog.getByLabel('Line 3 amount')).toHaveCount(0);
+			await page.keyboard.press('Escape');
+			await expect(dialog).toBeHidden();
+		});
 	} finally {
-		// Leaves no split behind if a step above failed.
-		if (await dialog.isVisible()) await page.keyboard.press('Escape');
-		while ((await row.count()) > 0) {
-			await row
-				.first()
-				.getByRole('button', { name: /^Smoke Test Warehouse/ })
-				.click();
-			await dialog.getByRole('button', { name: 'Delete' }).click();
-			await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
-			await expect(page.getByRole('alertdialog')).toBeHidden();
-		}
+		await test.step('leave no split behind, even if a step above failed', async () => {
+			if (await dialog.isVisible()) await page.keyboard.press('Escape');
+			while ((await row.count()) > 0) {
+				await row
+					.first()
+					.getByRole('button', { name: /^Smoke Test Warehouse/ })
+					.click();
+				await dialog.getByRole('button', { name: 'Delete' }).click();
+				await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+				await expect(page.getByRole('alertdialog')).toBeHidden();
+			}
+		});
 	}
 });

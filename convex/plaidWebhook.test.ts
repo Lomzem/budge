@@ -7,7 +7,6 @@ import { newBackend, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
-// Invented credentials and IDs; nothing here is a real token, key, or Plaid ID.
 const accessToken = 'access-token-synthetic-not-real';
 const itemId = 'item-synthetic-1';
 const externalId = 'account-synthetic-checking';
@@ -15,10 +14,6 @@ const cutoverDate = '2026-08-01';
 
 type Signer = Awaited<ReturnType<typeof webhookSigner>>;
 
-/**
- * Plaid Sandbox, faked at `fetch`: the webhook and the scheduled sync run in Convex functions, so
- * no test layer reaches them. Any request outside Plaid Sandbox fails the test.
- */
 function fakePlaid(signer: Signer) {
 	const paths: string[] = [];
 	const fetch = (input: RequestInfo | URL) => {
@@ -38,7 +33,6 @@ function fakePlaid(signer: Signer) {
 			case '/webhook_verification_key/get':
 				return answer({ key: signer.wireKey });
 			case '/transactions/sync':
-				// The same page every time, as a repeated or out-of-order update might bring.
 				return answer(syncPage);
 			default:
 				return assert.fail(`Unexpected Plaid call ${url.pathname}`);
@@ -59,7 +53,6 @@ beforeEach(async () => {
 	);
 	signer = await webhookSigner();
 	plaid = fakePlaid(signer);
-	// Effect keeps the first `fetch` it finds, so the stub always reads the current fake.
 	vi.stubGlobal('fetch', (input: RequestInfo | URL) => plaid.fetch(input));
 });
 
@@ -172,7 +165,7 @@ describe('the Plaid webhook', () => {
 		expect(keyLookups()).toBe(1);
 	});
 
-	test('asks Plaid about keys it has not seen at most once a minute', async () => {
+	test('asks Plaid about keys it has not seen at most once a minute, answering 429 with Retry-After so Plaid retries', async () => {
 		vi.useFakeTimers({ toFake: ['Date'] });
 		const backend = await connectedBudget();
 		const body = syncUpdatesBody(itemId);
@@ -183,9 +176,7 @@ describe('the Plaid webhook', () => {
 			const token = await impostor.sign(body, { kid: `key-forged-${String(i)}` });
 			statuses.push((await postWebhook(backend, body, token)).status);
 		}
-		// The first is looked up and refused; the rest are told to come back once the limit lifts.
 		expect(statuses).toEqual([401, 429, 429, 429, 429]);
-		// Plaid's own key, first seen while the limit holds, waits for it too, and Plaid retries a 429.
 		const limited = await postWebhook(backend, body, await signer.sign(body));
 		expect(limited.status).toBe(429);
 		expect(limited.headers.get('retry-after')).toBe('60');
@@ -195,7 +186,6 @@ describe('the Plaid webhook', () => {
 		expect((await postWebhook(backend, body, await signer.sign(body))).status).toBe(200);
 		expect(keyLookups()).toBe(2);
 
-		// A day on, the next lookup clears the row the forged key left.
 		vi.setSystemTime(Date.now() + 25 * 60 * 60 * 1000);
 		expect((await postWebhook(backend, body, await signer.sign(body))).status).toBe(200);
 		const kids = await backend.t.run(async (ctx) =>

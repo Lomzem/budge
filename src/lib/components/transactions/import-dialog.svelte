@@ -35,18 +35,17 @@
 
 	let accountId = $state('');
 	let file: BankFile | undefined = $state();
-	/** Per row with several candidates: a Transaction ID, `'new'`, or `''` until picked. */
+
 	let picks: string[] = $state([]);
 	let reading = $state(false);
-	/** Counts file reads, so a read that a newer read or a reopen replaced drops its result. */
+
 	let reads = 0;
 	let saving = $state(false);
 	let error = $state('');
 
 	const account = $derived(accounts.find(accountId));
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? null);
-	// The preview applies the picks as saving does, so a pick can change what later rows Match. It
-	// keeps showing the last plan while a new pick replans, so the row's picker stays put.
+
 	const preview = useQuery(
 		api.imports.preview,
 		() =>
@@ -70,7 +69,6 @@
 			counts.new + counts.match > 0
 	);
 
-	// Start over each time the dialog opens.
 	$effect(() => {
 		if (open) untrack(reset);
 	});
@@ -97,15 +95,14 @@
 		const read = ++reads;
 		reading = true;
 		const opened = await attempt(() => readBankFile(chosen, cutoverDate));
-		// Another file may have been chosen while this one was read; leave that one be.
-		if (read !== reads) return;
+		const anotherFileChosenWhileThisWasRead = read !== reads;
+		if (anotherFileChosenWhileThisWasRead) return;
 		reading = false;
 		if (!opened.ok) error = "Budge couldn't read this file.";
 		else if (opened.value.ok) file = opened.value.file;
 		else error = opened.value.message;
 	}
 
-	// A pick that is no longer one of its row's candidates is ignored by the matcher.
 	function rowsWithPicks({ rows }: BankFile): FileRows {
 		return rows.map((row, index) => {
 			const pick = picks[index] ?? '';
