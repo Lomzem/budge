@@ -6,7 +6,7 @@ import { fileRow, fileSource, planImport } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { importedPayee, ImportedPayees } from './lib/payees';
-import { bankRowsOf, insertTransaction } from './lib/transactions';
+import { bankRowsOf, insertTransaction, refreshSearchText } from './lib/transactions';
 
 const candidate = v.object({
 	_id: v.id('transactions'),
@@ -111,10 +111,12 @@ export const commit = mutation({
 					transactionId: decision.transactionId,
 					matched: true
 				});
+				await refreshSearchText(ctx, decision.transactionId);
 				counts.matched++;
 			} else if (decision.kind === 'new') {
 				const transactionId = await insertImported(ctx, accountId, row, payees);
 				await ctx.db.insert('imports', { ...bankRow, transactionId, matched: false });
+				await refreshSearchText(ctx, transactionId);
 				counts.added++;
 			} else {
 				counts.skipped++;
@@ -141,6 +143,8 @@ export const unmatch = mutation({
 		}
 		const transactionId = await insertImported(ctx, bankRow.accountId, bankRow);
 		await ctx.db.patch('imports', importId, { transactionId, matched: false });
+		await refreshSearchText(ctx, transactionId);
+		await refreshSearchText(ctx, matchedId);
 		const stillLinked = await bankRowsOf(ctx, matchedId);
 		if (stillLinked.length === 0) {
 			await ctx.db.patch('transactions', matchedId, { cleared: 'uncleared', approved: true });

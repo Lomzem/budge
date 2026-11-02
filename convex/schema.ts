@@ -81,14 +81,25 @@ export default defineSchema({
 		approved: v.optional(v.boolean()),
 		// Set on each side of a Transfer, pointing at the other side. The two sides have opposite
 		// amounts, the same date, and no Category; there is no Transfer table.
-		transferTransactionId: v.optional(v.id('transactions'))
+		transferTransactionId: v.optional(v.id('transactions')),
+		// What text search reads: the Payee's name, the memo, split memos, and linked Bank Text.
+		// Every Transaction write, Match, Unmatch, and Payee rename rewrites it. Left out only on
+		// Transactions written before search, until `migrations:backfillSearchText` runs.
+		searchText: v.optional(v.string())
 	})
 		.index('by_account_date', ['accountId', 'date'])
 		.index('by_date', ['date'])
 		.index('by_category_date', ['categoryId', 'date'])
+		.index('by_payee_date', ['payeeId', 'date'])
 		// Unapproved first: `approved: false` ranges for the review list.
 		.index('by_approved_date', ['approved', 'date'])
-		.index('by_account_approved_date', ['accountId', 'approved', 'date']),
+		.index('by_account_approved_date', ['accountId', 'approved', 'date'])
+		// A split has no Category of its own, so `split` lets a Category filter reach split
+		// Transactions to check their lines.
+		.searchIndex('search_text', {
+			searchField: 'searchText',
+			filterFields: ['accountId', 'categoryId', 'payeeId', 'split']
+		}),
 
 	// One line of a split Transaction. The lines sum to the Transaction's amount, and each follows
 	// the budget rules on its own. `date` is the Transaction's, kept in step for the
