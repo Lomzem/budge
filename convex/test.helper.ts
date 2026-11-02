@@ -37,3 +37,11 @@ export async function publicErrorCode(call: Promise<unknown>) {
 	);
 	return readPublicError(error)?.code;
 }
+
+export async function publicErrorMessage(call: Promise<unknown>) {
+	const error: unknown = await call.then(
+		() => undefined,
+		(thrown: unknown) => thrown
+	);
+	return readPublicError(error)?.message;
+}

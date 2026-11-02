@@ -11,6 +11,7 @@ import { requireIsoDate } from './lib/settings';
 import {
 	bankRowsOf,
 	deleteTransaction,
+	requireUnlocked,
 	saveTransaction,
 	splitLinesOf,
 	transferCandidatesOf
@@ -27,7 +28,9 @@ const transactionRow = v.object({
 	/** `null` while Uncategorized, and for a split or a Transfer. */
 	categoryName: v.union(v.string(), v.null()),
 	memo: v.union(v.string(), v.null()),
+	/** Cleared, or Reconciled, which is Cleared and locked. */
 	cleared: v.boolean(),
+	reconciled: v.boolean(),
 	approved: v.boolean(),
 	/** What the bank reported for it, read-only. */
 	bankRows: v.array(v.object({ _id: v.id('imports'), bankText: v.string(), matched: v.boolean() })),
@@ -177,7 +180,7 @@ export const transferCandidates = query({
 	}
 });
 
-/** Deletes a Transaction, and both sides of a Transfer. */
+/** Deletes a Transaction, and both sides of a Transfer. Neither side may be Reconciled. */
 export const remove = mutation({
 	args: { transactionId: v.id('transactions') },
 	returns: v.null(),
@@ -188,15 +191,34 @@ export const remove = mutation({
 	}
 });
 
+/** Marks a Transaction Cleared or uncleared; a Reconciled one is unlocked first. */
 export const setCleared = mutation({
 	args: { transactionId: v.id('transactions'), cleared: v.boolean() },
 	returns: v.null(),
 	handler: async (ctx, { transactionId, cleared }) => {
 		await requireOwner(ctx);
-		await requireTransaction(ctx, transactionId);
+		requireUnlocked(
+			await requireTransaction(ctx, transactionId),
+			'to change whether it is Cleared'
+		);
 		await ctx.db.patch('transactions', transactionId, {
 			cleared: cleared ? 'cleared' : 'uncleared'
 		});
+		return null;
+	}
+});
+
+/** Unlocks a Reconciled Transaction back to Cleared, so it can be changed or deleted. */
+export const unlock = mutation({
+	args: { transactionId: v.id('transactions') },
+	returns: v.null(),
+	handler: async (ctx, { transactionId }) => {
+		await requireOwner(ctx);
+		const transaction = await requireTransaction(ctx, transactionId);
+		if (transaction.cleared !== 'reconciled') {
+			throw publicError('INVALID_INPUT', 'This Transaction is not Reconciled.');
+		}
+		await ctx.db.patch('transactions', transactionId, { cleared: 'cleared' });
 		return null;
 	}
 });
@@ -274,7 +296,8 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		categoryId: transaction.categoryId ?? null,
 		categoryName: category?.name ?? null,
 		memo: transaction.memo ?? null,
-		cleared: transaction.cleared === 'cleared',
+		cleared: transaction.cleared !== 'uncleared',
+		reconciled: transaction.cleared === 'reconciled',
 		approved: transaction.approved !== false,
 		bankRows: (await bankRowsOf(ctx, transaction._id)).map((bankRow) => ({
 			_id: bankRow._id,
