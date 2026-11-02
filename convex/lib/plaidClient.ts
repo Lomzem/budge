@@ -51,6 +51,24 @@ interface PlaidClientShape {
 	readonly transactionsRefresh: (accessToken: string) => Effect.Effect<void, PlaidError>;
 	/** Points the Item's webhook at `webhook` (`/item/webhook/update`). */
 	readonly setWebhook: (accessToken: string, webhook: string) => Effect.Effect<void, PlaidError>;
+	/**
+	 * A Link token in update mode for an existing Item (`/link/token/create` with its access token
+	 * and no products), so the owner can sign in again or renew consent without a new Item.
+	 */
+	readonly linkTokenCreate: (request: UpdateLinkRequest) => Effect.Effect<string, PlaidError>;
+	/** The Item's state (`/item/get`): when the bank's consent ends, if it does. */
+	readonly itemGet: (accessToken: string) => Effect.Effect<ItemState, PlaidError>;
+}
+
+export interface UpdateLinkRequest {
+	accessToken: string;
+	/** A stable ID for the person linking; Budge uses the Bank Connection's. */
+	clientUserId: string;
+}
+
+export interface ItemState {
+	/** When the bank's consent for this Item ends, in ms since the epoch; `null` if it never does. */
+	consentExpiresAt: number | null;
 }
 
 export interface PlaidConfig {
@@ -93,12 +111,33 @@ export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>(
 		return Layer.succeed(PlaidClient, {
 			transactionsSync: fake.transactionsSync ?? unexpected('transactionsSync'),
 			transactionsRefresh: fake.transactionsRefresh ?? unexpected('transactionsRefresh'),
-			setWebhook: fake.setWebhook ?? unexpected('setWebhook')
+			setWebhook: fake.setWebhook ?? unexpected('setWebhook'),
+			linkTokenCreate: fake.linkTokenCreate ?? unexpected('linkTokenCreate'),
+			itemGet: fake.itemGet ?? unexpected('itemGet')
 		});
 	}
 }
 
 const PlaidErrorBody = Schema.Struct({ error_code: Schema.String, request_id: Schema.String });
+
+const LinkTokenBody = Schema.Struct({ link_token: Schema.String });
+
+const ItemGetBody = Schema.Struct({
+	item: Schema.Struct({ consent_expiration_time: Schema.NullOr(Schema.String) })
+});
+
+function decodeItem(body: unknown): Effect.Effect<ItemState, unknown> {
+	return Schema.decodeUnknownEffect(ItemGetBody)(body).pipe(
+		Effect.flatMap(({ item }): Effect.Effect<ItemState, PlaidDecode> => {
+			const at = item.consent_expiration_time;
+			if (at === null) return Effect.succeed({ consentExpiresAt: null });
+			const consentExpiresAt = Date.parse(at);
+			return Number.isNaN(consentExpiresAt)
+				? Effect.fail(new PlaidDecode())
+				: Effect.succeed({ consentExpiresAt });
+		})
+	);
+}
 
 function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClientShape {
 	const baseUrl = `https://${config.environment}.plaid.com`;
@@ -168,7 +207,21 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 		transactionsRefresh: (accessToken) =>
 			post('/transactions/refresh', { access_token: accessToken }, ignoreBody),
 		setWebhook: (accessToken, webhook) =>
-			post('/item/webhook/update', { access_token: accessToken, webhook }, ignoreBody)
+			post('/item/webhook/update', { access_token: accessToken, webhook }, ignoreBody),
+		linkTokenCreate: ({ accessToken, clientUserId }) =>
+			post(
+				'/link/token/create',
+				{
+					access_token: accessToken,
+					client_name: 'Budge',
+					language: 'en',
+					country_codes: ['US'],
+					user: { client_user_id: clientUserId }
+				},
+				(body) =>
+					Schema.decodeUnknownEffect(LinkTokenBody)(body).pipe(Effect.map((b) => b.link_token))
+			),
+		itemGet: (accessToken) => post('/item/get', { access_token: accessToken }, decodeItem)
 	};
 }
 

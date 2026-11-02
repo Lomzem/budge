@@ -100,6 +100,52 @@ describe('PlaidClient', () => {
 		}).pipe(Effect.provide(plaid.layer));
 	});
 
+	it.effect("reads when the bank's consent ends from the Item", () => {
+		const item = (consent: string | null) =>
+			json(200, {
+				item: { item_id: 'item-synthetic-1', consent_expiration_time: consent, error: null },
+				status: null,
+				request_id: 'request-synthetic-1'
+			});
+		const plaid = fakePlaid((attempt) =>
+			Promise.resolve(item(attempt === 1 ? '2026-11-20T15:00:00Z' : null))
+		);
+		const itemGet = PlaidClient.use((client) => client.itemGet(accessToken));
+		return Effect.gen(function* () {
+			expect(yield* itemGet).toEqual({ consentExpiresAt: Date.UTC(2026, 10, 20, 15) });
+			expect(yield* itemGet).toEqual({ consentExpiresAt: null });
+			expect(plaid.sent[0]?.url).toBe('https://sandbox.plaid.com/item/get');
+			expect(plaid.sent[0]?.body).toEqual({ access_token: accessToken });
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
+	it.effect('asks for an update-mode Link token with the access token and no products', () => {
+		const plaid = fakePlaid(() =>
+			Promise.resolve(
+				json(200, {
+					link_token: 'link-token-synthetic-1',
+					expiration: '2026-11-02T04:00:00Z',
+					request_id: 'request-synthetic-1'
+				})
+			)
+		);
+		return Effect.gen(function* () {
+			const token = yield* PlaidClient.use((client) =>
+				client.linkTokenCreate({ accessToken, clientUserId: 'connection-synthetic-1' })
+			);
+
+			expect(token).toBe('link-token-synthetic-1');
+			expect(plaid.sent[0]?.url).toBe('https://sandbox.plaid.com/link/token/create');
+			expect(plaid.sent[0]?.body).toEqual({
+				access_token: accessToken,
+				client_name: 'Budge',
+				language: 'en',
+				country_codes: ['US'],
+				user: { client_user_id: 'connection-synthetic-1' }
+			});
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
 	it.effect('retries a network failure, making at most three attempts', () => {
 		const plaid = fakePlaid(() => Promise.reject(new Error(`connection reset ${accessToken}`)));
 		return Effect.gen(function* () {

@@ -14,6 +14,7 @@
 	import AddCategoryDialog from '$lib/components/budget/add-category-dialog.svelte';
 	import BudgetTable from '$lib/components/budget/budget-table.svelte';
 	import CategoryInspector from '$lib/components/budget/category-inspector.svelte';
+	import ReconnectNotice from '$lib/components/budget/reconnect-notice.svelte';
 	import UpcomingList from '$lib/components/budget/upcoming-list.svelte';
 	import CutoverDate from '$lib/components/settings/cutover-date.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -129,6 +130,8 @@
 	</header>
 
 	<CutoverDate />
+
+	<ReconnectNotice />
 
 	{#if accounts.loaded && accounts.all.length === 0}
 		<section class="flex flex-col items-start gap-2">

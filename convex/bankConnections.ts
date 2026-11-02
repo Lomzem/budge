@@ -1,13 +1,16 @@
-import { v } from 'convex/values';
+import { v, type Infer } from 'convex/values';
 import { Effect, Layer } from 'effect';
 
+import { isSyncOverdue, renewalDue } from '../src/lib/domain/freshness';
 import type { PublicError } from '../src/lib/domain/publicError';
+import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import {
 	action,
 	env,
 	internalAction,
 	internalMutation,
+	internalQuery,
 	query,
 	type ActionCtx,
 	type MutationCtx
@@ -26,33 +29,39 @@ import {
 	leaseResult,
 	LEASE_MS,
 	MAX_SYNC_ROWS,
+	reconnectLinkToken,
+	RETRY_DELAYS_MS,
 	saveArgs,
 	setupConnection,
 	SyncStore,
 	syncConnection,
 	type SyncError
 } from './lib/sync';
+import { failureOf, failureOfPlaidCode } from './lib/syncFailure';
 import { TokenCipher } from './lib/tokenCipher';
 
 // A single owner has a handful of Bank Connections at most.
 const MAX_CONNECTIONS = 20;
 
 /**
- * Each Bank Connection's name and sync health, newest sync first. Never returns `provider`, which
- * holds the sealed token and Plaid's IDs.
+ * Each Bank Connection's name and sync health as of `now`: `overdue` once 48 hours pass without a
+ * successful sync, and `consentEndsAt` from 14 days before the bank's consent ends. Never returns
+ * `provider`, which holds the sealed token and Plaid's IDs.
  */
 export const list = query({
-	args: {},
+	args: { now: v.number() },
 	returns: v.array(
 		v.object({
 			_id: v.id('bankConnections'),
 			name: v.string(),
 			status: v.union(v.literal('ok'), v.literal('needsAttention')),
 			lastSyncedAt: v.union(v.number(), v.null()),
+			overdue: v.boolean(),
+			consentEndsAt: v.union(v.number(), v.null()),
 			lastError: v.union(v.object({ at: v.number(), message: v.string() }), v.null())
 		})
 	),
-	handler: async (ctx) => {
+	handler: async (ctx, { now }) => {
 		await requireOwner(ctx);
 		const connections = await ctx.db.query('bankConnections').take(MAX_CONNECTIONS);
 		return connections.map((connection) => ({
@@ -60,33 +69,80 @@ export const list = query({
 			name: connection.name,
 			status: connection.status,
 			lastSyncedAt: connection.lastSyncedAt ?? null,
+			overdue: isSyncOverdue(connection.lastSyncedAt ?? null, now),
+			consentEndsAt: renewalDue(connection.consentExpiresAt ?? null, now),
 			lastError: connection.lastError ?? null
 		}));
 	}
 });
 
+const ownerSyncResult = v.union(
+	v.object({ kind: v.literal('synced'), added: v.number(), matched: v.number() }),
+	v.object({ kind: v.literal('busy') }),
+	v.object({ kind: v.literal('noToken') })
+);
+
 /**
  * Sync now: syncs one Bank Connection, then asks Plaid to check the bank for anything newer. A sync
- * already running makes this a no-op, as does a connection with no bank login.
+ * already running makes this a no-op, as does a connection with no bank login. It runs even while
+ * the connection needs the owner, since the owner asked.
  */
 export const syncNow = action({
 	args: { connectionId: v.id('bankConnections') },
-	returns: v.union(
-		v.object({ kind: v.literal('synced'), added: v.number(), matched: v.number() }),
-		v.object({ kind: v.literal('busy') }),
-		v.object({ kind: v.literal('noToken') })
-	),
+	returns: ownerSyncResult,
 	handler: async (ctx, { connectionId }) => {
 		await requireOwner(ctx);
-		const outcome = await runEffect(
-			syncConnection(connectionId, { refresh: true }).pipe(Effect.provide(liveLayer(ctx))),
-			toPublicError
-		);
-		if (outcome.kind === 'missing') throw publicError('NOT_FOUND');
-		if (outcome.kind !== 'synced') return outcome;
-		return { kind: 'synced' as const, added: outcome.added, matched: outcome.matched };
+		return await ownerSync(ctx, connectionId, { refresh: true });
 	}
 });
+
+/**
+ * Reconnect, first step: a Plaid Link token in update mode for the Bank Connection's existing
+ * Item. It never creates or deletes a Plaid Item.
+ */
+export const reconnect = action({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.object({ linkToken: v.string() }),
+	handler: async (ctx, { connectionId }) => {
+		await requireOwner(ctx);
+		const result = await runEffect(
+			reconnectLinkToken(connectionId).pipe(Effect.provide(liveLayer(ctx))),
+			toPublicError
+		);
+		if (result.kind === 'missing') throw publicError('NOT_FOUND');
+		if (result.kind === 'noToken') {
+			throw publicError('INVALID_INPUT', 'This Bank Connection has no bank login to reconnect.');
+		}
+		return { linkToken: result.linkToken };
+	}
+});
+
+/** Reconnect, last step: once Plaid Link succeeds, syncs at once; success clears the notice. */
+export const syncAfterReconnect = action({
+	args: { connectionId: v.id('bankConnections') },
+	returns: ownerSyncResult,
+	handler: async (ctx, { connectionId }) => {
+		await requireOwner(ctx);
+		return await ownerSync(ctx, connectionId, { refresh: false });
+	}
+});
+
+/** A sync the owner started, so it runs even while the Bank Connection needs them. */
+async function ownerSync(
+	ctx: ActionCtx,
+	connectionId: Id<'bankConnections'>,
+	{ refresh }: { refresh: boolean }
+): Promise<Infer<typeof ownerSyncResult>> {
+	const outcome = await runEffect(
+		syncConnection(connectionId, { refresh, resume: true }).pipe(Effect.provide(liveLayer(ctx))),
+		toPublicError
+	);
+	if (outcome.kind === 'missing') throw publicError('NOT_FOUND');
+	// `resume` means it is never paused.
+	if (outcome.kind === 'paused') throw new Error('An owner sync was paused');
+	if (outcome.kind !== 'synced') return outcome;
+	return { kind: 'synced', added: outcome.added, matched: outcome.matched };
+}
 
 /**
  * Connects Budge to an existing Plaid Item, run by the owner from the Convex dashboard or CLI. It
@@ -112,6 +168,24 @@ export const setup = internalAction({
 		)
 });
 
+/**
+ * A retry after a short-lived failure. Its own failure is already recorded or retried again; only
+ * a defect surfaces.
+ */
+export const retrySync = internalAction({
+	args: { connectionId: v.id('bankConnections'), attempt: v.number() },
+	returns: v.null(),
+	handler: async (ctx, { connectionId, attempt }) => {
+		await Effect.runPromise(
+			syncConnection(connectionId, { refresh: false, attempt }).pipe(
+				Effect.ignore,
+				Effect.provide(liveLayer(ctx))
+			)
+		);
+		return null;
+	}
+});
+
 function liveLayer(ctx: ActionCtx) {
 	return Layer.mergeAll(
 		PlaidClient.layerLive({
@@ -125,25 +199,82 @@ function liveLayer(ctx: ActionCtx) {
 }
 
 function toPublicError(error: SyncError): PublicError {
-	if (error._tag === 'PlaidApi' && error.error_code === 'ITEM_LOGIN_REQUIRED') {
-		return { code: 'BANK_CONNECTION_NEEDS_LOGIN', message: 'The bank needs you to sign in again.' };
+	if (failureOf(error).status === 'needsAttention') {
+		return { code: 'BANK_CONNECTION_NEEDS_LOGIN', message: 'The bank needs you to reconnect.' };
 	}
-	return { code: 'BANK_UNAVAILABLE', message: "Couldn't sync with the bank; try again later." };
+	return { code: 'BANK_UNAVAILABLE', message: "Couldn't reach the bank; try again later." };
 }
 
 // The mutations sync runs (lib/sync.ts). Each checks the lease it was given is still the one held.
 
+/**
+ * Plaid's word, outside a sync, about an Item: a code such as `PENDING_DISCONNECT` or
+ * `USER_PERMISSION_REVOKED` that needs the owner pauses its Bank Connection's sync until Reconnect.
+ * Any other code, or an Item Budge doesn't know, changes nothing.
+ */
+export const flagItem = internalMutation({
+	args: { itemId: v.string(), code: v.string() },
+	returns: v.null(),
+	handler: async (ctx, { itemId, code }) => {
+		const failure = failureOfPlaidCode(code);
+		if (failure.status !== 'needsAttention') return null;
+		const connection = await ctx.db
+			.query('bankConnections')
+			.withIndex('by_itemId', (q) => q.eq('provider.itemId', itemId))
+			.first();
+		if (connection === null) return null;
+		await ctx.db.patch('bankConnections', connection._id, {
+			status: 'needsAttention',
+			lastError: { at: Date.now(), message: failure.message }
+		});
+		return null;
+	}
+});
+
+/** The Bank Connection's Plaid Item and sealed token, for Reconnect. */
+export const credentials = internalQuery({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.union(
+		v.literal('missing'),
+		v.literal('noToken'),
+		v.object({ itemId: v.string(), encryptedToken: v.string() })
+	),
+	handler: async (ctx, { connectionId }) => {
+		const connection = await ctx.db.get('bankConnections', connectionId);
+		if (connection === null) return 'missing' as const;
+		const { provider } = connection;
+		if (provider.kind !== 'plaid') return 'noToken' as const;
+		return { itemId: provider.itemId, encryptedToken: provider.encryptedToken };
+	}
+});
+
+/** Records when the bank's consent ends, as Plaid last reported it. */
+export const recordConsent = internalMutation({
+	args: {
+		connectionId: v.id('bankConnections'),
+		consentExpiresAt: v.union(v.number(), v.null())
+	},
+	returns: v.null(),
+	handler: async (ctx, { connectionId, consentExpiresAt }) => {
+		await ctx.db.patch('bankConnections', connectionId, {
+			consentExpiresAt: consentExpiresAt ?? undefined
+		});
+		return null;
+	}
+});
+
 /** Takes the sync lease for about two minutes, unless another sync holds it. */
 export const takeLease = internalMutation({
-	args: { connectionId: v.id('bankConnections') },
+	args: { connectionId: v.id('bankConnections'), resume: v.boolean() },
 	returns: leaseResult,
-	handler: async (ctx, { connectionId }) => {
+	handler: async (ctx, { connectionId, resume }) => {
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (connection === null) return { kind: 'missing' as const };
 		const now = Date.now();
 		if ((connection.syncLeaseUntil ?? 0) > now) return { kind: 'busy' as const };
 		const { provider } = connection;
 		if (provider.kind !== 'plaid') return { kind: 'noToken' as const };
+		if (connection.status === 'needsAttention' && !resume) return { kind: 'paused' as const };
 		const cutoverDate = await requireCutoverDate(ctx);
 		const lease = now + LEASE_MS;
 		await ctx.db.patch('bankConnections', connectionId, { syncLeaseUntil: lease });
@@ -235,17 +366,30 @@ export const renewLease = internalMutation({
 	}
 });
 
-/** Records why a sync failed and releases its lease, unless a newer sync has taken over. */
+/**
+ * Releases a failed sync's lease, unless a newer sync has taken over. A short-lived failure is
+ * retried quietly, with a longer wait each time, until the retries run out; any other failure, or
+ * the last retry's, is recorded for the owner. A failure only the owner can fix pauses sync.
+ */
 export const fail = internalMutation({
 	args: failArgs,
 	returns: v.null(),
-	handler: async (ctx, { connectionId, lease, message, needsLogin }) => {
+	handler: async (ctx, { connectionId, lease, attempt, message, status }) => {
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (connection?.syncLeaseUntil !== lease) return null;
+		const delay = status === 'shortLived' ? RETRY_DELAYS_MS[attempt] : undefined;
+		if (delay !== undefined) {
+			await ctx.scheduler.runAfter(delay, internal.bankConnections.retrySync, {
+				connectionId,
+				attempt: attempt + 1
+			});
+			await ctx.db.patch('bankConnections', connectionId, { syncLeaseUntil: undefined });
+			return null;
+		}
 		await ctx.db.patch('bankConnections', connectionId, {
 			syncLeaseUntil: undefined,
 			lastError: { at: Date.now(), message },
-			...(needsLogin ? { status: 'needsAttention' as const } : {})
+			...(status === 'needsAttention' ? { status } : {})
 		});
 		return null;
 	}

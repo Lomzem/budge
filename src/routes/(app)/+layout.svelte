@@ -3,6 +3,7 @@
 
 	import { api } from '$convex/_generated/api';
 	import { Accounts, setAccounts } from '$lib/accounts.svelte';
+	import { BankConnections, setBankConnections } from '$lib/bankConnections.svelte';
 	import { BudgetMonth, setBudgetMonth } from '$lib/budget.svelte';
 	import AccountSidebar from '$lib/components/shell/account-sidebar.svelte';
 	import AppMenu from '$lib/components/shell/app-menu.svelte';
@@ -19,7 +20,10 @@
 	const auth = useAuth();
 	// Nothing shows until the backend agrees this is the owner.
 	const whoami = useQuery(api.owner.whoami, () => (auth.isAuthenticated ? {} : 'skip'));
-	setAccounts(new Accounts(() => auth.isAuthenticated));
+	const accounts = new Accounts(() => auth.isAuthenticated);
+	setAccounts(accounts);
+	// Waits, like the rest of the sidebar, until the owner's Accounts load.
+	setBankConnections(new BankConnections(() => accounts.loaded));
 	const budget = new BudgetMonth(() => auth.isAuthenticated);
 	setBudgetMonth(budget);
 
