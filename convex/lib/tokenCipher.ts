@@ -41,8 +41,9 @@ export class TokenCipher extends Context.Service<TokenCipher, TokenCipherShape>(
 function importKey(key: string | undefined): Effect.Effect<CryptoKey, TokenCipherError> {
 	return Effect.cached(
 		Effect.gen(function* () {
-			const bytes = key === undefined ? undefined : fromBase64(key);
-			if (bytes?.length !== KEY_BYTES) return yield* new TokenCipherError();
+			if (key === undefined) return yield* new TokenCipherError();
+			const bytes = yield* fromBase64(key);
+			if (bytes.length !== KEY_BYTES) return yield* new TokenCipherError();
 			return yield* attempt(() =>
 				crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt'])
 			);
@@ -69,11 +70,11 @@ function makeCipher(key: Effect.Effect<CryptoKey, TokenCipherError>): TokenCiphe
 		decrypt: (sealed, context) =>
 			Effect.gen(function* () {
 				const [version, iv, data] = sealed.split('.');
-				const ivBytes = iv === undefined ? undefined : fromBase64(iv);
-				const dataBytes = data === undefined ? undefined : fromBase64(data);
-				if (version !== VERSION || ivBytes === undefined || dataBytes === undefined) {
+				if (version !== VERSION || iv === undefined || data === undefined) {
 					return yield* new TokenCipherError();
 				}
+				const ivBytes = yield* fromBase64(iv);
+				const dataBytes = yield* fromBase64(data);
 				const cryptoKey = yield* key;
 				const opened = yield* attempt(() =>
 					crypto.subtle.decrypt(
@@ -95,10 +96,9 @@ function toBase64(bytes: Uint8Array): string {
 	return btoa(String.fromCharCode(...bytes));
 }
 
-function fromBase64(text: string): Uint8Array<ArrayBuffer> | undefined {
-	try {
-		return Uint8Array.from(atob(text), (char) => char.charCodeAt(0));
-	} catch {
-		return undefined;
-	}
+function fromBase64(text: string): Effect.Effect<Uint8Array<ArrayBuffer>, TokenCipherError> {
+	return Effect.try({
+		try: () => Uint8Array.from(atob(text), (char) => char.charCodeAt(0)),
+		catch: () => new TokenCipherError()
+	});
 }

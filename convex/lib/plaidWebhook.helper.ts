@@ -1,6 +1,8 @@
 // Signs webhooks the way Plaid does, under a key made up for each test. The bundler skips files
 // with more than one dot, so this never deploys.
 
+import { assert } from 'vitest';
+
 import type { WebhookKey } from './plaidClient';
 
 const encoder = new TextEncoder();
@@ -35,7 +37,7 @@ export async function webhookSigner(kid = 'key-synthetic-1') {
 		'verify'
 	]);
 	const jwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
-	if (jwk.x === undefined || jwk.y === undefined) throw new Error('expected an EC key');
+	assert(jwk.x !== undefined && jwk.y !== undefined, 'expected an EC key');
 	const key: WebhookKey = { kty: 'EC', crv: 'P-256', x: jwk.x, y: jwk.y, expiredAt: null };
 	/** The key as `/webhook_verification_key/get` returns it. */
 	const wireKey = {

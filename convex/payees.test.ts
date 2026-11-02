@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -114,7 +114,7 @@ describe('Payee memory', () => {
 				paginationOpts: { numItems: 50, cursor: null }
 			})
 		).page;
-		if (!startingRow?.categoryId) throw new Error('expected a starting row');
+		assert(startingRow?.categoryId, 'expected a starting row');
 		// Editing the card's starting row keeps its Payment Category, and Budge remembers that.
 		await owner.mutation(api.transactions.update, {
 			transactionId: startingRow._id,
@@ -148,7 +148,7 @@ describe('rename memory', () => {
 		const { owner, checking, dining, rows, importCsv } = budget;
 		await importCsv([{ date: '2026-08-12', amount: -1_200, bankText: 'SQ *SAMPLE NOODLE 0042' }]);
 		const [imported] = await rows();
-		if (imported === undefined) throw new Error('no import');
+		assert(imported !== undefined, 'no import');
 		await owner.mutation(api.transactions.update, {
 			transactionId: imported._id,
 			accountId: checking,
@@ -182,7 +182,7 @@ describe('rename memory', () => {
 		const { owner, checking, dining, rows, importCsv } = await renameFirstImport();
 		await importCsv([{ date: '2026-08-14', amount: -900, bankText: 'SAMPLE NOODLE ONLINE' }]);
 		const online = byDate(await rows(), '2026-08-14');
-		if (online === undefined) throw new Error('no import');
+		assert(online !== undefined, 'no import');
 		await owner.mutation(api.transactions.update, {
 			transactionId: online._id,
 			accountId: checking,

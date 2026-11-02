@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
 import { api, internal } from './_generated/api';
@@ -23,7 +23,7 @@ function fakePlaid(signer: Signer) {
 	const paths: string[] = [];
 	const fetch = (input: RequestInfo | URL) => {
 		const url = new URL(input instanceof Request ? input.url : input);
-		if (url.host !== 'sandbox.plaid.com') throw new Error(`Unexpected request to ${url.host}`);
+		assert(url.host === 'sandbox.plaid.com', `Unexpected request to ${url.host}`);
 		paths.push(url.pathname);
 		const answer = (body: unknown) =>
 			Promise.resolve(
@@ -41,7 +41,7 @@ function fakePlaid(signer: Signer) {
 				// The same page every time, as a repeated or out-of-order update might bring.
 				return answer(syncPage);
 			default:
-				throw new Error(`Unexpected Plaid call ${url.pathname}`);
+				return assert.fail(`Unexpected Plaid call ${url.pathname}`);
 		}
 	};
 	return { paths, fetch };

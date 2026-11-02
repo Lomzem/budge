@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { api } from '$convex/_generated/api';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
@@ -11,7 +12,6 @@
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { formatDate } from '$lib/domain/dates';
 	import { parseCents } from '$lib/domain/money';
-	import { readPublicError } from '$lib/publicError';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
@@ -43,17 +43,15 @@
 			return;
 		}
 		saving = true;
-		try {
-			// A card's balance is what is owed, kept as a negative balance.
-			const startingBalance = kind === 'creditCard' ? -cents : cents;
+		// A card's balance is what is owed, kept as a negative balance.
+		const startingBalance = kind === 'creditCard' ? -cents : cents;
+		const added = await attempt(async () => {
 			const accountId = await createAccount({ name, kind, startingBalance });
 			open = false;
 			await goto(resolve('/(app)/accounts/[accountId]', { accountId }));
-		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't add the Account. Try again.";
-		} finally {
-			saving = false;
-		}
+		});
+		saving = false;
+		if (!added.ok) error = added.error?.message ?? "Budge couldn't add the Account. Try again.";
 	}
 </script>
 

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -50,7 +50,7 @@ async function budgetToReconcile() {
 		).page;
 	const account = async (accountId: Id<'accounts'>) => {
 		const found = (await owner.query(api.accounts.list, {})).find((a) => a._id === accountId);
-		if (found === undefined) throw new Error('No such Account');
+		assert(found !== undefined, 'No such Account');
 		return found;
 	};
 	const view = () => owner.query(api.budget.month, { month: '2026-08', today: '2026-08-31' });
@@ -145,7 +145,7 @@ describe('reconciling a Cash Account', () => {
 		const b = await budgetToReconcile();
 		await b.reconcile(b.checking, 299_000);
 		const [adjustment] = await b.rows(b.checking);
-		if (adjustment === undefined) throw new Error('No adjustment');
+		assert(adjustment !== undefined, 'No adjustment');
 
 		await b.owner.mutation(api.transactions.update, {
 			transactionId: adjustment._id,
@@ -289,7 +289,7 @@ describe('a Reconciled Transaction', () => {
 		});
 		await b.reconcile(b.checking, 299_550);
 		const bankRow = (await b.rows(b.checking))[0]?.bankRows[0];
-		if (bankRow === undefined) throw new Error('No Bank Row');
+		assert(bankRow !== undefined, 'No Bank Row');
 
 		expect(
 			await publicErrorCode(b.owner.mutation(api.imports.unmatch, { importId: bankRow._id }))
@@ -308,7 +308,7 @@ describe('a Reconciled Transaction', () => {
 			memo: ''
 		});
 		const [cardSide] = await b.rows(b.discover);
-		if (cardSide === undefined) throw new Error('No card side');
+		assert(cardSide !== undefined, 'No card side');
 		await b.owner.mutation(api.transactions.setCleared, {
 			transactionId: cardSide._id,
 			cleared: true
@@ -348,7 +348,7 @@ describe('a Reconciled Transaction', () => {
 		await importRow(b.checking, '2026-08-20', -10_000);
 		const fromChecking = (await b.rows(b.checking)).find((row) => row.amount === -10_000);
 		const intoCard = (await b.rows(b.discover)).find((row) => row.amount === 10_000);
-		if (fromChecking === undefined || intoCard === undefined) throw new Error('No import');
+		assert(fromChecking !== undefined && intoCard !== undefined, 'No import');
 
 		expect(
 			await publicErrorCode(

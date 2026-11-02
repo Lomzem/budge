@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -171,7 +171,7 @@ describe('changing one side of a Transfer', () => {
 			...toSavings
 		});
 		const [intoSavings] = await backend.rows(savings);
-		if (intoSavings === undefined) throw new Error('The Transfer has no Savings side.');
+		assert(intoSavings !== undefined, 'The Transfer has no Savings side.');
 		return { ...backend, fromChecking, intoSavings: intoSavings._id };
 	}
 
@@ -266,7 +266,7 @@ describe('changing one side of a Transfer', () => {
 	test('giving one side a Category makes it an ordinary Transaction and deletes the other', async () => {
 		const { owner, checking, fromChecking, balances, rows, savings } = await transferred();
 		const readyToAssignId = (await owner.query(api.categories.list, {})).readyToAssignId;
-		if (readyToAssignId === null) throw new Error('Ready to Assign is missing.');
+		assert(readyToAssignId !== null, 'Ready to Assign is missing.');
 
 		await owner.mutation(api.transactions.update, {
 			transactionId: fromChecking,
@@ -318,7 +318,7 @@ describe('a Transfer and file imports', () => {
 			})
 		).toEqual({ added: 0, matched: 1, skipped: 0 });
 		const [intoSavings] = await backend.rows(savings);
-		if (intoSavings === undefined) throw new Error('The Transfer has no Savings side.');
+		assert(intoSavings !== undefined, 'The Transfer has no Savings side.');
 		return { ...backend, fromChecking, intoSavings: intoSavings._id };
 	}
 
@@ -373,7 +373,7 @@ describe('a Transfer and file imports', () => {
 			rows: [outOfChecking]
 		});
 		const [imported] = await rows(checking);
-		if (imported === undefined) throw new Error('The import added nothing.');
+		assert(imported !== undefined, 'The import added nothing.');
 
 		await owner.mutation(api.transactions.update, {
 			transactionId: imported._id,

@@ -2,11 +2,11 @@
 	import { useMutation, useQuery } from 'convex-svelte';
 
 	import { api } from '$convex/_generated/api';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { formatDate, localIsoDate } from '$lib/domain/dates';
-	import { readPublicError } from '$lib/publicError';
 
 	const settings = useQuery(api.settings.get, {});
 	const setCutoverDate = useMutation(api.settings.setCutoverDate);
@@ -26,14 +26,10 @@
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		saving = true;
-		try {
-			await setCutoverDate({ cutoverDate: date });
-			changing = false;
-		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't save the date. Try again.";
-		} finally {
-			saving = false;
-		}
+		const saved = await attempt(() => setCutoverDate({ cutoverDate: date }));
+		saving = false;
+		if (saved.ok) changing = false;
+		else error = saved.error?.message ?? "Budge couldn't save the date. Try again.";
 	}
 </script>
 

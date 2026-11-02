@@ -2,13 +2,13 @@
 	import XIcon from '@lucide/svelte/icons/x';
 
 	import type { Id } from '$convex/_generated/dataModel';
+	import { attempt } from '$lib/attempt';
 	import { getBudgetMonth, type BudgetView } from '$lib/budget.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { formatCents, parseCents } from '$lib/domain/money';
-	import { readPublicError } from '$lib/publicError';
 
 	import { availableStatus, describeTarget, paymentNotes } from './status';
 	import TargetBar from './target-bar.svelte';
@@ -86,45 +86,40 @@
 			return;
 		}
 		moving = true;
-		try {
-			if (direction === 'to') await budget.moveMoney(category.id, other, cents);
-			else await budget.moveMoney(other, category.id, cents);
-			amount = '';
-		} catch (thrown) {
-			moveError = readPublicError(thrown)?.message ?? "Budge couldn't move the money. Try again.";
-		} finally {
-			moving = false;
-		}
+		const moved = await attempt(() =>
+			direction === 'to'
+				? budget.moveMoney(category.id, other, cents)
+				: budget.moveMoney(other, category.id, cents)
+		);
+		moving = false;
+		if (moved.ok) amount = '';
+		else moveError = moved.error?.message ?? "Budge couldn't move the money. Try again.";
 	}
 
 	async function cover() {
 		coverError = '';
 		covering = true;
-		try {
-			await budget.cover(category.id);
-			// The Cover button goes once Available reaches zero, so keep keyboard focus in the inspector.
-			section?.focus();
-		} catch (thrown) {
-			coverError =
-				readPublicError(thrown)?.message ?? "Budge couldn't cover the Category. Try again.";
-		} finally {
-			covering = false;
+		const covered = await attempt(() => budget.cover(category.id));
+		covering = false;
+		if (!covered.ok) {
+			coverError = covered.error?.message ?? "Budge couldn't cover the Category. Try again.";
+			return;
 		}
+		// The Cover button goes once Available reaches zero, so keep keyboard focus in the inspector.
+		section?.focus();
 	}
 
 	async function assignTarget() {
 		assignError = '';
 		assigning = true;
-		try {
-			await budget.assignTarget(category.id);
-			// The Assign button goes once the Target is funded, so keep keyboard focus in the inspector.
-			section?.focus();
-		} catch (thrown) {
-			assignError =
-				readPublicError(thrown)?.message ?? "Budge couldn't assign the money. Try again.";
-		} finally {
-			assigning = false;
+		const assigned = await attempt(() => budget.assignTarget(category.id));
+		assigning = false;
+		if (!assigned.ok) {
+			assignError = assigned.error?.message ?? "Budge couldn't assign the money. Try again.";
+			return;
 		}
+		// The Assign button goes once the Target is funded, so keep keyboard focus in the inspector.
+		section?.focus();
 	}
 
 	function editTarget() {

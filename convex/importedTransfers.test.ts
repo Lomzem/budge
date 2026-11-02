@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -56,7 +56,7 @@ describe('a Transfer from an imported Transaction', () => {
 			await budgetWithTwoCashAccounts();
 		await importCsv(checking, outOfChecking);
 		const [imported] = await rows(checking);
-		if (imported === undefined) throw new Error('The import added nothing.');
+		assert(imported !== undefined, 'The import added nothing.');
 
 		await owner.mutation(api.transactions.update, asTransfer(imported, savings));
 
@@ -89,9 +89,7 @@ describe('when both sides are already imported', () => {
 		await backend.importCsv(backend.savings, intoSavings);
 		const [fromChecking] = await backend.rows(backend.checking);
 		const [toSavings] = await backend.rows(backend.savings);
-		if (fromChecking === undefined || toSavings === undefined) {
-			throw new Error('The imports added nothing.');
-		}
+		assert(fromChecking !== undefined && toSavings !== undefined, 'The imports added nothing.');
 		return { ...backend, fromChecking, toSavings };
 	}
 
@@ -187,7 +185,7 @@ describe('when both sides are already imported', () => {
 		const other = (await rows(savings)).find(
 			(row) => row.date === (imported ? '2026-08-22' : '2026-08-21') && row.amount === amount
 		);
-		if (other === undefined) throw new Error('The other Transaction is missing.');
+		assert(other !== undefined, 'The other Transaction is missing.');
 
 		expect(
 			await publicErrorCode(
@@ -211,7 +209,7 @@ test.each(['create-then-import', 'link-existing'] as const)(
 		if (path === 'link-existing') await importCsv(savings, intoSavings);
 		const [fromChecking] = await rows(checking);
 		const [toSavings] = await rows(savings);
-		if (fromChecking === undefined) throw new Error('The import added nothing.');
+		assert(fromChecking !== undefined, 'The import added nothing.');
 		await owner.mutation(api.transactions.update, {
 			...asTransfer(fromChecking, savings),
 			...(path === 'link-existing' && toSavings ? { transferTransactionId: toSavings._id } : {})
@@ -253,7 +251,7 @@ test.each(['create-then-import', 'link-existing'] as const)(
 		if (path === 'link-existing') await importCsv(card, intoCard);
 		const [fromChecking] = await rows(checking);
 		const [toCard] = await rows(card);
-		if (fromChecking === undefined) throw new Error('The import added nothing.');
+		assert(fromChecking !== undefined, 'The import added nothing.');
 		await owner.mutation(api.transactions.update, {
 			...asTransfer(fromChecking, card),
 			...(path === 'link-existing' && toCard ? { transferTransactionId: toCard._id } : {})
@@ -278,7 +276,7 @@ test('linking a split import as the other side leaves no split lines behind', as
 	await importCsv(savings, intoSavings);
 	const [fromChecking] = await rows(checking);
 	const [toSavings] = await rows(savings);
-	if (fromChecking === undefined || toSavings === undefined) throw new Error('No import');
+	assert(fromChecking !== undefined && toSavings !== undefined, 'No import');
 	await owner.mutation(api.transactions.update, {
 		transactionId: toSavings._id,
 		accountId: savings,

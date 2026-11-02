@@ -1,5 +1,5 @@
 import type { FunctionReturnType } from 'convex/server';
-import { describe, expect, test, vi } from 'vitest';
+import { assert, describe, expect, onTestFinished, test, vi } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -124,7 +124,7 @@ describe('text search', () => {
 			})
 		).page;
 		const bankRow = row?.bankRows[0];
-		if (bankRow === undefined) throw new Error('expected a Bank Row');
+		assert(bankRow !== undefined, 'expected a Bank Row');
 		const own = await owner.mutation(api.imports.unmatch, { importId: bankRow._id });
 
 		expect(await find({ search: 'roastery' })).toEqual([own]);
@@ -146,7 +146,7 @@ describe('text search', () => {
 		const first = await add({ payee: 'Lantern Grocer' });
 		const second = await add({ payee: 'Lantern Grocer', date: '2026-08-11' });
 		const payee = (await owner.query(api.payees.list, {})).find((p) => p.name === 'Lantern Grocer');
-		if (payee === undefined) throw new Error('expected the Payee');
+		assert(payee !== undefined, 'expected the Payee');
 
 		await owner.mutation(api.payees.rename, { payeeId: payee._id, name: 'Beacon Grocer' });
 
@@ -157,35 +157,32 @@ describe('text search', () => {
 
 	test('a rename reaches every Transaction of a Payee with many, in batches', async () => {
 		vi.useFakeTimers();
-		try {
-			const { t, owner, add, find, checking } = await budget();
-			await add({ payee: 'Lantern Grocer' });
-			const payee = (await owner.query(api.payees.list, {})).find(
-				(p) => p.name === 'Lantern Grocer'
-			);
-			if (payee === undefined) throw new Error('expected the Payee');
-			await t.run(async (ctx) => {
-				for (let i = 0; i < PAYEE_RENAME_BATCH * 2; i++) {
-					await ctx.db.insert('transactions', {
-						accountId: checking,
-						date: '2026-08-12',
-						amount: -100,
-						payeeId: payee._id,
-						cleared: 'uncleared',
-						approved: true,
-						searchText: 'Lantern Grocer'
-					});
-				}
-			});
-
-			await owner.mutation(api.payees.rename, { payeeId: payee._id, name: 'Beacon Grocer' });
-			await t.finishAllScheduledFunctions(() => vi.runAllTimers());
-
-			expect(await find({ search: 'lantern' })).toEqual([]);
-			expect(await find({ search: 'beacon' })).toHaveLength(PAYEE_RENAME_BATCH * 2 + 1);
-		} finally {
+		onTestFinished(() => {
 			vi.useRealTimers();
-		}
+		});
+		const { t, owner, add, find, checking } = await budget();
+		await add({ payee: 'Lantern Grocer' });
+		const payee = (await owner.query(api.payees.list, {})).find((p) => p.name === 'Lantern Grocer');
+		assert(payee !== undefined, 'expected the Payee');
+		await t.run(async (ctx) => {
+			for (let i = 0; i < PAYEE_RENAME_BATCH * 2; i++) {
+				await ctx.db.insert('transactions', {
+					accountId: checking,
+					date: '2026-08-12',
+					amount: -100,
+					payeeId: payee._id,
+					cleared: 'uncleared',
+					approved: true,
+					searchText: 'Lantern Grocer'
+				});
+			}
+		});
+
+		await owner.mutation(api.payees.rename, { payeeId: payee._id, name: 'Beacon Grocer' });
+		await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+
+		expect(await find({ search: 'lantern' })).toEqual([]);
+		expect(await find({ search: 'beacon' })).toHaveLength(PAYEE_RENAME_BATCH * 2 + 1);
 	});
 
 	test("renaming a Payee to another Payee's name, or blank, is refused", async () => {
@@ -193,7 +190,7 @@ describe('text search', () => {
 		await add({ payee: 'Lantern Grocer' });
 		await add({ payee: 'Harbor Bakery' });
 		const payee = (await owner.query(api.payees.list, {})).find((p) => p.name === 'Lantern Grocer');
-		if (payee === undefined) throw new Error('expected the Payee');
+		assert(payee !== undefined, 'expected the Payee');
 
 		for (const name of ['Harbor Bakery', '  ']) {
 			expect(
@@ -204,40 +201,39 @@ describe('text search', () => {
 
 	test('the backfill gives Transactions written before search their searchText', async () => {
 		vi.useFakeTimers();
-		try {
-			const { t, find, checking } = await budget();
-			await t.run(async (ctx) => {
-				const payeeId = await ctx.db.insert('payees', { name: 'Lantern Grocer' });
-				const id = await ctx.db.insert('transactions', {
-					accountId: checking,
-					date: '2026-08-12',
-					amount: -100,
-					payeeId,
-					memo: 'weekly basket',
-					cleared: 'uncleared',
-					approved: true
-				});
-				await ctx.db.insert('imports', {
-					source: 'csv',
-					accountId: checking,
-					date: '2026-08-12',
-					amount: -100,
-					bankText: 'SAMPLE GROCER 7781',
-					transactionId: id,
-					matched: false,
-					state: 'linked'
-				});
-			});
-			expect(await find({ search: 'lantern' })).toEqual([]);
-
-			await t.mutation(internal.migrations.backfillSearchText, { cursor: null });
-			await t.finishAllScheduledFunctions(() => vi.runAllTimers());
-
-			for (const word of ['lantern', 'basket', 'grocer']) {
-				expect(await find({ search: word })).toHaveLength(1);
-			}
-		} finally {
+		onTestFinished(() => {
 			vi.useRealTimers();
+		});
+		const { t, find, checking } = await budget();
+		await t.run(async (ctx) => {
+			const payeeId = await ctx.db.insert('payees', { name: 'Lantern Grocer' });
+			const id = await ctx.db.insert('transactions', {
+				accountId: checking,
+				date: '2026-08-12',
+				amount: -100,
+				payeeId,
+				memo: 'weekly basket',
+				cleared: 'uncleared',
+				approved: true
+			});
+			await ctx.db.insert('imports', {
+				source: 'csv',
+				accountId: checking,
+				date: '2026-08-12',
+				amount: -100,
+				bankText: 'SAMPLE GROCER 7781',
+				transactionId: id,
+				matched: false,
+				state: 'linked'
+			});
+		});
+		expect(await find({ search: 'lantern' })).toEqual([]);
+
+		await t.mutation(internal.migrations.backfillSearchText, { cursor: null });
+		await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+
+		for (const word of ['lantern', 'basket', 'grocer']) {
+			expect(await find({ search: word })).toHaveLength(1);
 		}
 	});
 });
@@ -269,7 +265,7 @@ describe('filters', () => {
 		const payees = await b.owner.query(api.payees.list, {});
 		const payeeId = (name: string) => {
 			const payee = payees.find((p) => p.name === name);
-			if (payee === undefined) throw new Error(`expected ${name}`);
+			assert(payee !== undefined, `expected ${name}`);
 			return payee._id;
 		};
 		return { ...b, ids, lantern: payeeId('Lantern Grocer'), bakery: payeeId('Harbor Bakery') };

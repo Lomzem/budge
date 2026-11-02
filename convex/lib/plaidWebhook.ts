@@ -3,7 +3,7 @@
 // https://plaid.com/docs/api/webhooks/webhook-verification/
 
 import { v } from 'convex/values';
-import { Context, Effect, Layer, Option, Schema } from 'effect';
+import { Context, Effect, Layer, Option, Result, Schema } from 'effect';
 
 import { PlaidClient, type WebhookKey } from './plaidClient';
 
@@ -82,27 +82,49 @@ export const verifyWebhook = Effect.fnUntraced(function* (input: {
 	/** Milliseconds since the epoch. */
 	now: number;
 }): Effect.fn.Return<boolean, KeyLookupLimited, WebhookKeys> {
-	const parts = input.token?.split('.') ?? [];
-	const [encodedHeader, encodedPayload, encodedSignature] = parts;
-	if (
-		parts.length !== 3 ||
-		encodedHeader === undefined ||
-		encodedPayload === undefined ||
-		encodedSignature === undefined
-	) {
-		return false;
-	}
-	const header = decodeJsonPart(encodedHeader);
-	if (header?.alg !== 'ES256' || typeof header.kid !== 'string') return false;
+	const token = readToken(input.token);
+	if (token === null) return false;
 
-	const key = yield* (yield* WebhookKeys).find(header.kid);
+	const key = yield* (yield* WebhookKeys).find(token.kid);
 	if (Option.isNone(key)) return false;
-	const { kty, crv, x, y, expiredAt } = key.value;
+	const { expiredAt } = key.value;
 	if (expiredAt !== null && expiredAt * 1000 <= input.now) return false;
+	if (!(yield* signedBy(key.value, token))) return false;
 
+	if (Math.abs(input.now / 1000 - token.iat) > MAX_AGE_SECONDS) return false;
+	const digest = yield* attempt(() => crypto.subtle.digest('SHA-256', input.body));
+	if (digest === null) return false;
+	return equalInConstantTime(toHex(new Uint8Array(digest)), token.bodyHash);
+});
+
+/** A Plaid webhook token, split and decoded; not yet checked against any key. */
+interface WebhookToken {
+	kid: string;
+	iat: number;
+	bodyHash: string;
+	/** The bytes the signature covers: the encoded header and payload. */
+	signingInput: Uint8Array<ArrayBuffer>;
+	signature: Uint8Array<ArrayBuffer>;
+}
+
+/** The token's parts, or `null` unless it is a three-part ES256 JWT with Plaid's claims. */
+function readToken(token: string | null): WebhookToken | null {
+	const parts = token?.split('.') ?? [];
+	if (parts.length !== 3) return null;
+	const [encodedHeader = '', encodedPayload = '', encodedSignature = ''] = parts;
+	const header = decodeJsonPart(encodedHeader);
+	if (header?.alg !== 'ES256' || typeof header.kid !== 'string') return null;
+	const { iat, request_body_sha256: bodyHash } = decodeJsonPart(encodedPayload) ?? {};
+	if (typeof iat !== 'number' || typeof bodyHash !== 'string') return null;
 	const signature = fromBase64url(encodedSignature);
-	if (signature === null) return false;
-	const signed = yield* attempt(async () => {
+	if (signature === null) return null;
+	const signingInput = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`);
+	return { kid: header.kid, iat, bodyHash, signingInput, signature };
+}
+
+/** Whether the token's signature holds under `key`. */
+function signedBy({ kty, crv, x, y }: WebhookKey, token: WebhookToken): Effect.Effect<boolean> {
+	return attempt(async () => {
 		const publicKey = await crypto.subtle.importKey(
 			'jwk',
 			{ kty, crv, x, y },
@@ -113,20 +135,11 @@ export const verifyWebhook = Effect.fnUntraced(function* (input: {
 		return await crypto.subtle.verify(
 			{ name: 'ECDSA', hash: 'SHA-256' },
 			publicKey,
-			signature,
-			new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
+			token.signature,
+			token.signingInput
 		);
-	});
-	if (signed !== true) return false;
-
-	const payload = decodeJsonPart(encodedPayload);
-	const { iat, request_body_sha256: bodyHash } = payload ?? {};
-	if (typeof iat !== 'number' || typeof bodyHash !== 'string') return false;
-	if (Math.abs(input.now / 1000 - iat) > MAX_AGE_SECONDS) return false;
-	const digest = yield* attempt(() => crypto.subtle.digest('SHA-256', input.body));
-	if (digest === null) return false;
-	return equalInConstantTime(toHex(new Uint8Array(digest)), bodyHash);
-});
+	}).pipe(Effect.map((signed) => signed === true));
+}
 
 /** A WebCrypto call; a failure becomes `null`. */
 function attempt<A>(run: () => Promise<A>): Effect.Effect<A | null> {
@@ -134,11 +147,7 @@ function attempt<A>(run: () => Promise<A>): Effect.Effect<A | null> {
 }
 
 function parseJson(text: string): unknown {
-	try {
-		return JSON.parse(text);
-	} catch {
-		return undefined;
-	}
+	return Result.getOrUndefined(Result.try(() => JSON.parse(text) as unknown));
 }
 
 function decodeJsonPart(part: string): Record<string, unknown> | null {
@@ -153,13 +162,10 @@ function decodeJsonPart(part: string): Record<string, unknown> | null {
 function fromBase64url(text: string): Uint8Array<ArrayBuffer> | null {
 	if (!/^[A-Za-z0-9_-]*$/.test(text)) return null;
 	const base64 = text.replaceAll('-', '+').replaceAll('_', '/');
-	try {
-		return Uint8Array.from(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')), (c) =>
-			c.charCodeAt(0)
-		);
-	} catch {
-		return null;
-	}
+	const decoded = Result.try(() => atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')));
+	return Result.isSuccess(decoded)
+		? Uint8Array.from(decoded.success, (c) => c.charCodeAt(0))
+		: null;
 }
 
 function toHex(bytes: Uint8Array): string {

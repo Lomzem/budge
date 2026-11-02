@@ -180,16 +180,7 @@ export async function saveTransaction(
 		approved: true
 	};
 	requireLockKept(existing, fields);
-	if (fields.payeeId !== undefined) {
-		if (fields.categoryId !== undefined) {
-			await rememberCategory(ctx, fields.payeeId, fields.categoryId);
-		}
-		if (existing !== null && existing.payeeId !== fields.payeeId) {
-			for (const bankRow of await bankRowsOf(ctx, existing._id)) {
-				await rememberRename(ctx, bankRow.bankText, fields.payeeId);
-			}
-		}
-	}
+	await rememberPayee(ctx, existing, fields);
 	const counterpart =
 		existing?.transferTransactionId === undefined
 			? null
@@ -204,6 +195,48 @@ export async function saveTransaction(
 		return existing._id;
 	}
 
+	await requireTransfer(ctx, transferAccountId, fields, lines);
+	const otherSide = await otherSideOf(
+		ctx,
+		counterpart,
+		transferAccountId,
+		transferTransactionId,
+		fields
+	);
+	const other = otherSideFields(transferAccountId, fields, otherSide);
+	requireLockKept(otherSide.existing, other, true);
+	return await writeTransfer(
+		ctx,
+		{ existing, fields },
+		{ existing: otherSide.existing, fields: other }
+	);
+}
+
+/**
+ * Gives the Payee's memory the Category it was saved with, and, when an imported Transaction's
+ * Payee changes, renames each of its Bank Texts to the new Payee.
+ */
+async function rememberPayee(
+	ctx: MutationCtx,
+	existing: Doc<'transactions'> | null,
+	fields: TransactionFields
+) {
+	const { payeeId, categoryId } = fields;
+	if (payeeId === undefined) return;
+	if (categoryId !== undefined) await rememberCategory(ctx, payeeId, categoryId);
+	if (existing === null || existing.payeeId === payeeId) return;
+	for (const bankRow of await bankRowsOf(ctx, existing._id)) {
+		await rememberRename(ctx, bankRow.bankText, payeeId);
+	}
+}
+
+/** Refuses a Transfer with `transferAccountId` that isn't one Budge records. */
+async function requireTransfer(
+	ctx: MutationCtx,
+	transferAccountId: Id<'accounts'>,
+	fields: TransactionFields,
+	lines: SplitLine[]
+) {
 	const target = await ctx.db.get('accounts', transferAccountId);
 	if (target === null) throw publicError('NOT_FOUND');
 	if (transferAccountId === fields.accountId) {
@@ -222,37 +255,55 @@ export async function saveTransaction(
 	if (fields.categoryId !== undefined || fields.payeeId !== undefined || lines.length > 0) {
 		throw publicError('INVALID_INPUT', 'A Transfer has no Category or Payee.');
 	}
-	let otherSide = counterpart;
-	let linking = false;
-	if (transferTransactionId !== undefined && transferTransactionId !== counterpart?._id) {
-		const candidates = await transferCandidatesOf(
-			ctx,
-			transferAccountId,
-			fields.date,
-			fields.amount
-		);
-		const linked = candidates.find((candidate) => candidate._id === transferTransactionId);
-		if (linked === undefined) {
-			throw publicError(
-				'INVALID_INPUT',
-				'Link an imported Transaction with the opposite amount, within 10 days.'
-			);
-		}
-		if (counterpart !== null) await deleteOtherSide(ctx, counterpart);
-		otherSide = linked;
-		linking = true;
+}
+
+interface OtherSide {
+	existing: Doc<'transactions'> | null;
+	/** The owner picked an imported Transaction to become the other side. */
+	linking: boolean;
+}
+
+/**
+ * The Transfer's other side: the imported Transaction `transferTransactionId`, in place of the
+ * `counterpart` it had, or else that `counterpart`.
+ */
+async function otherSideOf(
+	ctx: MutationCtx,
+	counterpart: Doc<'transactions'> | null,
+	transferAccountId: Id<'accounts'>,
+	transferTransactionId: Id<'transactions'> | undefined,
+	fields: TransactionFields
+): Promise<OtherSide> {
+	if (transferTransactionId === undefined || transferTransactionId === counterpart?._id) {
+		return { existing: counterpart, linking: false };
 	}
-	const other: TransactionFields = {
+	const candidates = await transferCandidatesOf(ctx, transferAccountId, fields.date, fields.amount);
+	const linked = candidates.find((candidate) => candidate._id === transferTransactionId);
+	if (linked === undefined) {
+		throw publicError(
+			'INVALID_INPUT',
+			'Link an imported Transaction with the opposite amount, within 10 days.'
+		);
+	}
+	if (counterpart !== null) await deleteOtherSide(ctx, counterpart);
+	return { existing: linked, linking: true };
+}
+
+/** The other side's fields: the opposite amount on the same date, in `transferAccountId`. */
+function otherSideFields(
+	transferAccountId: Id<'accounts'>,
+	fields: TransactionFields,
+	{ existing, linking }: OtherSide
+): TransactionFields {
+	return {
 		accountId: transferAccountId,
 		date: fields.date,
 		amount: -fields.amount,
 		...(fields.memo === undefined ? {} : { memo: fields.memo }),
-		cleared: otherSide?.cleared ?? 'uncleared',
+		cleared: existing?.cleared ?? 'uncleared',
 		// Picking the import to link reviews it.
-		approved: linking || otherSide?.approved !== false
+		approved: linking || existing?.approved !== false
 	};
-	requireLockKept(otherSide, other, true);
-	return await writeTransfer(ctx, { existing, fields }, { existing: otherSide, fields: other });
 }
 
 /**

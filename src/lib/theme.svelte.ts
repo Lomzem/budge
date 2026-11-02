@@ -1,3 +1,4 @@
+import { Result } from 'effect';
 import { createContext } from 'svelte';
 import { MediaQuery } from 'svelte/reactivity';
 
@@ -11,12 +12,9 @@ function isThemeChoice(value: unknown): value is ThemeChoice {
 }
 
 function storedChoice(): ThemeChoice {
-	try {
-		const stored = localStorage.getItem(THEME_STORAGE_KEY);
-		return isThemeChoice(stored) ? stored : 'system';
-	} catch {
-		return 'system';
-	}
+	// Storage can be blocked; the theme then follows the system.
+	const stored = Result.try(() => localStorage.getItem(THEME_STORAGE_KEY));
+	return Result.isSuccess(stored) && isThemeChoice(stored.success) ? stored.success : 'system';
 }
 
 /** The owner's light or dark theme. Construct once, in the root layout, and share by context. */
@@ -39,11 +37,10 @@ export class Theme {
 
 	choose(choice: ThemeChoice) {
 		this.choice = choice;
-		try {
+		// Storage can be blocked; the theme still changes for this visit.
+		Result.try(() => {
 			localStorage.setItem(THEME_STORAGE_KEY, choice);
-		} catch {
-			// Storage can be blocked; the theme still changes for this visit.
-		}
+		});
 	}
 }
 

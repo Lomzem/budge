@@ -2,11 +2,11 @@
 	import { useMutation } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { readPublicError } from '$lib/publicError';
 
 	let {
 		open = $bindable(false),
@@ -49,17 +49,18 @@
 			return;
 		}
 		saving = true;
-		try {
+		const added = await attempt(async () => {
 			if (kind === 'group') await createGroup({ name });
 			else if (group) await createCategory({ groupId: group.id, name });
+		});
+		saving = false;
+		if (added.ok) {
 			open = false;
-		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't add it. Try again.";
-			// The dialog may have been closed while it saved: reopen it to show what failed.
-			open = true;
-		} finally {
-			saving = false;
+			return;
 		}
+		error = added.error?.message ?? "Budge couldn't add it. Try again.";
+		// The dialog may have been closed while it saved: reopen it to show what failed.
+		open = true;
 	}
 </script>
 

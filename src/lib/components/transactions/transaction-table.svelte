@@ -5,6 +5,7 @@
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import * as Table from '$lib/components/ui/table';
@@ -67,12 +68,12 @@
 	const hasSecond = $derived(!filtering || filters.categoryId !== undefined);
 	const second = usePaginatedQuery(
 		api.transactions.list,
-		() =>
-			first.status !== 'Exhausted' || !hasSecond
-				? 'skip'
-				: filtering
-					? { ...scope, ...filters, splitLines: true }
-					: { ...scope, approval: 'approved' as const },
+		() => {
+			if (first.status !== 'Exhausted' || !hasSecond) return 'skip';
+			return filtering
+				? { ...scope, ...filters, splitLines: true }
+				: { ...scope, approval: 'approved' as const };
+		},
 		{ initialNumItems: PAGE_SIZE }
 	);
 	const unapprovedCount = useQuery(api.transactions.unapprovedCount, () => scope);
@@ -100,6 +101,13 @@
 		dialogOpen = true;
 	}
 
+	/** A Transfer shows the other Account in place of a Category, and a split "Split". */
+	function categoryOf(row: Row) {
+		if (row.transfer) return `${row.amount < 0 ? 'To' : 'From'} ${row.transfer.accountName}`;
+		if (row.splits) return 'Split';
+		return row.categoryName ?? 'Uncategorized';
+	}
+
 	function edit(row: Row) {
 		editing = row;
 		dialogOpen = true;
@@ -107,32 +115,22 @@
 
 	async function toggleCleared(row: Row, cleared: boolean) {
 		rowError = '';
-		try {
-			await setCleared({ transactionId: row._id, cleared });
-		} catch {
-			rowError = "Budge couldn't change Cleared. Try again.";
-		}
+		const changed = await attempt(() => setCleared({ transactionId: row._id, cleared }));
+		if (!changed.ok) rowError = "Budge couldn't change Cleared. Try again.";
 	}
 
 	async function approveRow(row: Row) {
 		rowError = '';
-		try {
-			await approve({ transactionId: row._id });
-		} catch {
-			rowError = "Budge couldn't approve the Transaction. Try again.";
-		}
+		const approved = await attempt(() => approve({ transactionId: row._id }));
+		if (!approved.ok) rowError = "Budge couldn't approve the Transaction. Try again.";
 	}
 
 	async function approveEvery() {
 		rowError = '';
 		approvingAll = true;
-		try {
-			await approveAll(scope);
-		} catch {
-			rowError = "Budge couldn't approve the Transactions. Try again.";
-		} finally {
-			approvingAll = false;
-		}
+		const approved = await attempt(() => approveAll(scope));
+		approvingAll = false;
+		if (!approved.ok) rowError = "Budge couldn't approve the Transactions. Try again.";
 	}
 </script>
 
@@ -173,12 +171,7 @@
 			<Table.Body>
 				{#each rows as row (row._id)}
 					{@const payee = row.payeeName ?? (row.transfer ? 'Transfer' : 'No Payee')}
-					<!-- A Transfer shows the other Account in place of a Category, and a split "Split". -->
-					{@const category = row.transfer
-						? `${row.amount < 0 ? 'To' : 'From'} ${row.transfer.accountName}`
-						: row.splits
-							? 'Split'
-							: (row.categoryName ?? 'Uncategorized')}
+					{@const category = categoryOf(row)}
 					{@const categoryClass =
 						row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
 					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
@@ -263,11 +256,13 @@
 						<Table.Row>
 							<Table.Cell colspan={allAccounts ? 8 : 7}>
 								<span class="text-muted-foreground">
-									{loading
-										? 'Loading…'
-										: filtering
-											? 'No Transactions match.'
-											: 'No Transactions yet.'}
+									{#if loading}
+										Loading…
+									{:else if filtering}
+										No Transactions match.
+									{:else}
+										No Transactions yet.
+									{/if}
 								</span>
 							</Table.Cell>
 						</Table.Row>
