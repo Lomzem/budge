@@ -305,19 +305,23 @@ async function writeTransfer(ctx: MutationCtx, first: Side, second: Side) {
 	await ctx.db.replace('transactions', firstId, firstFields);
 	await countTransaction(ctx, firstFields, 1);
 	await countTransaction(ctx, secondFields, 1);
+	await refreshSearchText(ctx, firstId);
+	await refreshSearchText(ctx, secondId);
 	return firstId;
 }
 
-// Every Transaction write goes through these three, so the monthly totals and split lines stay in
-// step. `lines` are a split's, given with `split: true` in `fields`.
+// Every Transaction write goes through these three, so the monthly totals, split lines, and
+// `searchText` stay in step. `lines` are a split's, given with `split: true` in `fields`.
 
 export async function insertTransaction(
 	ctx: MutationCtx,
 	fields: TransactionFields,
-	lines: readonly SplitLine[] = []
+	lines: readonly SplitLine[] = [],
+	{ deferSearchText = false }: { deferSearchText?: boolean } = {}
 ) {
 	const id = await ctx.db.insert('transactions', fields);
 	await putIn(ctx, id, fields, lines);
+	if (!deferSearchText) await refreshSearchText(ctx, id);
 	return id;
 }
 
@@ -331,6 +335,30 @@ export async function replaceTransaction(
 	await takeOut(ctx, existing);
 	await ctx.db.replace('transactions', existing._id, fields);
 	await putIn(ctx, existing._id, fields, lines);
+	await refreshSearchText(ctx, existing._id);
+}
+
+/**
+ * Rewrites a Transaction's `searchText` from its Payee's name, its memo, its split memos, and its
+ * linked Bank Text. Call it after anything those come from changes.
+ */
+export async function refreshSearchText(ctx: MutationCtx, transactionId: Id<'transactions'>) {
+	const transaction = await ctx.db.get('transactions', transactionId);
+	if (transaction === null) return;
+	const payee =
+		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
+	const lines = transaction.split === true ? await splitLinesOf(ctx, transactionId) : [];
+	const searchText = [
+		payee?.name,
+		transaction.memo,
+		...lines.map((line) => line.memo),
+		...(await bankRowsOf(ctx, transactionId)).map((bankRow) => bankRow.bankText)
+	]
+		.filter((part) => part !== undefined && part !== '')
+		.join(' ');
+	if (transaction.searchText !== searchText) {
+		await ctx.db.patch('transactions', transactionId, { searchText });
+	}
 }
 
 /** Counts a written Transaction, and writes its split lines with its date and counts them. */

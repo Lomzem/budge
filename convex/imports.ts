@@ -6,7 +6,7 @@ import { applyBankRows, fileRow, fileSource, insertImported, planImport } from '
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { ImportedPayees } from './lib/payees';
-import { bankRowsOf, requireUnlocked } from './lib/transactions';
+import { bankRowsOf, refreshSearchText, requireUnlocked } from './lib/transactions';
 
 const candidate = v.object({
 	_id: v.id('transactions'),
@@ -117,6 +117,8 @@ export const unmatch = mutation({
 		if (matchedTransaction !== null) requireUnlocked(matchedTransaction, 'to unmatch it');
 		const transactionId = await insertImported(ctx, bankRow.accountId, bankRow);
 		await ctx.db.patch('imports', importId, { transactionId, matched: false });
+		await refreshSearchText(ctx, transactionId);
+		await refreshSearchText(ctx, matchedId);
 		const stillLinked = await bankRowsOf(ctx, matchedId);
 		if (stillLinked.length === 0) {
 			await ctx.db.patch('transactions', matchedId, { cleared: 'uncleared', approved: true });
