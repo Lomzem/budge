@@ -8,6 +8,11 @@
  * @module
  */
 
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
 import type * as accounts from "../accounts.js";
 import type * as bankConnections from "../bankConnections.js";
 import type * as budget from "../budget.js";
@@ -23,8 +28,10 @@ import type * as lib_payees from "../lib/payees.js";
 import type * as lib_plaidClient from "../lib/plaidClient.js";
 import type * as lib_publicError from "../lib/publicError.js";
 import type * as lib_runEffect from "../lib/runEffect.js";
+import type * as lib_search from "../lib/search.js";
 import type * as lib_settings from "../lib/settings.js";
 import type * as lib_sync from "../lib/sync.js";
+import type * as lib_targets from "../lib/targets.js";
 import type * as lib_tokenCipher from "../lib/tokenCipher.js";
 import type * as lib_transactions from "../lib/transactions.js";
 import type * as migrations from "../migrations.js";
@@ -36,12 +43,14 @@ import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
 import type * as transactions from "../transactions.js";
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
-
+/**
+ * A utility for referencing Convex functions in your app's API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
   bankConnections: typeof bankConnections;
@@ -58,8 +67,10 @@ declare const fullApi: ApiFromModules<{
   "lib/plaidClient": typeof lib_plaidClient;
   "lib/publicError": typeof lib_publicError;
   "lib/runEffect": typeof lib_runEffect;
+  "lib/search": typeof lib_search;
   "lib/settings": typeof lib_settings;
   "lib/sync": typeof lib_sync;
+  "lib/targets": typeof lib_targets;
   "lib/tokenCipher": typeof lib_tokenCipher;
   "lib/transactions": typeof lib_transactions;
   migrations: typeof migrations;
@@ -71,31 +82,11 @@ declare const fullApi: ApiFromModules<{
   settings: typeof settings;
   transactions: typeof transactions;
 }>;
-
-/**
- * A utility for referencing Convex functions in your app's public API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
-
-/**
- * A utility for referencing Convex functions in your app's internal API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = internal.myModule.myFunction;
- * ```
- */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
-
-export declare const components: {};
