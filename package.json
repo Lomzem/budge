@@ -23,7 +23,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:e2e": "playwright test",
-		"test:e2e:local": "bun e2e/run-local.ts"
+		"test:e2e:local": "bun e2e/run-local.ts",
+		"codegen": "bun scripts/codegen.js"
 	},
 	"dependencies": {
 		"convex": "1.48.0",
