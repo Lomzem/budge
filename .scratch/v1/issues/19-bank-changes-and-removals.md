@@ -12,7 +12,7 @@
   - **Unapproved and unedited Transaction**: the change is applied to it, or it is deleted.
   - **Otherwise**: the Bank Row's state becomes `changed` (keeping the bank's newest values) or `removed`.
 - [x] Transaction detail and the list show the flag in plain text. Resolving it either applies the bank's values (or deletes the Transaction) or keeps the owner's version, and clears the flag.
-- [ ] `monthlyTotals` and `searchText` stay correct through every path.
+- [x] `monthlyTotals` and `searchText` stay correct through every path.
 - [x] `convex-test`: all four paths (quiet change, quiet removal, flagged change, flagged removal) and both resolutions. The rebuild still equals the incrementally kept rows.
 
 ## Comments

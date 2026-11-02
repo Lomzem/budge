@@ -155,6 +155,14 @@ async function syncedBudget() {
 		await t.mutation(internal.monthlyTotals.rebuild, {});
 		expect(await totals()).toEqual(kept);
 	};
+	/** The IDs a search of the Transactions finds. */
+	const search = async (words: string) =>
+		(
+			await owner.query(api.transactions.list, {
+				search: words,
+				paginationOpts: { numItems: 50, cursor: null }
+			})
+		).page.map((found) => found._id);
 	const balance = async () =>
 		(await owner.query(api.accounts.list, {})).find((account) => account._id === checking)?.balance;
 
@@ -171,6 +179,7 @@ async function syncedBudget() {
 		row,
 		snapshot,
 		expectTotalsRebuild,
+		search,
 		balance
 	};
 }
@@ -316,9 +325,11 @@ describe('a bank change to a Transaction the owner approved or edited', () => {
 
 		await budget.sync(changes({ modified: [{ ...grocer, name: 'SAMPLE GROCERY 0193' }] }));
 
-		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({
+		const grocerRow = await budget.row('SAMPLE GROCER 0193');
+		expect(grocerRow).toMatchObject({
 			bankRows: [{ bankText: 'SAMPLE GROCERY 0193', state: 'linked' }]
 		});
+		expect(await budget.search('grocery')).toEqual([grocerRow._id]);
 	});
 });
 

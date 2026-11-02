@@ -5,6 +5,7 @@ import type { Id } from './_generated/dataModel';
 import { env, internalMutation, type MutationCtx } from './_generated/server';
 import { createPaymentCategory, ensureReadyToAssign } from './lib/categories';
 import { rebuildMonthlyTotals } from './lib/monthlyTotals';
+import { refreshSearchText } from './lib/transactions';
 
 // Invented Payees and amounts that mirror only the shape of a real budget. The repo is public:
 // nothing here may come from real data.
@@ -261,13 +262,16 @@ export const run = internalMutation({
 			provider: { kind: 'sandbox' }
 		});
 
+		const written: Id<'transactions'>[] = [];
+		for await (const transaction of ctx.db.query('transactions')) written.push(transaction._id);
+		for (const transactionId of written) await refreshSearchText(ctx, transactionId);
 		await rebuildMonthlyTotals(ctx);
 		return null;
 	}
 });
 
 /**
- * Inserts Transactions directly, leaving the monthly totals to the final rebuild. Each Payee
+ * Inserts Transactions directly, leaving the monthly totals and `searchText` to the end. Each Payee
  * remembers the Category it was last given.
  */
 function writer(ctx: MutationCtx) {

@@ -10,6 +10,7 @@ import { publicError } from './publicError';
 import {
 	bankRowsOf,
 	deleteTransaction,
+	refreshSearchText,
 	replaceTransaction,
 	saveTransaction,
 	splitLinesOf
@@ -92,6 +93,7 @@ export async function applyBankChange(
 			approved: false
 		});
 		await ctx.db.patch('imports', bankRow._id, values);
+		if (bankRow.bankText !== row.bankText) await refreshSearchText(ctx, transaction._id);
 		return;
 	}
 	const differs = row.date !== transaction.date || row.amount !== transaction.amount;
@@ -100,6 +102,7 @@ export async function applyBankChange(
 		...values,
 		...(datedOrAmountChanged ? { state: differs ? ('changed' as const) : ('linked' as const) } : {})
 	});
+	if (bankRow.bankText !== row.bankText) await refreshSearchText(ctx, transaction._id);
 }
 
 /**
@@ -144,6 +147,7 @@ export async function resolveBankChange(
 		} else {
 			await ctx.db.patch('imports', bankRow._id, { transactionId: undefined, matched: false });
 			await ctx.db.patch('transactions', transaction._id, { approved: true });
+			await refreshSearchText(ctx, transaction._id);
 		}
 		return;
 	}
