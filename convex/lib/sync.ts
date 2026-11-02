@@ -15,8 +15,8 @@ import { TokenCipher, TokenCipherError } from './tokenCipher';
 export const LEASE_MS = 2 * 60_000;
 
 // One batch is at most three pages of a hundred rows, and one mutation applies it. Each row costs
-// about six index reads (its import ID, rename and Payee memory, the monthly total, and the
-// Transactions near it), so 300 rows stay well inside Convex's 4,096 reads per mutation. Three
+// about a dozen reads (its import ID, rename and Payee memory, the monthly total, the Transactions
+// near it, and its search text), so 300 rows stay inside Convex's 4,096 reads per mutation. Three
 // pages at Plaid's 35-second limit each also fit inside one lease.
 export const PAGE_SIZE = 100;
 export const PAGES_PER_BATCH = 3;

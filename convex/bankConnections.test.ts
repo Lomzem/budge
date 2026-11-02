@@ -202,6 +202,18 @@ describe('syncing a Bank Connection', () => {
 		expect(saved?.lastSyncedAt).toBeTypeOf('number');
 	});
 
+	test('a synced Transaction can be found by its Bank Text', async () => {
+		const { sync, owner, checking } = await connectedBudget();
+		await sync(plaidPages(page));
+
+		const found = await owner.query(api.transactions.list, {
+			accountId: checking,
+			search: 'debit card purchase',
+			paginationOpts: { numItems: 50, cursor: null }
+		});
+		expect(found.page).toMatchObject([{ payeeName: 'Sample Grocer' }]);
+	});
+
 	test('the same batch again adds nothing, and continues from the saved cursor', async () => {
 		const { sync, rows } = await connectedBudget();
 		await sync(plaidPages(page));

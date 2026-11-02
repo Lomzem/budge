@@ -1,10 +1,11 @@
 import { v } from 'convex/values';
 
+import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { internalMutation } from './_generated/server';
 import { createPaymentCategory, readPaymentCategory } from './lib/categories';
 import { requireCutoverDate } from './lib/settings';
-import { replaceTransaction } from './lib/transactions';
+import { refreshSearchText, replaceTransaction } from './lib/transactions';
 
 /**
  * Gives each Credit Card Account made before Credit Card Accounts arrived what a new card gets: its
@@ -56,5 +57,29 @@ export const backfillPaymentCategories = internalMutation({
 			repaired++;
 		}
 		return { repaired, unmatched };
+	}
+});
+
+/** How many Transactions one backfill mutation rewrites; see `PAYEE_RENAME_BATCH`. */
+const SEARCH_BACKFILL_BATCH = 50;
+
+/**
+ * Gives every Transaction its `searchText`, one batch per mutation from `cursor`, scheduling the
+ * next batch until none are left. Start it with `cursor: null`. Running it again changes nothing.
+ */
+export const backfillSearchText = internalMutation({
+	args: { cursor: v.union(v.string(), v.null()) },
+	returns: v.null(),
+	handler: async (ctx, { cursor }) => {
+		const { page, isDone, continueCursor } = await ctx.db
+			.query('transactions')
+			.paginate({ numItems: SEARCH_BACKFILL_BATCH, cursor });
+		for (const transaction of page) await refreshSearchText(ctx, transaction._id);
+		if (!isDone) {
+			await ctx.scheduler.runAfter(0, internal.migrations.backfillSearchText, {
+				cursor: continueCursor
+			});
+		}
+		return null;
 	}
 });

@@ -14,6 +14,8 @@
 
 	import ImportDialog from './import-dialog.svelte';
 	import TransactionDialog from './transaction-dialog.svelte';
+	import { noFilters } from './filters';
+	import TransactionFilters from './transaction-filters.svelte';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
 
@@ -21,17 +23,56 @@
 	let { accountId }: { accountId?: Id<'accounts'> | undefined } = $props();
 
 	const PAGE_SIZE = 50;
-	const scope = $derived(accountId === undefined ? {} : { accountId });
-	// Unapproved first: the approved list starts once every Unapproved row is on screen.
-	const unapproved = usePaginatedQuery(
+	const SEARCH_PAUSE_MS = 300;
+	let filterValues = $state({ ...noFilters });
+	/** The search once typing pauses, so each keystroke doesn't run one. */
+	let search = $state('');
+	$effect(() => {
+		const typed = filterValues.search.trim();
+		if (typed === '') {
+			search = '';
+			return;
+		}
+		const timer = setTimeout(() => (search = typed), SEARCH_PAUSE_MS);
+		return () => {
+			clearTimeout(timer);
+		};
+	});
+
+	const allAccounts = $derived(accountId === undefined);
+	// All Accounts' Account filter narrows it like an Account's own page.
+	const scopeAccountId = $derived(
+		accountId ??
+			(filterValues.accountId === '' ? undefined : (filterValues.accountId as Id<'accounts'>))
+	);
+	const scope = $derived(scopeAccountId === undefined ? {} : { accountId: scopeAccountId });
+	const filters = $derived({
+		...(search === '' ? {} : { search }),
+		...(filterValues.categoryId === ''
+			? {}
+			: { categoryId: filterValues.categoryId as Id<'categories'> }),
+		...(filterValues.payeeId === '' ? {} : { payeeId: filterValues.payeeId as Id<'payees'> }),
+		...(filterValues.from === '' ? {} : { from: filterValues.from }),
+		...(filterValues.to === '' ? {} : { to: filterValues.to })
+	});
+	const filtering = $derived(Object.keys(filters).length > 0);
+	// Unapproved first, then the approved ones once every Unapproved row is on screen. Filtered,
+	// the list is one, newest first (best match first for a search); with a Category, the split
+	// Transactions with a line in it follow the whole ones.
+	const first = usePaginatedQuery(
 		api.transactions.list,
-		() => ({ ...scope, approval: 'unapproved' as const }),
+		() => (filtering ? { ...scope, ...filters } : { ...scope, approval: 'unapproved' as const }),
 		{ initialNumItems: PAGE_SIZE }
 	);
-	const approved = usePaginatedQuery(
+	const hasSecond = $derived(!filtering || filters.categoryId !== undefined);
+	const second = usePaginatedQuery(
 		api.transactions.list,
 		() =>
-			unapproved.status === 'Exhausted' ? { ...scope, approval: 'approved' as const } : 'skip',
+			first.status !== 'Exhausted' || !hasSecond
+				? 'skip'
+				: filtering
+					? { ...scope, ...filters, splitLines: true }
+					: { ...scope, approval: 'approved' as const },
 		{ initialNumItems: PAGE_SIZE }
 	);
 	const unapprovedCount = useQuery(api.transactions.unapprovedCount, () => scope);
@@ -39,12 +80,15 @@
 	const approve = useMutation(api.transactions.approve);
 	const approveAll = useMutation(api.transactions.approveAll);
 
-	const allAccounts = $derived(accountId === undefined);
-	const rows = $derived([...unapproved.results, ...approved.results]);
-	const loading = $derived(
-		unapproved.isLoading || (unapproved.status === 'Exhausted' && approved.isLoading)
+	const secondShown = $derived(first.status === 'Exhausted' && hasSecond);
+	// A split with lines in the filtered Category could also be listed whole, so it shows once.
+	const rows = $derived(
+		[...first.results, ...(secondShown ? second.results : [])].filter(
+			(row, index, all) => all.findIndex((other) => other._id === row._id) === index
+		)
 	);
-	const more = $derived(unapproved.status === 'Exhausted' ? approved : unapproved);
+	const loading = $derived(first.isLoading || (secondShown && second.isLoading));
+	const more = $derived(secondShown ? second : first);
 	let dialogOpen = $state(false);
 	let importOpen = $state(false);
 	let editing: Row | undefined = $state();
@@ -93,6 +137,7 @@
 </script>
 
 <div class="flex flex-col gap-3">
+	<TransactionFilters bind:values={filterValues} showAccount={allAccounts} />
 	<div class="flex flex-wrap items-center gap-2">
 		<Button onclick={add}>Add Transaction</Button>
 		<Button variant="outline" onclick={() => (importOpen = true)}>Import file</Button>
@@ -213,13 +258,20 @@
 						</Table.Cell>
 					</Table.Row>
 				{:else}
-					<Table.Row>
-						<Table.Cell colspan={allAccounts ? 8 : 7}>
-							<span class="text-muted-foreground">
-								{loading ? 'Loading…' : 'No Transactions yet.'}
-							</span>
-						</Table.Cell>
-					</Table.Row>
+					<!-- A filtered page can come back empty with more to read; say so only at the end. -->
+					{#if loading || more.status === 'Exhausted'}
+						<Table.Row>
+							<Table.Cell colspan={allAccounts ? 8 : 7}>
+								<span class="text-muted-foreground">
+									{loading
+										? 'Loading…'
+										: filtering
+											? 'No Transactions match.'
+											: 'No Transactions yet.'}
+								</span>
+							</Table.Cell>
+						</Table.Row>
+					{/if}
 				{/each}
 			</Table.Body>
 		</Table.Root>
@@ -235,7 +287,7 @@
 			</Button>
 		</div>
 	{/if}
-	{#if unapproved.error ?? approved.error}
+	{#if first.error ?? second.error}
 		<p role="alert" class="text-sm text-destructive">
 			Budge couldn't load Transactions. Try reloading the page.
 		</p>
