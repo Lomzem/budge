@@ -16,6 +16,7 @@ type Signer = Awaited<ReturnType<typeof webhookSigner>>;
 
 function fakePlaid(signer: Signer) {
 	const paths: string[] = [];
+	const state = { keyOutage: false };
 	const fetch = (input: RequestInfo | URL) => {
 		const url = new URL(input instanceof Request ? input.url : input);
 		assert(url.host === 'sandbox.plaid.com', `Unexpected request to ${url.host}`);
@@ -31,14 +32,16 @@ function fakePlaid(signer: Signer) {
 			case '/item/webhook/update':
 				return answer({ item: { item_id: itemId } });
 			case '/webhook_verification_key/get':
-				return answer({ key: signer.wireKey });
+				return state.keyOutage
+					? Promise.resolve(new Response('Service Unavailable', { status: 503 }))
+					: answer({ key: signer.wireKey });
 			case '/transactions/sync':
 				return answer(syncPage);
 			default:
 				return assert.fail(`Unexpected Plaid call ${url.pathname}`);
 		}
 	};
-	return { paths, fetch };
+	return { paths, state, fetch };
 }
 
 let signer: Signer;
@@ -194,20 +197,72 @@ describe('the Plaid webhook', () => {
 		expect(kids).toEqual(['key-synthetic-1']);
 	});
 
-	test('a webhook while a sync holds the lease does nothing', async () => {
+	test('answers 429 with Retry-After while Plaid cannot serve the key, then accepts the retry', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
 		const backend = await connectedBudget();
+		const body = syncUpdatesBody(itemId);
+		plaid.state.keyOutage = true;
+
+		const deferred = await postWebhook(backend, body, await signer.sign(body));
+		expect(deferred.status).toBe(429);
+		expect(deferred.headers.get('retry-after')).toBe('60');
+
+		plaid.state.keyOutage = false;
+		vi.setSystemTime(Date.now() + 61_000);
+		expect((await postWebhook(backend, body, await signer.sign(body))).status).toBe(200);
+		expect(keyLookups()).toBe(2);
+	});
+
+	async function webhookDuringHeldLease() {
+		const backend = await connectedBudget();
+		const lease = Date.now() + 60_000;
 		await backend.t.run((ctx) =>
-			ctx.db.patch('bankConnections', backend.connectionId, {
-				syncLeaseUntil: Date.now() + 60_000
-			})
+			ctx.db.patch('bankConnections', backend.connectionId, { syncLeaseUntil: lease })
 		);
 		const body = syncUpdatesBody(itemId);
-
 		expect((await postWebhook(backend, body, await signer.sign(body))).status).toBe(200);
 		await runScheduled(backend);
-
-		expect(await backend.rows()).toEqual([]);
 		expect(plaid.paths).not.toContain('/transactions/sync');
+		return { ...backend, lease };
+	}
+
+	test('a webhook while a sync holds the lease syncs again once that sync finishes', async () => {
+		const backend = await webhookDuringHeldLease();
+
+		await backend.t.mutation(internal.bankConnections.apply, {
+			connectionId: backend.connectionId,
+			lease: backend.lease,
+			fromCursor: null,
+			nextCursor: 'cursor-synthetic-held',
+			hasMore: false,
+			rows: [],
+			release: true
+		});
+		await runScheduled(backend);
+
+		expect(await backend.rows()).toHaveLength(2);
+	});
+
+	test('a webhook while a sync holds the lease syncs again once that sync fails', async () => {
+		const backend = await webhookDuringHeldLease();
+
+		await backend.t.mutation(internal.bankConnections.fail, {
+			connectionId: backend.connectionId,
+			lease: backend.lease,
+			message: "Couldn't reach Plaid.",
+			needsLogin: false
+		});
+		await runScheduled(backend);
+
+		expect(await backend.rows()).toHaveLength(2);
+	});
+
+	test('a sync that finishes with no webhook waiting schedules nothing', async () => {
+		const backend = await connectedBudget();
+
+		await backend.t.action(internal.bankConnections.sync, { connectionId: backend.connectionId });
+
+		expect(await scheduled(backend)).toEqual([]);
 	});
 
 	test('a webhook for an Item with no stored token returns at once', async () => {

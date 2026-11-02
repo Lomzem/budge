@@ -132,6 +132,7 @@ export default defineSchema({
 		lastError: v.optional(v.object({ at: v.number(), message: v.string() })),
 
 		syncLeaseUntil: v.optional(v.number()),
+		syncRequestedDuringLease: v.optional(v.boolean()),
 		consentExpiresAt: v.optional(v.number()),
 		provider: v.union(
 			v.object({

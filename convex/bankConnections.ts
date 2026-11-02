@@ -3,7 +3,7 @@ import { Effect, Layer, Option } from 'effect';
 
 import type { PublicError } from '../src/lib/domain/publicError';
 import { internal } from './_generated/api';
-import type { Id } from './_generated/dataModel';
+import type { Doc, Id } from './_generated/dataModel';
 import {
 	action,
 	env,
@@ -21,7 +21,8 @@ import { ImportedPayees } from './lib/payees';
 import { PlaidClient, type WebhookKey } from './lib/plaidClient';
 import {
 	KEY_LOOKUP_INTERVAL_MS,
-	KeyLookupLimited,
+	KeyLookupDeferred,
+	lookUpKey,
 	KEY_TTL_MS,
 	readWebhook,
 	verifyWebhook,
@@ -148,11 +149,11 @@ export const webhook = httpAction(async (ctx, request) => {
 			token: request.headers.get('plaid-verification'),
 			now: Date.now()
 		}).pipe(
-			Effect.catchTag('KeyLookupLimited', () => Effect.succeed('limited' as const)),
+			Effect.catchTag('KeyLookupDeferred', () => Effect.succeed('deferred' as const)),
 			Effect.provide(keptWebhookKeys(ctx))
 		)
 	);
-	if (verified === 'limited') {
+	if (verified === 'deferred') {
 		const retryAfter = String(KEY_LOOKUP_INTERVAL_MS / 1000);
 		return new Response(null, { status: 429, headers: { 'retry-after': retryAfter } });
 	}
@@ -173,8 +174,8 @@ function keptWebhookKeys(ctx: Pick<ActionCtx, 'runMutation'>): Layer.Layer<Webho
 						ctx.runMutation(internal.bankConnections.claimWebhookKey, { kid })
 					);
 					if (claim.kind === 'kept') return Option.some(claim.key);
-					if (claim.kind === 'limited') return yield* new KeyLookupLimited();
-					const key = yield* Effect.option(plaid.webhookVerificationKey(kid));
+					if (claim.kind === 'limited') return yield* new KeyLookupDeferred();
+					const key = yield* lookUpKey(plaid, kid);
 					if (Option.isSome(key)) {
 						yield* Effect.promise(() =>
 							ctx.runMutation(internal.bankConnections.saveWebhookKey, { kid, key: key.value })
@@ -281,12 +282,18 @@ export const takeLease = internalMutation({
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (connection === null) return { kind: 'missing' as const };
 		const now = Date.now();
-		if ((connection.syncLeaseUntil ?? 0) > now) return { kind: 'busy' as const };
+		if ((connection.syncLeaseUntil ?? 0) > now) {
+			await ctx.db.patch('bankConnections', connectionId, { syncRequestedDuringLease: true });
+			return { kind: 'busy' as const };
+		}
 		const { provider } = connection;
 		if (provider.kind !== 'plaid') return { kind: 'noToken' as const };
 		const cutoverDate = await requireCutoverDate(ctx);
 		const lease = now + LEASE_MS;
-		await ctx.db.patch('bankConnections', connectionId, { syncLeaseUntil: lease });
+		await ctx.db.patch('bankConnections', connectionId, {
+			syncLeaseUntil: lease,
+			syncRequestedDuringLease: undefined
+		});
 		return {
 			kind: 'taken' as const,
 			lease,
@@ -336,6 +343,7 @@ export const apply = internalMutation({
 			syncLeaseUntil: nextLease,
 			...(release ? { lastSyncedAt: now, lastError: undefined, status: 'ok' as const } : {})
 		});
+		if (release) await syncAgainIfRequested(ctx, connection);
 		return { kind: 'applied' as const, lease: nextLease ?? null, ...totals };
 	}
 });
@@ -396,9 +404,16 @@ export const fail = internalMutation({
 			lastError: { at: Date.now(), message },
 			...(needsLogin ? { status: 'needsAttention' as const } : {})
 		});
+		await syncAgainIfRequested(ctx, connection);
 		return null;
 	}
 });
+
+async function syncAgainIfRequested(ctx: MutationCtx, connection: Doc<'bankConnections'>) {
+	if (connection.syncRequestedDuringLease !== true) return;
+	await ctx.db.patch('bankConnections', connection._id, { syncRequestedDuringLease: undefined });
+	await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId: connection._id });
+}
 
 export const save = internalMutation({
 	args: saveArgs,

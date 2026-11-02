@@ -214,6 +214,23 @@ describe('PlaidClient', () => {
 		}).pipe(Effect.provide(plaid.layer));
 	});
 
+	it.effect(
+		'looks up a webhook key in one attempt of at most five seconds, since Plaid sends a webhook answered 429 again',
+		() => {
+			const plaid = fakePlaid((_, signal) => hang(signal));
+			return Effect.gen(function* () {
+				const fiber = yield* Effect.forkChild(
+					Effect.flip(PlaidClient.use((client) => client.webhookVerificationKey('key-synthetic-1')))
+				);
+				yield* TestClock.adjust('5 seconds');
+				const error = yield* Fiber.join(fiber);
+
+				expect(error._tag).toBe('PlaidTimeout');
+				expect(plaid.sent).toHaveLength(1);
+			}).pipe(Effect.provide(plaid.layer));
+		}
+	);
+
 	it.effect('asks Plaid to refresh, and points the Item webhook at Budge', () => {
 		const plaid = fakePlaid(() =>
 			Promise.resolve(json(200, { request_id: 'request-synthetic-3' }))

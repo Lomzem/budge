@@ -1,7 +1,14 @@
 import { describe, expect, it } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 
-import { PlaidApi, PlaidClient, type WebhookKey } from './plaidClient';
+import {
+	PlaidApi,
+	PlaidClient,
+	PlaidTimeout,
+	PlaidTransport,
+	type PlaidError,
+	type WebhookKey
+} from './plaidClient';
 import { syncUpdatesBody, webhookSigner, type SignOptions } from './plaidWebhook.helper';
 import { readWebhook, verifyWebhook, WebhookKeys } from './plaidWebhook';
 
@@ -11,7 +18,7 @@ const body = syncUpdatesBody('item-synthetic-1');
 const verify = Effect.fnUntraced(function* (
 	options: SignOptions & {
 		token?: string | null;
-		key?: (signer: WebhookKey) => Effect.Effect<WebhookKey, PlaidApi>;
+		key?: (signer: WebhookKey) => Effect.Effect<WebhookKey, PlaidError>;
 		received?: string;
 	} = {}
 ) {
@@ -108,6 +115,21 @@ describe('verifying a Plaid webhook', () => {
 					})
 				);
 			expect((yield* verify({ key: refused })).verified).toBe(false);
+		})
+	);
+
+	it.effect('leaves the webhook undecided while Plaid is down, so Plaid sends it again', () =>
+		Effect.gen(function* () {
+			const outages: PlaidError[] = [
+				new PlaidApi({ error_code: 'INTERNAL_SERVER_ERROR', status: 500, request_id: '' }),
+				new PlaidApi({ error_code: 'RATE_LIMIT_EXCEEDED', status: 429, request_id: '' }),
+				new PlaidTransport(),
+				new PlaidTimeout()
+			];
+			for (const outage of outages) {
+				const error = yield* Effect.flip(verify({ key: () => Effect.fail(outage) }));
+				expect(error._tag).toBe('KeyLookupDeferred');
+			}
 		})
 	);
 });

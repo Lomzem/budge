@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 import { Context, Effect, Layer, Option, Result, Schema } from 'effect';
 
-import { PlaidClient, type WebhookKey } from './plaidClient';
+import { isRetryable, PlaidClient, type WebhookKey } from './plaidClient';
 
 const TOKEN_REPLAY_WINDOW_SECONDS = 5 * 60;
 
@@ -17,22 +17,34 @@ export const webhookKeyValidator = v.object({
 	expiredAt: v.union(v.number(), v.null())
 });
 
-export class KeyLookupLimited extends Schema.TaggedError<
-	KeyLookupLimited,
+export class KeyLookupDeferred extends Schema.TaggedError<
+	KeyLookupDeferred,
 	{ readonly brand: unique symbol }
->()('KeyLookupLimited', {}) {}
+>()('KeyLookupDeferred', {}) {}
 
 export class WebhookKeys extends Context.Service<
 	WebhookKeys,
 	{
-		readonly find: (kid: string) => Effect.Effect<Option.Option<WebhookKey>, KeyLookupLimited>;
+		readonly find: (kid: string) => Effect.Effect<Option.Option<WebhookKey>, KeyLookupDeferred>;
 	}
 >()('budge/WebhookKeys') {
 	static readonly layerPlaid: Layer.Layer<WebhookKeys, never, PlaidClient> = Layer.effect(
 		WebhookKeys,
 		Effect.map(PlaidClient, (plaid) => ({
-			find: (kid: string) => Effect.option(plaid.webhookVerificationKey(kid))
+			find: (kid: string) => lookUpKey(plaid, kid)
 		}))
+	);
+}
+
+export function lookUpKey(
+	plaid: PlaidClient['Service'],
+	kid: string
+): Effect.Effect<Option.Option<WebhookKey>, KeyLookupDeferred> {
+	return plaid.webhookVerificationKey(kid).pipe(
+		Effect.asSome,
+		Effect.catch((error) =>
+			isRetryable(error) ? Effect.fail(new KeyLookupDeferred()) : Effect.succeedNone
+		)
 	);
 }
 
@@ -60,7 +72,7 @@ export const verifyWebhook = Effect.fnUntraced(function* (input: {
 	body: Uint8Array<ArrayBuffer>;
 	token: string | null;
 	now: number;
-}): Effect.fn.Return<boolean, KeyLookupLimited, WebhookKeys> {
+}): Effect.fn.Return<boolean, KeyLookupDeferred, WebhookKeys> {
 	const token = readToken(input.token);
 	if (token === null) return false;
 
