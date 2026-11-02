@@ -94,11 +94,24 @@ async function publicFunctions() {
 		const exports = (await load()) as Record<string, unknown>;
 		for (const [exportName, fn] of Object.entries(exports)) {
 			if (typeof fn !== 'function' || !('isPublic' in fn)) continue;
-			const kind: Kind = 'isQuery' in fn ? 'query' : 'isMutation' in fn ? 'mutation' : 'action';
-			found.push({ name: `${path.slice(2, -3)}:${exportName}`, kind });
+			found.push({ name: `${path.slice(2, -3)}:${exportName}`, kind: kindOf(fn) });
 		}
 	}
 	return found;
+}
+
+function kindOf(fn: object): Kind {
+	if ('isQuery' in fn) return 'query';
+	if ('isMutation' in fn) return 'mutation';
+	return 'action';
+}
+
+type Caller = ReturnType<ReturnType<typeof convexTest>['withIdentity']>;
+
+function callAs(client: Caller, { name, kind }: { name: string; kind: Kind }, args: object) {
+	if (kind === 'query') return client.query(makeFunctionReference<'query'>(name), args);
+	if (kind === 'mutation') return client.mutation(makeFunctionReference<'mutation'>(name), args);
+	return client.action(makeFunctionReference<'action'>(name), args);
 }
 
 beforeEach(() => {
@@ -193,12 +206,7 @@ describe('the owner guard', () => {
 		for (const { name, kind } of functions) {
 			const args = sample[name] ?? {};
 			for (const [caller, client] of Object.entries(callers)) {
-				const call =
-					kind === 'query'
-						? client.query(makeFunctionReference<'query'>(name), args)
-						: kind === 'mutation'
-							? client.mutation(makeFunctionReference<'mutation'>(name), args)
-							: client.action(makeFunctionReference<'action'>(name), args);
+				const call = callAs(client, { name, kind }, args);
 				expect(await publicErrorCode(call), `${name} as ${caller}`).toBe('FORBIDDEN');
 			}
 		}

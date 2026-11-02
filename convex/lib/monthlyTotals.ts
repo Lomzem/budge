@@ -107,41 +107,47 @@ export async function rebuildTotals(
 ) {
 	const categories = [...buckets];
 	for (const { month, accountId } of keys) {
-		for (const bucket of categories) {
-			const key = { month, accountId, bucket };
-			const row = await ctx.db
-				.query('monthlyTotals')
-				.withIndex('by_month_account_bucket', (q) =>
-					q.eq('month', month).eq('accountId', accountId).eq('bucket', bucket)
-				)
-				.unique();
-			if (row !== null) await ctx.db.delete('monthlyTotals', row._id);
-			let amount = 0;
-			let count = 0;
-			const transactions = ctx.db.query('transactions').withIndex('by_category_date', (q) =>
-				q
-					.eq('categoryId', bucket)
-					.gte('date', `${month}-01`)
-					.lt('date', `${addMonths(month, 1)}-01`)
-			);
-			for await (const transaction of transactions) {
-				if (transaction.accountId !== accountId) continue;
-				amount += transaction.amount;
-				count += 1;
-			}
-			const lines = ctx.db.query('transactionSplits').withIndex('by_category_date', (q) =>
-				q
-					.eq('categoryId', bucket)
-					.gte('date', `${month}-01`)
-					.lt('date', `${addMonths(month, 1)}-01`)
-			);
-			for await (const line of lines) {
-				const parent = await ctx.db.get('transactions', line.transactionId);
-				if (parent?.accountId !== accountId) continue;
-				amount += line.amount;
-				count += 1;
-			}
-			if (count > 0) await ctx.db.insert('monthlyTotals', { ...key, amount, count });
-		}
+		for (const bucket of categories) await rebuildTotal(ctx, { month, accountId, bucket });
 	}
+}
+
+/** Rewrites one Category's monthly total in one Account from its Transactions and split lines. */
+async function rebuildTotal(
+	ctx: MutationCtx,
+	key: Pick<Key, 'month' | 'accountId'> & { bucket: Id<'categories'> }
+) {
+	const { month, accountId, bucket } = key;
+	const row = await ctx.db
+		.query('monthlyTotals')
+		.withIndex('by_month_account_bucket', (q) =>
+			q.eq('month', month).eq('accountId', accountId).eq('bucket', bucket)
+		)
+		.unique();
+	if (row !== null) await ctx.db.delete('monthlyTotals', row._id);
+	let amount = 0;
+	let count = 0;
+	const transactions = ctx.db.query('transactions').withIndex('by_category_date', (q) =>
+		q
+			.eq('categoryId', bucket)
+			.gte('date', `${month}-01`)
+			.lt('date', `${addMonths(month, 1)}-01`)
+	);
+	for await (const transaction of transactions) {
+		if (transaction.accountId !== accountId) continue;
+		amount += transaction.amount;
+		count += 1;
+	}
+	const lines = ctx.db.query('transactionSplits').withIndex('by_category_date', (q) =>
+		q
+			.eq('categoryId', bucket)
+			.gte('date', `${month}-01`)
+			.lt('date', `${addMonths(month, 1)}-01`)
+	);
+	for await (const line of lines) {
+		const parent = await ctx.db.get('transactions', line.transactionId);
+		if (parent?.accountId !== accountId) continue;
+		amount += line.amount;
+		count += 1;
+	}
+	if (count > 0) await ctx.db.insert('monthlyTotals', { ...key, amount, count });
 }

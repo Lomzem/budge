@@ -3,6 +3,7 @@
 
 	import { resolve } from '$app/paths';
 	import { getAccounts } from '$lib/accounts.svelte';
+	import { attempt } from '$lib/attempt';
 	import ReconcileDialog from '$lib/components/accounts/reconcile-dialog.svelte';
 	import RenameAccountDialog from '$lib/components/accounts/rename-account-dialog.svelte';
 	import TransactionTable from '$lib/components/transactions/transaction-table.svelte';
@@ -36,11 +37,9 @@
 	async function move(direction: -1 | 1) {
 		if (!account) return;
 		moveError = '';
-		try {
-			await accounts.move(account._id, direction);
-		} catch {
-			moveError = "Budge couldn't move the Account. Try again.";
-		}
+		const accountId = account._id;
+		const moved = await attempt(() => accounts.move(accountId, direction));
+		if (!moved.ok) moveError = "Budge couldn't move the Account. Try again.";
 	}
 </script>
 

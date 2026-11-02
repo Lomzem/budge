@@ -252,12 +252,7 @@ export function computeBudget<C extends string, G extends string, A extends stri
 	input: BudgetInput<C, G, A>
 ): Budget<C, G> {
 	const { month } = input;
-	const paymentCategoryOf = new Map<A, C>();
-	for (const c of input.categories) {
-		if (c.kind === 'creditCardPayment' && c.accountId !== undefined) {
-			paymentCategoryOf.set(c.accountId, c.id);
-		}
-	}
+	const paymentCategoryOf = paymentCategories(input.categories);
 	// Each total counts in its own Category, and a card's also moves into its Payment Category:
 	// a purchase in full, even past what the Category has, and a refund back out.
 	const activityRows = input.monthlyTotals.flatMap((row) => {
@@ -342,10 +337,25 @@ export function computeBudget<C extends string, G extends string, A extends stri
 		return { waitingOn, uncovered: Math.max(0, -balance - available) };
 	};
 
+	const windowEnd = addDays(input.today, UPCOMING_DAYS);
+	// A Target that falls due inside the window, funded when its month has what it needs.
+	const upcomingOf = (c: BudgetInput<C, G, A>['categories'][number]) => {
+		if (c.target === undefined) return undefined;
+		const dueDate = nextDue(c.target, input.today);
+		if (dueDate === null || dueDate >= windowEnd) return undefined;
+		const due = budgetOf(c, monthOf(dueDate));
+		return {
+			id: c.id,
+			name: c.name,
+			dueDate,
+			amount: c.target.amount,
+			funded: due.available >= 0 && due.target?.needed === 0
+		};
+	};
+
 	const groups: GroupBudget<C, G>[] = [];
 	const hidden: CategoryBudget<C>[] = [];
 	const upcoming: Budget<C, G>['upcoming'] = [];
-	const windowEnd = addDays(input.today, UPCOMING_DAYS);
 	const overspent: Budget<C, G>['overspent'] = [];
 	for (const group of input.groups.toSorted(byPosition)) {
 		if (group.kind === 'readyToAssign') continue;
@@ -362,17 +372,8 @@ export function computeBudget<C extends string, G extends string, A extends stri
 			all.push(row);
 			const isHidden = group.hidden === true || c.hidden === true;
 			(isHidden ? hidden : shown).push(row);
-			const dueDate = c.target === undefined ? null : nextDue(c.target, input.today);
-			if (c.target !== undefined && dueDate !== null && dueDate < windowEnd) {
-				const due = budgetOf(c, monthOf(dueDate));
-				upcoming.push({
-					id: c.id,
-					name: c.name,
-					dueDate,
-					amount: c.target.amount,
-					funded: due.available >= 0 && due.target?.needed === 0
-				});
-			}
+			const soon = upcomingOf(c);
+			if (soon !== undefined) upcoming.push(soon);
 			if (row.available < 0) {
 				overspent.push({ id: row.id, name: row.name, available: row.available });
 			}
@@ -389,11 +390,42 @@ export function computeBudget<C extends string, G extends string, A extends stri
 		});
 	}
 
+	const { uncategorizedCount, ...readyToAssign } = readyToAssignOf(input);
+	return {
+		month,
+		firstMonth: input.cutoverDate === null ? null : monthOf(input.cutoverDate),
+		readyToAssign,
+		uncategorizedCount,
+		groups,
+		hidden,
+		overspent,
+		// Stable, so Targets due the same day stay in table order.
+		upcoming: upcoming.toSorted(byDueDate)
+	};
+}
+
+/** Each credit card Account's Payment Category. */
+function paymentCategories<C extends string, G extends string, A extends string>(
+	categories: BudgetInput<C, G, A>['categories']
+): Map<A, C> {
+	const paymentCategoryOf = new Map<A, C>();
+	for (const c of categories) {
+		if (c.kind === 'creditCardPayment' && c.accountId !== undefined) {
+			paymentCategoryOf.set(c.accountId, c.id);
+		}
+	}
+	return paymentCategoryOf;
+}
+
+/** Ready to Assign, with the Uncategorized amount in it and how many Transactions are Uncategorized. */
+function readyToAssignOf<C extends string, G extends string, A extends string>(
+	input: BudgetInput<C, G, A>
+) {
 	const readyToAssignIds = new Set<string>(
 		input.categories.filter((c) => c.kind === 'readyToAssign').map((c) => c.id)
 	);
 	// Uncategorized counts exactly as if categorized to Ready to Assign.
-	let readyToAssign = 0;
+	let amount = 0;
 	let uncategorized = 0;
 	let uncategorizedCount = 0;
 	for (const row of input.monthlyTotals) {
@@ -401,28 +433,20 @@ export function computeBudget<C extends string, G extends string, A extends stri
 			uncategorized += row.amount;
 			uncategorizedCount += row.count;
 		} else if (readyToAssignIds.has(row.bucket)) {
-			readyToAssign += row.amount;
+			amount += row.amount;
 		}
 	}
 	for (const transaction of input.transactionsAfterToday) {
 		if (transaction.amount <= 0 || transaction.date <= input.today) continue;
 		if (transaction.categoryId === null) uncategorized -= transaction.amount;
-		else if (readyToAssignIds.has(transaction.categoryId)) readyToAssign -= transaction.amount;
+		else if (readyToAssignIds.has(transaction.categoryId)) amount -= transaction.amount;
 	}
-	readyToAssign += uncategorized;
-	for (const row of input.assignments) readyToAssign -= row.amount;
+	amount += uncategorized;
+	for (const row of input.assignments) amount -= row.amount;
+	return { amount, uncategorized, uncategorizedCount };
+}
 
-	return {
-		month,
-		firstMonth: input.cutoverDate === null ? null : monthOf(input.cutoverDate),
-		readyToAssign: { amount: readyToAssign, uncategorized },
-		uncategorizedCount,
-		groups,
-		hidden,
-		overspent,
-		// Stable, so Targets due the same day stay in table order.
-		upcoming: upcoming.toSorted((a, b) =>
-			a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0
-		)
-	};
+function byDueDate(a: { dueDate: string }, b: { dueDate: string }) {
+	if (a.dueDate === b.dueDate) return 0;
+	return a.dueDate < b.dueDate ? -1 : 1;
 }

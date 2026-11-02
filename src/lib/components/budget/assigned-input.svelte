@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { attempt } from '$lib/attempt';
 	import { Input } from '$lib/components/ui/input';
 	import { formatCents, parseCents } from '$lib/domain/money';
 
@@ -42,11 +43,8 @@
 			return;
 		}
 		if (cents === amount) return;
-		try {
-			await onsave(cents);
-		} catch {
-			error = "Budge couldn't save Assigned. Try again.";
-		}
+		const saved = await attempt(() => onsave(cents));
+		if (!saved.ok) error = "Budge couldn't save Assigned. Try again.";
 	}
 
 	function keydown(event: KeyboardEvent) {

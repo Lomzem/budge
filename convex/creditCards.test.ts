@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -44,7 +44,7 @@ async function budgetWithCard() {
 	const view = () => owner.query(api.budget.month, { month: '2026-08', today: '2026-08-31' });
 	const row = async (name: string) => {
 		const found = (await view()).groups.flatMap((g) => g.categories).find((c) => c.name === name);
-		if (found === undefined) throw new Error(`No Category named ${name}`);
+		assert(found !== undefined, `No Category named ${name}`);
 		return found;
 	};
 	return { ...backend, checking, discover, groceries, dining, buy, assign, view, row };
@@ -158,7 +158,7 @@ describe('a Payment Category', () => {
 		const b = await budgetWithCard();
 		const discoverPayment = (await b.row('Discover')).id;
 		const paymentGroup = (await b.view()).groups[0]?.id;
-		if (paymentGroup === undefined) throw new Error('The Credit Card Payments group is missing.');
+		assert(paymentGroup !== undefined, 'The Credit Card Payments group is missing.');
 
 		const attempts = [
 			b.owner.mutation(api.categories.rename, { categoryId: discoverPayment, name: 'Mine' }),

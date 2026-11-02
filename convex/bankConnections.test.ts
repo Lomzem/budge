@@ -1,5 +1,5 @@
 import { Effect, Exit, Layer } from 'effect';
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { decodeSyncPage, type SyncPage } from '../src/lib/domain/plaid';
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
@@ -94,7 +94,7 @@ async function connectedBudget() {
 			accounts: [{ externalId, accountId: checking }]
 		})
 	);
-	if (!setup.ok) throw new Error('setup failed');
+	assert(setup.ok, 'setup failed');
 	const connectionId = setup.value;
 	const sync = (plaid: FakePlaid, refresh = false) =>
 		runInAction(backend, plaid, syncConnection(connectionId, { refresh }));
@@ -291,7 +291,7 @@ describe('syncing a Bank Connection', () => {
 	test('a batch whose lease or cursor is no longer current writes nothing', async () => {
 		const { t, connectionId, connection, rows } = await connectedBudget();
 		const taken = await t.mutation(internal.bankConnections.takeLease, { connectionId });
-		if (taken.kind !== 'taken') throw new Error('expected the lease');
+		assert(taken.kind === 'taken', 'expected the lease');
 		const batch = {
 			connectionId,
 			nextCursor: 'cursor-synthetic-2',

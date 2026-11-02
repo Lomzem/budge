@@ -3,13 +3,13 @@
 
 	import { api } from '$convex/_generated/api';
 	import type { Account } from '$lib/accounts.svelte';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { localToday } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
-	import { readPublicError } from '$lib/publicError';
 
 	let {
 		open = $bindable(false),
@@ -34,18 +34,12 @@
 
 	const isCard = $derived(account.kind === 'creditCard');
 	const entered = $derived(balance.trim() === '' ? undefined : parseCents(balance));
-	// A card's balance is what is owed, kept as a negative balance.
-	const bankBalance = $derived(
-		entered === undefined ? undefined : isCard && entered !== 0 ? -entered : entered
-	);
+	// A card's balance is what is owed, kept as a negative balance. Flipping the sign goes either
+	// way, between a balance and the amount the input shows.
+	const owed = (cents: number) => (isCard && cents !== 0 ? -cents : cents);
+	const bankBalance = $derived(entered === undefined ? undefined : owed(entered));
 	// Shown in the same terms as the input, so a card's cleared balance reads as an amount owed.
-	const clearedShown = $derived(
-		cleared.data === undefined
-			? undefined
-			: isCard && cleared.data !== 0
-				? -cleared.data
-				: cleared.data
-	);
+	const clearedShown = $derived(cleared.data === undefined ? undefined : owed(cleared.data));
 	const difference = $derived(
 		bankBalance === undefined || cleared.data === undefined ? undefined : bankBalance - cleared.data
 	);
@@ -65,16 +59,16 @@
 			return;
 		}
 		saving = true;
-		try {
-			const adjustment = await reconcile({ accountId: account._id, balance: bankBalance, date });
-			open = false;
-			onReconciled(adjustment);
-		} catch (thrown) {
-			error =
-				readPublicError(thrown)?.message ?? "Budge couldn't reconcile the Account. Try again.";
-		} finally {
-			saving = false;
+		const reconciled = await attempt(() =>
+			reconcile({ accountId: account._id, balance: bankBalance, date })
+		);
+		saving = false;
+		if (!reconciled.ok) {
+			error = reconciled.error?.message ?? "Budge couldn't reconcile the Account. Try again.";
+			return;
 		}
+		open = false;
+		onReconciled(reconciled.value);
 	}
 </script>
 

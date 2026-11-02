@@ -18,6 +18,13 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'lib',
+					environment: 'node',
+					include: ['src/lib/*.test.ts']
+				}
+			},
+			{
+				test: {
 					name: 'ssr',
 					environment: 'node',
 					include: ['src/ssr.test.ts'],

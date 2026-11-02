@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { useConvexClient } from 'convex-svelte';
 
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { localToday } from '$lib/domain/dates';
@@ -17,16 +18,14 @@
 	async function exportAs(save: (data: BudgetExport, date: string) => void | Promise<void>) {
 		busy = true;
 		error = '';
-		try {
+		const exported = await attempt(async () => {
 			const data = await fetchExport(client);
 			downloading = true;
 			await save(data, localToday());
-		} catch {
-			error = "Budge couldn't export. Try again.";
-		} finally {
-			busy = false;
-			downloading = false;
-		}
+		});
+		busy = false;
+		downloading = false;
+		if (!exported.ok) error = "Budge couldn't export. Try again.";
 	}
 </script>
 

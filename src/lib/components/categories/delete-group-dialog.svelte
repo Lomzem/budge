@@ -2,10 +2,10 @@
 	import { useMutation } from 'convex-svelte';
 
 	import { api } from '$convex/_generated/api';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Label } from '$lib/components/ui/label';
-	import { readPublicError } from '$lib/publicError';
 
 	import type { ManagedGroup } from './types';
 
@@ -48,20 +48,17 @@
 		}
 		const id = group._id;
 		saving = true;
-		try {
-			await removeGroup({
+		const removed = await attempt(() =>
+			removeGroup({
 				groupId: id,
 				...(destination ? { destinationGroupId: destination._id } : {})
-			});
-			// Another group may have taken the dialog over while this saved; leave that one be.
-			if (openFor() === id) open = false;
-		} catch (thrown) {
-			if (openFor() === id) {
-				error = readPublicError(thrown)?.message ?? "Budge couldn't delete the group. Try again.";
-			}
-		} finally {
-			saving = false;
-		}
+			})
+		);
+		saving = false;
+		// Another group may have taken the dialog over while this saved; leave that one be.
+		if (openFor() !== id) return;
+		if (removed.ok) open = false;
+		else error = removed.error?.message ?? "Budge couldn't delete the group. Try again.";
 	}
 </script>
 

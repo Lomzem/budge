@@ -1,5 +1,5 @@
 import { clerk } from '@clerk/testing/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { localToday } from '../src/lib/domain/dates';
 
@@ -34,6 +34,16 @@ async function importRow(page: Page, bankText: string, type: 'Debit' | 'Credit')
 	await expect(dialog.getByRole('status')).toHaveText(/^1 new Transaction/);
 	await dialog.getByRole('button', { name: 'Save' }).click();
 	await expect(dialog).toBeHidden();
+}
+
+/** Deletes each Transaction among `rows` in the open Account, through its dialog. */
+async function deleteRows(page: Page, rows: Locator) {
+	while ((await rows.count()) > 0) {
+		await rows.first().getByRole('button').first().click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+		await expect(page.getByRole('alertdialog')).toBeHidden();
+	}
 }
 
 test('a Transfer from an import links the other import instead of a duplicate', async ({
@@ -74,14 +84,7 @@ test('a Transfer from an import links the other import instead of a duplicate', 
 	} finally {
 		for (const account of ['Savings', 'Checking']) {
 			await openAccount(page, account);
-			for (const rows of [linked, leftovers]) {
-				while ((await rows.count()) > 0) {
-					await rows.first().getByRole('button').first().click();
-					await dialog.getByRole('button', { name: 'Delete' }).click();
-					await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
-					await expect(page.getByRole('alertdialog')).toBeHidden();
-				}
-			}
+			for (const rows of [linked, leftovers]) await deleteRows(page, rows);
 		}
 	}
 });

@@ -1,4 +1,4 @@
-import { v } from 'convex/values';
+import { v, type Infer } from 'convex/values';
 import { Effect, Layer } from 'effect';
 
 import type { PublicError } from '../src/lib/domain/publicError';
@@ -30,6 +30,7 @@ import {
 	setupConnection,
 	SyncStore,
 	syncConnection,
+	type syncRow,
 	type SyncError
 } from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
@@ -178,32 +179,14 @@ export const apply = internalMutation({
 		) {
 			return { kind: 'stale' as const };
 		}
-		if (rows.length > MAX_SYNC_ROWS) {
-			throw new Error(`A sync batch holds at most ${String(MAX_SYNC_ROWS)} rows.`);
-		}
+		// Sync never sends more; the owner sees only that the sync failed.
+		if (rows.length > MAX_SYNC_ROWS) throw publicError('INVALID_INPUT');
 		const cutoverDate = await requireCutoverDate(ctx);
-
-		const byExternalId = new Map<string, IncomingRow[]>();
-		for (const { externalAccountId, ...row } of rows) {
-			const checked = requireBankRow(row, cutoverDate);
-			byExternalId.set(externalAccountId, [
-				...(byExternalId.get(externalAccountId) ?? []),
-				checked
-			]);
-		}
-		const payees = new ImportedPayees();
-		const totals = { added: 0, matched: 0, held: 0 };
-		for (const [externalId, accountRows] of byExternalId) {
-			const target = await connectionAccountOf(ctx, connectionId, externalId);
-			if (target.state !== 'mapped') {
-				if (target.state === 'held') totals.held += accountRows.length;
-				continue;
-			}
-			const plan = await planBankRows(ctx, target.accountId, 'plaid', accountRows);
-			const counts = await applyBankRows(ctx, target.accountId, 'plaid', plan, payees, target._id);
-			totals.added += counts.added;
-			totals.matched += counts.matched;
-		}
+		const totals = await applyByBankAccount(
+			ctx,
+			connectionId,
+			rowsByBankAccount(rows, cutoverDate)
+		);
 
 		const now = Date.now();
 		const nextLease = release ? undefined : now + LEASE_MS;
@@ -221,6 +204,41 @@ export const apply = internalMutation({
 		return { kind: 'applied' as const, lease: nextLease ?? null, ...totals };
 	}
 });
+
+/** The batch's rows, each checked, under the bank Account it came through. */
+function rowsByBankAccount(
+	rows: Infer<typeof syncRow>[],
+	cutoverDate: string
+): Map<string, IncomingRow[]> {
+	const byExternalId = new Map<string, IncomingRow[]>();
+	for (const { externalAccountId, ...row } of rows) {
+		const checked = requireBankRow(row, cutoverDate);
+		byExternalId.set(externalAccountId, [...(byExternalId.get(externalAccountId) ?? []), checked]);
+	}
+	return byExternalId;
+}
+
+/** Applies each bank Account's rows to its mapped Budge Account, and counts the rows held. */
+async function applyByBankAccount(
+	ctx: MutationCtx,
+	connectionId: Id<'bankConnections'>,
+	byExternalId: Map<string, IncomingRow[]>
+) {
+	const payees = new ImportedPayees();
+	const totals = { added: 0, matched: 0, held: 0 };
+	for (const [externalId, accountRows] of byExternalId) {
+		const target = await connectionAccountOf(ctx, connectionId, externalId);
+		if (target.state !== 'mapped') {
+			if (target.state === 'held') totals.held += accountRows.length;
+			continue;
+		}
+		const plan = await planBankRows(ctx, target.accountId, 'plaid', accountRows);
+		const counts = await applyBankRows(ctx, target.accountId, 'plaid', plan, payees, target._id);
+		totals.added += counts.added;
+		totals.matched += counts.matched;
+	}
+	return totals;
+}
 
 /** Extends the sync lease it was given, unless a newer sync has taken over. */
 export const renewLease = internalMutation({

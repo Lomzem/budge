@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -22,7 +22,7 @@ async function budgetWithCategories() {
 	});
 	const rent = await owner.mutation(api.categories.create, { groupId: everyday, name: 'Rent' });
 	const { readyToAssignId } = await owner.query(api.categories.list, {});
-	if (readyToAssignId === null) throw new Error('Ready to Assign was not created.');
+	assert(readyToAssignId !== null, 'Ready to Assign was not created.');
 
 	const spend = (date: string, amount: number, categoryId?: Id<'categories'>) =>
 		owner.mutation(api.transactions.create, {
@@ -350,7 +350,7 @@ describe('Categories', () => {
 		const systemGroup = await b.t.run(
 			async (ctx) => (await ctx.db.get('categories', b.readyToAssignId))?.groupId
 		);
-		if (systemGroup === undefined) throw new Error('No system group.');
+		assert(systemGroup !== undefined, 'No system group.');
 
 		expect(
 			await publicErrorCode(

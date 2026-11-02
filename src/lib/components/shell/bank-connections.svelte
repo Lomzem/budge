@@ -1,15 +1,18 @@
 <script lang="ts">
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { formatSynced } from '$lib/domain/freshness';
-	import { readPublicError } from '$lib/publicError';
+
+	type SyncOutcome = FunctionReturnType<typeof api.bankConnections.syncNow>;
 
 	const client = useConvexClient();
 	const accounts = getAccounts();
@@ -40,23 +43,26 @@
 		result = '';
 	}
 
+	/** What a finished sync says: one was running, it can't sync, or what it added. */
+	function describeSync(outcome: SyncOutcome): string {
+		if (outcome.kind === 'busy') return 'A sync is already running.';
+		if (outcome.kind === 'noToken') {
+			return 'This Bank Connection has no bank login, so it never syncs.';
+		}
+		return `Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`;
+	}
+
 	async function syncNow(connectionId: Id<'bankConnections'>) {
 		syncing = true;
 		result = '';
-		try {
-			const outcome = await client.action(api.bankConnections.syncNow, { connectionId });
-			result =
-				outcome.kind === 'busy'
-					? 'A sync is already running.'
-					: outcome.kind === 'noToken'
-						? 'This Bank Connection has no bank login, so it never syncs.'
-						: `Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`;
-		} catch (thrown) {
-			result = readPublicError(thrown)?.message ?? "Budge couldn't sync. Try again.";
-		} finally {
-			syncing = false;
-			now = Date.now();
-		}
+		const synced = await attempt(() =>
+			client.action(api.bankConnections.syncNow, { connectionId })
+		);
+		syncing = false;
+		now = Date.now();
+		result = synced.ok
+			? describeSync(synced.value)
+			: (synced.error?.message ?? "Budge couldn't sync. Try again.");
 	}
 </script>
 
