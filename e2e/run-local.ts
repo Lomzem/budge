@@ -42,8 +42,7 @@ const SCRUBBED =
 const PREVIEW_PORT = 4173;
 
 function fail(message: string): never {
-	console.error(`e2e-local: ${message}`);
-	process.exit(1);
+	throw new Error(message);
 }
 
 function git(cwd: string, ...args: string[]) {
@@ -233,7 +232,19 @@ async function main() {
 		else
 			console.error(`e2e-local: kept ${workdir} (convex.log, playwright-report/) for debugging.`);
 	};
-	process.once('SIGINT', () => void cleanUp().then(() => process.exit(130)));
+	for (const [signal, code] of [
+		['SIGINT', 130],
+		['SIGTERM', 143]
+	] as const) {
+		process.once(
+			signal,
+			() =>
+				void cleanUp().finally(() => {
+					restoreCheckoutTypes();
+					process.exit(code);
+				})
+		);
+	}
 
 	try {
 		// `convex dev` writes the new deployment's name and URL to the copy's `.env.local`.
@@ -302,12 +313,30 @@ async function main() {
 		const code = await exitCode(playwright);
 		succeeded = code === 0;
 		await cleanUp();
-		process.exit(code);
+		process.exitCode = code;
 	} catch (error) {
 		console.error(`e2e-local: ${error instanceof Error ? error.message : String(error)}`);
 		await cleanUp();
-		process.exit(1);
+		process.exitCode = 1;
 	}
 }
 
-await main();
+// SSR tests can leave public-env types generated with a missing URL. E2E only
+// syncs its temp copy, so restore the caller's types on every exit for typed ESLint.
+function restoreCheckoutTypes() {
+	try {
+		execFileSync(process.execPath, ['run', 'sync'], { stdio: 'inherit' });
+	} catch {
+		console.error('e2e-local: restoring checkout types failed.');
+		process.exitCode = 1;
+	}
+}
+
+try {
+	await main();
+} catch (error) {
+	console.error(`e2e-local: ${error instanceof Error ? error.message : String(error)}`);
+	process.exitCode = 1;
+} finally {
+	restoreCheckoutTypes();
+}

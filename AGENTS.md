@@ -27,11 +27,13 @@ Before running Playwright E2E or changing Clerk setup, sign-in, or CI authentica
 
 ## Pull requests
 
-Every ticket from 02 onward is a branch and a PR into `main`, squash-merged once CodeRabbit approves. Docs, `.scratch/`, ticket 01 (the scaffold), and small fixes outside a ticket are committed straight to `main`. When unsure, open a PR.
+**Local review per ticket:** before a ticket enters a PR, review it locally with the `code-review` skill and fix or answer every finding.
+
+**Feature-slice PRs:** group related tickets (typically 3–5) into one branch and PR into `main`, squash-merged once CodeRabbit approves. This fits CodeRabbit's review limit of about one per hour. Docs, `.scratch/`, ticket 01 (the scaffold), dev-environment changes (tooling, lint rules, hooks, CI), and small fixes outside a ticket are committed straight to `main` after a local `code-review`. When unsure, open a PR.
 
 `main` has no branch protection, so this merge rule is the gate:
 
-1. Wait for CodeRabbit's review. A rate-limit or "review skipped" message is neither a review nor an approval: wait out the window, then comment `@coderabbitai review`.
+1. CodeRabbit does not review automatically. Once CI and the local ticket reviews pass, comment `@coderabbitai review` and wait for the completed review. A rate-limit or "review skipped" message is neither a review nor an approval: wait out the window, then comment `@coderabbitai review`.
 2. Address every CodeRabbit comment with a fix or a reply, and push.
 3. Merge only when CodeRabbit has approved the latest commit and CI is green.
 
