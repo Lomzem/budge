@@ -128,6 +128,45 @@ describe('setting up a Bank Connection', () => {
 			{ connectionId, externalId, state: 'mapped', accountId: checking }
 		]);
 	});
+
+	test('setting up an Item again replaces its token, however many connections there are', async () => {
+		const { owner, t } = newBackend();
+		await owner.mutation(api.settings.setCutoverDate, { cutoverDate });
+		const checking = await owner.mutation(api.accounts.create, {
+			name: 'Checking',
+			kind: 'cash',
+			startingBalance: 0
+		});
+		await t.run(async (ctx) => {
+			for (let i = 0; i < 25; i++) {
+				await ctx.db.insert('bankConnections', {
+					name: `Other Bank ${String(i)}`,
+					status: 'ok',
+					provider: {
+						kind: 'plaid',
+						itemId: `item-synthetic-other-${String(i)}`,
+						encryptedToken: 'x'
+					}
+				});
+			}
+		});
+		const save = (encryptedToken: string) =>
+			t.mutation(internal.bankConnections.save, {
+				name: 'Sample Bank',
+				itemId,
+				encryptedToken,
+				accounts: [{ externalId, accountId: checking }]
+			});
+
+		const first = await save('sealed-token-synthetic-1');
+		expect(await save('sealed-token-synthetic-2')).toBe(first);
+		const items = await t.run(async (ctx) =>
+			(await ctx.db.query('bankConnections').collect()).filter(
+				(c) => c.provider.kind === 'plaid' && c.provider.itemId === itemId
+			)
+		);
+		expect(items).toMatchObject([{ provider: { encryptedToken: 'sealed-token-synthetic-2' } }]);
+	});
 });
 
 describe('syncing a Bank Connection', () => {

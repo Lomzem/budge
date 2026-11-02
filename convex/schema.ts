@@ -160,7 +160,7 @@ export default defineSchema({
 			}),
 			v.object({ kind: v.literal('sandbox') })
 		)
-	}),
+	}).index('by_itemId', ['provider.itemId']),
 
 	// The bank's Accounts under a Bank Connection. A mapped one feeds a Budge Account; rows from a
 	// held one wait for the owner to map it, and an ignored one's rows are dropped.

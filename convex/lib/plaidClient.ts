@@ -110,7 +110,8 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 	): Effect.Effect<A, PlaidError> => {
 		const { clientId, secret } = config;
 		if (clientId === undefined || secret === undefined) {
-			return Effect.die(new Error('PLAID_CLIENT_ID and PLAID_SECRET are not set'));
+			// A deployment without Plaid's credentials can't reach Plaid, and another attempt won't help.
+			return Effect.fail(new PlaidTransport());
 		}
 		const request = HttpClientRequest.post(`${baseUrl}${path}`).pipe(
 			HttpClientRequest.setHeaders({ 'PLAID-CLIENT-ID': clientId, 'PLAID-SECRET': secret }),
@@ -120,12 +121,20 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 			const response = yield* http
 				.execute(request)
 				.pipe(Effect.mapError(() => new PlaidTransport()));
-			const json: unknown = yield* response.json.pipe(Effect.mapError(() => new PlaidDecode()));
 			if (response.status >= 200 && response.status < 300) {
-				return yield* decode(json).pipe(Effect.mapError(() => new PlaidDecode()));
+				return yield* response.json.pipe(
+					Effect.flatMap(decode),
+					Effect.mapError(() => new PlaidDecode())
+				);
 			}
-			const error = yield* Schema.decodeUnknownEffect(PlaidErrorBody)(json).pipe(
-				Effect.mapError(() => new PlaidDecode())
+			// An outage or rate limit can answer with HTML or nothing at all; it is still Plaid's
+			// refusal, so its status decides whether to retry.
+			const error = yield* response.json.pipe(
+				Effect.flatMap(Schema.decodeUnknownEffect(PlaidErrorBody)),
+				Effect.orElseSucceed(() => ({
+					error_code: `HTTP_${String(response.status)}`,
+					request_id: ''
+				}))
 			);
 			return yield* new PlaidApi({ ...error, status: response.status });
 		});

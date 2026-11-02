@@ -241,9 +241,10 @@ export const save = internalMutation({
 		for (const { accountId } of accounts) {
 			if ((await ctx.db.get('accounts', accountId)) === null) throw publicError('NOT_FOUND');
 		}
-		const existing = (await ctx.db.query('bankConnections').take(MAX_CONNECTIONS)).find(
-			(connection) => connection.provider.kind === 'plaid' && connection.provider.itemId === itemId
-		);
+		const existing = await ctx.db
+			.query('bankConnections')
+			.withIndex('by_itemId', (q) => q.eq('provider.itemId', itemId))
+			.first();
 		let connectionId: Id<'bankConnections'>;
 		if (existing?.provider.kind === 'plaid') {
 			connectionId = existing._id;

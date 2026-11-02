@@ -3,7 +3,7 @@ import { Effect, Fiber, Layer } from 'effect';
 import { FetchHttpClient } from 'effect/http';
 import { TestClock } from 'effect/testing';
 
-import { PlaidClient } from './plaidClient';
+import { PlaidClient, type PlaidConfig } from './plaidClient';
 
 // Obviously fake credentials and IDs: no test ever reaches Plaid.
 const config = {
@@ -23,7 +23,10 @@ interface Sent {
  * The live PlaidClient over a fake `fetch`, so its requests, retries, and timeouts run for real
  * without a network. `respond` answers each attempt in turn.
  */
-function fakePlaid(respond: (attempt: number, signal: AbortSignal) => Promise<Response>) {
+function fakePlaid(
+	respond: (attempt: number, signal: AbortSignal) => Promise<Response>,
+	plaidConfig: PlaidConfig = config
+) {
 	const sent: Sent[] = [];
 	const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 		sent.push({
@@ -36,7 +39,7 @@ function fakePlaid(respond: (attempt: number, signal: AbortSignal) => Promise<Re
 		});
 		return await respond(sent.length, init?.signal ?? new AbortController().signal);
 	};
-	const layer = PlaidClient.layer(config).pipe(
+	const layer = PlaidClient.layer(plaidConfig).pipe(
 		Layer.provide(FetchHttpClient.layer),
 		Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch))
 	);
@@ -163,6 +166,33 @@ describe('PlaidClient', () => {
 			expect(plaid.sent).toHaveLength(1);
 			// Plaid's message can quote the request, so it is never kept.
 			expect(JSON.stringify(error)).not.toContain(accessToken);
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
+	it.effect("retries Plaid's outage even when its body isn't JSON", () => {
+		const plaid = fakePlaid(() =>
+			Promise.resolve(new Response('<html>Service Unavailable</html>', { status: 503 }))
+		);
+		return Effect.gen(function* () {
+			const fiber = yield* Effect.forkChild(Effect.flip(sync));
+			yield* TestClock.adjust('1 minute');
+			const error = yield* Fiber.join(fiber);
+
+			expect(error).toMatchObject({ _tag: 'PlaidApi', error_code: 'HTTP_503', status: 503 });
+			expect(plaid.sent).toHaveLength(3);
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
+	it.effect('fails with a typed error, sending nothing, when the credentials are not set', () => {
+		const plaid = fakePlaid(() => Promise.resolve(json(200, syncBody)), {
+			...config,
+			secret: undefined
+		});
+		return Effect.gen(function* () {
+			const error = yield* Effect.flip(sync);
+
+			expect(error._tag).toBe('PlaidTransport');
+			expect(plaid.sent).toHaveLength(0);
 		}).pipe(Effect.provide(plaid.layer));
 	});
 
