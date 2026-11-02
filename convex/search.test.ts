@@ -328,6 +328,15 @@ describe('filters', () => {
 		expect(listed).toEqual([split]);
 	});
 
+	test('a search keeps whole words in any script, and one of only punctuation finds nothing', async () => {
+		const { add, find } = await budget();
+		const book = await add({ payee: 'किताब घर' });
+		await add({ payee: 'कप' });
+
+		expect(await find({ search: 'किताब' })).toEqual([book]);
+		expect(await find({ search: '***' })).toEqual([]);
+	});
+
 	test('narrow a search, with the date range applied after it', async () => {
 		const { find, ids, groceries, household, checking, lantern } = await filtered();
 

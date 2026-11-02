@@ -89,13 +89,14 @@ export const list = query({
 		if (args.accountId !== undefined && (await ctx.db.get('accounts', args.accountId)) === null) {
 			throw publicError('NOT_FOUND');
 		}
+		const searching = (args.search ?? '').trim() !== '';
 		const filters: Filters = {
 			...args,
 			search: searchTerms(args.search ?? ''),
 			splitLines: args.splitLines === true
 		};
 		const filtering =
-			filters.search !== '' ||
+			searching ||
 			filters.categoryId !== undefined ||
 			filters.payeeId !== undefined ||
 			filters.from !== undefined ||
@@ -109,8 +110,11 @@ export const list = query({
 		if (filters.from !== undefined) requireIsoDate(filters.from);
 		if (filters.to !== undefined) requireIsoDate(filters.to);
 
+		// A search of only punctuation has no words to find, so it finds nothing.
+		if (searching && filters.search === '') return { page: [], isDone: true, continueCursor: '' };
+
 		let result: PaginationResult<Doc<'transactions'>>;
-		if (filters.search !== '') {
+		if (searching) {
 			result = await searched(ctx, filters, paginationOpts);
 		} else if (filters.splitLines) {
 			result = await withLinesIn(ctx, filters, paginationOpts);
@@ -142,7 +146,7 @@ const MAX_SEARCH_TERMS = 16;
 /** The words of a search as Convex splits them, keeping the first `MAX_SEARCH_TERMS`. */
 function searchTerms(search: string) {
 	return search
-		.split(/[^\p{L}\p{N}]+/u)
+		.split(/[^\p{Alphabetic}\p{N}]+/u)
 		.filter((term) => term !== '')
 		.slice(0, MAX_SEARCH_TERMS)
 		.join(' ');

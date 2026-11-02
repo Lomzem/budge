@@ -44,8 +44,10 @@ has Transactions from before search, run the backfill once after deploying; it
 schedules its own remaining batches, and running it again changes nothing:
 
 ```sh
-npx convex run migrations:backfillSearchText '{"cursor": null}'
+npx convex run migrations:backfillSearchText '{"cursor": null}' --prod
 ```
+
+Leave out `--prod` to backfill the development deployment.
 
 The app embeds `PUBLIC_CONVEX_URL` during the build. CI uses an explicit localhost
 value for type generation. Vercel supplies each build with its matching backend
