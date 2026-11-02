@@ -3,8 +3,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { formatCents, parseCents } from '../src/lib/domain/money';
 
-// Runs on the local backend after CI's `seed:run`, so Groceries and Coffee exist. Every move it
-// makes, it moves back.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 
 async function cents(page: Page, read: () => Promise<string | null>) {
@@ -56,16 +54,18 @@ test('the inspector moves money by keyboard, and opens under its row on a phone'
 	await expect.poll(() => assigned('Coffee')).toBe(before.coffee + 1_000);
 	expect(await readyToAssign()).toBe(before.readyToAssign);
 
-	// Move it back, so the seeded budget stays as it was.
-	await move('Take from');
-	await expect.poll(() => assigned('Groceries')).toBe(before.groceries);
-	await expect.poll(() => assigned('Coffee')).toBe(before.coffee);
+	await test.step('move it back, so the seeded budget stays as it was', async () => {
+		await move('Take from');
+		await expect.poll(() => assigned('Groceries')).toBe(before.groceries);
+		await expect.poll(() => assigned('Coffee')).toBe(before.coffee);
+	});
 
-	// On a phone the same inspector opens in a row under Groceries.
-	await page.setViewportSize({ width: 320, height: 640 });
-	await expect(inspector).toBeVisible();
-	await expect(page.getByRole('row').filter({ has: inspector })).toBeVisible();
-	await inspector.getByRole('button', { name: 'Close Groceries' }).click();
-	await expect(inspector).toBeHidden();
-	await expect(groceries).toBeFocused();
+	await test.step('on a phone the same inspector opens in a row under Groceries', async () => {
+		await page.setViewportSize({ width: 320, height: 640 });
+		await expect(inspector).toBeVisible();
+		await expect(page.getByRole('row').filter({ has: inspector })).toBeVisible();
+		await inspector.getByRole('button', { name: 'Close Groceries' }).click();
+		await expect(inspector).toBeHidden();
+		await expect(groceries).toBeFocused();
+	});
 });

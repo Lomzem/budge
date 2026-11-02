@@ -6,10 +6,6 @@ type CategoryBudget = BudgetView['groups'][number]['categories'][number];
 export type TargetProgress = NonNullable<CategoryBudget['target']>;
 export type TargetDefinition = TargetProgress['definition'];
 
-/**
- * A Category's status in words, with its color. Color is never the only signal: every colored
- * amount has its status in words beside it, and the words are a Target bar's text equivalent.
- */
 export function availableStatus(
 	category: Pick<CategoryBudget, 'status' | 'available' | 'target'>
 ): { text: string; class: string } | undefined {
@@ -31,10 +27,6 @@ export function availableStatus(
 	}
 }
 
-/**
- * A Payment Category's notes in words: what it still waits on from each overspent Category, then
- * the card debt not yet covered. Empty for any other Category.
- */
 export function paymentNotes(category: Pick<CategoryBudget, 'payment'>): string[] {
 	const { payment } = category;
 	if (payment === null) return [];
@@ -44,7 +36,6 @@ export function paymentNotes(category: Pick<CategoryBudget, 'payment'>): string[
 	return notes;
 }
 
-/** A Target in words, with a repeating By date Target's date as of the viewed month. */
 export function describeTarget(target: TargetProgress): string {
 	const { definition } = target;
 	const amount = formatCents(definition.amount);

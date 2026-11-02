@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 
 import { matchBankRows, type BankSource, type MatchCandidate, type MatchContext } from './matcher';
 
-// Invented Bank Text and amounts.
 const coffee = { date: '2026-08-14', amount: -450, bankText: 'SAMPLE COFFEE 0042' };
 
 function handEntered(

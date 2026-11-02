@@ -3,14 +3,15 @@ import { readFile } from 'node:fs/promises';
 import { clerk } from '@clerk/testing/playwright';
 import { expect, test, type Download } from '@playwright/test';
 
-// Runs on the local backend after CI's `seed:run`, so Checking exists.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 
 async function text(download: Download) {
 	return readFile(await download.path(), 'utf8');
 }
 
-test('the owner exports the budget as JSON and as CSV', async ({ page }) => {
+test('exports every table as JSON and paced CSV downloads, past Chromium’s ten-file burst limit', async ({
+	page
+}) => {
 	if (!ownerEmail) throw new Error('E2E_CLERK_USER_EMAIL is not set.');
 
 	await page.goto('/sign-in');

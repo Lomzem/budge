@@ -21,7 +21,7 @@
 	let renameOpen = $state(false);
 	let reconcileOpen = $state(false);
 	let moveError = $state('');
-	// Kept with its Account, so the message doesn't follow the owner to another.
+
 	let reconciled: { accountId: string; message: string } | undefined = $state();
 
 	function onReconciled(adjustment: number) {

@@ -1,12 +1,8 @@
-// Decodes Plaid's `/transactions/sync` responses into Bank Rows. Only the fields sync needs are
-// read; the rest of the response is dropped, so raw bank data never travels further.
-
 import { Effect, Schema, SchemaGetter, SchemaIssue } from 'effect';
 
 import { isIsoDate } from './dates';
 import { parseCents } from './money';
 
-/** Plaid writes outflows positive; Budge writes them negative, in whole cents. */
 const OutflowPositiveCents = Schema.Finite.pipe(
 	Schema.decodeTo(Schema.Finite, {
 		decode: SchemaGetter.transformEffect((amount: number) => {
@@ -40,18 +36,15 @@ const SyncResponse = Schema.Struct({
 	has_more: Schema.Boolean
 });
 
-/** One decoded `/transactions/sync` page. */
 export interface SyncPage {
 	added: readonly (typeof SyncTransaction.Type)[];
 	nextCursor: string;
 	hasMore: boolean;
 }
 
-/** A posted Plaid Transaction as a Bank Row, still keyed by Plaid's Account. */
 export interface SyncRow {
-	/** Plaid's ID for the Account the row arrived through. */
 	externalAccountId: string;
-	/** Plaid's transaction ID: the row's import ID. */
+
 	sourceId: string;
 	date: string;
 	amount: number;
@@ -59,7 +52,6 @@ export interface SyncRow {
 	merchantName?: string;
 }
 
-/** Reads one `/transactions/sync` response body, failing on anything sync can't trust. */
 export const decodeSyncPage = (body: unknown): Effect.Effect<SyncPage, Schema.SchemaError> =>
 	Schema.decodeUnknownEffect(SyncResponse)(body).pipe(
 		Effect.map((response) => ({
@@ -69,10 +61,6 @@ export const decodeSyncPage = (body: unknown): Effect.Effect<SyncPage, Schema.Sc
 		}))
 	);
 
-/**
- * The page's new Bank Rows: posted rows dated on or after the cutover date. The Bank Text is the
- * bank's original wording when Plaid has it, otherwise Plaid's name for the Transaction.
- */
 export function syncRowsOf(page: SyncPage, cutoverDate: string): SyncRow[] {
 	return page.added.flatMap((transaction) => {
 		if (transaction.pending || transaction.date < cutoverDate) return [];

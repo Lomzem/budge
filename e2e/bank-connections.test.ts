@@ -9,13 +9,12 @@ test('the sidebar shows when each Bank Connection last synced', async ({ page })
 	await clerk.signIn({ page, emailAddress: ownerEmail });
 	await page.goto('/');
 
-	// The seed's Sandbox connection synced two hours ago and has no token.
-	const line = page
+	const seededSandboxConnection = page
 		.getByRole('list', { name: 'Bank Connections' })
 		.getByRole('button', { name: /Sample Bank \(Sandbox\): Synced 2 hours ago/ });
-	await expect(line).toBeVisible();
+	await expect(seededSandboxConnection).toBeVisible();
 
-	await line.click();
+	await seededSandboxConnection.click();
 	const dialog = page.getByRole('dialog', { name: 'Sample Bank (Sandbox)' });
 	await expect(dialog.getByText(/^Last synced /)).toBeVisible();
 

@@ -32,11 +32,9 @@ async function budgetWithTwoCashAccounts() {
 	return { ...backend, checking, savings, rows, importCsv, balances };
 }
 
-// Invented Bank Text and amounts.
 const outOfChecking = { date: '2026-08-20', amount: -25_000, bankText: 'SAMPLE XFER TO SAV 0001' };
 const intoSavings = { date: '2026-08-22', amount: 25_000, bankText: 'SAMPLE XFER FROM CHK 0001' };
 
-/** The owner categorizes a Transaction as a Transfer, keeping its date, amount, and memo. */
 const asTransfer = (
 	row: { _id: Id<'transactions'>; accountId: Id<'accounts'>; date: string; amount: number },
 	transferAccountId: Id<'accounts'>
@@ -95,17 +93,19 @@ describe('when both sides are already imported', () => {
 
 	test('Budge offers the other import, with the opposite amount, within 10 days', async () => {
 		const { owner, checking, savings, importCsv, fromChecking, toSavings } = await bothImported();
-		// Not offered: the same amount, the wrong date, and one already a Transfer side.
-		await importCsv(savings, { ...intoSavings, amount: -25_000, bankText: 'SAMPLE FEE' });
-		await importCsv(savings, { ...intoSavings, date: '2026-09-05', bankText: 'SAMPLE LATE' });
-		await owner.mutation(api.transactions.create, {
+		const notOfferedSameAmount = { ...intoSavings, amount: -25_000, bankText: 'SAMPLE FEE' };
+		const notOfferedWrongDate = { ...intoSavings, date: '2026-09-05', bankText: 'SAMPLE LATE' };
+		const notOfferedAlreadyATransferSide = {
 			accountId: checking,
 			transferAccountId: savings,
 			date: '2026-08-21',
 			amount: -25_000,
 			payee: '',
 			memo: ''
-		});
+		};
+		await importCsv(savings, notOfferedSameAmount);
+		await importCsv(savings, notOfferedWrongDate);
+		await owner.mutation(api.transactions.create, notOfferedAlreadyATransferSide);
 
 		expect(
 			await owner.query(api.transactions.transferCandidates, {

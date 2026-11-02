@@ -1,11 +1,8 @@
 import { clerk } from '@clerk/testing/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-// Runs on the local backend after CI's `seed:run`, so Groceries exists. Everything it adds, it
-// deletes again.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 
-/** Opens the actions menu of a group or Category by keyboard, then picks `action`. */
 async function act(page: Page, name: string, action: string) {
 	const trigger = page.getByRole('button', {
 		name: new RegExp(`^${name}( \\(hidden\\))? actions$`)
@@ -47,8 +44,10 @@ test('a Category can be added, renamed, hidden, and deleted, down to 320 px', as
 	await expect(
 		page.getByRole('button', { name: 'Smoke Test Renamed (hidden) actions' })
 	).toBeVisible();
-	// Nothing scrolls sideways at the narrowest width.
-	expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+	const scrollWidthAtTheNarrowestWidth = await page.evaluate(
+		() => document.documentElement.scrollWidth
+	);
+	expect(scrollWidthAtTheNarrowestWidth).toBeLessThanOrEqual(320);
 
 	await act(page, 'Smoke Test Renamed', 'Delete…');
 	const deleteCategory = page.getByRole('dialog', { name: 'Delete Smoke Test Renamed' });

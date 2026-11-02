@@ -12,8 +12,6 @@ const modules = import.meta.glob('./**/*.ts');
 const ownerSubject = 'user_owner';
 const clerkIssuer = 'https://budge-dev.clerk.accounts.dev';
 
-// Valid arguments for every public function, so the guard (not argument validation) is what
-// rejects a caller. A new public function fails the sweep below until it is listed here.
 function sampleArgs(ids: {
 	accountId: Id<'accounts'>;
 	transactionId: Id<'transactions'>;

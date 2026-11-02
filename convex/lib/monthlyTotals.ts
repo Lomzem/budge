@@ -12,7 +12,6 @@ function keyOf(transaction: Counted): Key {
 	return {
 		month: monthOf(transaction.date),
 		accountId: transaction.accountId,
-		// A Transfer side is never Uncategorized.
 		bucket:
 			transaction.transferTransactionId === undefined
 				? (transaction.categoryId ?? 'uncategorized')
@@ -20,7 +19,6 @@ function keyOf(transaction: Counted): Key {
 	};
 }
 
-/** A split line, counted as a Transaction of its own in its parent's Account. */
 export function lineCounted(
 	parent: Pick<Doc<'transactions'>, 'accountId'>,
 	line: Pick<Doc<'transactionSplits'>, 'date' | 'amount' | 'categoryId'>
@@ -33,11 +31,6 @@ export function lineCounted(
 	};
 }
 
-/**
- * Adds a Transaction to its monthly total (`sign` 1), or takes it back out (`sign` -1). A total
- * left summing no Transactions is deleted, as the rebuild never writes one. A split Transaction
- * counts nothing itself; each of its lines is counted with `lineCounted`.
- */
 export async function countTransaction(ctx: MutationCtx, transaction: Counted, sign: 1 | -1) {
 	if (transaction.split === true) return;
 	const key = keyOf(transaction);
@@ -59,7 +52,6 @@ export async function countTransaction(ctx: MutationCtx, transaction: Counted, s
 	}
 }
 
-/** Recreates every monthly total from the Transactions, the source of truth. */
 export async function rebuildMonthlyTotals(ctx: MutationCtx) {
 	for await (const row of ctx.db.query('monthlyTotals')) {
 		await ctx.db.delete('monthlyTotals', row._id);
@@ -86,7 +78,6 @@ export async function rebuildMonthlyTotals(ctx: MutationCtx) {
 	for (const total of totals.values()) await ctx.db.insert('monthlyTotals', total);
 }
 
-/** Each Account's balance, summed from the monthly totals rather than its Transactions. */
 export async function accountBalances(ctx: QueryCtx): Promise<Map<Id<'accounts'>, number>> {
 	const balances = new Map<Id<'accounts'>, number>();
 	for await (const row of ctx.db.query('monthlyTotals')) {
@@ -95,11 +86,6 @@ export async function accountBalances(ctx: QueryCtx): Promise<Map<Id<'accounts'>
 	return balances;
 }
 
-/**
- * Rebuilds, from the Transactions and split lines, the totals of each Category in `buckets` for each (month,
- * Account) in `keys`. For a change that touches a few Categories, it writes what the full
- * rebuild would for them, without reading the whole history.
- */
 export async function rebuildTotals(
 	ctx: MutationCtx,
 	buckets: Iterable<Id<'categories'>>,
@@ -111,7 +97,6 @@ export async function rebuildTotals(
 	}
 }
 
-/** Rewrites one Category's monthly total in one Account from its Transactions and split lines. */
 async function rebuildTotal(
 	ctx: MutationCtx,
 	key: Pick<Key, 'month' | 'accountId'> & { bucket: Id<'categories'> }

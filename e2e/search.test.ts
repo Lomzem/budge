@@ -1,9 +1,6 @@
 import { clerk } from '@clerk/testing/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-// Runs on the local backend after CI's `seed:run`, whose invented Transactions include a coffee
-// Matched to the Bank Text "SAMPLE COFFEE SHOP 0042" and a split warehouse trip with a line in
-// Gifts memo'd "Birthday present". It only reads.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 
 async function openAllAccounts(page: Page) {
@@ -14,7 +11,6 @@ async function openAllAccounts(page: Page) {
 	await expect(page.getByRole('heading', { level: 1, name: 'All Accounts' })).toBeVisible();
 }
 
-/** The Payees of the listed Transactions, as their edit buttons name them. */
 async function listedPayees(page: Page) {
 	return await page
 		.getByRole('table')
@@ -31,8 +27,8 @@ test('search finds Transactions by Bank Text and split memo, and filters narrow 
 	await openAllAccounts(page);
 	const search = page.getByRole('searchbox', { name: 'Search' });
 
-	// Only the Matched coffee's Bank Text has this number.
-	await search.fill('0042');
+	const numberOnlyInTheMatchedCoffeesBankText = '0042';
+	await search.fill(numberOnlyInTheMatchedCoffeesBankText);
 	await expect.poll(() => listedPayees(page)).toEqual(['Sample Coffee Shop']);
 
 	await search.fill('birthday');
@@ -44,10 +40,11 @@ test('search finds Transactions by Bank Text and split memo, and filters narrow 
 		.poll(async () => new Set(await listedPayees(page)))
 		.toEqual(new Set(['Sample Landlord']));
 
-	// The split has no Category of its own; its Gifts line lists it under Gifts.
-	await page.getByLabel('Payee', { exact: true }).selectOption({ label: 'Any Payee' });
-	await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Gifts' });
-	await expect.poll(() => listedPayees(page)).toContain('Sample Warehouse Club');
+	await test.step('the split has no Category of its own; its Gifts line lists it under Gifts', async () => {
+		await page.getByLabel('Payee', { exact: true }).selectOption({ label: 'Any Payee' });
+		await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Gifts' });
+		await expect.poll(() => listedPayees(page)).toContain('Sample Warehouse Club');
+	});
 
 	await page.getByRole('button', { name: 'Clear search and filters' }).click();
 	await expect(page.getByLabel('Category', { exact: true })).toHaveValue('');

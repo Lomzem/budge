@@ -1,13 +1,9 @@
-// Decodes the bank files the owner downloads into Bank Rows: whole cents, ISO dates, Bank Text,
-// and the bank's import ID when the file has one. Rows dated before the cutover date are dropped.
-
 import { Effect, Schema, SchemaGetter, SchemaIssue } from 'effect';
 
 import { isIsoDate } from './dates';
 import type { BankRow } from './matcher';
 import { parseCents } from './money';
 
-/** Why a bank file could not be read, worded for the owner. */
 export class BankFileError extends Schema.TaggedError<
 	BankFileError,
 	{ readonly brand: unique symbol }
@@ -23,7 +19,6 @@ export interface BankFile {
 	rows: BankRow[];
 }
 
-/** Bank Rows read from the text of a Capital One or Discover CSV, or any bank's QFX. */
 export const decodeBankFile = Effect.fnUntraced(function* (
 	text: string,
 	cutoverDate: string
@@ -31,8 +26,6 @@ export const decodeBankFile = Effect.fnUntraced(function* (
 	const file = /<OFX>/i.test(text) ? yield* decodeQfx(text) : yield* decodeCsv(text);
 	return { ...file, rows: file.rows.filter((row) => row.date >= cutoverDate) };
 });
-
-// Field decoders.
 
 function parsedString<T extends Schema.Top>(
 	to: T,
@@ -55,7 +48,6 @@ function parsedString<T extends Schema.Top>(
 const SHORT_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/;
 const pad = (n: string) => n.padStart(2, '0');
 
-/** `MM/DD/YY`, `MM/DD/YYYY`, or `YYYY-MM-DD`, as an ISO date. */
 const CsvDate = parsedString(
 	Schema.String,
 	(text) => {
@@ -69,7 +61,6 @@ const CsvDate = parsedString(
 	'Expected a date'
 );
 
-/** An OFX `YYYYMMDD…` date and time, as the ISO date written in it, without moving time zones. */
 const OfxDate = parsedString(
 	Schema.String,
 	(text) => {
@@ -80,14 +71,12 @@ const OfxDate = parsedString(
 	'Expected a date'
 );
 
-/** A dollar amount, as whole cents. */
 const Cents = parsedString(
 	Schema.Finite,
 	(text) => parseCents(text.trim().replace(/^\+/, '')),
 	'Expected an amount in dollars and cents'
 );
 
-/** A dollar amount or an empty cell, as whole cents. */
 const OptionalCents = parsedString(
 	Schema.Finite,
 	(text) => (text.trim() === '' ? 0 : parseCents(text)),
@@ -99,8 +88,6 @@ const Text = parsedString(
 	(text) => text.replace(/\s+/g, ' ').trim() || undefined,
 	'Expected a description'
 );
-
-// CSV.
 
 interface CsvProfile {
 	format: BankFileFormat;
@@ -121,7 +108,6 @@ function csvProfile<S extends Schema.Top & { readonly DecodingServices: never }>
 }
 
 const csvProfiles = [
-	// Checking and savings: an unsigned amount and a Debit or Credit type.
 	csvProfile(
 		'capitalOneCsv',
 		Schema.Struct({
@@ -136,7 +122,7 @@ const csvProfiles = [
 			bankText: row['Transaction Description']
 		})
 	),
-	// Credit cards: separate Debit and Credit columns.
+
 	csvProfile(
 		'capitalOneCardCsv',
 		Schema.Struct({
@@ -151,7 +137,7 @@ const csvProfiles = [
 			bankText: row.Description
 		})
 	),
-	// Discover writes purchases positive and payments negative.
+
 	csvProfile(
 		'discoverCsv',
 		Schema.Struct({ 'Trans. Date': CsvDate, Description: Text, Amount: Cents }),
@@ -199,7 +185,6 @@ const decodeCsv = Effect.fnUntraced(function* (
 	return { format: profile.format, source: 'csv', rows };
 });
 
-/** The rows of RFC 4180 CSV text, with quoted fields unquoted. */
 function parseCsv(text: string): string[][] {
 	const rows: string[][] = [];
 	let row: string[] = [];
@@ -238,8 +223,6 @@ function parseCsv(text: string): string[][] {
 	return rows;
 }
 
-// QFX, both the SGML of OFX 1 and the XML of OFX 2.
-
 const QfxTransaction = Schema.Struct({
 	DTPOSTED: OfxDate,
 	DTUSER: Schema.optionalKey(OfxDate),
@@ -253,9 +236,8 @@ const decodeQfx = Effect.fnUntraced(function* (
 	text: string
 ): Effect.fn.Return<Omit<BankFile, 'rows'> & { rows: BankRow[] }, BankFileError> {
 	const rows: BankRow[] = [];
-	// Posted transactions only: pending ones sit in STMTTRNP, which this never matches.
-	const blocks = [...text.matchAll(/<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi)];
-	for (const [index, [, block = '']] of blocks.entries()) {
+	const postedBlocks = [...text.matchAll(/<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi)];
+	for (const [index, [, block = '']] of postedBlocks.entries()) {
 		const tags: Record<string, string> = Object.fromEntries(
 			[...block.matchAll(/<([A-Z0-9.]+)>([^<\r\n]*)/gi)]
 				.map(([, name = '', value = '']): [string, string] => [
@@ -264,8 +246,8 @@ const decodeQfx = Effect.fnUntraced(function* (
 				])
 				.filter(([, value]) => value !== '')
 		);
-		// A correction rewrites an earlier row; the matcher has no way to apply it, so it is skipped.
-		if ('CORRECTACTION' in tags) continue;
+		const correctsAnEarlierRow = 'CORRECTACTION' in tags;
+		if (correctsAnEarlierRow) continue;
 		const transaction = yield* Schema.decodeUnknownEffect(QfxTransaction)(tags).pipe(
 			Effect.mapError(
 				(error) =>
@@ -301,8 +283,8 @@ function decodeEntities(text: string): string {
 		if (name.startsWith('#')) {
 			const hex = name.startsWith('#x') || name.startsWith('#X');
 			const code = hex ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1));
-			// Past Unicode's last code point the reference names no character, so it stays as written.
-			return code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+			const namesACharacter = code <= 0x10ffff;
+			return namesACharacter ? String.fromCodePoint(code) : entity;
 		}
 		return ENTITIES[name.toLowerCase()] ?? entity;
 	});

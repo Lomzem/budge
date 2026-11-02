@@ -7,7 +7,6 @@ export async function readCutoverDate(ctx: QueryCtx): Promise<string | null> {
 	return settings?.cutoverDate ?? null;
 }
 
-/** The cutover date, which must be set before any Account or Transaction exists. */
 export async function requireCutoverDate(ctx: QueryCtx): Promise<string> {
 	const cutoverDate = await readCutoverDate(ctx);
 	if (cutoverDate === null) throw publicError('INVALID_INPUT', 'Set the cutover date first.');

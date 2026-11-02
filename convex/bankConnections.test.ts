@@ -4,8 +4,15 @@ import { assert, describe, expect, test } from 'vitest';
 import { decodeSyncPage, type SyncPage } from '../src/lib/domain/plaid';
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
 import { api, internal } from './_generated/api';
-import { PlaidApi, PlaidClient, type SyncRequest } from './lib/plaidClient';
 import {
+	PLAID_MIN_SYNC_COUNT,
+	PLAID_MAX_SYNC_COUNT,
+	PlaidApi,
+	PlaidClient,
+	type SyncRequest
+} from './lib/plaidClient';
+import {
+	PAGE_SIZE,
 	MAX_BATCHES,
 	PAGES_PER_BATCH,
 	setupConnection,
@@ -18,7 +25,7 @@ import { newBackend, useOwnerEnv } from './test.helper';
 useOwnerEnv();
 
 const cutoverDate = '2026-08-01';
-// Invented credentials and IDs; nothing here is a real token or Plaid ID.
+
 const accessToken = 'access-token-synthetic-not-real';
 const itemId = 'item-synthetic-1';
 const externalId = 'account-synthetic-checking';
@@ -30,16 +37,11 @@ type Backend = ReturnType<typeof newBackend>;
 
 type FakePlaid = Parameters<typeof PlaidClient.layerTest>[0];
 
-/**
- * Runs a sync program inside an action on the test backend, as the live actions do, but with
- * Plaid faked and a test key.
- */
 function runInAction<A, E>(
 	{ t }: Backend,
 	plaid: FakePlaid,
 	program: Effect.Effect<A, E, PlaidClient | TokenCipher | SyncStore>
 ) {
-	// An action's result crosses Convex's serialization, so the Exit becomes a plain object.
 	return t.action(async (ctx) => {
 		const exit = await Effect.runPromiseExit(
 			program.pipe(
@@ -56,7 +58,6 @@ function runInAction<A, E>(
 	});
 }
 
-/** A fake `/transactions/sync` that records each request and answers from `pages` in turn. */
 function plaidPages(...pages: SyncPage[]) {
 	const requests: SyncRequest[] = [];
 	const transactionsSync = (request: SyncRequest) => {
@@ -189,7 +190,6 @@ describe('syncing a Bank Connection', () => {
 			{
 				date: '2026-08-14',
 				amount: -4_250,
-				// The merchant name names the Payee; the Bank Text stays on the Bank Row.
 				payeeName: 'Sample Grocer',
 				cleared: true,
 				approved: false,
@@ -263,8 +263,8 @@ describe('syncing a Bank Connection', () => {
 			ctx.db.patch('bankConnections', connectionId, { syncLeaseUntil: Date.now() + 60_000 })
 		);
 
-		// The test layer fails on any Plaid call it wasn't given.
-		expect(synced(await sync({}))).toEqual({ kind: 'busy' });
+		const plaidFailingEveryCall = {};
+		expect(synced(await sync(plaidFailingEveryCall))).toEqual({ kind: 'busy' });
 		expect(await rows()).toEqual([]);
 	});
 
@@ -422,11 +422,11 @@ describe('syncing a Bank Connection', () => {
 		};
 
 		expect(synced(await sync({ transactionsSync }))).toMatchObject({ added: 2 });
-		// The batch after the first starts from where the first stopped, then, once the bank
-		// changes, the update starts over from the cursor before its first page.
+		const whereTheFirstBatchStopped = `cursor-synthetic-page-${String(PAGES_PER_BATCH)}`;
+		const cursorBeforeTheUpdatesFirstPage = null;
 		expect(cursors.slice(PAGES_PER_BATCH)).toEqual([
-			`cursor-synthetic-page-${String(PAGES_PER_BATCH)}`,
-			null
+			whereTheFirstBatchStopped,
+			cursorBeforeTheUpdatesFirstPage
 		]);
 		const saved = await connection();
 		expect(saved?.provider).toMatchObject({ cursor: page.nextCursor });
@@ -456,15 +456,16 @@ describe('syncing a Bank Connection', () => {
 	test('renews the lease before starting an update over, and stops if it was lost', async () => {
 		const { t, sync, connectionId } = await connectedBudget();
 		let calls = 0;
-		const transactionsSync = () => {
-			calls++;
-			if (calls === 1) return Effect.succeed(morePage(1));
-			// Another sync takes over while this one is paging.
-			return Effect.promise(() =>
+		const anotherSyncTakesOverTheLease = () =>
+			Effect.promise(() =>
 				t.run((ctx) =>
 					ctx.db.patch('bankConnections', connectionId, { syncLeaseUntil: Date.now() + 60_000 })
 				)
-			).pipe(Effect.andThen(bankChanged));
+			);
+		const transactionsSync = () => {
+			calls++;
+			if (calls === 1) return Effect.succeed(morePage(1));
+			return anotherSyncTakesOverTheLease().pipe(Effect.andThen(bankChanged));
 		};
 
 		expect(synced(await sync({ transactionsSync }))).toEqual({ kind: 'busy' });
@@ -545,4 +546,9 @@ describe('the Bank Connection status', () => {
 		expect(status).toMatchObject({ _id: connectionId, name: 'Sample Bank', lastError: null });
 		expect(JSON.stringify(status)).not.toMatch(/item-synthetic|cursor-synthetic|v1\./);
 	});
+});
+
+test('sync page size stays within Plaid’s 1–500 transaction contract', () => {
+	expect(PAGE_SIZE).toBeGreaterThanOrEqual(PLAID_MIN_SYNC_COUNT);
+	expect(PAGE_SIZE).toBeLessThanOrEqual(PLAID_MAX_SYNC_COUNT);
 });

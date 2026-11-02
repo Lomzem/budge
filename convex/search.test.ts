@@ -8,7 +8,6 @@ import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
-// Invented Accounts, Payees, memos, and Bank Text.
 async function budget() {
 	const backend = newBackend();
 	const { owner } = backend;
@@ -53,7 +52,7 @@ async function budget() {
 		Parameters<typeof owner.query<typeof api.transactions.list>>[1],
 		'paginationOpts'
 	>;
-	/** The IDs one page of the list holds for these filters. */
+
 	const find = async (filters: Filters) =>
 		(
 			await owner.query(api.transactions.list, {

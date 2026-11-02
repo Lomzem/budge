@@ -35,13 +35,8 @@ import {
 } from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
 
-// A single owner has a handful of Bank Connections at most.
 const MAX_CONNECTIONS = 20;
 
-/**
- * Each Bank Connection's name and sync health, newest sync first. Never returns `provider`, which
- * holds the sealed token and Plaid's IDs.
- */
 export const list = query({
 	args: {},
 	returns: v.array(
@@ -66,10 +61,6 @@ export const list = query({
 	}
 });
 
-/**
- * Sync now: syncs one Bank Connection, then asks Plaid to check the bank for anything newer. A sync
- * already running makes this a no-op, as does a connection with no bank login.
- */
 export const syncNow = action({
 	args: { connectionId: v.id('bankConnections') },
 	returns: v.union(
@@ -89,11 +80,6 @@ export const syncNow = action({
 	}
 });
 
-/**
- * Connects Budge to an existing Plaid Item, run by the owner from the Convex dashboard or CLI. It
- * seals the access token, maps the bank's Accounts to Budge Accounts, and points the Item's webhook
- * at this deployment. It never creates or deletes a Plaid Item.
- */
 export const setup = internalAction({
 	args: {
 		name: v.string(),
@@ -132,9 +118,6 @@ function toPublicError(error: SyncError): PublicError {
 	return { code: 'BANK_UNAVAILABLE', message: "Couldn't sync with the bank; try again later." };
 }
 
-// The mutations sync runs (lib/sync.ts). Each checks the lease it was given is still the one held.
-
-/** Takes the sync lease for about two minutes, unless another sync holds it. */
 export const takeLease = internalMutation({
 	args: { connectionId: v.id('bankConnections') },
 	returns: leaseResult,
@@ -161,12 +144,6 @@ export const takeLease = internalMutation({
 	}
 });
 
-/**
- * Applies one batch of synced rows and moves the cursor past it, in one transaction, so a batch is
- * applied once or not at all. Rows from a bank Account not yet mapped to a Budge Account are held:
- * the Account is recorded for the owner to map, and its rows come back when its cursor is reset.
- * Refuses, writing nothing, once the lease or cursor is no longer the sync's.
- */
 export const apply = internalMutation({
 	args: applyArgs,
 	returns: applyResult,
@@ -194,14 +171,12 @@ export const apply = internalMutation({
 
 		const now = Date.now();
 		const nextLease = release ? undefined : now + LEASE_MS;
-		// An update keeps its start until Plaid has no more pages of it.
 		const { updateStart, ...provider } = connection.provider;
+		const updateStartUntilItsLastPage = hasMore
+			? { updateStart: updateStart === undefined ? fromCursor : updateStart }
+			: {};
 		await ctx.db.patch('bankConnections', connectionId, {
-			provider: {
-				...provider,
-				cursor: nextCursor,
-				...(hasMore ? { updateStart: updateStart === undefined ? fromCursor : updateStart } : {})
-			},
+			provider: { ...provider, cursor: nextCursor, ...updateStartUntilItsLastPage },
 			syncLeaseUntil: nextLease,
 			...(release ? { lastSyncedAt: now, lastError: undefined, status: 'ok' as const } : {})
 		});
@@ -209,7 +184,6 @@ export const apply = internalMutation({
 	}
 });
 
-/** The batch's rows, each checked, under the bank Account it came through. */
 function rowsByBankAccount(
 	rows: Infer<typeof syncRow>[],
 	cutoverDate: string
@@ -222,7 +196,6 @@ function rowsByBankAccount(
 	return byExternalId;
 }
 
-/** Applies each bank Account's rows to its mapped Budge Account, and counts the rows held. */
 async function applyByBankAccount(
 	ctx: MutationCtx,
 	connectionId: Id<'bankConnections'>,
@@ -244,7 +217,6 @@ async function applyByBankAccount(
 	return totals;
 }
 
-/** Extends the sync lease it was given, unless a newer sync has taken over. */
 export const renewLease = internalMutation({
 	args: { connectionId: v.id('bankConnections'), lease: v.number() },
 	returns: v.union(v.number(), v.null()),
@@ -257,7 +229,6 @@ export const renewLease = internalMutation({
 	}
 });
 
-/** Records why a sync failed and releases its lease, unless a newer sync has taken over. */
 export const fail = internalMutation({
 	args: failArgs,
 	returns: v.null(),
@@ -273,10 +244,6 @@ export const fail = internalMutation({
 	}
 });
 
-/**
- * Saves the Bank Connection for a Plaid Item, replacing the token of one already saved for it, and
- * maps the given bank Accounts.
- */
 export const save = internalMutation({
 	args: saveArgs,
 	returns: v.id('bankConnections'),
@@ -326,7 +293,6 @@ async function findConnectionAccount(
 		.unique();
 }
 
-/** The bank Account's mapping, held for the owner to map when sync first sees it. */
 async function connectionAccountOf(
 	ctx: MutationCtx,
 	connectionId: Id<'bankConnections'>,

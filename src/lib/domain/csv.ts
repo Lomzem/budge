@@ -1,7 +1,3 @@
-// CSV as RFC 4180 describes it: CRLF line ends, and a field quoted when it holds a comma, a quote,
-// or a line break. A string a spreadsheet would run as a formula gets a leading `'`, so it opens
-// as text; numbers are left alone, so a negative amount stays a number.
-
 function text(value: unknown): string {
 	if (typeof value === 'string') return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 	if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
@@ -16,10 +12,6 @@ function cell(value: unknown): string {
 	return /[",\r\n]/.test(field) ? `"${field.replaceAll('"', '""')}"` : field;
 }
 
-/**
- * One table as CSV. The header lists every field any row has, in the order they first appear; a
- * row without a field leaves its cell empty. A nested value is written as JSON.
- */
 export function toCsv(rows: readonly Readonly<Record<string, unknown>>[]): string {
 	const fields = [...new Set(rows.flatMap((row) => Object.keys(row)))];
 	if (fields.length === 0) return '';

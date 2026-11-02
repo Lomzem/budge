@@ -6,8 +6,7 @@ import { newBackend, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
-/** A small seeded generator, so a failing sequence can be replayed. */
-function random(seed: number) {
+function replayableSeededRandom(seed: number) {
 	let state = seed;
 	const next = () => {
 		state = (Math.imul(state, 1_103_515_245) + 12_345) & 0x7fffffff;
@@ -21,12 +20,13 @@ function random(seed: number) {
 
 const dates = ['2026-08-01', '2026-08-19', '2026-09-03', '2026-09-30', '2026-10-15', '2027-01-02'];
 const payees = ['Corner Grocer', 'Bus Pass Co', 'Paycheck Inc', ''];
+const smallAmountsSoEditsOftenBringATotalBackToZero = [-500, 500, -1_250, 1_250, -99, 0];
 
 test.each([1, 2, 3, 4, 5])(
 	'the rebuilt monthly totals equal the kept ones after any writes (sequence %i)',
 	async (seed) => {
 		const { t, owner } = newBackend();
-		const rand = random(seed);
+		const rand = replayableSeededRandom(seed);
 		await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
 		const accounts: Id<'accounts'>[] = [];
 		for (const name of ['Checking', 'Savings', 'Card']) {
@@ -53,27 +53,26 @@ test.each([1, 2, 3, 4, 5])(
 			const shared = {
 				accountId,
 				date: rand.pick(dates),
-				// Small amounts, so edits often bring a total back to zero.
-				amount: rand.pick([-500, 500, -1_250, 1_250, -99, 0]),
+				amount: rand.pick(smallAmountsSoEditsOftenBringATotalBackToZero),
 				memo: ''
 			};
-			// About one in four is a Transfer: between the two Cash Accounts, or on the card a card
-			// payment from Checking.
+			const aboutOneInFourIsATransfer = rand.int(4) === 0;
 			const [checking, savings, card] = accounts;
-			if (rand.int(4) === 0 && checking !== undefined && savings !== undefined) {
+			if (aboutOneInFourIsATransfer && checking !== undefined && savings !== undefined) {
 				if (accountId === checking) return { ...shared, payee: '', transferAccountId: savings };
 				if (accountId === savings) return { ...shared, payee: '', transferAccountId: checking };
 				if (accountId === card) {
-					return {
+					const cardPaymentFromChecking = {
 						...shared,
 						amount: Math.abs(shared.amount),
 						payee: '',
 						transferAccountId: checking
 					};
+					return cardPaymentFromChecking;
 				}
 			}
-			// About one in five of the rest is split in two lines across Categories.
-			if (rand.int(5) === 0) {
+			const aboutOneInFiveOfTheRestIsSplitInTwo = rand.int(5) === 0;
+			if (aboutOneInFiveOfTheRestIsSplitInTwo) {
 				splitsEntered++;
 				const first = rand.pick([-250, 0, 300]);
 				return {

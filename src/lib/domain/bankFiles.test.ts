@@ -5,26 +5,26 @@ import { Effect } from 'effect';
 
 import { decodeBankFile } from './bankFiles';
 
-// Hand-written synthetic files that mirror only the banks' layouts.
 const fixture = (name: string) =>
 	readFileSync(new URL(`./fixtures/synthetic/${name}`, import.meta.url), 'utf8');
 
 const cutoverDate = '2026-08-01';
 
 describe('decoding a bank file', () => {
-	it.effect('reads a Capital One CSV, outflows negative, by header not column order', () =>
-		Effect.gen(function* () {
-			const file = yield* decodeBankFile(fixture('capital-one-checking.csv'), cutoverDate);
+	it.effect(
+		'reads a Capital One CSV by header not column order, outflows negative even when a debit is already written negative',
+		() =>
+			Effect.gen(function* () {
+				const file = yield* decodeBankFile(fixture('capital-one-checking.csv'), cutoverDate);
 
-			expect(file.source).toBe('csv');
-			expect(file.rows).toEqual([
-				{ date: '2026-08-14', amount: -4_250, bankText: 'Debit Card Purchase - SAMPLE GROCER' },
-				{ date: '2026-08-15', amount: 231_042, bankText: 'Deposit from SAMPLE PAYROLL, INC' },
-				// A debit already written negative is still an outflow, never an inflow.
-				{ date: '2026-08-16', amount: -450, bankText: 'Debit Card Purchase - SAMPLE COFFEE' },
-				{ date: '2026-08-16', amount: -450, bankText: 'Debit Card Purchase - SAMPLE COFFEE' }
-			]);
-		})
+				expect(file.source).toBe('csv');
+				expect(file.rows).toEqual([
+					{ date: '2026-08-14', amount: -4_250, bankText: 'Debit Card Purchase - SAMPLE GROCER' },
+					{ date: '2026-08-15', amount: 231_042, bankText: 'Deposit from SAMPLE PAYROLL, INC' },
+					{ date: '2026-08-16', amount: -450, bankText: 'Debit Card Purchase - SAMPLE COFFEE' },
+					{ date: '2026-08-16', amount: -450, bankText: 'Debit Card Purchase - SAMPLE COFFEE' }
+				]);
+			})
 	);
 
 	it.effect('reads a Capital One card CSV as credit minus debit, by transaction date', () =>

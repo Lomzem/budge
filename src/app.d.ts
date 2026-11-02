@@ -1,13 +1,6 @@
-// See https://svelte.dev/docs/kit/types#app.d.ts
-/// <reference types="svelte-clerk/env" />
-
+import type {} from 'svelte-clerk/env';
 declare global {
-	namespace App {
-		// interface Error {}
-		// interface PageData {}
-		// interface PageState {}
-		// interface Platform {}
-	}
+	namespace App {}
 }
 
 export {};

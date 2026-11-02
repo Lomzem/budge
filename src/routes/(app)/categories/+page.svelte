@@ -64,7 +64,6 @@
 		deleteGroupOpen = true;
 	}
 
-	/** Runs a change from a menu, showing what failed above the list. */
 	async function run(change: () => Promise<unknown>) {
 		actionError = '';
 		const changed = await attempt(change);
@@ -79,7 +78,6 @@
 {#snippet trigger(name: string, hidden: boolean, heading: boolean)}
 	<DropdownMenu.Trigger>
 		{#snippet child({ props })}
-			<!-- A plain button, so a long name truncates instead of widening the page at 320 px. -->
 			<button
 				class={[
 					'flex max-w-full min-w-0 items-center gap-1 rounded-md px-2 py-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:bg-muted',

@@ -31,7 +31,6 @@ async function budgetWithChecking() {
 	return { ...backend, checking, dining, groceries, rows, importCsv, lastCategory };
 }
 
-// Invented Payees, Bank Text, and amounts.
 const lunch = { date: '2026-08-10', amount: -1_850, payee: 'Sample Noodle Bar', memo: '' };
 
 describe('Payee memory', () => {
@@ -115,8 +114,7 @@ describe('Payee memory', () => {
 			})
 		).page;
 		assert(startingRow?.categoryId, 'expected a starting row');
-		// Editing the card's starting row keeps its Payment Category, and Budge remembers that.
-		await owner.mutation(api.transactions.update, {
+		const startingRowEditKeepingItsPaymentCategory = {
 			transactionId: startingRow._id,
 			accountId: card,
 			date: startingRow.date,
@@ -124,7 +122,8 @@ describe('Payee memory', () => {
 			payee: 'Starting Balance',
 			categoryId: startingRow.categoryId,
 			memo: 'Opening debt'
-		});
+		};
+		await owner.mutation(api.transactions.update, startingRowEditKeepingItsPaymentCategory);
 
 		expect(await lastCategory('Starting Balance')).toBeNull();
 		await importCsv([{ date: '2026-08-20', amount: 5_000, bankText: 'Starting Balance' }]);

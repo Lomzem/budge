@@ -30,18 +30,18 @@ const transactionRow = v.object({
 	amount: v.number(),
 	payeeName: v.union(v.string(), v.null()),
 	categoryId: v.union(v.id('categories'), v.null()),
-	/** `null` while Uncategorized, and for a split or a Transfer. */
+
 	categoryName: v.union(v.string(), v.null()),
 	memo: v.union(v.string(), v.null()),
-	/** Cleared, or Reconciled, which is Cleared and locked. */
+
 	cleared: v.boolean(),
 	reconciled: v.boolean(),
 	approved: v.boolean(),
-	/** What the bank reported for it, read-only. */
+
 	bankRows: v.array(v.object({ _id: v.id('imports'), bankText: v.string(), matched: v.boolean() })),
-	/** The other side's Account, for a Transfer. */
+
 	transfer: v.union(v.object({ accountId: v.id('accounts'), accountName: v.string() }), v.null()),
-	/** A split's lines, in the order entered; `null` when it isn't split. */
+
 	splits: v.union(
 		v.array(
 			v.object({
@@ -57,20 +57,6 @@ const transactionRow = v.object({
 
 const approval = v.union(v.literal('unapproved'), v.literal('approved'));
 
-/**
- * One page of an Account's Transactions, or of All Accounts' when `accountId` is left out,
- * newest first. `approval` narrows it to the Unapproved ones or the rest, so the list can show
- * Unapproved first; it takes no other filter.
- *
- * `search` finds Transactions whose Payee, memo, split memos, or Bank Text has any of its words,
- * those with more of them first. Only its last word matches by prefix; the others match whole
- * words. `categoryId`, `payeeId`, and the inclusive `from` and `to` dates narrow the list, with or
- * without `search`; the dates apply after the search.
- *
- * A split has no Category of its own, so `categoryId` takes whole Transactions in that Category.
- * With `splitLines` as well, it takes instead the split Transactions with a line in it, so the list
- * shows those after the whole ones.
- */
 export const list = query({
 	args: {
 		accountId: v.optional(v.id('accounts')),
@@ -92,8 +78,8 @@ export const list = query({
 		const searching = (args.search ?? '').trim() !== '';
 		const filters = requireFilters(args, searching, approval);
 
-		// A search of only punctuation has no words to find, so it finds nothing.
-		if (searching && filters.search === '') return { page: [], isDone: true, continueCursor: '' };
+		const searchOfOnlyPunctuation = searching && filters.search === '';
+		if (searchOfOnlyPunctuation) return { page: [], isDone: true, continueCursor: '' };
 
 		const result = await pageOf(ctx, filters, searching, approval, paginationOpts);
 		return {
@@ -115,7 +101,6 @@ interface Filters {
 
 type Approval = Infer<typeof approval>;
 
-/** The list's filters, with the search split into its words; refuses filters that don't combine. */
 function requireFilters(
 	args: Omit<Filters, 'search' | 'splitLines'> & { search?: string; splitLines?: boolean },
 	searching: boolean,
@@ -143,7 +128,6 @@ function requireFilters(
 	return filters;
 }
 
-/** One page of the list, read the way its filters call for. */
 async function pageOf(
 	ctx: QueryCtx,
 	filters: Filters,
@@ -159,10 +143,8 @@ async function pageOf(
 	return await filtered(ctx, filters, approval === 'approved', paginationOpts);
 }
 
-// Convex rejects a search of more than 16 terms.
 const MAX_SEARCH_TERMS = 16;
 
-/** The words of a search as Convex splits them, keeping the first `MAX_SEARCH_TERMS`. */
 function searchTerms(search: string) {
 	return search
 		.split(/[^\p{Alphabetic}\p{N}]+/u)
@@ -171,15 +153,9 @@ function searchTerms(search: string) {
 		.join(' ');
 }
 
-// Bounds that every `YYYY-MM-DD` date falls between, for a range left open.
 const FIRST_DATE = '0000-01-01';
 const LAST_DATE = '9999-12-31';
 
-/**
- * The search, with the Account, Payee, and Category as filter fields. The dates, and a Category's
- * split lines, apply to each page after the search, so a page may come back short; filtering
- * inside the query instead could scan past the search index's 1,024-row limit and fail.
- */
 async function searched(ctx: QueryCtx, filters: Filters, paginationOpts: PaginationOptions) {
 	const { accountId, payeeId, categoryId, from, to } = filters;
 	const result = await ctx.db
@@ -205,10 +181,6 @@ async function searched(ctx: QueryCtx, filters: Filters, paginationOpts: Paginat
 	return { ...result, page };
 }
 
-/**
- * The split Transactions with a line in the Category, through the lines' Category-by-date index.
- * The Account and Payee apply to each page, so a page may come back short.
- */
 async function withLinesIn(ctx: QueryCtx, filters: Filters, paginationOpts: PaginationOptions) {
 	const { categoryId, accountId, payeeId, from, to } = filters;
 	if (categoryId === undefined) throw publicError('INVALID_INPUT');
@@ -224,12 +196,10 @@ async function withLinesIn(ctx: QueryCtx, filters: Filters, paginationOpts: Pagi
 		.paginate(paginationOpts);
 	const page: Doc<'transactions'>[] = [];
 	for (const line of lines.page) {
-		// Two lines in the same Category list their Transaction once, at its first such line, even
-		// when the lines fall on different pages.
-		const first = (await splitLinesOf(ctx, line.transactionId)).find(
+		const firstLineInTheCategory = (await splitLinesOf(ctx, line.transactionId)).find(
 			(other) => other.categoryId === categoryId
 		);
-		if (first?._id !== line._id) continue;
+		if (firstLineInTheCategory?._id !== line._id) continue;
 		const transaction = await ctx.db.get('transactions', line.transactionId);
 		if (transaction === null) continue;
 		if (accountId !== undefined && transaction.accountId !== accountId) continue;
@@ -239,11 +209,6 @@ async function withLinesIn(ctx: QueryCtx, filters: Filters, paginationOpts: Pagi
 	return { ...lines, page };
 }
 
-/**
- * The list without search, newest first, through the narrowest index the filters allow: by Payee,
- * by Category, by Account, or by date, each with the date range. The other filters apply as rows
- * are read.
- */
 async function filtered(
 	ctx: QueryCtx,
 	{ accountId, categoryId, payeeId, from, to }: Filters,
@@ -252,8 +217,6 @@ async function filtered(
 ) {
 	return await narrowestIndex(ctx, { accountId, categoryId, payeeId, from, to })
 		.order('desc')
-		// Old Transactions leave `approved` out; they count as approved, so no index range covers
-		// them. Nearly every row is approved, so this skips only the few Unapproved ones.
 		// eslint-disable-next-line @convex-dev/no-filter-in-query
 		.filter((q) =>
 			q.and(
@@ -265,7 +228,6 @@ async function filtered(
 		.paginate(paginationOpts);
 }
 
-/** The Transactions in the date range, through the narrowest index the filters allow. */
 function narrowestIndex(
 	ctx: QueryCtx,
 	{ accountId, categoryId, payeeId, from, to }: Omit<Filters, 'search' | 'splitLines'>
@@ -296,24 +258,19 @@ const transactionInput = {
 	date: v.string(),
 	amount: v.number(),
 	payee: v.string(),
-	// Left out for Uncategorized.
+
 	categoryId: v.optional(v.id('categories')),
 	memo: v.string(),
-	// Two or more lines summing to `amount`, each with its own Category; the Transaction then takes
-	// no `categoryId`.
+
 	splits: v.optional(
 		v.array(v.object({ categoryId: v.id('categories'), amount: v.number(), memo: v.string() }))
 	),
-	// The other Account of a Transfer, which then takes no Category and no Payee.
+
 	transferAccountId: v.optional(v.id('accounts')),
-	// An imported Transaction in that Account to link as the other side, in place of creating one.
+
 	transferTransactionId: v.optional(v.id('transactions'))
 };
 
-/**
- * Enters a Transaction by hand, or both sides of a Transfer. It starts uncleared; a new Payee name
- * creates the Payee. Returns the Transaction in `accountId`.
- */
 export const create = mutation({
 	args: transactionInput,
 	returns: v.id('transactions'),
@@ -323,11 +280,6 @@ export const create = mutation({
 	}
 });
 
-/**
- * Changes everything the owner entered on a Transaction, keeping whether it is Cleared. Editing
- * or categorizing approves it. Editing either side of a Transfer changes the other side to match,
- * leaving whether that side is approved; leaving out `transferAccountId` deletes the other side.
- */
 export const update = mutation({
 	args: { transactionId: v.id('transactions'), ...transactionInput },
 	returns: v.null(),
@@ -338,11 +290,6 @@ export const update = mutation({
 	}
 });
 
-/**
- * The imported Transactions in `transferAccountId` that a Transfer of `amount` on `date` could link
- * as its other side, nearest date first: not yet a Transfer side, with the opposite amount, dated
- * within 10 days. There is no automatic Transfer detection; the owner picks one or none.
- */
 export const transferCandidates = query({
 	args: { transferAccountId: v.id('accounts'), date: v.string(), amount: v.number() },
 	returns: v.array(
@@ -379,7 +326,6 @@ export const transferCandidates = query({
 	}
 });
 
-/** Deletes a Transaction, and both sides of a Transfer. Neither side may be Reconciled. */
 export const remove = mutation({
 	args: { transactionId: v.id('transactions') },
 	returns: v.null(),
@@ -390,7 +336,6 @@ export const remove = mutation({
 	}
 });
 
-/** Marks a Transaction Cleared or uncleared; a Reconciled one is unlocked first. */
 export const setCleared = mutation({
 	args: { transactionId: v.id('transactions'), cleared: v.boolean() },
 	returns: v.null(),
@@ -407,7 +352,6 @@ export const setCleared = mutation({
 	}
 });
 
-/** Unlocks a Reconciled Transaction back to Cleared, so it can be changed or deleted. */
 export const unlock = mutation({
 	args: { transactionId: v.id('transactions') },
 	returns: v.null(),
@@ -433,25 +377,19 @@ export const approve = mutation({
 	}
 });
 
-/** Approves an Account's Unapproved Transactions, or All Accounts', and returns how many. */
 export const approveAll = mutation({
 	args: { accountId: v.optional(v.id('accounts')) },
 	returns: v.number(),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
-		// Bounds one call's writes; the rest stay Unapproved for the next "Approve all".
-		const transactions = await unapproved(ctx, accountId).take(UNAPPROVED_COUNT_LIMIT);
-		for (const transaction of transactions) {
+		const boundedBatch = await unapproved(ctx, accountId).take(UNAPPROVED_COUNT_LIMIT);
+		for (const transaction of boundedBatch) {
 			await ctx.db.patch('transactions', transaction._id, { approved: true });
 		}
-		return transactions.length;
+		return boundedBatch.length;
 	}
 });
 
-/**
- * How many Transactions are Unapproved, in one Account or all. The count stops one past the limit,
- * so a count past it reads as "at least".
- */
 export const unapprovedCount = query({
 	args: { accountId: v.optional(v.id('accounts')) },
 	returns: v.number(),

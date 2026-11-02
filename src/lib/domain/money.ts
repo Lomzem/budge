@@ -1,8 +1,5 @@
-// Money is whole cents as safe integers. Typed amounts become cents here and nowhere else.
-
 const AMOUNT = /^([-−])?\$?(\d{1,3}(?:,\d{3})+|\d*)(?:\.(\d{0,2}))?$/;
 
-/** Cents for an amount the owner typed, such as `1,234.56` or `-3.07`, or `undefined`. */
 export function parseCents(text: string): number | undefined {
 	const match = AMOUNT.exec(text.trim());
 	if (!match) return undefined;
@@ -15,7 +12,6 @@ export function parseCents(text: string): number | undefined {
 
 const dollars = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
-/** Cents as dollars, with a true minus sign for negatives: `−$450.00`. */
 export function formatCents(cents: number): string {
 	const text = dollars.format(Math.abs(cents) / 100);
 	return cents < 0 ? `−${text}` : text;

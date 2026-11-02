@@ -2,7 +2,6 @@ import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { publicError } from './publicError';
 
-/** The Ready to Assign system Category, or `null` before Budge has created it. */
 export async function readReadyToAssign(ctx: QueryCtx): Promise<Doc<'categories'> | null> {
 	for await (const group of ctx.db.query('categoryGroups')) {
 		if (group.kind !== 'readyToAssign') continue;
@@ -14,7 +13,6 @@ export async function readReadyToAssign(ctx: QueryCtx): Promise<Doc<'categories'
 	return null;
 }
 
-/** The Ready to Assign system Category, created with its hidden system group on first use. */
 export async function ensureReadyToAssign(ctx: MutationCtx): Promise<Id<'categories'>> {
 	const existing = await readReadyToAssign(ctx);
 	if (existing !== null) return existing._id;
@@ -31,10 +29,6 @@ export async function ensureReadyToAssign(ctx: MutationCtx): Promise<Id<'categor
 	});
 }
 
-/**
- * Creates a Credit Card Account's Payment Category, named after the card, at the end of the
- * Credit Card Payments system group, which is created on first use.
- */
 export async function createPaymentCategory(
 	ctx: MutationCtx,
 	account: Pick<Doc<'accounts'>, '_id' | 'name'>
@@ -62,7 +56,6 @@ export async function createPaymentCategory(
 	});
 }
 
-/** A Credit Card Account's Payment Category, or `null` for a Cash Account. */
 export async function readPaymentCategory(
 	ctx: QueryCtx,
 	accountId: Id<'accounts'>
@@ -73,7 +66,6 @@ export async function readPaymentCategory(
 		.unique();
 }
 
-/** A Category the owner may change: not one Budge manages. */
 export async function requireOwnCategory(
 	ctx: QueryCtx,
 	categoryId: Id<'categories'>
@@ -85,7 +77,6 @@ export async function requireOwnCategory(
 	return category;
 }
 
-/** A Category Group the owner may change: not one Budge manages. */
 export async function requireOwnGroup(
 	ctx: QueryCtx,
 	groupId: Id<'categoryGroups'>

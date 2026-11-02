@@ -46,8 +46,6 @@ async function budgetWithCard() {
 
 type Backend = Awaited<ReturnType<typeof budgetWithCard>>;
 
-/** Puts the budget back as it was before Credit Card Accounts: the card has no Payment Category, and
- * its starting debt sits Uncategorized. */
 async function makeLegacy({ t, card }: Backend, startingRow: { date?: string } = {}) {
 	await t.run(async (ctx) => {
 		for await (const category of ctx.db.query('categories')) {

@@ -1,12 +1,3 @@
-// Runs the Playwright suite locally the way CI does: a fresh anonymous Convex backend with the synthetic
-// seed, the Clerk development instance, and its one hand-made test user as owner. Never production,
-// never the owner's dev backend.
-//
-//   bun run test:e2e:local [playwright args]
-//
-// The run happens in a copy of this checkout under the system temp directory, so no `.env*` file or
-// `.convex/` state from the checkout is used or changed. Only the Clerk test variables below are passed
-// in, from the environment or else the main checkout's `.env.local`. Their values are never printed.
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import {
 	cpSync,
@@ -33,12 +24,9 @@ const CREDENTIALS = [
 ] as const;
 type Credentials = Record<(typeof CREDENTIALS)[number], string>;
 
-// Inherited variables that could point a command at another deployment or carry other credentials.
-// Bun loads the checkout's `.env.local` into this process, so these are dropped before any child runs.
 const SCRUBBED =
 	/^(CONVEX_|PUBLIC_CONVEX_|CLERK_|PUBLIC_CLERK_|BUDGE_|E2E_|DEPLOY_|PLAID_|VERIFIED_)/;
 
-// Playwright's web server port. Outside CI the config reuses whatever already listens there.
 const PREVIEW_PORT = 4173;
 
 function fail(message: string): never {
@@ -77,7 +65,6 @@ function loadCredentials(mainCheckout: string): Credentials {
 		);
 	}
 
-	// Development instance only: test keys, and an issuer that is the publishable key's own Frontend API.
 	if (!credentials.PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith('pk_test_')) {
 		fail('PUBLIC_CLERK_PUBLISHABLE_KEY is not a Clerk development key.');
 	}
@@ -125,7 +112,6 @@ function portInUse(port: number) {
 	return Promise.all([probe('127.0.0.1'), probe('::1')]).then((results) => results.includes(true));
 }
 
-// Tracked and unignored files only: no `.env*`, `.convex/`, build output, or node_modules.
 function copyCheckout(checkout: string, workdir: string) {
 	const files = git(checkout, 'ls-files', '-z', '--cached', '--others', '--exclude-standard')
 		.split('\0')
@@ -139,8 +125,7 @@ function copyCheckout(checkout: string, workdir: string) {
 	symlinkSync(join(checkout, 'node_modules'), join(workdir, 'node_modules'), 'dir');
 }
 
-// `@clerk/testing` logs failed token refreshes with their session IDs and dev browser tokens.
-const AUTH_ARTIFACTS = [
+const CLERK_REFRESH_SESSION_AND_BROWSER_TOKENS = [
 	/__clerk_db_jwt=[^&\s]+/g,
 	/\b(sess|dvb|sk_test|sk_live)_[A-Za-z0-9]+/g,
 	/\beyJ[\w-]+\.[\w-]+\.[\w-]+/g
@@ -151,7 +136,8 @@ function redactInto(source: Readable, target: Writable, credentials: Credentials
 		let redacted = line;
 		for (const value of Object.values(credentials))
 			redacted = redacted.replaceAll(value, '<redacted>');
-		for (const pattern of AUTH_ARTIFACTS) redacted = redacted.replace(pattern, '<redacted>');
+		for (const pattern of CLERK_REFRESH_SESSION_AND_BROWSER_TOKENS)
+			redacted = redacted.replace(pattern, '<redacted>');
 		target.write(`${redacted}\n`);
 	});
 }
@@ -247,7 +233,6 @@ async function main() {
 	}
 
 	try {
-		// `convex dev` writes the new deployment's name and URL to the copy's `.env.local`.
 		let deployment = '';
 		let url = '';
 		await waitFor('the anonymous backend', 180, async () => {
@@ -271,7 +256,6 @@ async function main() {
 		}
 		console.log(`e2e-local: target: local-anonymous (${deployment.split(':')[1] ?? ''}, ${url})`);
 
-		// The first push fails until these are set; `convex dev` then retries it. Values go via stdin.
 		for (const [name, value] of [
 			['CLERK_JWT_ISSUER_DOMAIN', credentials.CLERK_JWT_ISSUER_DOMAIN],
 			['BUDGE_OWNER_SUBJECT', credentials.E2E_CLERK_USER_ID]
@@ -289,7 +273,6 @@ async function main() {
 			return readFileSync(logPath, 'utf8').includes('Convex functions ready');
 		});
 
-		// Synthetic Accounts and Transactions; never real data.
 		const seed = spawn(bun, ['x', 'convex', 'run', 'seed:run'], {
 			cwd: workdir,
 			env: convexEnv,
@@ -321,8 +304,6 @@ async function main() {
 	}
 }
 
-// SSR tests can leave public-env types generated with a missing URL. E2E only
-// syncs its temp copy, so restore the caller's types on every exit for typed ESLint.
 function restoreCheckoutTypes() {
 	try {
 		execFileSync(process.execPath, ['run', 'sync'], { stdio: 'inherit' });

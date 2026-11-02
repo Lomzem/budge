@@ -20,7 +20,7 @@
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DialogPortal>>;
 		children: Snippet;
 		showCloseButton?: boolean;
-		/** `wide` fits a table, such as an import preview. Content taller than the screen scrolls. */
+
 		size?: 'default' | 'wide';
 	} = $props();
 </script>
@@ -31,20 +31,22 @@
 		bind:ref
 		data-slot="dialog-content"
 		class={cn(
-			'fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh_-_2rem)] w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+			'fixed top-1/2 left-1/2 z-50 grid max-h-dialog-height w-full max-w-dialog-width -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
 			size === 'wide' && 'sm:max-w-3xl',
 			className
 		)}
 		{...restProps}
 	>
-		{@render children?.()}
+		{@render children()}
 		{#if showCloseButton}
 			<DialogPrimitive.Close data-slot="dialog-close">
 				{#snippet child({ props })}
-					<Button variant="ghost" class="absolute top-2 right-2" size="icon-sm" {...props}>
-						<XIcon />
-						<span class="sr-only">Close</span>
-					</Button>
+					<div class="absolute top-2 right-2">
+						<Button variant="ghost" size="icon-sm" {...props}>
+							<XIcon />
+							<span class="sr-only">Close</span>
+						</Button>
+					</div>
 				{/snippet}
 			</DialogPrimitive.Close>
 		{/if}

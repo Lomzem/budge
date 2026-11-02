@@ -1,48 +1,33 @@
-// The budget rules: one entry point turns stored Assigned amounts and monthly totals into
-// everything the budget screen shows. Callers never assemble these numbers from smaller pieces.
-
 import { addDays, addMonths, addMonthsToDate, dayOfMonth, monthOf, monthsBetween } from './dates';
 
-/**
- * Ready to Assign and each Credit Card Account's Payment Category are system Categories, each in
- * its own system group; Budge manages them.
- */
 export type CategoryKind = 'normal' | 'readyToAssign' | 'creditCardPayment';
 export type GroupKind = 'normal' | 'readyToAssign' | 'creditCardPayments';
 
-/**
- * How much a Category needs and by when. A Monthly Target either refills Available up to `amount`
- * or sets aside `amount` on top of what was left over. A By date Target needs `amount` Available
- * by `firstDate`, then again every `everyMonths` months when it repeats.
- */
 export type Target =
 	| { kind: 'monthly'; amount: number; mode: 'refill' | 'setAside'; dueDay?: number }
 	| { kind: 'byDate'; amount: number; firstDate: string; everyMonths?: number };
 
-/** The longest a By date Target may wait between repeats: ten years is already beyond any bill. */
 export const MAX_REPEAT_MONTHS = 120;
 
-/** Whether `months` is a repeat interval a By date Target accepts: whole months, 1 to the max. */
 export function isRepeatInterval(months: number): boolean {
 	return Number.isInteger(months) && months >= 1 && months <= MAX_REPEAT_MONTHS;
 }
 
 export interface TargetProgress {
 	definition: Target;
-	/** What the Target still needs Assigned this month. */
+
 	needed: number;
-	/** How full the progress bar is this month, from 0 to 1. */
+
 	progress: number;
-	/** The date a By date Target is due as of this month; `null` for a Monthly Target. */
+
 	dueDate: string | null;
 }
 
 export interface BudgetInput<C extends string, G extends string, A extends string = string> {
-	/** The viewed month, `YYYY-MM`. */
 	month: string;
 	today: string;
 	cutoverDate: string | null;
-	/** A hidden group leaves the budget table with all its Categories. */
+
 	groups: readonly {
 		id: G;
 		name: string;
@@ -58,15 +43,11 @@ export interface BudgetInput<C extends string, G extends string, A extends strin
 		kind: CategoryKind;
 		hidden?: boolean | undefined;
 		target?: Target | undefined;
-		/** A Payment Category's Credit Card Account. */
+
 		accountId?: A | undefined;
 	}[];
 	assignments: readonly { month: string; categoryId: C; amount: number }[];
-	/**
-	 * Summed Transactions per month, Account, and bucket. Transfer sides sum in `transfer`; between
-	 * Cash Accounts they touch no Category and not Ready to Assign. On a Credit Card Account, every
-	 * total also moves its amount, reversed, into that card's Payment Category.
-	 */
+
 	monthlyTotals: readonly {
 		month: string;
 		accountId: A;
@@ -74,41 +55,29 @@ export interface BudgetInput<C extends string, G extends string, A extends strin
 		amount: number;
 		count: number;
 	}[];
-	/**
-	 * Ready to Assign and Uncategorized Transactions dated after `today`, Transfer sides left out.
-	 * Their inflows wait for their date before they count.
-	 */
+
 	transactionsAfterToday: readonly { date: string; amount: number; categoryId: C | null }[];
 }
 
-/**
- * How a Category's Available stands. `underfunded` arrives with Targets, which say how much a
- * Category needs.
- */
 export type AvailableStatus = 'funded' | 'underfunded' | 'overspent' | 'empty';
 
 export interface CategoryBudget<C extends string> {
 	id: C;
 	name: string;
-	/** Available at the end of last month, left over into this one. */
+
 	priorAvailable: number;
 	assigned: number;
 	activity: number;
 	available: number;
 	status: AvailableStatus;
 	target: TargetProgress | null;
-	/** What a Payment Category still waits on, or `null` for any other Category. */
+
 	payment: PaymentBudget<C> | null;
 }
 
 export interface PaymentBudget<C extends string> {
-	/**
-	 * Overspent Categories whose card purchases this Payment Category holds money for that isn't
-	 * there yet, in table order. A Category is waited on for at most what it is overspent by,
-	 * shared out across cards in table order.
-	 */
 	waitingOn: { id: C; name: string; amount: number }[];
-	/** Card debt Available doesn't cover yet: the debt minus Available, never below zero. */
+
 	uncovered: number;
 }
 
@@ -124,35 +93,26 @@ export interface GroupBudget<C extends string, G extends string> {
 
 export interface Budget<C extends string, G extends string> {
 	month: string;
-	/** The cutover month, before which there is nothing to budget; `null` until it is set. */
+
 	firstMonth: string | null;
-	/** Global: the same in every month. It may go negative. */
+
 	readyToAssign: {
 		amount: number;
-		/** How much of `amount` is Uncategorized Transactions. */
+
 		uncategorized: number;
 	};
-	/** How many Transactions still need a Category. */
+
 	uncategorizedCount: number;
-	/** The budget table: shown groups with their shown Categories, and totals over those. */
+
 	groups: GroupBudget<C, G>[];
-	/**
-	 * Hidden Categories, and those in hidden groups, in table order. They leave the table but still
-	 * hold their Available and count in Ready to Assign.
-	 */
+
 	hidden: CategoryBudget<C>[];
-	/**
-	 * Categories with a negative Available, hidden or not, in table order, until they are Covered.
-	 */
+
 	overspent: { id: C; name: string; available: number }[];
-	/**
-	 * Targets due in the 30 days from `today`, soonest first, whichever month is viewed. Each is
-	 * funded when its Category needs nothing more and isn't overspent in the month it is due.
-	 */
+
 	upcoming: { id: C; name: string; dueDate: string; amount: number; funded: boolean }[];
 }
 
-/** How many days ahead the Upcoming list looks, starting with `today`. */
 const UPCOMING_DAYS = 30;
 
 const sum = (
@@ -166,10 +126,6 @@ function statusOf(available: number, target: TargetProgress | null): AvailableSt
 	return available > 0 ? 'funded' : 'empty';
 }
 
-/**
- * A Target's progress in `month`. `goal` is what the Target wants this month, and `funded` what
- * already counts toward it.
- */
 function progressOf(
 	definition: Target,
 	month: string,
@@ -181,7 +137,7 @@ function progressOf(
 	if (definition.kind === 'byDate') {
 		const due = byDateDue(definition, month);
 		dueDate = due;
-		// Counting both ends; a date already past wants everything now.
+
 		const monthsLeft = Math.max(1, monthsBetween(month, monthOf(due)) + 1);
 		goal = Math.ceil((definition.amount - numbers.priorAvailable) / monthsLeft);
 		funded = numbers.assigned;
@@ -198,11 +154,9 @@ function progressOf(
 	};
 }
 
-/** The first date on or after `today` that `target` falls due, or `null` when it never will. */
 function nextDue(target: Target, today: string): string | null {
 	if (target.kind === 'monthly') {
 		if (target.dueDay === undefined) return null;
-		// A short month moves the day to its last, so the next date may be two months on.
 		for (let ahead = 0; ahead <= 2; ahead++) {
 			const date = dayOfMonth(addMonths(monthOf(today), ahead), target.dueDay);
 			if (date >= today) return date;
@@ -219,10 +173,6 @@ function nextDue(target: Target, today: string): string | null {
 	}
 }
 
-/**
- * The date a By date Target is due as of `month`. A repeating one keeps each date through its
- * month, then moves `everyMonths` on; every date is counted from the first, so nothing is stored.
- */
 function byDateDue(definition: Extract<Target, { kind: 'byDate' }>, month: string): string {
 	const every = definition.everyMonths;
 	const behind = monthsBetween(monthOf(definition.firstDate), month);
@@ -230,7 +180,6 @@ function byDateDue(definition: Extract<Target, { kind: 'byDate' }>, month: strin
 	return addMonthsToDate(definition.firstDate, Math.ceil(behind / every) * every);
 }
 
-/** Per Category: the amount in `month` (`now`) and through the end of `month` (`through`). */
 function sumByCategory<C extends string>(
 	month: string,
 	rows: readonly { month: string; key: C; amount: number }[]
@@ -253,8 +202,7 @@ export function computeBudget<C extends string, G extends string, A extends stri
 ): Budget<C, G> {
 	const { month } = input;
 	const paymentCategoryOf = paymentCategories(input.categories);
-	// Each total counts in its own Category, and a card's also moves into its Payment Category:
-	// a purchase in full, even past what the Category has, and a refund back out.
+
 	const activityRows = input.monthlyTotals.flatMap((row) => {
 		const rows: { month: string; key: C; amount: number }[] = [];
 		if (row.bucket !== 'uncategorized' && row.bucket !== 'transfer') {
@@ -311,7 +259,7 @@ export function computeBudget<C extends string, G extends string, A extends stri
 	const byTableOrder = (a: { groupId: G; position: number }, b: typeof a) =>
 		(groupPosition.get(a.groupId) ?? 0) - (groupPosition.get(b.groupId) ?? 0) ||
 		a.position - b.position;
-	// What each overspent Category is still short, shared out to the cards that waited on it.
+
 	const shortOf = new Map<C, number>();
 	for (const c of input.categories) {
 		if (c.kind !== 'normal') continue;
@@ -338,7 +286,7 @@ export function computeBudget<C extends string, G extends string, A extends stri
 	};
 
 	const windowEnd = addDays(input.today, UPCOMING_DAYS);
-	// A Target that falls due inside the window, funded when its month has what it needs.
+
 	const upcomingOf = (c: BudgetInput<C, G, A>['categories'][number]) => {
 		if (c.target === undefined) return undefined;
 		const dueDate = nextDue(c.target, input.today);
@@ -359,8 +307,7 @@ export function computeBudget<C extends string, G extends string, A extends stri
 	const overspent: Budget<C, G>['overspent'] = [];
 	for (const group of input.groups.toSorted(byPosition)) {
 		if (group.kind === 'readyToAssign') continue;
-		// Hidden Categories leave the table but still count in their group's totals.
-		const all: CategoryBudget<C>[] = [];
+		const shownAndHidden: CategoryBudget<C>[] = [];
 		const shown: CategoryBudget<C>[] = [];
 		for (const c of input.categories
 			.filter((c) => c.groupId === group.id && c.kind !== 'readyToAssign')
@@ -369,7 +316,7 @@ export function computeBudget<C extends string, G extends string, A extends stri
 			if (c.kind === 'creditCardPayment' && c.accountId !== undefined) {
 				row.payment = paymentOf(c.accountId, row.available);
 			}
-			all.push(row);
+			shownAndHidden.push(row);
 			const isHidden = group.hidden === true || c.hidden === true;
 			(isHidden ? hidden : shown).push(row);
 			const soon = upcomingOf(c);
@@ -383,9 +330,9 @@ export function computeBudget<C extends string, G extends string, A extends stri
 			id: group.id,
 			name: group.name,
 			kind: group.kind,
-			assigned: sum(all, 'assigned'),
-			activity: sum(all, 'activity'),
-			available: sum(all, 'available'),
+			assigned: sum(shownAndHidden, 'assigned'),
+			activity: sum(shownAndHidden, 'activity'),
+			available: sum(shownAndHidden, 'available'),
 			categories: shown
 		});
 	}
@@ -399,12 +346,10 @@ export function computeBudget<C extends string, G extends string, A extends stri
 		groups,
 		hidden,
 		overspent,
-		// Stable, so Targets due the same day stay in table order.
 		upcoming: upcoming.toSorted(byDueDate)
 	};
 }
 
-/** Each credit card Account's Payment Category. */
 function paymentCategories<C extends string, G extends string, A extends string>(
 	categories: BudgetInput<C, G, A>['categories']
 ): Map<A, C> {
@@ -417,14 +362,12 @@ function paymentCategories<C extends string, G extends string, A extends string>
 	return paymentCategoryOf;
 }
 
-/** Ready to Assign, with the Uncategorized amount in it and how many Transactions are Uncategorized. */
 function readyToAssignOf<C extends string, G extends string, A extends string>(
 	input: BudgetInput<C, G, A>
 ) {
 	const readyToAssignIds = new Set<string>(
 		input.categories.filter((c) => c.kind === 'readyToAssign').map((c) => c.id)
 	);
-	// Uncategorized counts exactly as if categorized to Ready to Assign.
 	let amount = 0;
 	let uncategorized = 0;
 	let uncategorizedCount = 0;

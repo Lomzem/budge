@@ -2,8 +2,6 @@ import { assert, describe, expect, test } from 'vitest';
 
 import { computeBudget, type BudgetInput, type Target } from './budget';
 
-// A small budget: one Category Group with Groceries and Rent, plus Ready to Assign in its hidden
-// system group, and a Checking Account. Amounts are cents.
 type CategoryId = 'groceries' | 'rent' | 'readyToAssign' | 'discoverPayment' | 'visaPayment';
 type GroupId = 'everyday' | 'system' | 'cards';
 type AccountId = 'checking' | 'savings' | 'discover' | 'visa';
@@ -43,7 +41,7 @@ function category(result: ReturnType<typeof computeBudget>, name: string) {
 }
 
 describe('Available', () => {
-	test('is prior Available plus Assigned plus Activity, and a negative carries forward', () => {
+	test('is prior Available plus Assigned plus Activity, and an overspend carries forward with nothing resetting it at month-end', () => {
 		const input = budget({
 			assignments: [
 				{ month: '2026-08', categoryId: 'groceries', amount: 30_000 },
@@ -51,7 +49,6 @@ describe('Available', () => {
 			],
 			monthlyTotals: [
 				{ month: '2026-08', accountId: 'checking', bucket: 'groceries', amount: -20_000, count: 3 },
-				// September overspends Groceries by $150; nothing resets it at month-end.
 				{ month: '2026-09', accountId: 'checking', bucket: 'groceries', amount: -25_000, count: 4 },
 				{ month: '2026-10', accountId: 'checking', bucket: 'groceries', amount: -2_000, count: 1 }
 			]
@@ -115,9 +112,8 @@ describe('Ready to Assign', () => {
 		}
 	});
 
-	test('counts future-dated income only once its date arrives', () => {
+	test('counts future-dated income only once its date arrives, but a future-dated outflow now, since money cannot be spent twice', () => {
 		const paycheck = { date: '2026-10-31', amount: 230_000, categoryId: 'readyToAssign' as const };
-		// A future-dated outflow still counts now: money can't be spent twice.
 		const bill = { date: '2026-10-20', amount: -5_000, categoryId: null };
 		const input = budget({
 			monthlyTotals: [
@@ -247,26 +243,25 @@ test('a Transfer between Cash Accounts touches no Category and not Ready to Assi
 		],
 		assignments: [{ month: '2026-10', categoryId: 'groceries', amount: 10_000 }]
 	});
+	const bothSidesOfAFiveHundredDollarTransfer = [
+		{
+			month: '2026-10',
+			accountId: 'checking',
+			bucket: 'transfer' as const,
+			amount: -50_000,
+			count: 1
+		},
+		{
+			month: '2026-10',
+			accountId: 'checking',
+			bucket: 'transfer' as const,
+			amount: 50_000,
+			count: 1
+		}
+	];
 	const withTransfer = {
 		...without,
-		monthlyTotals: [
-			...without.monthlyTotals,
-			// Both sides of a $500 Transfer, one in each Account.
-			{
-				month: '2026-10',
-				accountId: 'checking',
-				bucket: 'transfer' as const,
-				amount: -50_000,
-				count: 1
-			},
-			{
-				month: '2026-10',
-				accountId: 'checking',
-				bucket: 'transfer' as const,
-				amount: 50_000,
-				count: 1
-			}
-		]
+		monthlyTotals: [...without.monthlyTotals, ...bothSidesOfAFiveHundredDollarTransfer]
 	};
 
 	const result = computeBudget(withTransfer);
@@ -405,10 +400,6 @@ describe('a hidden Category', () => {
 	});
 });
 
-/**
- * The small budget with a Discover Credit Card Account, its Payment Category in the system
- * Credit Card Payments group.
- */
 function withCard(change: Partial<Input> = {}): Input {
 	const input = budget(change);
 	return {
@@ -501,8 +492,7 @@ describe('a Credit Card Account', () => {
 		expect(result.readyToAssign).toEqual(computeBudget(without).readyToAssign);
 	});
 
-	test("leaves a card's starting debt out of every Category and Ready to Assign", () => {
-		// The starting balance sits in the card's own Payment Category, where the move cancels it.
+	test("leaves a card's starting debt out of every Category and Ready to Assign: it sits in the card's own Payment Category, where the move cancels it", () => {
 		const startingDebt = {
 			month: '2026-08',
 			accountId: 'discover',
@@ -518,7 +508,7 @@ describe('a Credit Card Account', () => {
 	});
 
 	describe('Payment Category', () => {
-		test('says how much is waiting on each overspent Category, and the debt not yet covered', () => {
+		test('says how much is waiting on each Category overspent on the card, not by cash, and the debt not yet covered', () => {
 			const rentByCash = {
 				month: '2026-10',
 				accountId: 'checking',
@@ -540,7 +530,6 @@ describe('a Credit Card Account', () => {
 				})
 			);
 
-			// Rent is overspent by cash, so the card waits on nothing there.
 			expect(category(result, 'Discover').payment).toEqual({
 				waitingOn: [{ id: 'groceries', name: 'Groceries', amount: 2_000 }],
 				uncovered: 60_000
@@ -567,8 +556,10 @@ describe('a Credit Card Account', () => {
 			} as const;
 			const result = computeBudget({ ...input, categories: [...input.categories, visa] });
 
-			// $60 of card purchases against $30 Assigned leaves Groceries overspent by $30.
-			expect(category(result, 'Groceries').available).toBe(-3_000);
+			const sixtyDollarsOfCardPurchasesAgainstThirtyAssigned = -3_000;
+			expect(category(result, 'Groceries').available).toBe(
+				sixtyDollarsOfCardPurchasesAgainstThirtyAssigned
+			);
 			expect(category(result, 'Discover').payment?.waitingOn).toEqual([
 				{ id: 'groceries', name: 'Groceries', amount: 2_000 }
 			]);
@@ -589,8 +580,7 @@ test('the budget starts in the cutover month', () => {
 });
 
 describe('the cash invariant', () => {
-	/** A small seeded generator, so a failing sequence can be replayed. */
-	function random(seed: number) {
+	function replayableSeededRandom(seed: number) {
 		let state = seed;
 		const next = () => {
 			state = (Math.imul(state, 1_103_515_245) + 12_345) & 0x7fffffff;
@@ -606,32 +596,29 @@ describe('the cash invariant', () => {
 	const buckets = ['groceries', 'rent', 'readyToAssign', null] as const;
 	const accounts = ['checking', 'savings', 'discover'] as const;
 	const isCash = (accountId: AccountId) => accountId !== 'discover';
+	const cardsStartingDebtInItsOwnPaymentCategory = {
+		accountId: 'discover' as const,
+		date: '2026-08-01',
+		amount: -60_000,
+		categoryId: 'discoverPayment' as const
+	};
 
 	test.each([1, 2, 3, 4, 5, 6, 7, 8])(
 		'cash = Ready to Assign + every Available, hidden or not, after any edits (sequence %i)',
 		(seed) => {
-			const rand = random(seed);
+			const rand = replayableSeededRandom(seed);
+			const oddSequencesHideRentWhichStillHoldsMoney = seed % 2 === 1;
 			const transactions: {
 				accountId: AccountId;
 				date: string;
 				amount: number;
 				categoryId: CategoryId | null;
-			}[] = [
-				// The card's starting debt, which sits in its own Payment Category.
-				{
-					accountId: 'discover',
-					date: '2026-08-01',
-					amount: -60_000,
-					categoryId: 'discoverPayment'
-				}
-			];
-			// Transfers: each is a pair of sides with opposite amounts, `amount` into `to`. With the
-			// card, it is a card payment from a Cash Account.
+			}[] = [cardsStartingDebtInItsOwnPaymentCategory];
+
 			const transfers: { date: string; amount: number; from: AccountId; to: AccountId }[] = [];
 			const assigned = new Map<string, number>();
 
-			// Every Transaction has happened by now.
-			const today = '2027-01-01';
+			const afterEveryTransaction = '2027-01-01';
 			const check = () => {
 				const totals = new Map<string, { amount: number; count: number }>();
 				const sides = transfers.flatMap(({ date, amount, from, to }) => [
@@ -650,11 +637,10 @@ describe('the cash invariant', () => {
 					totals.set(key, row);
 				}
 				const input = withCard({
-					today,
+					today: afterEveryTransaction,
 					month: '2026-12',
-					// Odd sequences hide Rent, which still holds money.
 					categories: budget().categories.map((c) =>
-						c.id === 'rent' ? { ...c, hidden: seed % 2 === 1 } : c
+						c.id === 'rent' ? { ...c, hidden: oddSequencesHideRentWhichStillHoldsMoney } : c
 					),
 					assignments: [...assigned].map(([key, amount]) => {
 						const [month = '', categoryId] = key.split('|');
@@ -700,14 +686,11 @@ describe('the cash invariant', () => {
 					else if (rand.int(2) === 0)
 						transfers.push({ date, amount, from: 'checking', to: 'savings' });
 					else transfers.push({ date, amount: Math.abs(amount), from: 'checking', to: 'discover' });
+				} else {
+					const monthAndCategory = `${rand.pick(months)}|${rand.pick(['groceries', 'rent', 'discoverPayment'])}`;
+					const assignedSometimesBackToZero = rand.pick([0, 5_000, 40_000, 125_000]);
+					assigned.set(monthAndCategory, assignedSometimesBackToZero);
 				}
-				// Setting Assigned, sometimes back to zero.
-				else
-					assigned.set(
-						`${rand.pick(months)}|${rand.pick(['groceries', 'rent', 'discoverPayment'])}`,
-						rand.pick([0, 5_000, 40_000, 125_000])
-					);
-				// After every edit, not only at the end.
 				check();
 			}
 		}
@@ -715,7 +698,6 @@ describe('the cash invariant', () => {
 });
 
 describe('Targets', () => {
-	/** The budget with Groceries given `target`, and Groceries' row from it. */
 	function groceriesWith(target: Target, change: Partial<Input> = {}) {
 		const input = budget(change);
 		return category(
@@ -761,10 +743,15 @@ describe('Targets', () => {
 				]
 			});
 
-			// $150 left over and $50 Assigned leave $300 to reach $500, so the bar is 40% full.
+			const fiveHundredLessOneFiftyLeftOverAndFiftyAssigned = 30_000;
+			const twoHundredOfFiveHundred = 0.4;
 			expect(groceries).toMatchObject({
 				status: 'underfunded',
-				target: { definition: refill, needed: 30_000, progress: 0.4 }
+				target: {
+					definition: refill,
+					needed: fiveHundredLessOneFiftyLeftOverAndFiftyAssigned,
+					progress: twoHundredOfFiveHundred
+				}
 			});
 		});
 	});
@@ -798,10 +785,10 @@ describe('Targets', () => {
 		const prime: Target = { kind: 'byDate', amount: 13_900, firstDate: '2027-03-03' };
 
 		test('spreads the amount evenly over the months left, counting both ends', () => {
-			// November through March is five months: $139 ÷ 5.
+			const oneThirtyNineOverNovemberThroughMarch = 2_780;
 			expect(groceriesWith(prime, { month: '2026-11' })).toMatchObject({
 				status: 'underfunded',
-				target: { needed: 2_780 }
+				target: { needed: oneThirtyNineOverNovemberThroughMarch }
 			});
 		});
 
@@ -817,8 +804,10 @@ describe('Targets', () => {
 				}
 			);
 
-			// $90 still to save over three months is $30.00 each; $5 is already Assigned.
-			expect(groceries).toMatchObject({ target: { needed: 2_500 } });
+			const thirtyAMonthOfTheNinetyStillToSaveLessFiveAssigned = 2_500;
+			expect(groceries).toMatchObject({
+				target: { needed: thirtyAMonthOfTheNinetyStillToSaveLessFiveAssigned }
+			});
 			expect(
 				groceriesWith(
 					{ kind: 'byDate', amount: 10_000, firstDate: '2027-01-15' },
@@ -848,10 +837,10 @@ describe('Targets', () => {
 				status: 'funded',
 				target: { dueDate: '2027-03-03', needed: 0 }
 			});
-			// April through next March is twelve months: $139 ÷ 12, rounded up.
+			const oneThirtyNineOverAprilThroughNextMarchRoundedUp = 1_159;
 			expect(groceriesWith(yearly, { ...spentOnTime, month: '2027-04' })).toMatchObject({
 				status: 'underfunded',
-				target: { dueDate: '2028-03-03', needed: 1_159 }
+				target: { dueDate: '2028-03-03', needed: oneThirtyNineOverAprilThroughNextMarchRoundedUp }
 			});
 		});
 
@@ -880,7 +869,6 @@ describe('Targets', () => {
 });
 
 describe('the Upcoming list', () => {
-	/** The budget with each Category in `targets` given its Target, and maybe more Categories. */
 	function withTargets(
 		targets: Partial<Record<string, Target>>,
 		change: Partial<BudgetInput<string, GroupId>> = {}
@@ -930,11 +918,12 @@ describe('the Upcoming list', () => {
 			{ id: 'gift', groupId: 'everyday', name: 'Gift', position: 3, kind: 'normal' },
 			{ id: 'old', groupId: 'everyday', name: 'Old', position: 4, kind: 'normal', hidden: true }
 		];
+		const lastDayInTheWindow = '2026-11-13';
+		const firstDayAfterIt = '2026-11-14';
 		const result = withTargets(
 			{
-				// The last day in the window, and the first day after it.
-				prime: { kind: 'byDate', amount: 13_900, firstDate: '2026-11-13' },
-				gift: { kind: 'byDate', amount: 5_000, firstDate: '2026-11-14' },
+				prime: { kind: 'byDate', amount: 13_900, firstDate: lastDayInTheWindow },
+				gift: { kind: 'byDate', amount: 5_000, firstDate: firstDayAfterIt },
 				groceries: { kind: 'monthly', amount: 20_000, mode: 'refill' },
 				old: { kind: 'monthly', amount: 1_000, mode: 'refill', dueDay: 16 }
 			},
@@ -945,10 +934,14 @@ describe('the Upcoming list', () => {
 	});
 
 	test('takes the next date of a repeating By date Target once its date has passed', () => {
+		const pastInItsUnfinishedDueMonthAndNotRepeating: Target = {
+			kind: 'byDate',
+			amount: 5_000,
+			firstDate: '2026-10-01'
+		};
 		const result = withTargets({
 			groceries: { kind: 'byDate', amount: 5_000, firstDate: '2026-09-20', everyMonths: 1 },
-			// Its due month hasn't ended, but its date has passed and it won't repeat.
-			rent: { kind: 'byDate', amount: 5_000, firstDate: '2026-10-01' }
+			rent: pastInItsUnfinishedDueMonthAndNotRepeating
 		});
 
 		expect(result.upcoming).toMatchObject([{ id: 'groceries', dueDate: '2026-10-20' }]);

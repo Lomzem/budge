@@ -5,7 +5,6 @@ import { TestClock } from 'effect/testing';
 
 import { PlaidClient, type PlaidConfig } from './plaidClient';
 
-// Obviously fake credentials and IDs: no test ever reaches Plaid.
 const config = {
 	clientId: 'client-id-synthetic',
 	secret: 'secret-synthetic-not-real',
@@ -19,16 +18,11 @@ interface Sent {
 	body: Record<string, unknown>;
 }
 
-/** The URL a `fetch` was called with. */
 function urlOf(input: RequestInfo | URL) {
 	if (input instanceof URL) return input.href;
 	return typeof input === 'string' ? input : input.url;
 }
 
-/**
- * The live PlaidClient over a fake `fetch`, so its requests, retries, and timeouts run for real
- * without a network. `respond` answers each attempt in turn.
- */
 function fakePlaid(
 	respond: (attempt: number, signal: AbortSignal) => Promise<Response>,
 	plaidConfig: PlaidConfig = config
@@ -73,7 +67,6 @@ const plaidError = (status: number, code: string) =>
 		request_id: 'request-synthetic-2'
 	});
 
-/** A `fetch` that never answers, until its request is aborted. */
 const hang = (signal: AbortSignal) =>
 	new Promise<Response>((_, reject) => {
 		signal.addEventListener('abort', () => {
@@ -86,40 +79,44 @@ const sync = PlaidClient.use((plaid) =>
 );
 
 describe('PlaidClient', () => {
-	it.effect('posts to Plaid Sandbox with the credentials and decodes the page', () => {
-		const plaid = fakePlaid(() => Promise.resolve(json(200, syncBody)));
-		return Effect.gen(function* () {
-			const page = yield* sync;
+	it.effect(
+		"posts the first sync to Plaid Sandbox with the credentials, no cursor, and the bank's original wording asked for, and decodes the page",
+		() => {
+			const plaid = fakePlaid(() => Promise.resolve(json(200, syncBody)));
+			return Effect.gen(function* () {
+				const page = yield* sync;
 
-			expect(page).toEqual({ added: [], nextCursor: 'cursor-synthetic-1', hasMore: false });
-			expect(plaid.sent).toHaveLength(1);
-			const [request] = plaid.sent;
-			expect(request?.url).toBe('https://sandbox.plaid.com/transactions/sync');
-			expect(request?.headers['plaid-client-id']).toBe(config.clientId);
-			expect(request?.headers['plaid-secret']).toBe(config.secret);
-			// The first sync sends no cursor, and asks for the bank's original wording.
-			expect(request?.body).toEqual({
-				access_token: accessToken,
-				count: 100,
-				options: { include_original_description: true }
-			});
-		}).pipe(Effect.provide(plaid.layer));
-	});
+				expect(page).toEqual({ added: [], nextCursor: 'cursor-synthetic-1', hasMore: false });
+				expect(plaid.sent).toHaveLength(1);
+				const [request] = plaid.sent;
+				expect(request?.url).toBe('https://sandbox.plaid.com/transactions/sync');
+				expect(request?.headers['plaid-client-id']).toBe(config.clientId);
+				expect(request?.headers['plaid-secret']).toBe(config.secret);
+				expect(request?.body).toEqual({
+					access_token: accessToken,
+					count: 100,
+					options: { include_original_description: true }
+				});
+			}).pipe(Effect.provide(plaid.layer));
+		}
+	);
 
-	it.effect('retries a network failure, making at most three attempts', () => {
-		const plaid = fakePlaid(() => Promise.reject(new Error(`connection reset ${accessToken}`)));
-		return Effect.gen(function* () {
-			const fiber = yield* Effect.forkChild(Effect.flip(sync));
-			yield* TestClock.adjust('1 minute');
-			const error = yield* Fiber.join(fiber);
+	it.effect(
+		'retries a network failure, making at most three attempts, with no request, token, or cause in the error',
+		() => {
+			const plaid = fakePlaid(() => Promise.reject(new Error(`connection reset ${accessToken}`)));
+			return Effect.gen(function* () {
+				const fiber = yield* Effect.forkChild(Effect.flip(sync));
+				yield* TestClock.adjust('1 minute');
+				const error = yield* Fiber.join(fiber);
 
-			expect(error._tag).toBe('PlaidTransport');
-			expect(plaid.sent).toHaveLength(3);
-			// Errors never carry the request, the token, or the underlying cause.
-			expect(JSON.stringify(error)).not.toContain(accessToken);
-			expect(String(error)).not.toContain(accessToken);
-		}).pipe(Effect.provide(plaid.layer));
-	});
+				expect(error._tag).toBe('PlaidTransport');
+				expect(plaid.sent).toHaveLength(3);
+				expect(JSON.stringify(error)).not.toContain(accessToken);
+				expect(String(error)).not.toContain(accessToken);
+			}).pipe(Effect.provide(plaid.layer));
+		}
+	);
 
 	it.effect('succeeds when a retry gets through', () => {
 		const plaid = fakePlaid((attempt) =>
@@ -143,8 +140,8 @@ describe('PlaidClient', () => {
 			const fiber = yield* Effect.forkChild(Effect.flip(sync));
 			yield* TestClock.adjust('10 seconds');
 			expect(plaid.sent).toHaveLength(1);
-			// The first attempt times out at 10 seconds, and the second starts after a short backoff.
-			yield* TestClock.adjust('5 seconds');
+			const shortBackoffAfterTheFirstTimeout = '5 seconds';
+			yield* TestClock.adjust(shortBackoffAfterTheFirstTimeout);
 			expect(plaid.sent).toHaveLength(2);
 			yield* TestClock.adjust('15 seconds');
 			expect(plaid.sent).toHaveLength(3);
@@ -158,22 +155,24 @@ describe('PlaidClient', () => {
 		}).pipe(Effect.provide(plaid.layer));
 	});
 
-	it.effect("reports Plaid's error code, status, and request ID, without retrying", () => {
-		const plaid = fakePlaid(() => Promise.resolve(plaidError(400, 'ITEM_LOGIN_REQUIRED')));
-		return Effect.gen(function* () {
-			const error = yield* Effect.flip(sync);
+	it.effect(
+		"reports Plaid's error code, status, and request ID, without retrying or keeping Plaid's message, which can quote the request",
+		() => {
+			const plaid = fakePlaid(() => Promise.resolve(plaidError(400, 'ITEM_LOGIN_REQUIRED')));
+			return Effect.gen(function* () {
+				const error = yield* Effect.flip(sync);
 
-			expect(error).toMatchObject({
-				_tag: 'PlaidApi',
-				error_code: 'ITEM_LOGIN_REQUIRED',
-				status: 400,
-				request_id: 'request-synthetic-2'
-			});
-			expect(plaid.sent).toHaveLength(1);
-			// Plaid's message can quote the request, so it is never kept.
-			expect(JSON.stringify(error)).not.toContain(accessToken);
-		}).pipe(Effect.provide(plaid.layer));
-	});
+				expect(error).toMatchObject({
+					_tag: 'PlaidApi',
+					error_code: 'ITEM_LOGIN_REQUIRED',
+					status: 400,
+					request_id: 'request-synthetic-2'
+				});
+				expect(plaid.sent).toHaveLength(1);
+				expect(JSON.stringify(error)).not.toContain(accessToken);
+			}).pipe(Effect.provide(plaid.layer));
+		}
+	);
 
 	it.effect("retries Plaid's outage even when its body isn't JSON", () => {
 		const plaid = fakePlaid(() =>

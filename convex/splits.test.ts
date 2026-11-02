@@ -72,7 +72,6 @@ test('a split card purchase gives the same budget as a Transaction per line', as
 	expect(budget.uncategorizedCount).toBe(0);
 });
 
-/** Each Category's Activity in a month, by name, Payment Categories included. */
 async function activityIn(b: Awaited<ReturnType<typeof budgetWithCard>>, month: string) {
 	const budget = await b.view(month);
 	return Object.fromEntries(

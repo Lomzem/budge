@@ -1,12 +1,10 @@
 import { defineConfig } from '@playwright/test';
 
-// Smoke tests run against an anonymous local Convex backend and the Clerk development instance: in
-// CI, and locally only through `bun run test:e2e:local`, which sets up the same backend.
 export default defineConfig({
 	testDir: 'e2e',
 	globalSetup: './e2e/global.setup.ts',
 	forbidOnly: !!process.env.CI,
-	// Every test edits the same seeded budget, so they run one at a time.
+
 	workers: 1,
 	reporter: process.env.CI ? 'github' : 'list',
 	webServer: {

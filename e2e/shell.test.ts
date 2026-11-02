@@ -1,8 +1,6 @@
 import { clerk } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 
-// The one test user, created by hand on the Clerk development instance. CI makes it the owner
-// of the local backend.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 
 test('the owner signs in and lands in the app shell', async ({ page }) => {

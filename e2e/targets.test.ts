@@ -1,11 +1,9 @@
 import { clerk } from '@clerk/testing/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { ordinal } from '../src/lib/domain/dates';
 import { formatCents, parseCents } from '../src/lib/domain/money';
 
-// Runs on the local backend after CI's `seed:run`, where nothing is spent from Emergency Fund, so
-// its Available stays positive. Pass or fail, it removes the Target and restores Assigned.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 
 async function assigned(page: Page, name: string) {
@@ -13,6 +11,17 @@ async function assigned(page: Page, name: string) {
 	const amount = parseCents(text);
 	if (amount === undefined) throw new Error(`Expected an Assigned amount for ${name}.`);
 	return amount;
+}
+
+async function waitForAssignToSettle(inspector: Locator) {
+	const assign = inspector.getByRole('button', { name: /^Assign \$/ });
+	await expect
+		.poll(() =>
+			assign.evaluateAll(
+				(buttons) => buttons.length === 0 || buttons.some((button) => !button.matches(':disabled'))
+			)
+		)
+		.toBe(true);
 }
 
 test('a Target shows its progress, "Assign $X" funds it, and it is listed as Upcoming', async ({
@@ -34,15 +43,14 @@ test('a Target shows its progress, "Assign $X" funds it, and it is listed as Upc
 	const dialog = page.getByRole('dialog');
 	let assigning = false;
 	try {
-		// Set aside $25 more than is Assigned, due today, so it needs exactly $25.00.
+		const twentyFiveDollarsMoreThanAssigned = before + 2_500;
+		const dueToday = `The ${ordinal(new Date().getDate())}`;
 		await inspector.getByRole('button', { name: 'Add Target' }).click();
 		await dialog
 			.getByLabel('Amount', { exact: true })
-			.fill(formatCents(before + 2_500).replace('$', ''));
+			.fill(formatCents(twentyFiveDollarsMoreThanAssigned).replace('$', ''));
 		await dialog.getByLabel('Set aside the amount', { exact: true }).check();
-		await dialog
-			.getByLabel('Due day', { exact: true })
-			.selectOption({ label: `The ${ordinal(new Date().getDate())}` });
+		await dialog.getByLabel('Due day', { exact: true }).selectOption({ label: dueToday });
 		await dialog.getByRole('button', { name: 'Save' }).click();
 		await expect(dialog).toBeHidden();
 
@@ -58,29 +66,16 @@ test('a Target shows its progress, "Assign $X" funds it, and it is listed as Upc
 		await expect(inspector.getByText('Funded', { exact: true })).toBeVisible();
 		await expect(bar).toHaveAttribute('aria-valuetext', 'Funded');
 		await expect(row).toContainText('Yes');
-		await expect.poll(() => assigned(page, name)).toBe(before + 2_500);
+		await expect.poll(() => assigned(page, name)).toBe(twentyFiveDollarsMoreThanAssigned);
 
-		// On a phone the Upcoming list follows the table.
-		await page.setViewportSize({ width: 320, height: 640 });
-		await expect(upcoming).toBeVisible();
+		await test.step('on a phone the Upcoming list follows the table', async () => {
+			await page.setViewportSize({ width: 320, height: 640 });
+			await expect(upcoming).toBeVisible();
+		});
 	} finally {
-		// Leave the seeded budget as it was, even when an assertion above failed.
 		await page.setViewportSize({ width: 1280, height: 800 });
 		if (await dialog.isVisible()) await page.keyboard.press('Escape');
-		// A pending "Assign $25.00" could land after the restore below, so wait until it settles: the
-		// button stays disabled while the write is in flight, then goes away once the Target is
-		// funded, or comes back enabled with an alert if the write failed.
-		if (assigning) {
-			const assign = inspector.getByRole('button', { name: /^Assign \$/ });
-			await expect
-				.poll(() =>
-					assign.evaluateAll(
-						(buttons) =>
-							buttons.length === 0 || buttons.some((button) => !button.matches(':disabled'))
-					)
-				)
-				.toBe(true);
-		}
+		if (assigning) await waitForAssignToSettle(inspector);
 		const edit = inspector.getByRole('button', { name: 'Edit Target' });
 		if (await edit.isVisible()) {
 			await edit.click();

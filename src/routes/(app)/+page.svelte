@@ -30,7 +30,7 @@
 	let addAccountOpen = $state(false);
 	let adding: 'group' | 'category' = $state('group');
 	let addingOpen = $state(false);
-	// A pending save keeps its form, so the other kind can't open until it settles.
+
 	let addingSaving = $state(false);
 	let addDialog: { reset: () => void } | undefined = $state();
 
@@ -38,18 +38,15 @@
 	const readyToAssign = $derived(budget.readyToAssign);
 	const groups = $derived(view?.groups.map((group) => ({ id: group.id, name: group.name })) ?? []);
 
-	// At 1024 px and wider the inspector is a column beside the table; below, a row under the
-	// selected Category.
 	const wide = new MediaQuery('(min-width: 1024px)');
 	let selectedId: Id<'categories'> | null = $state(null);
-	// The selection survives moving between months, and clears if its Category leaves the table.
+
 	const selected = $derived(
 		view?.groups.flatMap((group) => group.categories).find((c) => c.id === selectedId)
 	);
 
 	async function select(id: Id<'categories'>) {
 		selectedId = selectedId === id ? null : id;
-		// The column sits after the whole table, so focus follows the selection there.
 		if (selectedId !== null && wide.current) {
 			await tick();
 			document.getElementById('category-inspector')?.focus();
@@ -217,7 +214,6 @@
 						/>
 					</div>
 					{#if wide.current}
-						<!-- The inspector column, with the Upcoming list below it. -->
 						<aside class="sticky top-6 flex w-72 shrink-0 flex-col gap-6">
 							{#if selected}
 								<div class="rounded-lg border p-4">{@render inspector()}</div>
@@ -234,7 +230,6 @@
 					No Categories yet. Add a Category Group, then Categories to assign money to.
 				</p>
 			{:else if view.upcoming.length > 0}
-				<!-- Every Category is hidden, but their Targets still come due. -->
 				<UpcomingList upcoming={view.upcoming} />
 			{/if}
 		</section>

@@ -6,10 +6,6 @@ import { promisify } from 'node:util';
 import { createServer, preview, type PreviewServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, onTestFinished, test, vi } from 'vitest';
 
-// Drives the real hooks, layouts, and pages through SvelteKit's dev server and a production
-// build. Clerk verifies a locally signed session token with a fake production instance's JWT
-// key, and the Convex URL points at this machine, so nothing leaves it.
-
 const convexUrl = 'http://127.0.0.1:3210';
 
 const frontendApi = 'clerk.budge.test';
@@ -97,8 +93,8 @@ describe('server-rendered pages', () => {
 	describe('when a signed-in page fails to render', () => {
 		let server: ViteDevServer;
 		beforeAll(async () => {
-			// A missing Convex URL makes the app shell throw while rendering.
-			server = await startApp({ ...clerkEnv, PUBLIC_CONVEX_URL: '' });
+			const missingConvexUrlMakesTheShellThrow = { ...clerkEnv, PUBLIC_CONVEX_URL: '' };
+			server = await startApp(missingConvexUrlMakesTheShellThrow);
 		});
 		afterAll(() => server.close());
 
@@ -120,22 +116,27 @@ describe('server-rendered pages', () => {
 	describe('in a build deployed without the Convex URL in its runtime env', () => {
 		let server: PreviewServer;
 		beforeAll(async () => {
-			// `convex deploy` gives each deployment's URL to the build command only.
+			const urlOnlyInTheBuildCommandAsConvexDeployGivesIt = {
+				...process.env,
+				PUBLIC_CONVEX_URL: convexUrl
+			};
 			await promisify(execFile)('node_modules/.bin/vite', ['build', '--logLevel', 'error'], {
-				env: { ...process.env, PUBLIC_CONVEX_URL: convexUrl }
+				env: urlOnlyInTheBuildCommandAsConvexDeployGivesIt
 			});
-			// Empty rather than unset, so a developer's `.env.local` can't fill it in.
-			server = await withEnv({ ...clerkEnv, PUBLIC_CONVEX_URL: '' }, () =>
-				preview({
-					configFile: 'vite.config.ts',
-					logLevel: 'silent',
-					preview: { port: 0, host: '127.0.0.1', open: false }
-				})
+			const emptyNotUnsetSoADevelopersEnvLocalCantFillItIn = '';
+			server = await withEnv(
+				{ ...clerkEnv, PUBLIC_CONVEX_URL: emptyNotUnsetSoADevelopersEnvLocalCantFillItIn },
+				() =>
+					preview({
+						configFile: 'vite.config.ts',
+						logLevel: 'silent',
+						preview: { port: 0, host: '127.0.0.1', open: false }
+					})
 			);
 		}, 120_000);
 		afterAll(() => server.close());
 
-		test('the signed-in Budget page renders with the URL the build was given', async () => {
+		test('uses the build-time Convex URL when runtime env omits it', async () => {
 			const response = await get(server, '/', true);
 			expect(response.status).toBe(200);
 			expect(response.headers.get('cache-control')).toBe('private, no-store');

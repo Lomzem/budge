@@ -32,7 +32,6 @@ async function startBudget() {
 
 type Budget = Awaited<ReturnType<typeof startBudget>>;
 
-/** The groups and Categories as the owner manages them, by name. */
 async function layout(b: Budget) {
 	const { groups } = await b.owner.query(api.categories.list, {});
 	return groups.map((g) => ({
@@ -42,11 +41,6 @@ async function layout(b: Budget) {
 	}));
 }
 
-/**
- * Months of Assigned amounts and Transactions, some for `dining`, some for Groceries, and a split
- * across both. When
- * `dining` is Groceries, its Assigned amounts are added to Groceries' in the same month.
- */
 async function enterHistory(b: Budget, dining: Id<'categories'>) {
 	const assigned = new Map<string, number>();
 	const assign = (month: string, categoryId: Id<'categories'>, amount: number) => {
@@ -55,9 +49,7 @@ async function enterHistory(b: Budget, dining: Id<'categories'>) {
 	};
 	assign('2026-08', b.groceries, 40_000);
 	assign('2026-08', dining, 9_000);
-	// September has Dining but no Groceries row, so a row moves across whole.
 	assign('2026-09', dining, 12_000);
-	// October's rows cancel, so the summed row is zero.
 	assign('2026-10', b.groceries, 5_000);
 	assign('2026-10', dining, -5_000);
 	assign('2026-12', dining, 7_500);
@@ -90,7 +82,6 @@ async function enterHistory(b: Budget, dining: Id<'categories'>) {
 	await spend(b.checking, '2026-09-15', -2_000, b.groceries);
 	await spend(b.checking, '2026-10-01', 1_200, dining);
 	await spend(b.checking, '2026-11-20', -4_400, dining);
-	// A split with a line in each moves its `dining` line alone.
 	await b.owner.mutation(api.transactions.create, {
 		accountId: b.savings,
 		date: '2026-09-21',
@@ -104,7 +95,6 @@ async function enterHistory(b: Budget, dining: Id<'categories'>) {
 	});
 }
 
-/** Groceries and Ready to Assign in each month from August to January. */
 async function groceriesByMonth(b: Budget) {
 	const months = ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01'];
 	return await Promise.all(
@@ -170,14 +160,14 @@ describe('deleting a Category', () => {
 			name: 'Dining Out'
 		});
 		await enterHistory(b, dining);
-		// The cache has drifted for both Categories where Dining Out has history: August in
-		// Checking holds both.
 		await b.t.run(async (ctx) => {
 			for (const row of await ctx.db.query('monthlyTotals').collect()) {
-				const touched =
-					row.bucket === dining ||
-					(row.bucket === b.groceries && row.month === '2026-08' && row.accountId === b.checking);
-				if (touched) await ctx.db.patch('monthlyTotals', row._id, { amount: row.amount + 999 });
+				const augustInCheckingHoldsBothCategories =
+					row.bucket === b.groceries && row.month === '2026-08' && row.accountId === b.checking;
+				const cacheDrifted = row.bucket === dining || augustInCheckingHoldsBothCategories;
+				if (cacheDrifted) {
+					await ctx.db.patch('monthlyTotals', row._id, { amount: row.amount + 999 });
+				}
 			}
 		});
 		await b.owner.mutation(api.categories.remove, {
@@ -269,11 +259,11 @@ describe('reordering', () => {
 			{ name: 'Bills', hidden: false, categories: ['Phone'] }
 		]);
 
-		// An index past the end puts it last.
+		const indexPastTheEnd = 9;
 		await b.owner.mutation(api.categories.move, {
 			categoryId: coffee,
 			groupId: b.everyday,
-			index: 9
+			index: indexPastTheEnd
 		});
 		expect((await layout(b))[0]?.categories).toEqual(['Rent', 'Groceries', 'Coffee']);
 	});

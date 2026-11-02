@@ -10,7 +10,6 @@
 		...restProps
 	}: WithoutChildrenOrChild<ProgressPrimitive.RootProps> = $props();
 
-	// Typed apart from the spread: svelte-check can't represent the union of every root prop.
 	const rootProps: ProgressPrimitive.RootProps = $derived({ ...restProps, value, max });
 </script>
 
@@ -25,7 +24,7 @@
 >
 	<div
 		data-slot="progress-indicator"
-		class="size-full flex-1 bg-primary transition-all"
-		style="transform: translateX(-{100 - (100 * (value ?? 0)) / (max ?? 1)}%)"
+		class="size-full flex-1 transform-(--progress-transform) bg-primary transition-all"
+		style:--progress-transform="translateX(-{100 - (100 * (value ?? 0)) / max}%)"
 	></div>
 </ProgressPrimitive.Root>

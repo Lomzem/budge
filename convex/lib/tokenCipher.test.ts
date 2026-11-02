@@ -3,13 +3,12 @@ import { Effect, Exit } from 'effect';
 
 import { TokenCipher } from './tokenCipher';
 
-// Obviously fake: never a real access token.
 const token = 'access-token-synthetic-not-real';
 
 const freshKey = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
 
 describe('TokenCipher', () => {
-	it.effect('round-trips a token, storing only ciphertext', () =>
+	it.effect('round-trips a token, storing only ciphertext with a fresh IV each time', () =>
 		Effect.gen(function* () {
 			const cipher = yield* TokenCipher;
 
@@ -18,8 +17,8 @@ describe('TokenCipher', () => {
 			expect(sealed).not.toContain(token);
 			expect(sealed).not.toContain(btoa(token));
 			expect(yield* cipher.decrypt(sealed, 'item-synthetic-1')).toBe(token);
-			// A fresh IV each time, so the same token never encrypts the same way twice.
-			expect(yield* cipher.encrypt(token, 'item-synthetic-1')).not.toBe(sealed);
+			const sealedAgain = yield* cipher.encrypt(token, 'item-synthetic-1');
+			expect(sealedAgain).not.toBe(sealed);
 		}).pipe(Effect.provide(TokenCipher.layerTest))
 	);
 

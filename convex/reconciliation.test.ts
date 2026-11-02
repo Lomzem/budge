@@ -26,7 +26,6 @@ async function budgetToReconcile() {
 		name: 'Groceries'
 	});
 
-	/** Enters a Groceries purchase, Cleared unless `cleared` is false. */
 	const buy = async (accountId: Id<'accounts'>, amount: number, cleared = true) => {
 		const id = await owner.mutation(api.transactions.create, {
 			accountId,
@@ -56,7 +55,7 @@ async function budgetToReconcile() {
 	const view = () => owner.query(api.budget.month, { month: '2026-08', today: '2026-08-31' });
 	const available = async (name: string) =>
 		(await view()).groups.flatMap((g) => g.categories).find((c) => c.name === name)?.available;
-	/** The monthly totals, which must equal a rebuild from the Transactions. */
+
 	const expectTotalsInStep = async () => {
 		const read = () =>
 			t.run(async (ctx) =>
@@ -195,8 +194,8 @@ describe('reconciling a Credit Card Account', () => {
 		const b = await budgetToReconcile();
 		await b.buy(b.discover, -5_000);
 
-		// The bank says the card owes $3.00 more than Budge has cleared.
-		expect(await b.reconcile(b.discover, -25_300)).toBe(-300);
+		const bankOwesThreeDollarsMoreThanCleared = -25_300;
+		expect(await b.reconcile(b.discover, bankOwesThreeDollarsMoreThanCleared)).toBe(-300);
 
 		expect(await b.rows(b.discover)).toMatchObject([
 			{ amount: -300, payeeName: 'Reconciliation Adjustment', reconciled: true },
@@ -327,10 +326,9 @@ describe('a Reconciled Transaction', () => {
 			}),
 			b.owner.mutation(api.transactions.remove, { transactionId: payment })
 		]) {
-			// The owner is told which side is locked, since only that side can be unlocked.
-			expect(await publicErrorMessage(attempt)).toMatch(
-				/^The other side of this Transfer is Reconciled/
-			);
+			const namesTheLockedSideSinceOnlyItCanBeUnlocked =
+				/^The other side of this Transfer is Reconciled/;
+			expect(await publicErrorMessage(attempt)).toMatch(namesTheLockedSideSinceOnlyItCanBeUnlocked);
 		}
 		expect((await b.rows(b.discover))[0]).toMatchObject({ amount: 10_000, reconciled: true });
 	});

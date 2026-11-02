@@ -15,10 +15,6 @@ import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { requireTarget, targetValidator } from './lib/targets';
 
-/**
- * Every Category a Transaction can take, hidden ones included: Ready to Assign, then the groups
- * in table order.
- */
 export const list = query({
 	args: {},
 	returns: v.object({
@@ -60,7 +56,6 @@ export const list = query({
 	}
 });
 
-/** Adds a Category Group at the bottom of the budget table. */
 export const createGroup = mutation({
 	args: { name: v.string() },
 	returns: v.id('categoryGroups'),
@@ -76,7 +71,6 @@ export const createGroup = mutation({
 	}
 });
 
-/** Adds a Category at the bottom of its group. */
 export const create = mutation({
 	args: { groupId: v.id('categoryGroups'), name: v.string() },
 	returns: v.id('categories'),
@@ -102,7 +96,6 @@ export const create = mutation({
 	}
 });
 
-/** Renames a Category. */
 export const rename = mutation({
 	args: { categoryId: v.id('categories'), name: v.string() },
 	returns: v.null(),
@@ -115,7 +108,6 @@ export const rename = mutation({
 	}
 });
 
-/** Sets, replaces, or with `null` clears a Category's Target. */
 export const setTarget = mutation({
 	args: { categoryId: v.id('categories'), target: v.union(targetValidator, v.null()) },
 	returns: v.null(),
@@ -128,7 +120,6 @@ export const setTarget = mutation({
 	}
 });
 
-/** Renames a Category Group. */
 export const renameGroup = mutation({
 	args: { groupId: v.id('categoryGroups'), name: v.string() },
 	returns: v.null(),
@@ -141,10 +132,6 @@ export const renameGroup = mutation({
 	}
 });
 
-/**
- * Moves a Category to `index` among the Categories of `groupId`, its own group or another. An
- * index past the end puts it last.
- */
 export const move = mutation({
 	args: { categoryId: v.id('categories'), groupId: v.id('categoryGroups'), index: v.number() },
 	returns: v.null(),
@@ -154,13 +141,10 @@ export const move = mutation({
 		const group = await requireOwnGroup(ctx, args.groupId);
 		const index = requireIndex(args.index);
 		if (category.groupId !== group._id) {
-			// Close the gap it leaves behind.
-			const left = await categoriesIn(ctx, category.groupId);
-			await writePositions(
-				ctx,
-				category.groupId,
-				left.filter((c) => c._id !== category._id)
+			const oldGroupClosingTheGap = (await categoriesIn(ctx, category.groupId)).filter(
+				(c) => c._id !== category._id
 			);
+			await writePositions(ctx, category.groupId, oldGroupClosingTheGap);
 		}
 		const siblings = (await categoriesIn(ctx, group._id)).filter((c) => c._id !== category._id);
 		siblings.splice(index, 0, category);
@@ -169,7 +153,6 @@ export const move = mutation({
 	}
 });
 
-/** Moves a Category Group to `index` in the budget table. An index past the end puts it last. */
 export const moveGroup = mutation({
 	args: { groupId: v.id('categoryGroups'), index: v.number() },
 	returns: v.null(),
@@ -184,7 +167,6 @@ export const moveGroup = mutation({
 	}
 });
 
-/** Hides a Category from the budget table, or shows it again. It still counts in every total. */
 export const setHidden = mutation({
 	args: { categoryId: v.id('categories'), hidden: v.boolean() },
 	returns: v.null(),
@@ -196,7 +178,6 @@ export const setHidden = mutation({
 	}
 });
 
-/** Hides a Category Group, with all its Categories, from the budget table, or shows it again. */
 export const setGroupHidden = mutation({
 	args: { groupId: v.id('categoryGroups'), hidden: v.boolean() },
 	returns: v.null(),
@@ -208,11 +189,6 @@ export const setGroupHidden = mutation({
 	}
 });
 
-/**
- * Deletes a Category after moving its Transactions, split lines, and Assigned amounts to `destinationId`, so
- * every month's Available and Ready to Assign come out as if they had been there all along.
- * Assigned sums into the destination's rows; a sum of zero removes the row.
- */
 export const remove = mutation({
 	args: { categoryId: v.id('categories'), destinationId: v.id('categories') },
 	returns: v.null(),
@@ -224,15 +200,13 @@ export const remove = mutation({
 			throw publicError('INVALID_INPUT', 'Pick another Category to move its history to.');
 		}
 
-		// Each Transaction and split line moves under the same month and Account, so only both Categories' totals
-		// for those keys change, and they are rebuilt from the Transactions.
-		const keys = new Map<string, { month: string; accountId: Id<'accounts'> }>();
+		const monthAccountKeysMoved = new Map<string, { month: string; accountId: Id<'accounts'> }>();
 		const transactions = ctx.db
 			.query('transactions')
 			.withIndex('by_category_date', (q) => q.eq('categoryId', category._id));
 		for await (const transaction of transactions) {
 			const key = { month: monthOf(transaction.date), accountId: transaction.accountId };
-			keys.set(`${key.month}|${key.accountId}`, key);
+			monthAccountKeysMoved.set(`${key.month}|${key.accountId}`, key);
 			await ctx.db.patch('transactions', transaction._id, { categoryId: destination._id });
 		}
 		const lines = ctx.db
@@ -242,10 +216,10 @@ export const remove = mutation({
 			const parent = await ctx.db.get('transactions', line.transactionId);
 			if (parent === null) continue;
 			const key = { month: monthOf(line.date), accountId: parent.accountId };
-			keys.set(`${key.month}|${key.accountId}`, key);
+			monthAccountKeysMoved.set(`${key.month}|${key.accountId}`, key);
 			await ctx.db.patch('transactionSplits', line._id, { categoryId: destination._id });
 		}
-		await rebuildTotals(ctx, [category._id, destination._id], keys.values());
+		await rebuildTotals(ctx, [category._id, destination._id], monthAccountKeysMoved.values());
 
 		const assignments = ctx.db
 			.query('assignments')
@@ -277,10 +251,6 @@ export const remove = mutation({
 	}
 });
 
-/**
- * Deletes a Category Group. Its Categories, and their history, first move to the end of
- * `destinationGroupId`, which a group with Categories requires.
- */
 export const removeGroup = mutation({
 	args: {
 		groupId: v.id('categoryGroups'),
@@ -329,7 +299,6 @@ async function categoriesIn(
 		.collect();
 }
 
-/** Makes `categories` the group's sibling list, in order, positioned 0, 1, 2, … */
 async function writePositions(
 	ctx: MutationCtx,
 	groupId: Id<'categoryGroups'>,
@@ -342,7 +311,6 @@ async function writePositions(
 	}
 }
 
-/** Positions the normal groups 0, 1, 2, … in the order given. */
 async function writeGroupPositions(ctx: MutationCtx, groups: readonly Doc<'categoryGroups'>[]) {
 	for (const [position, group] of groups.entries()) {
 		if (group.position !== position) {

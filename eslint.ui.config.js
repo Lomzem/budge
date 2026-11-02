@@ -1,16 +1,14 @@
-// `bun run lint:ui`: @shadcn/lint design-system rules for Svelte components.
-// Kept apart from eslint.config.js so the main lint and the UI lint run as separate checks.
+import { generatedUiIgnores } from './eslint/ui-ownership.js';
 import { plugin as shadcn } from '@shadcn/lint';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import svelteParser from 'svelte-eslint-parser';
 import ts from 'typescript-eslint';
 
-import svelteConfig from './svelte.config.js';
+import svelteConfig from './svelte.config.ts';
 
 export default defineConfig(
-	// shadcn-svelte's generated components own their styles.
-	globalIgnores(['.svelte-kit/', 'build/', '.vercel/', 'convex/', 'src/lib/components/ui/']),
-	// The main lint reports unused disable directives.
+	globalIgnores(['.svelte-kit/', 'build/', '.vercel/', 'convex/', ...generatedUiIgnores]),
+
 	{ linterOptions: { reportUnusedDisableDirectives: 'off' } },
 	{
 		files: ['**/*.svelte'],

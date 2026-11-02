@@ -17,7 +17,7 @@
 
 	setupConvexWithClerk();
 	const auth = useAuth();
-	// Nothing shows until the backend agrees this is the owner.
+
 	const whoami = useQuery(api.owner.whoami, () => (auth.isAuthenticated ? {} : 'skip'));
 	setAccounts(new Accounts(() => auth.isAuthenticated));
 	const budget = new BudgetMonth(() => auth.isAuthenticated);

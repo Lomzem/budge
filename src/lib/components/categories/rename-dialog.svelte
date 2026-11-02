@@ -20,10 +20,8 @@
 	let error = $state('');
 	let saving = $state(false);
 
-	/** Which item the dialog is open for now; a save may outlast it. */
 	const openFor = () => target?.id;
 
-	/** Fills the form from `target`; the parent calls it before each open. */
 	export function reset(next: RenameTarget) {
 		name = next.name;
 		error = '';
@@ -42,8 +40,8 @@
 		saving = true;
 		const renamed = await attempt(() => rename(item));
 		saving = false;
-		// Another item may have taken the dialog over while this saved; leave that one be.
-		if (openFor() !== item.id) return;
+		const anotherItemTookTheDialogOver = openFor() !== item.id;
+		if (anotherItemTookTheDialogOver) return;
 		if (renamed.ok) open = false;
 		else error = renamed.error?.message ?? "Budge couldn't rename it. Try again.";
 	}

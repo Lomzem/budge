@@ -16,7 +16,6 @@ const candidate = v.object({
 	memo: v.union(v.string(), v.null())
 });
 
-// A Match or new row that a pick resolved keeps its candidates, so the owner can change the pick.
 const previewRow = v.union(
 	v.object({ kind: v.literal('new'), candidates: v.optional(v.array(candidate)) }),
 	v.object({ kind: v.literal('skip') }),
@@ -30,11 +29,6 @@ const previewRow = v.union(
 
 const fileArgs = { accountId: v.id('accounts'), source: fileSource, rows: v.array(fileRow) };
 
-/**
- * What saving a decoded bank file would do to each row: add it as a new Transaction, skip it as a
- * duplicate, Match it to a Transaction already there, or ask which of several to Match. Picks apply
- * in row order, as they do on commit, so a pick can change what later rows Match.
- */
 export const preview = query({
 	args: fileArgs,
 	returns: v.array(previewRow),
@@ -72,12 +66,6 @@ export const preview = query({
 	}
 });
 
-/**
- * Saves a decoded bank file into an Account in one transaction, checking every row and running the
- * matcher again. New rows become Cleared, Unapproved Transactions, with the Payee and Category
- * that rename and Payee memory give their Bank Text. Matched Transactions keep what the owner entered, become Cleared, and go back to
- * Unapproved. Refused while any row still needs a pick.
- */
 export const commit = mutation({
 	args: fileArgs,
 	returns: v.object({ added: v.number(), matched: v.number(), skipped: v.number() }),
@@ -97,10 +85,6 @@ export const commit = mutation({
 	}
 });
 
-/**
- * Splits a Matched Bank Row back into its own Cleared, Unapproved Transaction. The Transaction it
- * Matched goes back to uncleared and approved once no other Bank Row is linked to it.
- */
 export const unmatch = mutation({
 	args: { importId: v.id('imports') },
 	returns: v.id('transactions'),
@@ -112,7 +96,6 @@ export const unmatch = mutation({
 		if (!bankRow.matched || matchedId === undefined) {
 			throw publicError('INVALID_INPUT', 'This bank row is not Matched.');
 		}
-		// Unmatching takes the Transaction back to uncleared, so a Reconciled one is unlocked first.
 		const matchedTransaction = await ctx.db.get('transactions', matchedId);
 		if (matchedTransaction !== null) requireUnlocked(matchedTransaction, 'to unmatch it');
 		const transactionId = await insertImported(ctx, bankRow.accountId, bankRow);

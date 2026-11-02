@@ -63,7 +63,7 @@ describe('a Transfer', () => {
 		]);
 	});
 
-	test('between Cash Accounts leaves Ready to Assign and every Category unchanged', async () => {
+	test('between Cash Accounts, dated today or still ahead, leaves Ready to Assign and every Category unchanged', async () => {
 		const { owner, checking, savings } = await budgetWithThreeAccounts();
 		const groupId = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
 		const groceries = await owner.mutation(api.categories.create, { groupId, name: 'Groceries' });
@@ -72,27 +72,30 @@ describe('a Transfer', () => {
 			categoryId: groceries,
 			amount: 30_000
 		});
-		const budget = () => owner.query(api.budget.month, { month: '2026-08', today: '2026-08-15' });
+		const today = '2026-08-15';
+		const budget = () => owner.query(api.budget.month, { month: '2026-08', today });
 		const before = await budget();
 
-		// One dated today and one still ahead: an inflow side waiting for its date is no
-		// Uncategorized inflow either.
 		await owner.mutation(api.transactions.create, {
 			accountId: checking,
 			transferAccountId: savings,
 			...toSavings,
-			date: '2026-08-15'
+			date: today
 		});
-		await owner.mutation(api.transactions.create, {
+		const inflowSideWaitingForItsDate = {
 			accountId: savings,
 			transferAccountId: checking,
 			...toSavings,
 			date: '2026-08-20'
-		});
+		};
+		await owner.mutation(api.transactions.create, inflowSideWaitingForItsDate);
 
 		expect(await budget()).toEqual(before);
-		// The card's starting debt touches no Category and not Ready to Assign.
-		expect(before.readyToAssign).toEqual({ amount: 580_000, uncategorized: 0 });
+		const cashOnlySinceTheCardsStartingDebtTouchesNoCategory = {
+			amount: 580_000,
+			uncategorized: 0
+		};
+		expect(before.readyToAssign).toEqual(cashOnlySinceTheCardsStartingDebtTouchesNoCategory);
 	});
 
 	test.each([
@@ -117,23 +120,24 @@ describe('a Transfer', () => {
 		).toBe('INVALID_INPUT');
 	});
 
-	// With a Credit Card Account, a Transfer is a card payment: money from a Cash Account into the
-	// card, entered from either side.
 	test.each([
 		['from the Cash Account', 'checking', 'card', -25_000],
 		['from the card', 'card', 'checking', 25_000]
-	] as const)('pays a card, entered %s', async (_, accountId, transferAccountId, amount) => {
-		const accounts = await budgetWithThreeAccounts();
+	] as const)(
+		'pays a card with money from a Cash Account, entered %s',
+		async (_, accountId, transferAccountId, amount) => {
+			const accounts = await budgetWithThreeAccounts();
 
-		await accounts.owner.mutation(api.transactions.create, {
-			...toSavings,
-			amount,
-			accountId: accounts[accountId],
-			transferAccountId: accounts[transferAccountId]
-		});
+			await accounts.owner.mutation(api.transactions.create, {
+				...toSavings,
+				amount,
+				accountId: accounts[accountId],
+				transferAccountId: accounts[transferAccountId]
+			});
 
-		expect(await accounts.balances()).toMatchObject({ Checking: 75_000, Card: 5_000 });
-	});
+			expect(await accounts.balances()).toMatchObject({ Checking: 75_000, Card: 5_000 });
+		}
+	);
 
 	test.each([
 		['moving money from a card into a Cash Account', 'card', 'checking', -25_000],
@@ -203,8 +207,8 @@ describe('changing one side of a Transfer', () => {
 				amount: 25_000
 			});
 
-		// The other side moves from Checking to the Wallet.
-		await intoSavingsFrom(savings, wallet);
+		const moveTheOtherSideFromCheckingToTheWallet = () => intoSavingsFrom(savings, wallet);
+		await moveTheOtherSideFromCheckingToTheWallet();
 		expect(await balances()).toMatchObject({
 			Checking: 100_000,
 			Savings: 525_000,
@@ -215,8 +219,8 @@ describe('changing one side of a Transfer', () => {
 			{ amount: -25_000, transfer: { accountId: savings, accountName: 'Savings' } }
 		]);
 
-		// This side moves from Savings to Checking.
-		await intoSavingsFrom(checking, wallet);
+		const moveThisSideFromSavingsToChecking = () => intoSavingsFrom(checking, wallet);
+		await moveThisSideFromSavingsToChecking();
 		expect(await balances()).toMatchObject({
 			Checking: 125_000,
 			Savings: 500_000,
@@ -299,7 +303,6 @@ describe('changing one side of a Transfer', () => {
 });
 
 describe('a Transfer and file imports', () => {
-	// Invented Bank Text.
 	const bankRow = { date: '2026-08-21', amount: 25_000, bankText: 'SAMPLE TRANSFER IN 0007' };
 
 	async function importedIntoSavings() {

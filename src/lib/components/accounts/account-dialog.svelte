@@ -43,7 +43,6 @@
 			return;
 		}
 		saving = true;
-		// A card's balance is what is owed, kept as a negative balance.
 		const startingBalance = kind === 'creditCard' ? -cents : cents;
 		const added = await attempt(async () => {
 			const accountId = await createAccount({ name, kind, startingBalance });

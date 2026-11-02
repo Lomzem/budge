@@ -3,7 +3,6 @@ import { expect, test } from '@playwright/test';
 
 import { localToday } from '../src/lib/domain/dates';
 
-// Runs on the local backend after CI's `seed:run`, so Savings exists and today is past the cutover.
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 
 test('an imported row arrives Unapproved and Approve clears it', async ({ page }) => {
@@ -18,9 +17,8 @@ test('an imported row arrives Unapproved and Approve clears it', async ({ page }
 	await sidebar.getByRole('link', { name: /^Savings/ }).click();
 	await expect(page.getByRole('heading', { level: 1, name: 'Savings' })).toBeVisible();
 
-	// Invented Bank Text and amount, in Capital One's checking and savings layout.
 	const [year, month, day] = localToday().split('-');
-	const csv = [
+	const inventedCapitalOneCheckingAndSavingsCsv = [
 		'Account Number,Transaction Description,Transaction Date,Transaction Type,Transaction Amount,Balance',
 		`0000,SAMPLE E2E BOOKSHOP,${month ?? ''}/${day ?? ''}/${year ?? ''},Debit,23.45,100.00`
 	].join('\n');
@@ -31,7 +29,7 @@ test('an imported row arrives Unapproved and Approve clears it', async ({ page }
 	await dialog.getByLabel('File').setInputFiles({
 		name: 'savings.csv',
 		mimeType: 'text/csv',
-		buffer: Buffer.from(csv)
+		buffer: Buffer.from(inventedCapitalOneCheckingAndSavingsCsv)
 	});
 	await expect(dialog.getByRole('status')).toHaveText(/^1 new Transaction, 0 Matches/);
 	await dialog.getByRole('button', { name: 'Save' }).click();

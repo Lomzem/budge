@@ -25,7 +25,7 @@
 		defaultAccountId
 	}: {
 		open?: boolean;
-		/** The Transaction to edit; left out to add one. */
+
 		transaction?: Row | undefined;
 		defaultAccountId?: Id<'accounts'> | undefined;
 	} = $props();
@@ -42,13 +42,9 @@
 	let accountId = $state('');
 	let date = $state('');
 	let payee = $state('');
-	/**
-	 * What the form opened with or the owner picked: a Category ID, `''` for Uncategorized, `split`
-	 * for a split, or `transfer:` and the other Account's ID. Payee memory can stand in for it until
-	 * the owner picks.
-	 */
+
 	let chosenCategoryId = $state('');
-	/** A split's lines. Amounts follow the Direction; a minus sign turns a line the other way. */
+
 	let lines: { key: number; categoryId: string; amount: string; memo: string }[] = $state([]);
 	let nextLineKey = 0;
 	let direction: 'outflow' | 'inflow' = $state('outflow');
@@ -58,16 +54,13 @@
 	let saving = $state(false);
 	let confirmDelete = $state(false);
 	let unlocked = $state(false);
-	/** A Reconciled Transaction keeps its Account, date, and amount, and stays, until unlocked. */
+
 	const locked = $derived(transaction?.reconciled === true && !unlocked);
-	/** The Category the form opened with. */
+
 	let filledCategoryId = $state('');
-	/** Whether the owner has picked a Category since the form opened. */
+
 	let categoryPicked = $state(false);
 
-	// Payee memory: the Payee's last Category fills in until the owner picks one, whether the Payee
-	// was typed or an Uncategorized Transaction opened with it. A Transaction that already has a
-	// Category keeps it.
 	const prefillsCategory = $derived(open && !categoryPicked && filledCategoryId === '');
 	const payeeName = $derived(payee.trim());
 	const payeeGiven = $derived(payeeName !== '');
@@ -75,7 +68,7 @@
 		prefillsCategory && payeeGiven ? { name: payeeName } : 'skip'
 	);
 	const recallsCategory = $derived(prefillsCategory && payeeGiven);
-	/** Whether the Category the typed Payee was last given, or the list it is in, is on its way. */
+
 	const recallingCategory = $derived(
 		recallsCategory &&
 			(payeeMemory.isLoading ||
@@ -84,7 +77,7 @@
 					categories.data === undefined &&
 					categories.error === undefined))
 	);
-	/** Why the typed Payee's last Category can't be shown, if it can't. */
+
 	const recallFailed = $derived.by(() => {
 		if (!recallsCategory || recallingCategory) return undefined;
 		if (payeeMemory.error !== undefined) {
@@ -95,52 +88,51 @@
 		}
 		return undefined;
 	});
-	/** Stands in for a Category until the typed Payee's memory arrives or the owner picks one. */
+
 	const UNRESOLVED = 'unresolved';
-	// Neither the previous Payee's Category nor Uncategorized stands in while the typed Payee's own
-	// memory is on its way or failed, so Save waits for it or for the owner's pick.
+
 	const rememberedCategoryId = $derived.by(() => {
 		if (!recallsCategory) return '';
 		if (recallingCategory || recallFailed !== undefined) return UNRESOLVED;
 		return payeeMemory.data ? (findCategory(payeeMemory.data) ?? '') : '';
 	});
-	/** The Category or Transfer the form saves; see `chosenCategoryId`. */
+
 	const categoryId = $derived(prefillsCategory ? rememberedCategoryId : chosenCategoryId);
 
 	const TRANSFER = 'transfer:';
 	const SPLIT = 'split';
 	const isSplit = $derived(categoryId === SPLIT);
-	/** What is left to split, in the Direction's terms, or `undefined` while an amount isn't one. */
+
 	const remainder = $derived.by(() => {
 		const total = parseCents(amount);
 		if (total === undefined) return undefined;
 		let left = Math.abs(total);
 		for (const line of lines) {
-			// A line not filled in yet holds nothing.
-			const cents = line.amount.trim() === '' ? 0 : parseCents(line.amount);
+			const notFilledInYet = line.amount.trim() === '';
+			const cents = notFilledInYet ? 0 : parseCents(line.amount);
 			if (cents === undefined) return undefined;
 			left -= cents;
 		}
 		return left;
 	});
-	/** Whether a line has no amount yet, so a zero remainder isn't a finished split. */
+
 	const blankLine = $derived(lines.some((line) => line.amount.trim() === ''));
-	/** The other Account picked for a Transfer, or `undefined` for an ordinary Transaction. */
+
 	const transferAccountId = $derived(
 		categoryId.startsWith(TRANSFER) ? categoryId.slice(TRANSFER.length) : undefined
 	);
 	const isCash = $derived(accounts.cash.some((account) => account._id === accountId));
-	// A Transfer is between two Cash Accounts, or a card payment from a Cash Account into a card.
+
 	const transferAccounts = $derived(
 		isCash ? accounts.all.filter((account) => account._id !== accountId) : accounts.cash
 	);
 	const isTransfer = $derived(transferAccountId !== undefined);
-	/** A card payment: money leaves the Cash Account and goes into the card. */
+
 	const isCardPayment = $derived(
 		transferAccountId !== undefined &&
 			!(isCash && accounts.cash.some((account) => account._id === transferAccountId))
 	);
-	// A Payment Category isn't offered, so keep a card's starting debt in the one it sits in.
+
 	const isUnlisted = (id: string | null | undefined) =>
 		id !== null &&
 		id !== undefined &&
@@ -149,15 +141,14 @@
 		!categories.data.groups.some((group) => group.categories.some((c) => c._id === id));
 
 	const LINK_NONE = 'new';
-	/** What the owner picked for the other side; left unset, Budge picks. */
+
 	let linkChoice: string | undefined = $state();
 	const signedAmount = $derived.by(() => {
 		const cents = parseCents(amount);
 		if (cents === undefined) return undefined;
 		return direction === 'outflow' ? -Math.abs(cents) : Math.abs(cents);
 	});
-	// An imported Transaction becoming a Transfer may already have its other side imported. Once
-	// the pair is linked to that Account there is nothing more to offer.
+
 	const linkAccountId = $derived(
 		open &&
 			transaction !== undefined &&
@@ -172,10 +163,7 @@
 			: 'skip'
 	);
 	const candidates = $derived(linkAccountId === undefined ? [] : (linkCandidates.data ?? []));
-	/**
-	 * The imported Transaction to link as the other side, or `LINK_NONE` to create one. Budge picks
-	 * the nearest import, so saving doesn't duplicate it; the owner can still pick none.
-	 */
+
 	const link: string = $derived(
 		linkChoice === LINK_NONE || candidates.some((candidate) => candidate._id === linkChoice)
 			? (linkChoice ?? LINK_NONE)
@@ -187,13 +175,10 @@
 		linkChoice = value;
 	};
 
-	// Fill the form each time the dialog opens, and only then: live updates to the Accounts
-	// must not wipe what the owner is typing.
 	$effect(() => {
 		if (open) untrack(fill);
 	});
 
-	/** What the Category picker opens with for a saved Transaction: its Transfer, split, or Category. */
 	function choiceOf(saved: Row) {
 		if (saved.transfer) return TRANSFER + saved.transfer.accountId;
 		if (saved.splits) return SPLIT;
@@ -238,18 +223,17 @@
 		lines.push({ key: nextLineKey++, categoryId: '', amount: lineAmount, memo: '' });
 	}
 
-	/** Picking Split starts two lines, the first holding the whole amount and any Category. */
 	function startSplit(previous: string) {
 		if (lines.length > 0) return;
-		// The amount's Direction is set apart, so the first line takes its size alone.
 		const total = parseCents(amount);
-		addLine(total === undefined ? amount : formatCents(Math.abs(total)).replace('$', ''));
+		const sizeAloneSinceTheDirectionIsSetApart =
+			total === undefined ? amount : formatCents(Math.abs(total)).replace('$', '');
+		addLine(sizeAloneSinceTheDirectionIsSetApart);
 		addLine();
 		const first = lines[0];
 		if (first && previous !== '' && !previous.startsWith(TRANSFER)) first.categoryId = previous;
 	}
 
-	/** The Category picked, or `undefined` for Uncategorized. */
 	function findCategory(id: string): Id<'categories'> | undefined {
 		if (id === '') return undefined;
 		const list = categories.data;
@@ -261,7 +245,6 @@
 		return list.groups.flatMap((group) => group.categories).find((c) => c._id === id)?._id;
 	}
 
-	/** The split's lines as saved, or a message saying what to fix. */
 	function readSplits() {
 		const splits = [];
 		for (const line of lines) {
@@ -277,15 +260,11 @@
 		return splits;
 	}
 
-	/**
-	 * The Transfer with the other Account, and the import it links, if any; a message saying what to
-	 * fix; or `undefined` while the imports it could link are loading.
-	 */
 	function readTransfer(otherAccountId: string) {
 		const other = transferAccounts.find((a) => a._id === otherAccountId);
 		if (!other) return 'Pick another Account to transfer with.';
-		// Saving before the other imports load would create a side that duplicates one of them.
-		if (linkCandidates.isLoading) return undefined;
+		const savingNowCouldDuplicateAnImportStillLoading = linkCandidates.isLoading;
+		if (savingNowCouldDuplicateAnImportStillLoading) return undefined;
 		const linked = candidates.find((candidate) => candidate._id === link);
 		return {
 			transferAccountId: other._id,
@@ -330,8 +309,8 @@
 				error = transfer;
 				return;
 			}
-			// A Transfer has no Payee or Category.
-			fields = { ...shared, payee: '', ...transfer };
+			const noPayeeOrCategory = { payee: '' };
+			fields = { ...shared, ...noPayeeOrCategory, ...transfer };
 		}
 		saving = true;
 		const transactionId = transaction?._id;
@@ -353,7 +332,6 @@
 		else error = approved.error?.message ?? "Budge couldn't approve the Transaction. Try again.";
 	}
 
-	/** Splits a Matched Bank Row back into its own Transaction. */
 	async function unmatchRow(importId: Id<'imports'>) {
 		saving = true;
 		const unmatched = await attempt(() => unmatch({ importId }));
@@ -404,7 +382,6 @@
 			</optgroup>
 		{/each}
 	{:else if savedId}
-		<!-- Keeps the saved Category selected while the list loads. -->
 		<option value={savedId}>{savedName}</option>
 	{/if}
 {/snippet}
