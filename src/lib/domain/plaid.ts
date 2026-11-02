@@ -1,5 +1,6 @@
-// Decodes Plaid's `/transactions/sync` responses into Bank Rows. Only the fields sync needs are
-// read; the rest of the response is dropped, so raw bank data never travels further.
+// Decodes Plaid's `/transactions/sync` responses into Bank Rows, and `/accounts/get` responses
+// into the bank's Accounts. Only the fields Budge needs are read; the rest of the response is
+// dropped, so raw bank data never travels further.
 
 import { Effect, Schema, SchemaGetter, SchemaIssue } from 'effect';
 
@@ -91,6 +92,67 @@ export function syncRowsOf(page: SyncPage, cutoverDate: string): SyncRow[] {
 		];
 	});
 }
+
+const Cents = Schema.Finite.pipe(
+	Schema.decodeTo(Schema.Finite, {
+		decode: SchemaGetter.transformEffect((amount: number) => {
+			const cents = parseCents(String(amount));
+			return cents === undefined
+				? Effect.fail(new SchemaIssue.InvalidValue({ message: 'Expected dollars and cents' }))
+				: Effect.succeed(cents);
+		}),
+		encode: SchemaGetter.transform((cents: number) => cents / 100)
+	})
+);
+
+const PlaidAccount = Schema.Struct({
+	account_id: Schema.String,
+	name: Schema.String,
+	mask: Schema.optionalKey(Schema.NullOr(Schema.String)),
+	type: Schema.String,
+	balances: Schema.Struct({ current: Schema.NullOr(Cents) })
+});
+
+const AccountsResponse = Schema.Struct({ accounts: Schema.Array(PlaidAccount) });
+
+/** One of the bank's Accounts under a Bank Connection. */
+export interface BankAccount {
+	/** Plaid's ID for the Account. */
+	externalId: string;
+	name: string;
+	/** The last few characters of the bank's account number, when Plaid has them. */
+	mask?: string;
+	/**
+	 * Plaid's current balance, as of the bank's last update, written as a Budge balance: what a card
+	 * or loan owes is negative. `null` when the bank doesn't report one.
+	 */
+	balance: number | null;
+}
+
+// For these, Plaid's positive current balance is the amount owed.
+const OWED_TYPES = new Set(['credit', 'loan']);
+
+/** Reads one `/accounts/get` response body, failing on anything Budge can't trust. */
+export const decodeAccounts = (body: unknown): Effect.Effect<BankAccount[], Schema.SchemaError> =>
+	Schema.decodeUnknownEffect(AccountsResponse)(body).pipe(
+		Effect.map((response) =>
+			response.accounts.map((account) => {
+				const current = account.balances.current;
+				const mask = clean(account.mask);
+				return {
+					externalId: account.account_id,
+					name: clean(account.name) ?? 'Bank account',
+					...(mask === undefined ? {} : { mask }),
+					balance:
+						current === null
+							? null
+							: OWED_TYPES.has(account.type) && current !== 0
+								? -current
+								: current
+				};
+			})
+		)
+	);
 
 function clean(text: string | null | undefined) {
 	const trimmed = text?.replace(/\s+/g, ' ').trim();

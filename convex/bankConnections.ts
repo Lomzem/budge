@@ -112,7 +112,7 @@ export const setup = internalAction({
 		)
 });
 
-function liveLayer(ctx: ActionCtx) {
+export function liveLayer(ctx: ActionCtx) {
 	return Layer.mergeAll(
 		PlaidClient.layerLive({
 			clientId: env.PLAID_CLIENT_ID,
@@ -124,7 +124,7 @@ function liveLayer(ctx: ActionCtx) {
 	);
 }
 
-function toPublicError(error: SyncError): PublicError {
+export function toPublicError(error: SyncError): PublicError {
 	if (error._tag === 'PlaidApi' && error.error_code === 'ITEM_LOGIN_REQUIRED') {
 		return { code: 'BANK_CONNECTION_NEEDS_LOGIN', message: 'The bank needs you to sign in again.' };
 	}
@@ -163,8 +163,10 @@ export const takeLease = internalMutation({
 /**
  * Applies one batch of synced rows and moves the cursor past it, in one transaction, so a batch is
  * applied once or not at all. Rows from a bank Account not yet mapped to a Budge Account are held:
- * the Account is recorded for the owner to map, and its rows come back when its cursor is reset.
- * Refuses, writing nothing, once the lease or cursor is no longer the sync's.
+ * the Account is recorded for the owner to map, and its rows wait as held Bank Rows with no
+ * Account. An ignored bank Account's rows are dropped. Applying the same batch again, as a restarted
+ * update does, adds nothing twice. Refuses, writing nothing, once the lease or cursor is no longer
+ * the sync's.
  */
 export const apply = internalMutation({
 	args: applyArgs,
@@ -196,7 +198,7 @@ export const apply = internalMutation({
 		for (const [externalId, accountRows] of byExternalId) {
 			const target = await connectionAccountOf(ctx, connectionId, externalId);
 			if (target.state !== 'mapped') {
-				if (target.state === 'held') totals.held += accountRows.length;
+				if (target.state === 'held') totals.held += await holdRows(ctx, target._id, accountRows);
 				continue;
 			}
 			const plan = await planBankRows(ctx, target.accountId, 'plaid', accountRows);
@@ -285,13 +287,20 @@ export const save = internalMutation({
 			const known = await findConnectionAccount(ctx, connectionId, externalId);
 			const mapped = { connectionId, externalId, state: 'mapped' as const, accountId };
 			if (known === null) await ctx.db.insert('connectionAccounts', mapped);
-			else await ctx.db.replace('connectionAccounts', known._id, mapped);
+			else {
+				const { name, mask } = known;
+				await ctx.db.replace('connectionAccounts', known._id, {
+					...mapped,
+					...(name === undefined ? {} : { name }),
+					...(mask === undefined ? {} : { mask })
+				});
+			}
 		}
 		return connectionId;
 	}
 });
 
-async function findConnectionAccount(
+export async function findConnectionAccount(
 	ctx: MutationCtx,
 	connectionId: Id<'bankConnections'>,
 	externalId: string
@@ -302,6 +311,37 @@ async function findConnectionAccount(
 			q.eq('connectionId', connectionId).eq('externalId', externalId)
 		)
 		.unique();
+}
+
+/** Stores a held bank Account's new rows, skipping any already held; returns how many it stored. */
+async function holdRows(
+	ctx: MutationCtx,
+	connectionAccountId: Id<'connectionAccounts'>,
+	rows: IncomingRow[]
+) {
+	let held = 0;
+	for (const row of rows) {
+		const known = await ctx.db
+			.query('imports')
+			.withIndex('by_connectionAccountId_sourceId', (q) =>
+				q.eq('connectionAccountId', connectionAccountId).eq('sourceId', row.sourceId)
+			)
+			.first();
+		if (known !== null) continue;
+		await ctx.db.insert('imports', {
+			source: 'plaid',
+			...(row.sourceId === undefined ? {} : { sourceId: row.sourceId }),
+			connectionAccountId,
+			date: row.date,
+			amount: row.amount,
+			bankText: row.bankText,
+			...(row.merchantName === undefined ? {} : { merchantName: row.merchantName }),
+			matched: false,
+			state: 'held'
+		});
+		held++;
+	}
+	return held;
 }
 
 /** The bank Account's mapping, held for the owner to map when sync first sees it. */

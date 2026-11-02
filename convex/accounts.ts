@@ -1,13 +1,12 @@
 import { v } from 'convex/values';
 
 import { mutation, query } from './_generated/server';
-import { requireCents, requireName } from './lib/input';
-import { createPaymentCategory, ensureReadyToAssign, readPaymentCategory } from './lib/categories';
+import { insertAccount, saveStartingBalance } from './lib/accounts';
+import { requireName } from './lib/input';
+import { readPaymentCategory } from './lib/categories';
 import { accountBalances } from './lib/monthlyTotals';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import { requireCutoverDate } from './lib/settings';
-import { insertTransaction, transactionFields } from './lib/transactions';
 
 const accountKind = v.union(v.literal('cash'), v.literal('creditCard'));
 
@@ -49,29 +48,21 @@ export const create = mutation({
 	returns: v.id('accounts'),
 	handler: async (ctx, args) => {
 		await requireOwner(ctx);
-		const name = requireName(args.name);
-		const amount = requireCents(args.startingBalance);
-		const cutoverDate = await requireCutoverDate(ctx);
-		let position = 0;
-		for await (const account of ctx.db.query('accounts')) {
-			position = Math.max(position, account.position + 1);
-		}
-		const accountId = await ctx.db.insert('accounts', { name, kind: args.kind, position });
-		const fields = await transactionFields(ctx, {
-			accountId,
-			date: cutoverDate,
-			amount,
-			payee: 'Starting Balance',
-			// A Cash Account's starting balance is money to budget. A card's debt sits in its own
-			// Payment Category, where the card's move cancels it, so it touches no Category.
-			categoryId:
-				args.kind === 'cash'
-					? await ensureReadyToAssign(ctx)
-					: await createPaymentCategory(ctx, { _id: accountId, name }),
-			memo: ''
-		});
-		await insertTransaction(ctx, { ...fields, cleared: 'cleared', approved: true });
-		return accountId;
+		return await insertAccount(ctx, args);
+	}
+});
+
+/**
+ * Confirms or corrects an Account's starting balance, saved as its Starting Balance Transaction on
+ * the cutover date; a card's debt is negative.
+ */
+export const setStartingBalance = mutation({
+	args: { accountId: v.id('accounts'), startingBalance: v.number() },
+	returns: v.null(),
+	handler: async (ctx, { accountId, startingBalance }) => {
+		await requireOwner(ctx);
+		await saveStartingBalance(ctx, accountId, startingBalance);
+		return null;
 	}
 });
 

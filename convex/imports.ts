@@ -109,7 +109,7 @@ export const unmatch = mutation({
 		const bankRow = await ctx.db.get('imports', importId);
 		if (bankRow === null) throw publicError('NOT_FOUND');
 		const matchedId = bankRow.transactionId;
-		if (!bankRow.matched || matchedId === undefined) {
+		if (!bankRow.matched || matchedId === undefined || bankRow.accountId === undefined) {
 			throw publicError('INVALID_INPUT', 'This bank row is not Matched.');
 		}
 		// Unmatching takes the Transaction back to uncleared, so a Reconciled one is unlocked first.

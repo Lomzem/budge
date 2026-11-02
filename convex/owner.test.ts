@@ -21,8 +21,17 @@ function sampleArgs(ids: {
 	categoryId: Id<'categories'>;
 	importId: Id<'imports'>;
 	connectionId: Id<'bankConnections'>;
+	connectionAccountId: Id<'connectionAccounts'>;
 }) {
-	const { accountId, transactionId, groupId, categoryId, importId, connectionId } = ids;
+	const {
+		accountId,
+		transactionId,
+		groupId,
+		categoryId,
+		importId,
+		connectionId,
+		connectionAccountId
+	} = ids;
 	const entry = { accountId, date: '2026-08-14', amount: -500, payee: 'Corner Grocer', memo: '' };
 	const args: Record<string, Record<string, unknown>> = {
 		'owner:whoami': {},
@@ -34,6 +43,7 @@ function sampleArgs(ids: {
 		'accounts:create': { name: 'Wallet', kind: 'cash', startingBalance: 0 },
 		'accounts:rename': { accountId, name: 'Wallet' },
 		'accounts:reorder': { accountIds: [accountId] },
+		'accounts:setStartingBalance': { accountId, startingBalance: 0 },
 		'transactions:list': { paginationOpts: { numItems: 10, cursor: null } },
 		'transactions:create': entry,
 		'transactions:update': { transactionId, ...entry },
@@ -55,6 +65,11 @@ function sampleArgs(ids: {
 		'imports:unmatch': { importId },
 		'bankConnections:list': {},
 		'bankConnections:syncNow': { connectionId },
+		'heldAccounts:list': {},
+		'heldAccounts:map': { connectionAccountId, accountId },
+		'heldAccounts:createAccount': { connectionAccountId, name: 'Savings', kind: 'cash' },
+		'heldAccounts:ignore': { connectionAccountId },
+		'heldAccounts:suggestStartingBalance': { accountId },
 		'payees:lastCategory': { name: 'Corner Grocer' },
 		'categories:list': {},
 		'categories:createGroup': { name: 'Bills' },
@@ -172,7 +187,20 @@ describe('the owner guard', () => {
 				status: 'ok',
 				provider: { kind: 'sandbox' }
 			});
-			return { accountId, transactionId, groupId, categoryId, importId, connectionId };
+			const connectionAccountId = await ctx.db.insert('connectionAccounts', {
+				connectionId,
+				externalId: 'account-synthetic-savings',
+				state: 'held'
+			});
+			return {
+				accountId,
+				transactionId,
+				groupId,
+				categoryId,
+				importId,
+				connectionId,
+				connectionAccountId
+			};
 		});
 		const sample = sampleArgs(ids);
 		const callers = {

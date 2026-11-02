@@ -1,7 +1,12 @@
 import { Context, Effect, Layer, Schedule, Schema } from 'effect';
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http';
 
-import { decodeSyncPage, type SyncPage } from '../../src/lib/domain/plaid';
+import {
+	decodeAccounts,
+	decodeSyncPage,
+	type BankAccount,
+	type SyncPage
+} from '../../src/lib/domain/plaid';
 
 // Plaid's failures, typed. None carries the request, the response body, or an underlying cause,
 // because those can hold the access token, client secret, or bank data.
@@ -51,6 +56,14 @@ interface PlaidClientShape {
 	readonly transactionsRefresh: (accessToken: string) => Effect.Effect<void, PlaidError>;
 	/** Points the Item's webhook at `webhook` (`/item/webhook/update`). */
 	readonly setWebhook: (accessToken: string, webhook: string) => Effect.Effect<void, PlaidError>;
+	/**
+	 * The Item's Accounts, or only `accountIds`, with balances as of the bank's last update
+	 * (`/accounts/get`, which Plaid doesn't bill, unlike the live `/accounts/balance/get`).
+	 */
+	readonly accountsGet: (
+		accessToken: string,
+		accountIds?: readonly string[]
+	) => Effect.Effect<BankAccount[], PlaidError>;
 }
 
 export interface PlaidConfig {
@@ -93,7 +106,8 @@ export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>(
 		return Layer.succeed(PlaidClient, {
 			transactionsSync: fake.transactionsSync ?? unexpected('transactionsSync'),
 			transactionsRefresh: fake.transactionsRefresh ?? unexpected('transactionsRefresh'),
-			setWebhook: fake.setWebhook ?? unexpected('setWebhook')
+			setWebhook: fake.setWebhook ?? unexpected('setWebhook'),
+			accountsGet: fake.accountsGet ?? unexpected('accountsGet')
 		});
 	}
 }
@@ -168,7 +182,16 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 		transactionsRefresh: (accessToken) =>
 			post('/transactions/refresh', { access_token: accessToken }, ignoreBody),
 		setWebhook: (accessToken, webhook) =>
-			post('/item/webhook/update', { access_token: accessToken, webhook }, ignoreBody)
+			post('/item/webhook/update', { access_token: accessToken, webhook }, ignoreBody),
+		accountsGet: (accessToken, accountIds) =>
+			post(
+				'/accounts/get',
+				{
+					access_token: accessToken,
+					...(accountIds === undefined ? {} : { options: { account_ids: accountIds } })
+				},
+				decodeAccounts
+			)
 	};
 }
 

@@ -40,6 +40,8 @@ export interface IncomingRow extends BankRow {
 	/** The bank's merchant name, which names the Payee when there is no rename for the Bank Text. */
 	merchantName?: string | undefined;
 	pick?: Id<'transactions'> | 'new' | undefined;
+	/** The held Bank Row this row already is, which becomes linked in place of a new one. */
+	heldId?: Id<'imports'> | undefined;
 }
 
 export interface ImportPlan<R extends IncomingRow = FileRow> {
@@ -72,13 +74,16 @@ export async function planImport(
 
 /**
  * Runs the matcher for checked Bank Rows against what the Account already holds: known import IDs,
- * identical rows without one, and the Transactions dated near each row.
+ * identical rows without one, and the Transactions dated near each row. `mappedFeed` is the newly
+ * mapped bank Account whose held rows these are: they may Match any Transaction the Account
+ * already imported, except one that bank Account's own rows took.
  */
 export async function planBankRows<R extends IncomingRow>(
 	ctx: QueryCtx,
 	accountId: Id<'accounts'>,
 	source: BankSource,
-	rows: R[]
+	rows: R[],
+	mappedFeed?: Id<'connectionAccounts'>
 ): Promise<ImportPlan<R>> {
 	if (rows.length === 0) return { rows, decisions: [], candidates: new Map() };
 
@@ -129,14 +134,18 @@ export async function planBankRows<R extends IncomingRow>(
 			date: transaction.date,
 			amount: transaction.amount,
 			cleared: transaction.cleared !== 'uncleared',
-			linkedSources: linked.map((row) => row.source)
+			linkedSources: linked.map((row) => row.source),
+			...(mappedFeed === undefined
+				? {}
+				: { linkedFromFeed: linked.some((row) => row.connectionAccountId === mappedFeed) })
 		});
 	}
 
 	const decisions = matchBankRows(source, rows, {
 		knownImportIds,
 		knownRowsWithoutId,
-		candidates: matchCandidates
+		candidates: matchCandidates,
+		...(mappedFeed === undefined ? {} : { matchImported: true })
 	});
 	return { rows, decisions, candidates };
 }
@@ -151,7 +160,8 @@ export interface ImportCounts {
  * Applies the matcher's decisions: a Match makes the Transaction Cleared and Unapproved, keeping
  * what the owner entered; a new row becomes its own Transaction. Each row that isn't skipped gets
  * its Bank Row. An "ask" row, which only a bank sync applies, becomes a new Transaction rather than
- * a guessed Match. Pass the same `payees` for every row of one import.
+ * a guessed Match. Pass the same `payees` for every row of one import. A held row becomes linked
+ * in place, or is dropped when it repeats a row already imported.
  */
 export async function applyBankRows(
 	ctx: MutationCtx,
@@ -175,6 +185,19 @@ export async function applyBankRows(
 			bankText: row.bankText,
 			state: 'linked' as const
 		};
+		const writeBankRow = async (transactionId: Id<'transactions'>, matched: boolean) => {
+			if (row.heldId === undefined) {
+				await ctx.db.insert('imports', { ...bankRow, transactionId, matched });
+			} else {
+				await ctx.db.patch('imports', row.heldId, {
+					accountId,
+					transactionId,
+					matched,
+					state: 'linked',
+					merchantName: undefined
+				});
+			}
+		};
 		if (decision.kind === 'match') {
 			// A row can Match a Transaction Reconciled already; it stays locked.
 			const reconciled = candidates.get(decision.transactionId)?.cleared === 'reconciled';
@@ -182,17 +205,14 @@ export async function applyBankRows(
 				cleared: reconciled ? 'reconciled' : 'cleared',
 				approved: false
 			});
-			await ctx.db.insert('imports', {
-				...bankRow,
-				transactionId: decision.transactionId,
-				matched: true
-			});
+			await writeBankRow(decision.transactionId, true);
 			counts.matched++;
 		} else if (decision.kind === 'skip') {
+			if (row.heldId !== undefined) await ctx.db.delete('imports', row.heldId);
 			counts.skipped++;
 		} else {
 			const transactionId = await insertImported(ctx, accountId, row, payees);
-			await ctx.db.insert('imports', { ...bankRow, transactionId, matched: false });
+			await writeBankRow(transactionId, false);
 			counts.added++;
 		}
 	}

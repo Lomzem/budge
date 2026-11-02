@@ -111,17 +111,22 @@ export default defineSchema({
 
 	// Bank Rows: what a bank reported, kept apart from what the owner entered. A Bank Row links to
 	// the Transaction it created or Matched. Rows are never deleted, so a known import ID (or, for
-	// CSV rows without one, an identical row) is skipped when the same file comes back.
+	// CSV rows without one, an identical row) is skipped when the same file comes back. The one
+	// exception is a `held` row: it waits, with no Account, for the owner to map its bank Account,
+	// and is dropped if the owner ignores that Account or it repeats a row already imported.
 	imports: defineTable({
 		source: v.union(v.literal('plaid'), v.literal('qfx'), v.literal('csv')),
 		// The bank's import ID, unique within the Account and source. CSV rows have none.
 		sourceId: v.optional(v.string()),
-		accountId: v.id('accounts'),
+		// Left out only while the row is `held`.
+		accountId: v.optional(v.id('accounts')),
 		// The bank's Account the row arrived through, for synced rows.
 		connectionAccountId: v.optional(v.id('connectionAccounts')),
 		date: v.string(),
 		amount: v.number(),
 		bankText: v.string(),
+		// The bank's merchant name, kept only while the row is `held`, to name its Payee later.
+		merchantName: v.optional(v.string()),
 		// Left out once the Transaction is deleted, so the row still blocks a re-import.
 		transactionId: v.optional(v.id('transactions')),
 		// Whether the row Matched a Transaction already there, rather than creating its own.
@@ -135,7 +140,8 @@ export default defineSchema({
 	})
 		.index('by_account_source_sourceId_date', ['accountId', 'source', 'sourceId', 'date'])
 		.index('by_transactionId', ['transactionId'])
-		.index('by_connectionAccountId_state', ['connectionAccountId', 'state']),
+		.index('by_connectionAccountId_state', ['connectionAccountId', 'state'])
+		.index('by_connectionAccountId_sourceId', ['connectionAccountId', 'sourceId']),
 
 	// A Bank Connection: one login at one bank, synced through a provider. `status` and the fields
 	// beside it are provider-neutral; `provider` holds what only that provider understands. The
@@ -166,18 +172,23 @@ export default defineSchema({
 	}).index('by_itemId', ['provider.itemId']),
 
 	// The bank's Accounts under a Bank Connection. A mapped one feeds a Budge Account; rows from a
-	// held one wait for the owner to map it, and an ignored one's rows are dropped.
+	// held one wait for the owner to map it, and an ignored one's rows are dropped. `name` and
+	// `mask` are the bank's, recorded once Budge asks Plaid about the Account.
 	connectionAccounts: defineTable(
 		v.union(
 			v.object({
 				connectionId: v.id('bankConnections'),
 				externalId: v.string(),
+				name: v.optional(v.string()),
+				mask: v.optional(v.string()),
 				state: v.literal('mapped'),
 				accountId: v.id('accounts')
 			}),
 			v.object({
 				connectionId: v.id('bankConnections'),
 				externalId: v.string(),
+				name: v.optional(v.string()),
+				mask: v.optional(v.string()),
 				state: v.union(v.literal('held'), v.literal('ignored'))
 			})
 		)

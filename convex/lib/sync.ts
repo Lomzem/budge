@@ -5,7 +5,7 @@ import type { GenericActionCtx } from 'convex/server';
 import { v, type Infer } from 'convex/values';
 import { Cause, Context, Effect, Layer, Option, Result } from 'effect';
 
-import { syncRowsOf, type SyncRow } from '../../src/lib/domain/plaid';
+import { syncRowsOf, type BankAccount, type SyncRow } from '../../src/lib/domain/plaid';
 import { internal } from '../_generated/api';
 import type { DataModel, Id } from '../_generated/dataModel';
 import { PlaidClient, type PlaidError } from './plaidClient';
@@ -88,6 +88,30 @@ export const failArgs = {
 	needsLogin: v.boolean()
 };
 
+export const recordAccountsArgs = {
+	connectionId: v.id('bankConnections'),
+	accounts: v.array(
+		v.object({ externalId: v.string(), name: v.string(), mask: v.optional(v.string()) })
+	)
+};
+
+/** What a suggested starting balance needs from Budge, before asking Plaid. */
+export const startingBalanceBasis = v.union(
+	/** The Account has no bank Account mapped to it through a Bank Connection with a login. */
+	v.object({ kind: v.literal('notSynced') }),
+	/** Its held rows are still being imported, so what was imported isn't known yet. */
+	v.object({ kind: v.literal('importing') }),
+	v.object({
+		kind: v.literal('synced'),
+		itemId: v.string(),
+		encryptedToken: v.string(),
+		externalId: v.string(),
+		/** The Transactions in the Account, since the cutover date, that a Bank Row brought in. */
+		imported: v.number()
+	})
+);
+export type StartingBalanceBasis = Infer<typeof startingBalanceBasis>;
+
 export const saveArgs = {
 	name: v.string(),
 	itemId: v.string(),
@@ -123,14 +147,20 @@ interface SyncStoreShape {
 		encryptedToken: string;
 		accounts: { externalId: string; accountId: Id<'accounts'> }[];
 	}) => Effect.Effect<Id<'bankConnections'>>;
+	/** Names the bank Accounts Budge knows, and holds any it doesn't. */
+	readonly recordAccounts: (args: {
+		connectionId: Id<'bankConnections'>;
+		accounts: { externalId: string; name: string; mask?: string }[];
+	}) => Effect.Effect<void>;
+	readonly startingBalanceBasis: (accountId: Id<'accounts'>) => Effect.Effect<StartingBalanceBasis>;
 }
 
 /** What sync needs of an action's context. */
-export type MutationRunner = Pick<GenericActionCtx<DataModel>, 'runMutation'>;
+export type MutationRunner = Pick<GenericActionCtx<DataModel>, 'runMutation' | 'runQuery'>;
 
 /** The mutations sync runs, each its own transaction. A failed one is a defect. */
 export class SyncStore extends Context.Service<SyncStore, SyncStoreShape>()('budge/SyncStore') {
-	static layer({ runMutation }: MutationRunner): Layer.Layer<SyncStore> {
+	static layer({ runMutation, runQuery }: MutationRunner): Layer.Layer<SyncStore> {
 		return Layer.succeed(SyncStore, {
 			takeLease: (connectionId) =>
 				Effect.promise(() => runMutation(internal.bankConnections.takeLease, { connectionId })),
@@ -138,7 +168,11 @@ export class SyncStore extends Context.Service<SyncStore, SyncStoreShape>()('bud
 			renewLease: (args) =>
 				Effect.promise(() => runMutation(internal.bankConnections.renewLease, args)),
 			fail: (args) => Effect.promise(() => runMutation(internal.bankConnections.fail, args)),
-			save: (args) => Effect.promise(() => runMutation(internal.bankConnections.save, args))
+			save: (args) => Effect.promise(() => runMutation(internal.bankConnections.save, args)),
+			recordAccounts: (args) =>
+				Effect.promise(() => runMutation(internal.heldAccounts.recordAccounts, args)),
+			startingBalanceBasis: (accountId) =>
+				Effect.promise(() => runQuery(internal.heldAccounts.startingBalanceBasis, { accountId }))
 		});
 	}
 }
@@ -157,10 +191,12 @@ export type SyncError = PlaidError | TokenCipherError;
  * checks the lease and cursor are still this sync's; if not, a newer sync took over and this one
  * stops without writing. A failure records a message for the owner and releases the lease.
  * `refresh` then asks Plaid to check the bank for newer Transactions, ignoring any failure.
+ * When rows were held, or `discover` asks, sync then reads the Item's Accounts from Plaid: it
+ * names the bank Accounts it knows, and holds any new one for the owner, ignoring any failure.
  */
 export const syncConnection = Effect.fnUntraced(function* (
 	connectionId: Id<'bankConnections'>,
-	{ refresh }: { refresh: boolean }
+	{ refresh, discover = false }: { refresh: boolean; discover?: boolean }
 ): Effect.fn.Return<SyncOutcome, SyncError, PlaidClient | TokenCipher | SyncStore> {
 	const store = yield* SyncStore;
 	const plaid = yield* PlaidClient;
@@ -212,6 +248,17 @@ export const syncConnection = Effect.fnUntraced(function* (
 			if (applied.lease === null) break;
 			lease = applied.lease;
 		}
+		if (discover || totals.held > 0) {
+			yield* Effect.ignore(
+				plaid
+					.accountsGet(accessToken)
+					.pipe(
+						Effect.flatMap((accounts) =>
+							store.recordAccounts({ connectionId, accounts: accounts.map(namesOf) })
+						)
+					)
+			);
+		}
 		if (refresh) yield* Effect.ignore(plaid.transactionsRefresh(accessToken));
 		return { kind: 'synced', ...totals } as const;
 	});
@@ -221,6 +268,35 @@ export const syncConnection = Effect.fnUntraced(function* (
 			return store.fail({ connectionId, lease, ...failure });
 		})
 	);
+});
+
+function namesOf({ externalId, name, mask }: BankAccount) {
+	return { externalId, name, ...(mask === undefined ? {} : { mask }) };
+}
+
+export type StartingBalanceSuggestion =
+	| { kind: 'suggested'; startingBalance: number }
+	| { kind: 'notSynced' }
+	| { kind: 'importing' }
+	/** The bank reports no current balance for the Account. */
+	| { kind: 'noBalance' };
+
+/**
+ * A synced Account's suggested starting balance: Plaid's current balance less the Transactions
+ * imported since the cutover date. Plaid's balance is as of the bank's last update.
+ */
+export const suggestStartingBalance = Effect.fnUntraced(function* (
+	accountId: Id<'accounts'>
+): Effect.fn.Return<StartingBalanceSuggestion, SyncError, PlaidClient | TokenCipher | SyncStore> {
+	const store = yield* SyncStore;
+	const plaid = yield* PlaidClient;
+	const cipher = yield* TokenCipher;
+	const basis = yield* store.startingBalanceBasis(accountId);
+	if (basis.kind !== 'synced') return basis;
+	const accessToken = yield* cipher.decrypt(basis.encryptedToken, basis.itemId);
+	const [account] = yield* plaid.accountsGet(accessToken, [basis.externalId]);
+	if (account === undefined || account.balance === null) return { kind: 'noBalance' } as const;
+	return { kind: 'suggested', startingBalance: account.balance - basis.imported } as const;
 });
 
 interface Batch {

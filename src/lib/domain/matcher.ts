@@ -23,6 +23,11 @@ export interface MatchCandidate<T> {
 	cleared: boolean;
 	/** The sources of the Bank Rows already linked to it. */
 	linkedSources: readonly BankSource[];
+	/**
+	 * Whether a row from the batch's own feed is already linked to it. Left out, the feed is the
+	 * batch's source; a newly mapped bank Account's held rows set it for that bank Account.
+	 */
+	linkedFromFeed?: boolean;
 }
 
 /** What the Account already holds that the matcher checks a batch of Bank Rows against. */
@@ -36,6 +41,11 @@ export interface MatchContext<T> {
 	knownRowsWithoutId?: readonly Pick<BankRow, 'date' | 'amount' | 'bankText'>[];
 	/** The Account's Transactions dated within the match window of any row in the batch. */
 	candidates: readonly MatchCandidate<T>[];
+	/**
+	 * Lets a Cleared Transaction already imported, from any source, take a row. A newly mapped bank
+	 * Account's held rows repeat history the Account may already hold under other import IDs.
+	 */
+	matchImported?: boolean;
 }
 
 /**
@@ -65,6 +75,11 @@ export function matchBankRows<T>(
 	const repeats = [...(context.knownRowsWithoutId ?? [])];
 	const taken = new Set<T>();
 	const fromFile = source !== 'plaid';
+	// A file repeats what sync imported; a newly mapped bank Account repeats any import.
+	const takesImported = ({ linkedSources }: MatchCandidate<T>) =>
+		context.matchImported === true
+			? linkedSources.length > 0
+			: fromFile && linkedSources.includes('plaid');
 
 	return rows.map((row) => {
 		if (row.sourceId !== undefined) {
@@ -87,8 +102,8 @@ export function matchBankRows<T>(
 					!taken.has(candidate.id) &&
 					candidate.amount === row.amount &&
 					withinWindow(candidate.date, row.date) &&
-					(!candidate.cleared || (fromFile && candidate.linkedSources.includes('plaid'))) &&
-					!candidate.linkedSources.includes(source)
+					(!candidate.cleared || takesImported(candidate)) &&
+					!(candidate.linkedFromFeed ?? candidate.linkedSources.includes(source))
 			)
 			.sort((a, b) => distance(a.date, row.date) - distance(b.date, row.date))
 			.map((candidate) => candidate.id);
