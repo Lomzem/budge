@@ -316,11 +316,12 @@ async function writeTransfer(ctx: MutationCtx, first: Side, second: Side) {
 export async function insertTransaction(
 	ctx: MutationCtx,
 	fields: TransactionFields,
-	lines: readonly SplitLine[] = []
+	lines: readonly SplitLine[] = [],
+	{ deferSearchText = false }: { deferSearchText?: boolean } = {}
 ) {
 	const id = await ctx.db.insert('transactions', fields);
 	await putIn(ctx, id, fields, lines);
-	await refreshSearchText(ctx, id);
+	if (!deferSearchText) await refreshSearchText(ctx, id);
 	return id;
 }
 

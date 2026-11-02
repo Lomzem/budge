@@ -62,9 +62,10 @@ const approval = v.union(v.literal('unapproved'), v.literal('approved'));
  * newest first. `approval` narrows it to the Unapproved ones or the rest, so the list can show
  * Unapproved first; it takes no other filter.
  *
- * `search` finds Transactions whose Payee, memo, split memos, or Bank Text has a word starting
- * with each of its words, best match first. `categoryId`, `payeeId`, and the inclusive `from` and
- * `to` dates narrow the list, with or without `search`; the dates apply after the search.
+ * `search` finds Transactions whose Payee, memo, split memos, or Bank Text has any of its words,
+ * those with more of them first. Only its last word matches by prefix; the others match whole
+ * words. `categoryId`, `payeeId`, and the inclusive `from` and `to` dates narrow the list, with or
+ * without `search`; the dates apply after the search.
  *
  * A split has no Category of its own, so `categoryId` takes whole Transactions in that Category.
  * With `splitLines` as well, it takes instead the split Transactions with a line in it, so the list

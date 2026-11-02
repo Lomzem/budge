@@ -203,7 +203,8 @@ export async function applyBankRows(
 
 /**
  * A Transaction for a Bank Row of its own: Cleared and Unapproved, with the Payee and Category that
- * rename memory, the merchant name, and Payee memory give it.
+ * rename memory, the merchant name, and Payee memory give it. Its search text waits for the caller
+ * to link the Bank Row, then call `refreshSearchText`.
  */
 export async function insertImported(
 	ctx: MutationCtx,
@@ -211,14 +212,19 @@ export async function insertImported(
 	row: { date: string; amount: number; bankText: string; merchantName?: string | undefined },
 	payees?: ImportedPayees
 ) {
-	return await insertTransaction(ctx, {
-		accountId,
-		date: row.date,
-		amount: row.amount,
-		...(await importedPayee(ctx, row, payees)),
-		cleared: 'cleared',
-		approved: false
-	});
+	return await insertTransaction(
+		ctx,
+		{
+			accountId,
+			date: row.date,
+			amount: row.amount,
+			...(await importedPayee(ctx, row, payees)),
+			cleared: 'cleared',
+			approved: false
+		},
+		[],
+		{ deferSearchText: true }
+	);
 }
 
 /** A Bank Row's date, amount, and Bank Text, checked again on the server; never trusts the caller. */
