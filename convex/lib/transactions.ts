@@ -115,13 +115,20 @@ async function splitLines(
 
 /**
  * Refuses a change to a Reconciled Transaction other than its Category, Payee, or memo, until the
- * owner unlocks it.
+ * owner unlocks it. `action` finishes "Unlock it …"; `otherSide` says the lock is on the other side
+ * of the Transfer the owner is changing, which is unlocked in its own Account.
  */
-export function requireUnlocked(transaction: Pick<Doc<'transactions'>, 'cleared'>) {
+export function requireUnlocked(
+	transaction: Pick<Doc<'transactions'>, 'cleared'>,
+	action: string,
+	otherSide = false
+) {
 	if (transaction.cleared === 'reconciled') {
 		throw publicError(
 			'INVALID_INPUT',
-			'This Transaction is Reconciled. Unlock it to change its amount, date, or Account.'
+			otherSide
+				? `The other side of this Transfer is Reconciled. Unlock it in its Account ${action}.`
+				: `This Transaction is Reconciled. Unlock it ${action}.`
 		);
 	}
 }
@@ -129,7 +136,8 @@ export function requireUnlocked(transaction: Pick<Doc<'transactions'>, 'cleared'
 /** Refuses saving `fields` over a Reconciled Transaction with another amount, date, or Account. */
 function requireLockKept(
 	existing: Doc<'transactions'> | null,
-	fields: Pick<TransactionFields, 'accountId' | 'date' | 'amount'>
+	fields: Pick<TransactionFields, 'accountId' | 'date' | 'amount'>,
+	otherSide = false
 ) {
 	if (
 		existing !== null &&
@@ -137,7 +145,13 @@ function requireLockKept(
 			existing.date !== fields.date ||
 			existing.amount !== fields.amount)
 	) {
-		requireUnlocked(existing);
+		requireUnlocked(
+			existing,
+			otherSide
+				? "to change this Transfer's amount or date"
+				: 'to change its amount, date, or Account',
+			otherSide
+		);
 	}
 }
 
@@ -184,7 +198,7 @@ export async function saveTransaction(
 		if (transferTransactionId !== undefined) {
 			throw publicError('INVALID_INPUT', 'Pick the Account to transfer with.');
 		}
-		if (counterpart !== null) await deleteOne(ctx, counterpart);
+		if (counterpart !== null) await deleteOtherSide(ctx, counterpart);
 		if (existing === null) return await insertTransaction(ctx, fields, lines);
 		await replaceTransaction(ctx, existing, fields, lines);
 		return existing._id;
@@ -224,7 +238,7 @@ export async function saveTransaction(
 				'Link an imported Transaction with the opposite amount, within 10 days.'
 			);
 		}
-		if (counterpart !== null) await deleteOne(ctx, counterpart);
+		if (counterpart !== null) await deleteOtherSide(ctx, counterpart);
 		otherSide = linked;
 		linking = true;
 	}
@@ -237,7 +251,7 @@ export async function saveTransaction(
 		// Picking the import to link reviews it.
 		approved: linking || otherSide?.approved !== false
 	};
-	requireLockKept(otherSide, other);
+	requireLockKept(otherSide, other, true);
 	return await writeTransfer(ctx, { existing, fields }, { existing: otherSide, fields: other });
 }
 
@@ -353,15 +367,24 @@ export async function splitLinesOf(ctx: QueryCtx, transactionId: Id<'transaction
 
 /** Deletes a Transaction, and both sides when it is a Transfer; neither may be Reconciled. */
 export async function deleteTransaction(ctx: MutationCtx, existing: Doc<'transactions'>) {
+	requireUnlocked(existing, 'to delete it');
 	if (existing.transferTransactionId !== undefined) {
 		const counterpart = await ctx.db.get('transactions', existing.transferTransactionId);
-		if (counterpart !== null) await deleteOne(ctx, counterpart);
+		if (counterpart !== null) {
+			requireUnlocked(counterpart, 'to delete this Transfer', true);
+			await deleteOne(ctx, counterpart);
+		}
 	}
 	await deleteOne(ctx, existing);
 }
 
+/** Deletes the other side of a Transfer the owner is changing into something else. */
+async function deleteOtherSide(ctx: MutationCtx, counterpart: Doc<'transactions'>) {
+	requireUnlocked(counterpart, 'to change this Transfer', true);
+	await deleteOne(ctx, counterpart);
+}
+
 async function deleteOne(ctx: MutationCtx, existing: Doc<'transactions'>) {
-	requireUnlocked(existing);
 	await takeOut(ctx, existing);
 	await ctx.db.delete('transactions', existing._id);
 	// Its Bank Rows stay, unlinked, so importing the same file again doesn't bring it back.

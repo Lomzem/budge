@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
+import { newBackend, publicErrorCode, publicErrorMessage, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -240,6 +240,7 @@ describe('a Reconciled Transaction', () => {
 			b.owner.mutation(api.transactions.setCleared, { transactionId: b.id, cleared: false })
 		]) {
 			expect(await publicErrorCode(attempt)).toBe('INVALID_INPUT');
+			expect(await publicErrorMessage(attempt)).toMatch(/^This Transaction is Reconciled/);
 		}
 		expect((await b.rows(b.checking))[0]).toMatchObject({ amount: -4_250, reconciled: true });
 	});
@@ -326,7 +327,10 @@ describe('a Reconciled Transaction', () => {
 			}),
 			b.owner.mutation(api.transactions.remove, { transactionId: payment })
 		]) {
-			expect(await publicErrorCode(attempt)).toBe('INVALID_INPUT');
+			// The owner is told which side is locked, since only that side can be unlocked.
+			expect(await publicErrorMessage(attempt)).toMatch(
+				/^The other side of this Transfer is Reconciled/
+			);
 		}
 		expect((await b.rows(b.discover))[0]).toMatchObject({ amount: 10_000, reconciled: true });
 	});

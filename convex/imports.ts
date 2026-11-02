@@ -143,7 +143,7 @@ export const unmatch = mutation({
 		}
 		// Unmatching takes the Transaction back to uncleared, so a Reconciled one is unlocked first.
 		const matchedTransaction = await ctx.db.get('transactions', matchedId);
-		if (matchedTransaction !== null) requireUnlocked(matchedTransaction);
+		if (matchedTransaction !== null) requireUnlocked(matchedTransaction, 'to unmatch it');
 		const transactionId = await insertImported(ctx, bankRow.accountId, bankRow);
 		await ctx.db.patch('imports', importId, { transactionId, matched: false });
 		const stillLinked = await bankRowsOf(ctx, matchedId);

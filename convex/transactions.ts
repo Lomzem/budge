@@ -197,7 +197,10 @@ export const setCleared = mutation({
 	returns: v.null(),
 	handler: async (ctx, { transactionId, cleared }) => {
 		await requireOwner(ctx);
-		requireUnlocked(await requireTransaction(ctx, transactionId));
+		requireUnlocked(
+			await requireTransaction(ctx, transactionId),
+			'to change whether it is Cleared'
+		);
 		await ctx.db.patch('transactions', transactionId, {
 			cleared: cleared ? 'cleared' : 'uncleared'
 		});
