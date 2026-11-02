@@ -4,6 +4,7 @@
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { attempt } from '$lib/attempt';
 	import AddCategoryDialog from '$lib/components/budget/add-category-dialog.svelte';
 	import DeleteCategoryDialog from '$lib/components/categories/delete-category-dialog.svelte';
 	import DeleteGroupDialog from '$lib/components/categories/delete-group-dialog.svelte';
@@ -11,7 +12,6 @@
 	import type { ManagedGroup, RenameTarget } from '$lib/components/categories/types';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { readPublicError } from '$lib/publicError';
 
 	const list = useQuery(api.categories.list, {});
 	const groups: ManagedGroup[] = $derived(list.data?.groups ?? []);
@@ -67,11 +67,8 @@
 	/** Runs a change from a menu, showing what failed above the list. */
 	async function run(change: () => Promise<unknown>) {
 		actionError = '';
-		try {
-			await change();
-		} catch (thrown) {
-			actionError = readPublicError(thrown)?.message ?? "Budge couldn't save that. Try again.";
-		}
+		const changed = await attempt(change);
+		if (!changed.ok) actionError = changed.error?.message ?? "Budge couldn't save that. Try again.";
 	}
 </script>
 

@@ -3,10 +3,10 @@
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Label } from '$lib/components/ui/label';
-	import { readPublicError } from '$lib/publicError';
 
 	import type { ManagedGroup } from './types';
 
@@ -56,18 +56,12 @@
 		}
 		const { id } = category;
 		saving = true;
-		try {
-			await remove({ categoryId: id, destinationId: destination._id });
-			// Another Category may have taken the dialog over while this saved; leave that one be.
-			if (openFor() === id) open = false;
-		} catch (thrown) {
-			if (openFor() === id) {
-				error =
-					readPublicError(thrown)?.message ?? "Budge couldn't delete the Category. Try again.";
-			}
-		} finally {
-			saving = false;
-		}
+		const removed = await attempt(() => remove({ categoryId: id, destinationId: destination._id }));
+		saving = false;
+		// Another Category may have taken the dialog over while this saved; leave that one be.
+		if (openFor() !== id) return;
+		if (removed.ok) open = false;
+		else error = removed.error?.message ?? "Budge couldn't delete the Category. Try again.";
 	}
 </script>
 

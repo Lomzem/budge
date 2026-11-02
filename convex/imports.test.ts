@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { decodeBankFile } from '../src/lib/domain/bankFiles';
 import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
@@ -319,7 +319,7 @@ describe('approving', () => {
 		]);
 
 		const [first, second] = unapproved;
-		if (first === undefined || second === undefined) throw new Error('expected rows');
+		assert(first !== undefined && second !== undefined, 'expected rows');
 		await owner.mutation(api.transactions.update, {
 			transactionId: first._id,
 			accountId: checking,

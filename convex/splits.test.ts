@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
 import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
@@ -179,7 +179,7 @@ describe('a split', () => {
 test('a split inflow waits for its date before its Ready to Assign line counts', async () => {
 	const b = await budgetWithCard();
 	const { readyToAssignId } = await b.owner.query(api.categories.list, {});
-	if (readyToAssignId === null) throw new Error('Ready to Assign was not created.');
+	assert(readyToAssignId !== null, 'Ready to Assign was not created.');
 	const before = (await b.view()).readyToAssign;
 
 	await b.owner.mutation(api.transactions.create, {

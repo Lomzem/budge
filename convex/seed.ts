@@ -5,6 +5,7 @@ import type { Id } from './_generated/dataModel';
 import { env, internalMutation, type MutationCtx } from './_generated/server';
 import { createPaymentCategory, ensureReadyToAssign } from './lib/categories';
 import { rebuildMonthlyTotals } from './lib/monthlyTotals';
+import { publicError } from './lib/publicError';
 import { refreshSearchText } from './lib/transactions';
 
 // Invented Payees and amounts that mirror only the shape of a real budget. The repo is public:
@@ -65,16 +66,7 @@ export const run = internalMutation({
 	args: {},
 	returns: v.null(),
 	handler: async (ctx) => {
-		// Any value, even an empty one, marks production.
-		if (env.BUDGE_PRODUCTION !== undefined) throw new Error('The seed never runs on production.');
-		const started =
-			(await ctx.db.query('accounts').first()) !== null ||
-			(await ctx.db.query('settings').first()) !== null;
-		if (started) {
-			throw new Error(
-				'The seed runs only on an empty backend, before any Account or cutover date.'
-			);
-		}
+		await requireEmptyBackend(ctx);
 
 		const now = new Date(Date.now());
 		const today = localIsoDate(now);
@@ -82,29 +74,10 @@ export const run = internalMutation({
 		const cutoverDate = localIsoDate(cutover);
 		await ctx.db.insert('settings', { cutoverDate });
 		const readyToAssign = await ensureReadyToAssign(ctx);
-		const category = new Map<CategoryName, Id<'categories'>>();
 		const months = [0, 1, 2].map((ago) =>
 			monthOf(localIsoDate(new Date(now.getFullYear(), now.getMonth() - ago, 1)))
 		);
-		for (const [groupPosition, group] of GROUPS.entries()) {
-			const groupId = await ctx.db.insert('categoryGroups', {
-				name: group.name,
-				position: groupPosition,
-				kind: 'normal'
-			});
-			for (const [position, [name, monthly]] of group.categories.entries()) {
-				const categoryId = await ctx.db.insert('categories', {
-					groupId,
-					name,
-					position,
-					kind: 'normal'
-				});
-				category.set(name, categoryId);
-				for (const month of months) {
-					await ctx.db.insert('assignments', { month, categoryId, amount: monthly });
-				}
-			}
-		}
+		const category = await insertCategories(ctx, months);
 		const to = (name: CategoryName) => category.get(name);
 
 		const checking = await ctx.db.insert('accounts', {
@@ -129,7 +102,8 @@ export const run = internalMutation({
 			state = (state * 48_271) % 2_147_483_647;
 			return state % below;
 		};
-		for (let day = new Date(cutover); localIsoDate(day) <= today; day.setDate(day.getDate() + 1)) {
+		// One day's made-up Transactions: bills and paychecks on their days, and some spending.
+		const writeDay = async (day: Date) => {
 			const date = localIsoDate(day);
 			const dayOfMonth = day.getDate();
 			// Recent days stay uncleared, as if the bank hasn't confirmed them yet.
@@ -172,6 +146,9 @@ export const run = internalMutation({
 					categorizeIfCleared(to('Dining Out'))
 				);
 			}
+		};
+		for (let day = new Date(cutover); localIsoDate(day) <= today; day.setDate(day.getDate() + 1)) {
+			await writeDay(day);
 		}
 
 		// Bank Rows from a card statement file, waiting for review: two new Transactions named by
@@ -269,6 +246,48 @@ export const run = internalMutation({
 		return null;
 	}
 });
+
+/** Refuses to run on production, or on a backend that already has an Account or cutover date. */
+async function requireEmptyBackend(ctx: MutationCtx) {
+	// Any value, even an empty one, marks production.
+	if (env.BUDGE_PRODUCTION !== undefined) {
+		throw publicError('FORBIDDEN', 'The seed never runs on production.');
+	}
+	const started =
+		(await ctx.db.query('accounts').first()) !== null ||
+		(await ctx.db.query('settings').first()) !== null;
+	if (started) {
+		throw publicError(
+			'INVALID_INPUT',
+			'The seed runs only on an empty backend, before any Account or cutover date.'
+		);
+	}
+}
+
+/** Inserts the Categories in their groups, each Assigned its monthly amount in each of `months`. */
+async function insertCategories(ctx: MutationCtx, months: string[]) {
+	const category = new Map<CategoryName, Id<'categories'>>();
+	for (const [groupPosition, group] of GROUPS.entries()) {
+		const groupId = await ctx.db.insert('categoryGroups', {
+			name: group.name,
+			position: groupPosition,
+			kind: 'normal'
+		});
+		for (const [position, [name, monthly]] of group.categories.entries()) {
+			const categoryId = await ctx.db.insert('categories', {
+				groupId,
+				name,
+				position,
+				kind: 'normal'
+			});
+			category.set(name, categoryId);
+			for (const month of months) {
+				await ctx.db.insert('assignments', { month, categoryId, amount: monthly });
+			}
+		}
+	}
+	return category;
+}
 
 /**
  * Inserts Transactions directly, leaving the monthly totals and `searchText` to the end. Each Payee

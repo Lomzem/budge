@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import { newBackend, useOwnerEnv } from './test.helper';
@@ -115,14 +115,14 @@ describe('backfilling Payment Categories', () => {
 				owner.mutation(api.categories.create, { groupId: everyday, name })
 			)
 		);
-		if (groceries === undefined || dining === undefined) throw new Error('No Categories.');
+		assert(groceries !== undefined && dining !== undefined, 'No Categories.');
 		const startingRow = await t.run(async (ctx) =>
 			ctx.db
 				.query('transactions')
 				.withIndex('by_account_date', (q) => q.eq('accountId', card).eq('date', '2026-08-01'))
 				.unique()
 		);
-		if (startingRow === null) throw new Error('No starting row.');
+		assert(startingRow !== null, 'No starting row.');
 		await owner.mutation(api.transactions.update, {
 			transactionId: startingRow._id,
 			accountId: card,

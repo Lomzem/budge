@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -26,7 +26,7 @@ async function startBudget() {
 		name: 'Groceries'
 	});
 	const { readyToAssignId } = await owner.query(api.categories.list, {});
-	if (readyToAssignId === null) throw new Error('Ready to Assign was not created.');
+	assert(readyToAssignId !== null, 'Ready to Assign was not created.');
 	return { ...backend, checking, savings, everyday, groceries, readyToAssignId };
 }
 
@@ -111,7 +111,7 @@ async function groceriesByMonth(b: Budget) {
 		months.map(async (month) => {
 			const view = await b.owner.query(api.budget.month, { month, today: '2026-11-25' });
 			const row = view.groups.flatMap((g) => g.categories).find((c) => c.id === b.groceries);
-			if (!row) throw new Error('Groceries is missing.');
+			assert(row, 'Groceries is missing.');
 			const { name, assigned, activity, available, status } = row;
 			return {
 				month,
@@ -319,7 +319,7 @@ test('Budge manages Ready to Assign and its group, so the owner cannot change th
 	const b = await startBudget();
 	const systemGroup = await b.t.run(async (ctx) => {
 		const category = await ctx.db.get('categories', b.readyToAssignId);
-		if (category === null) throw new Error('Ready to Assign is missing.');
+		assert(category !== null, 'Ready to Assign is missing.');
 		return category.groupId;
 	});
 	const rta = b.readyToAssignId;

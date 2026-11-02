@@ -4,7 +4,7 @@ import {
 	type PaginationOptions,
 	type PaginationResult
 } from 'convex/server';
-import { v } from 'convex/values';
+import { v, type Infer } from 'convex/values';
 
 import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
 
@@ -90,39 +90,12 @@ export const list = query({
 			throw publicError('NOT_FOUND');
 		}
 		const searching = (args.search ?? '').trim() !== '';
-		const filters: Filters = {
-			...args,
-			search: searchTerms(args.search ?? ''),
-			splitLines: args.splitLines === true
-		};
-		const filtering =
-			searching ||
-			filters.categoryId !== undefined ||
-			filters.payeeId !== undefined ||
-			filters.from !== undefined ||
-			filters.to !== undefined;
-		if (approval !== undefined && filtering) {
-			throw publicError('INVALID_INPUT', 'Unapproved first takes no filter.');
-		}
-		if (filters.splitLines && filters.categoryId === undefined) {
-			throw publicError('INVALID_INPUT', 'Pick the Category the split lines are in.');
-		}
-		if (filters.from !== undefined) requireIsoDate(filters.from);
-		if (filters.to !== undefined) requireIsoDate(filters.to);
+		const filters = requireFilters(args, searching, approval);
 
 		// A search of only punctuation has no words to find, so it finds nothing.
 		if (searching && filters.search === '') return { page: [], isDone: true, continueCursor: '' };
 
-		let result: PaginationResult<Doc<'transactions'>>;
-		if (searching) {
-			result = await searched(ctx, filters, paginationOpts);
-		} else if (filters.splitLines) {
-			result = await withLinesIn(ctx, filters, paginationOpts);
-		} else if (approval === 'unapproved') {
-			result = await unapproved(ctx, filters.accountId).order('desc').paginate(paginationOpts);
-		} else {
-			result = await filtered(ctx, filters, approval === 'approved', paginationOpts);
-		}
+		const result = await pageOf(ctx, filters, searching, approval, paginationOpts);
 		return {
 			...result,
 			page: await Promise.all(result.page.map((transaction) => toRow(ctx, transaction)))
@@ -138,6 +111,52 @@ interface Filters {
 	from?: string | undefined;
 	to?: string | undefined;
 	splitLines: boolean;
+}
+
+type Approval = Infer<typeof approval>;
+
+/** The list's filters, with the search split into its words; refuses filters that don't combine. */
+function requireFilters(
+	args: Omit<Filters, 'search' | 'splitLines'> & { search?: string; splitLines?: boolean },
+	searching: boolean,
+	approval: Approval | undefined
+): Filters {
+	const filters: Filters = {
+		...args,
+		search: searchTerms(args.search ?? ''),
+		splitLines: args.splitLines === true
+	};
+	const filtering =
+		searching ||
+		filters.categoryId !== undefined ||
+		filters.payeeId !== undefined ||
+		filters.from !== undefined ||
+		filters.to !== undefined;
+	if (approval !== undefined && filtering) {
+		throw publicError('INVALID_INPUT', 'Unapproved first takes no filter.');
+	}
+	if (filters.splitLines && filters.categoryId === undefined) {
+		throw publicError('INVALID_INPUT', 'Pick the Category the split lines are in.');
+	}
+	if (filters.from !== undefined) requireIsoDate(filters.from);
+	if (filters.to !== undefined) requireIsoDate(filters.to);
+	return filters;
+}
+
+/** One page of the list, read the way its filters call for. */
+async function pageOf(
+	ctx: QueryCtx,
+	filters: Filters,
+	searching: boolean,
+	approval: Approval | undefined,
+	paginationOpts: PaginationOptions
+): Promise<PaginationResult<Doc<'transactions'>>> {
+	if (searching) return await searched(ctx, filters, paginationOpts);
+	if (filters.splitLines) return await withLinesIn(ctx, filters, paginationOpts);
+	if (approval === 'unapproved') {
+		return await unapproved(ctx, filters.accountId).order('desc').paginate(paginationOpts);
+	}
+	return await filtered(ctx, filters, approval === 'approved', paginationOpts);
 }
 
 // Convex rejects a search of more than 16 terms.
@@ -231,24 +250,7 @@ async function filtered(
 	approvedOnly: boolean,
 	paginationOpts: PaginationOptions
 ) {
-	const first = from ?? FIRST_DATE;
-	const last = to ?? LAST_DATE;
-	const transactions = ctx.db.query('transactions');
-	const indexed =
-		payeeId !== undefined
-			? transactions.withIndex('by_payee_date', (q) =>
-					q.eq('payeeId', payeeId).gte('date', first).lte('date', last)
-				)
-			: categoryId !== undefined
-				? transactions.withIndex('by_category_date', (q) =>
-						q.eq('categoryId', categoryId).gte('date', first).lte('date', last)
-					)
-				: accountId !== undefined
-					? transactions.withIndex('by_account_date', (q) =>
-							q.eq('accountId', accountId).gte('date', first).lte('date', last)
-						)
-					: transactions.withIndex('by_date', (q) => q.gte('date', first).lte('date', last));
-	return await indexed
+	return await narrowestIndex(ctx, { accountId, categoryId, payeeId, from, to })
 		.order('desc')
 		// Old Transactions leave `approved` out; they count as approved, so no index range covers
 		// them. Nearly every row is approved, so this skips only the few Unapproved ones.
@@ -261,6 +263,32 @@ async function filtered(
 			)
 		)
 		.paginate(paginationOpts);
+}
+
+/** The Transactions in the date range, through the narrowest index the filters allow. */
+function narrowestIndex(
+	ctx: QueryCtx,
+	{ accountId, categoryId, payeeId, from, to }: Omit<Filters, 'search' | 'splitLines'>
+) {
+	const first = from ?? FIRST_DATE;
+	const last = to ?? LAST_DATE;
+	const transactions = ctx.db.query('transactions');
+	if (payeeId !== undefined) {
+		return transactions.withIndex('by_payee_date', (q) =>
+			q.eq('payeeId', payeeId).gte('date', first).lte('date', last)
+		);
+	}
+	if (categoryId !== undefined) {
+		return transactions.withIndex('by_category_date', (q) =>
+			q.eq('categoryId', categoryId).gte('date', first).lte('date', last)
+		);
+	}
+	if (accountId !== undefined) {
+		return transactions.withIndex('by_account_date', (q) =>
+			q.eq('accountId', accountId).gte('date', first).lte('date', last)
+		);
+	}
+	return transactions.withIndex('by_date', (q) => q.gte('date', first).lte('date', last));
 }
 
 const transactionInput = {

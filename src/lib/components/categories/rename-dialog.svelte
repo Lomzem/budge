@@ -2,11 +2,11 @@
 	import { useMutation } from 'convex-svelte';
 
 	import { api } from '$convex/_generated/api';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { readPublicError } from '$lib/publicError';
 
 	import type { RenameTarget } from './types';
 
@@ -29,23 +29,23 @@
 		error = '';
 	}
 
+	function rename(item: RenameTarget) {
+		return item.kind === 'group'
+			? renameGroup({ groupId: item.id, name })
+			: renameCategory({ categoryId: item.id, name });
+	}
+
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (!target) return;
-		const { id } = target;
+		const item = target;
 		saving = true;
-		try {
-			if (target.kind === 'group') await renameGroup({ groupId: target.id, name });
-			else await renameCategory({ categoryId: target.id, name });
-			// Another item may have taken the dialog over while this saved; leave that one be.
-			if (openFor() === id) open = false;
-		} catch (thrown) {
-			if (openFor() === id) {
-				error = readPublicError(thrown)?.message ?? "Budge couldn't rename it. Try again.";
-			}
-		} finally {
-			saving = false;
-		}
+		const renamed = await attempt(() => rename(item));
+		saving = false;
+		// Another item may have taken the dialog over while this saved; leave that one be.
+		if (openFor() !== item.id) return;
+		if (renamed.ok) open = false;
+		else error = renamed.error?.message ?? "Budge couldn't rename it. Try again.";
 	}
 </script>
 

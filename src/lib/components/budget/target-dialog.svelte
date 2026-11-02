@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
+	import { attempt } from '$lib/attempt';
 	import { getBudgetMonth } from '$lib/budget.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Checkbox } from '$lib/components/ui/checkbox';
@@ -10,7 +11,6 @@
 	import { isRepeatInterval, MAX_REPEAT_MONTHS } from '$lib/domain/budget';
 	import { isIsoDate, ordinal } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
-	import { readPublicError } from '$lib/publicError';
 
 	import type { TargetDefinition } from './status';
 
@@ -42,13 +42,12 @@
 		kind = target?.kind ?? 'monthly';
 		amount = target === null ? '' : formatCents(target.amount).replace('$', '');
 		mode = target?.kind === 'monthly' ? target.mode : 'refill';
-		dueDay = target?.kind === 'monthly' && target.dueDay !== undefined ? String(target.dueDay) : '';
+		const due = target?.kind === 'monthly' ? target.dueDay : undefined;
+		dueDay = due === undefined ? '' : String(due);
 		date = target?.kind === 'byDate' ? target.firstDate : '';
-		repeats = target?.kind === 'byDate' && target.everyMonths !== undefined;
-		everyMonths =
-			target?.kind === 'byDate' && target.everyMonths !== undefined
-				? String(target.everyMonths)
-				: '12';
+		const every = target?.kind === 'byDate' ? target.everyMonths : undefined;
+		repeats = every !== undefined;
+		everyMonths = every === undefined ? '12' : String(every);
 		error = '';
 	}
 
@@ -70,14 +69,10 @@
 
 	async function save(target: TargetDefinition | null) {
 		saving = true;
-		try {
-			await budget.setTarget(category.id, target);
-			open = false;
-		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't save the Target. Try again.";
-		} finally {
-			saving = false;
-		}
+		const saved = await attempt(() => budget.setTarget(category.id, target));
+		saving = false;
+		if (saved.ok) open = false;
+		else error = saved.error?.message ?? "Budge couldn't save the Target. Try again.";
 	}
 
 	async function submit(event: SubmitEvent) {

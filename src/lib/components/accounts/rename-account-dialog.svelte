@@ -3,11 +3,11 @@
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { readPublicError } from '$lib/publicError';
 
 	let {
 		open = $bindable(false),
@@ -30,14 +30,10 @@
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		saving = true;
-		try {
-			await rename({ accountId, name });
-			open = false;
-		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't rename the Account. Try again.";
-		} finally {
-			saving = false;
-		}
+		const renamed = await attempt(() => rename({ accountId, name }));
+		saving = false;
+		if (renamed.ok) open = false;
+		else error = renamed.error?.message ?? "Budge couldn't rename the Account. Try again.";
 	}
 </script>
 

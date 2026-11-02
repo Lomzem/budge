@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { computeBudget, type BudgetInput, type Target } from './budget';
 
@@ -38,7 +38,7 @@ function budget(change: Partial<Input> = {}): Input {
 
 function category(result: ReturnType<typeof computeBudget>, name: string) {
 	const found = result.groups.flatMap((group) => group.categories).find((c) => c.name === name);
-	if (!found) throw new Error(`No Category named ${name}`);
+	assert(found, `No Category named ${name}`);
 	return found;
 }
 

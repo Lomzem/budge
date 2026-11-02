@@ -6,6 +6,7 @@
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
+	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
@@ -95,16 +96,13 @@
 		}
 		const read = ++reads;
 		reading = true;
-		try {
-			const result = await readBankFile(chosen, cutoverDate);
-			if (read !== reads) return;
-			if (result.ok) file = result.file;
-			else error = result.message;
-		} catch {
-			if (read === reads) error = "Budge couldn't read this file.";
-		} finally {
-			if (read === reads) reading = false;
-		}
+		const opened = await attempt(() => readBankFile(chosen, cutoverDate));
+		// Another file may have been chosen while this one was read; leave that one be.
+		if (read !== reads) return;
+		reading = false;
+		if (!opened.ok) error = "Budge couldn't read this file.";
+		else if (opened.value.ok) file = opened.value.file;
+		else error = opened.value.message;
 	}
 
 	// A pick that is no longer one of its row's candidates is ignored by the matcher.
@@ -121,14 +119,11 @@
 		if (!account || !file || !ready) return;
 		saving = true;
 		error = '';
-		try {
-			await commit({ accountId: account._id, source: file.source, rows: rowsWithPicks(file) });
-			open = false;
-		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't save the import. Try again.";
-		} finally {
-			saving = false;
-		}
+		const args = { accountId: account._id, source: file.source, rows: rowsWithPicks(file) };
+		const committed = await attempt(() => commit(args));
+		saving = false;
+		if (committed.ok) open = false;
+		else error = committed.error?.message ?? "Budge couldn't save the import. Try again.";
 	}
 
 	function plural(count: number, one: string, many: string) {

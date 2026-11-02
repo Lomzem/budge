@@ -19,6 +19,12 @@ interface Sent {
 	body: Record<string, unknown>;
 }
 
+/** The URL a `fetch` was called with. */
+function urlOf(input: RequestInfo | URL) {
+	if (input instanceof URL) return input.href;
+	return typeof input === 'string' ? input : input.url;
+}
+
 /**
  * The live PlaidClient over a fake `fetch`, so its requests, retries, and timeouts run for real
  * without a network. `respond` answers each attempt in turn.
@@ -30,7 +36,7 @@ function fakePlaid(
 	const sent: Sent[] = [];
 	const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 		sent.push({
-			url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
+			url: urlOf(input),
 			headers: Object.fromEntries(new Headers(init?.headers).entries()),
 			body: JSON.parse(new TextDecoder().decode(init?.body as Uint8Array)) as Record<
 				string,

@@ -6,6 +6,7 @@
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
+	import { attempt } from '$lib/attempt';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -15,7 +16,6 @@
 	import { formatDate, isIsoDate, localIsoDate } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
 	import { SPLIT_LINE_LIMIT } from '$lib/domain/splits';
-	import { readPublicError } from '$lib/publicError';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
 
@@ -85,28 +85,25 @@
 					categories.error === undefined))
 	);
 	/** Why the typed Payee's last Category can't be shown, if it can't. */
-	const recallFailed = $derived(
-		!recallsCategory || recallingCategory
-			? undefined
-			: payeeMemory.error !== undefined
-				? "Budge couldn't look up this Payee's last Category. Pick one to save."
-				: payeeMemory.data && categories.error !== undefined
-					? "Budge couldn't load the Categories. Pick Uncategorized or a Transfer to save."
-					: undefined
-	);
+	const recallFailed = $derived.by(() => {
+		if (!recallsCategory || recallingCategory) return undefined;
+		if (payeeMemory.error !== undefined) {
+			return "Budge couldn't look up this Payee's last Category. Pick one to save.";
+		}
+		if (payeeMemory.data && categories.error !== undefined) {
+			return "Budge couldn't load the Categories. Pick Uncategorized or a Transfer to save.";
+		}
+		return undefined;
+	});
 	/** Stands in for a Category until the typed Payee's memory arrives or the owner picks one. */
 	const UNRESOLVED = 'unresolved';
 	// Neither the previous Payee's Category nor Uncategorized stands in while the typed Payee's own
 	// memory is on its way or failed, so Save waits for it or for the owner's pick.
-	const rememberedCategoryId = $derived(
-		!recallsCategory
-			? ''
-			: recallingCategory || recallFailed !== undefined
-				? UNRESOLVED
-				: payeeMemory.data
-					? (findCategory(payeeMemory.data) ?? '')
-					: ''
-	);
+	const rememberedCategoryId = $derived.by(() => {
+		if (!recallsCategory) return '';
+		if (recallingCategory || recallFailed !== undefined) return UNRESOLVED;
+		return payeeMemory.data ? (findCategory(payeeMemory.data) ?? '') : '';
+	});
 	/** The Category or Transfer the form saves; see `chosenCategoryId`. */
 	const categoryId = $derived(prefillsCategory ? rememberedCategoryId : chosenCategoryId);
 
@@ -196,6 +193,13 @@
 		if (open) untrack(fill);
 	});
 
+	/** What the Category picker opens with for a saved Transaction: its Transfer, split, or Category. */
+	function choiceOf(saved: Row) {
+		if (saved.transfer) return TRANSFER + saved.transfer.accountId;
+		if (saved.splits) return SPLIT;
+		return saved.categoryId ?? '';
+	}
+
 	function fill() {
 		error = '';
 		unlocked = false;
@@ -204,11 +208,7 @@
 			accountId = transaction.accountId;
 			date = transaction.date;
 			payee = transaction.payeeName ?? '';
-			chosenCategoryId = transaction.transfer
-				? TRANSFER + transaction.transfer.accountId
-				: transaction.splits
-					? SPLIT
-					: (transaction.categoryId ?? '');
+			chosenCategoryId = choiceOf(transaction);
 			direction = transaction.amount < 0 ? 'outflow' : 'inflow';
 			amount = formatCents(Math.abs(transaction.amount)).replace('$', '');
 			memo = transaction.memo ?? '';
@@ -261,6 +261,38 @@
 		return list.groups.flatMap((group) => group.categories).find((c) => c._id === id)?._id;
 	}
 
+	/** The split's lines as saved, or a message saying what to fix. */
+	function readSplits() {
+		const splits = [];
+		for (const line of lines) {
+			const category = findCategory(line.categoryId);
+			const cents = parseCents(line.amount);
+			if (category === undefined) return 'Pick a Category for each line.';
+			if (cents === undefined) return "Enter each line's amount, such as 12.50.";
+			const signed = direction === 'outflow' ? -cents : cents;
+			splits.push({ categoryId: category, amount: signed, memo: line.memo });
+		}
+		if (splits.length < 2) return 'A split needs two or more lines.';
+		if (remainder !== 0) return 'The lines must add up to the amount.';
+		return splits;
+	}
+
+	/**
+	 * The Transfer with the other Account, and the import it links, if any; a message saying what to
+	 * fix; or `undefined` while the imports it could link are loading.
+	 */
+	function readTransfer(otherAccountId: string) {
+		const other = transferAccounts.find((a) => a._id === otherAccountId);
+		if (!other) return 'Pick another Account to transfer with.';
+		// Saving before the other imports load would create a side that duplicates one of them.
+		if (linkCandidates.isLoading) return undefined;
+		const linked = candidates.find((candidate) => candidate._id === link);
+		return {
+			transferAccountId: other._id,
+			...(linked === undefined ? {} : { transferTransactionId: linked._id })
+		};
+	}
+
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (categoryId === UNRESOLVED) return;
@@ -282,27 +314,9 @@
 		};
 		let fields;
 		if (isSplit) {
-			const splits = [];
-			for (const line of lines) {
-				const category = findCategory(line.categoryId);
-				const cents = parseCents(line.amount);
-				if (category === undefined) {
-					error = 'Pick a Category for each line.';
-					return;
-				}
-				if (cents === undefined) {
-					error = "Enter each line's amount, such as 12.50.";
-					return;
-				}
-				const signed = direction === 'outflow' ? -cents : cents;
-				splits.push({ categoryId: category, amount: signed, memo: line.memo });
-			}
-			if (splits.length < 2) {
-				error = 'A split needs two or more lines.';
-				return;
-			}
-			if (remainder !== 0) {
-				error = 'The lines must add up to the amount.';
+			const splits = readSplits();
+			if (typeof splits === 'string') {
+				error = splits;
 				return;
 			}
 			fields = { ...shared, payee, splits };
@@ -310,90 +324,67 @@
 			const category = findCategory(categoryId);
 			fields = { ...shared, payee, ...(category === undefined ? {} : { categoryId: category }) };
 		} else {
-			const other = transferAccounts.find((a) => a._id === transferAccountId);
-			if (!other) {
-				error = 'Pick another Account to transfer with.';
+			const transfer = readTransfer(transferAccountId);
+			if (transfer === undefined) return;
+			if (typeof transfer === 'string') {
+				error = transfer;
 				return;
 			}
-			// Saving before the other imports load would create a side that duplicates one of them.
-			if (linkCandidates.isLoading) return;
-			const linked = candidates.find((candidate) => candidate._id === link);
 			// A Transfer has no Payee or Category.
-			fields = {
-				...shared,
-				payee: '',
-				transferAccountId: other._id,
-				...(linked === undefined ? {} : { transferTransactionId: linked._id })
-			};
+			fields = { ...shared, payee: '', ...transfer };
 		}
 		saving = true;
-		try {
-			if (transaction) await update({ transactionId: transaction._id, ...fields });
-			else await create(fields);
-			open = false;
-		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't save the Transaction. Try again.";
-		} finally {
-			saving = false;
-		}
+		const transactionId = transaction?._id;
+		const saved = await attempt(() =>
+			transactionId === undefined ? create(fields) : update({ transactionId, ...fields })
+		);
+		saving = false;
+		if (saved.ok) open = false;
+		else error = saved.error?.message ?? "Budge couldn't save the Transaction. Try again.";
 	}
 
 	async function approveTransaction() {
 		if (!transaction) return;
+		const transactionId = transaction._id;
 		saving = true;
-		try {
-			await approve({ transactionId: transaction._id });
-			open = false;
-		} catch (thrown) {
-			error =
-				readPublicError(thrown)?.message ?? "Budge couldn't approve the Transaction. Try again.";
-		} finally {
-			saving = false;
-		}
+		const approved = await attempt(() => approve({ transactionId }));
+		saving = false;
+		if (approved.ok) open = false;
+		else error = approved.error?.message ?? "Budge couldn't approve the Transaction. Try again.";
 	}
 
 	/** Splits a Matched Bank Row back into its own Transaction. */
 	async function unmatchRow(importId: Id<'imports'>) {
 		saving = true;
-		try {
-			await unmatch({ importId });
-			open = false;
-		} catch (thrown) {
-			error = readPublicError(thrown)?.message ?? "Budge couldn't Unmatch the row. Try again.";
-		} finally {
-			saving = false;
-		}
+		const unmatched = await attempt(() => unmatch({ importId }));
+		saving = false;
+		if (unmatched.ok) open = false;
+		else error = unmatched.error?.message ?? "Budge couldn't Unmatch the row. Try again.";
 	}
 
 	async function unlockTransaction() {
 		if (!transaction) return;
+		const transactionId = transaction._id;
 		saving = true;
-		try {
-			await unlock({ transactionId: transaction._id });
-			unlocked = true;
-			error = '';
-		} catch (thrown) {
-			error =
-				readPublicError(thrown)?.message ?? "Budge couldn't unlock the Transaction. Try again.";
-		} finally {
-			saving = false;
+		const unlockedNow = await attempt(() => unlock({ transactionId }));
+		saving = false;
+		if (!unlockedNow.ok) {
+			error = unlockedNow.error?.message ?? "Budge couldn't unlock the Transaction. Try again.";
+			return;
 		}
+		unlocked = true;
+		error = '';
 	}
 
 	async function deleteTransaction() {
 		if (!transaction) return;
+		const transactionId = transaction._id;
 		saving = true;
-		try {
-			await remove({ transactionId: transaction._id });
-			confirmDelete = false;
-			open = false;
-		} catch (thrown) {
-			confirmDelete = false;
-			error =
-				readPublicError(thrown)?.message ?? "Budge couldn't delete the Transaction. Try again.";
-		} finally {
-			saving = false;
-		}
+		const removed = await attempt(() => remove({ transactionId }));
+		saving = false;
+		confirmDelete = false;
+		if (removed.ok) open = false;
+		else error = removed.error?.message ?? "Budge couldn't delete the Transaction. Try again.";
 	}
 </script>
 

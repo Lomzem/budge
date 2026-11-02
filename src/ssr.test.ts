@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { promisify } from 'node:util';
 
 import { createServer, preview, type PreviewServer, type ViteDevServer } from 'vite';
-import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, onTestFinished, test, vi } from 'vitest';
 
 // Drives the real hooks, layouts, and pages through SvelteKit's dev server and a production
 // build. Clerk verifies a locally signed session token with a fake production instance's JWT
@@ -47,11 +47,7 @@ function sessionCookie() {
 
 async function withEnv<T>(env: Record<string, string>, start: () => Promise<T>) {
 	for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
-	try {
-		return await start();
-	} finally {
-		vi.unstubAllEnvs();
-	}
+	return await start().finally(() => vi.unstubAllEnvs());
 }
 
 function startApp(env: Record<string, string>) {
@@ -107,19 +103,17 @@ describe('server-rendered pages', () => {
 		afterAll(() => server.close());
 
 		test('the error page renders privately with the render error, not a header clash', async () => {
-			const errors: unknown[] = [];
-			const original = console.error;
-			console.error = (...args: unknown[]) => errors.push(args);
-			try {
-				const response = await get(server, '/', true);
-				expect(response.status).toBe(500);
-				expect(response.headers.get('cache-control')).toBe('private, no-store');
-				expect(await response.text()).toContain('Internal Error');
-			} finally {
-				console.error = original;
-			}
-			expect(String(errors)).toContain('PUBLIC_CONVEX_URL is not set.');
-			expect(String(errors)).not.toContain('header is already set');
+			const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+			onTestFinished(() => {
+				logged.mockRestore();
+			});
+
+			const response = await get(server, '/', true);
+			expect(response.status).toBe(500);
+			expect(response.headers.get('cache-control')).toBe('private, no-store');
+			expect(await response.text()).toContain('Internal Error');
+			expect(String(logged.mock.calls)).toContain('PUBLIC_CONVEX_URL is not set.');
+			expect(String(logged.mock.calls)).not.toContain('header is already set');
 		});
 	});
 
