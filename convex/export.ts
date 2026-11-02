@@ -6,8 +6,9 @@ import { query } from './_generated/server';
 import { requireOwner } from './lib/owner';
 import schema from './schema';
 
-// `monthlyTotals` can be rebuilt from Transactions, so a backup leaves it out.
-const rebuildable: readonly string[] = ['monthlyTotals'];
+// `monthlyTotals` can be rebuilt from Transactions, and `webhookKeys` is Plaid's keys fetched
+// again on demand, so a backup leaves both out.
+const rebuildable: readonly string[] = ['monthlyTotals', 'webhookKeys'];
 
 // Fields an export never holds, by table. A Bank Connection's `provider` holds its encrypted
 // token, so a backup file can't read the bank.

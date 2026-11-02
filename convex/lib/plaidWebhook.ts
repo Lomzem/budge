@@ -2,12 +2,41 @@
 // JWT in the `Plaid-Verification` header, whose payload holds the SHA-256 of the exact body bytes.
 // https://plaid.com/docs/api/webhooks/webhook-verification/
 
-import { Effect, Option } from 'effect';
+import { v } from 'convex/values';
+import { Context, Effect, Layer, Option } from 'effect';
 
-import { PlaidClient } from './plaidClient';
+import { PlaidClient, type WebhookKey } from './plaidClient';
 
 /** How old a webhook's token may be, either way, before it is refused as a replay. */
 const MAX_AGE_SECONDS = 5 * 60;
+
+/** How long a key Plaid gave is kept before it is asked for again. */
+export const KEY_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** How often Plaid may be asked about a key not kept, across the deployment. */
+export const KEY_LOOKUP_INTERVAL_MS = 60 * 1000;
+
+export const webhookKeyValidator = v.object({
+	kty: v.string(),
+	crv: v.string(),
+	x: v.string(),
+	y: v.string(),
+	expiredAt: v.union(v.number(), v.null())
+});
+
+/** Where `verifyWebhook` finds the key a token names. `None` refuses the webhook. */
+export class WebhookKeys extends Context.Service<
+	WebhookKeys,
+	{ readonly find: (kid: string) => Effect.Effect<Option.Option<WebhookKey>> }
+>()('budge/WebhookKeys') {
+	/** Asks Plaid every time; any failure is `None`. */
+	static readonly layerPlaid: Layer.Layer<WebhookKeys, never, PlaidClient> = Layer.effect(
+		WebhookKeys,
+		Effect.map(PlaidClient, (plaid) => ({
+			find: (kid: string) => Effect.option(plaid.webhookVerificationKey(kid))
+		}))
+	);
+}
 
 export interface Webhook {
 	type: string;
@@ -33,14 +62,14 @@ export function readWebhook(body: Uint8Array): Webhook | null {
 /**
  * Whether Plaid signed `body`: the token names an ES256 key Plaid still uses, its signature holds
  * under that key, it was issued within five minutes of `now`, and it carries the body's hash. Any
- * failure, including Plaid not giving the key, is a refusal.
+ * failure, including no key being found, is a refusal.
  */
 export const verifyWebhook = Effect.fnUntraced(function* (input: {
 	body: Uint8Array<ArrayBuffer>;
 	token: string | null;
 	/** Milliseconds since the epoch. */
 	now: number;
-}): Effect.fn.Return<boolean, never, PlaidClient> {
+}): Effect.fn.Return<boolean, never, WebhookKeys> {
 	const parts = input.token?.split('.') ?? [];
 	const [encodedHeader, encodedPayload, encodedSignature] = parts;
 	if (
@@ -54,8 +83,7 @@ export const verifyWebhook = Effect.fnUntraced(function* (input: {
 	const header = decodeJsonPart(encodedHeader);
 	if (header?.alg !== 'ES256' || typeof header.kid !== 'string') return false;
 
-	const plaid = yield* PlaidClient;
-	const key = yield* Effect.option(plaid.webhookVerificationKey(header.kid));
+	const key = yield* (yield* WebhookKeys).find(header.kid);
 	if (Option.isNone(key)) return false;
 	const { kty, crv, x, y, expiredAt } = key.value;
 	if (expiredAt !== null && expiredAt * 1000 <= input.now) return false;

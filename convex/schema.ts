@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
+import { webhookKeyValidator } from './lib/plaidWebhook';
 import { targetValidator } from './lib/targets';
 
 // Each deployment is one owner's budget, so no table has an owner column. Amounts are whole
@@ -175,6 +176,16 @@ export default defineSchema({
 			v.object({ kind: v.literal('sandbox') })
 		)
 	}).index('by_itemId', ['provider.itemId']),
+
+	// Plaid's webhook signing keys by key ID, kept a day after each lookup. A lookup that found no
+	// key leaves `key` null; the newest `checkedAt` limits lookups of keys not kept.
+	webhookKeys: defineTable({
+		kid: v.string(),
+		key: v.union(webhookKeyValidator, v.null()),
+		checkedAt: v.number()
+	})
+		.index('by_kid', ['kid'])
+		.index('by_checkedAt', ['checkedAt']),
 
 	// The bank's Accounts under a Bank Connection. A mapped one feeds a Budge Account; rows from a
 	// held one wait for the owner to map it, and an ignored one's rows are dropped.

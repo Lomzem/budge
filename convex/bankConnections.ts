@@ -1,5 +1,5 @@
 import { v } from 'convex/values';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Option } from 'effect';
 
 import type { PublicError } from '../src/lib/domain/publicError';
 import { internal } from './_generated/api';
@@ -18,8 +18,15 @@ import {
 import { applyBankRows, planBankRows, requireBankRow, type IncomingRow } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { ImportedPayees } from './lib/payees';
-import { PlaidClient } from './lib/plaidClient';
-import { readWebhook, verifyWebhook } from './lib/plaidWebhook';
+import { PlaidClient, type WebhookKey } from './lib/plaidClient';
+import {
+	KEY_LOOKUP_INTERVAL_MS,
+	KEY_TTL_MS,
+	readWebhook,
+	verifyWebhook,
+	webhookKeyValidator,
+	WebhookKeys
+} from './lib/plaidWebhook';
 import { publicError } from './lib/publicError';
 import { runEffect } from './lib/runEffect';
 import { requireCutoverDate } from './lib/settings';
@@ -141,7 +148,8 @@ export const webhookTarget = internalQuery({
 
 /**
  * Plaid's webhook. A webhook for an Item with no stored token is acknowledged at once, without
- * calling Plaid; any other is refused unless Plaid signed it. `SYNC_UPDATES_AVAILABLE` schedules a
+ * calling Plaid; any other is refused unless Plaid signed it, under a key found as
+ * `keptWebhookKeys` says. `SYNC_UPDATES_AVAILABLE` schedules a
  * sync, which a sync already running makes a no-op.
  */
 export const webhook = httpAction(async (ctx, request) => {
@@ -158,13 +166,98 @@ export const webhook = httpAction(async (ctx, request) => {
 			body,
 			token: request.headers.get('plaid-verification'),
 			now: Date.now()
-		}).pipe(Effect.provide(livePlaid()))
+		}).pipe(Effect.provide(keptWebhookKeys(ctx)))
 	);
 	if (!verified) return new Response(null, { status: 401 });
 	if (webhook.type === 'TRANSACTIONS' && webhook.code === 'SYNC_UPDATES_AVAILABLE') {
 		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
 	}
 	return new Response(null, { status: 200 });
+});
+
+/**
+ * Plaid's webhook keys, kept a day after each lookup so a webhook rarely costs a Plaid call. A key
+ * not kept is looked up at most once a minute across the deployment, so forged tokens naming
+ * made-up keys can't each cost a call. A real webhook refused meanwhile is retried by Plaid, and
+ * the daily sync covers any it gives up on.
+ */
+function keptWebhookKeys(ctx: Pick<ActionCtx, 'runMutation'>): Layer.Layer<WebhookKeys> {
+	return Layer.effect(
+		WebhookKeys,
+		Effect.map(PlaidClient, (plaid) => ({
+			find: (kid: string) =>
+				Effect.gen(function* () {
+					const claim: WebhookKeyClaim = yield* Effect.promise(() =>
+						ctx.runMutation(internal.bankConnections.claimWebhookKey, { kid })
+					);
+					if (claim.kind === 'kept') return Option.some(claim.key);
+					if (claim.kind === 'limited') return Option.none();
+					const key = yield* Effect.option(plaid.webhookVerificationKey(kid));
+					if (Option.isSome(key)) {
+						yield* Effect.promise(() =>
+							ctx.runMutation(internal.bankConnections.saveWebhookKey, { kid, key: key.value })
+						);
+					}
+					return key;
+				})
+		}))
+	).pipe(Layer.provide(livePlaid()));
+}
+
+type WebhookKeyClaim = { kind: 'kept'; key: WebhookKey } | { kind: 'lookup' | 'limited' };
+
+// A forged kid leaves a row behind; a lookup clears this many expired ones, more than it adds.
+const EXPIRED_KEYS_CLEARED = 10;
+
+/**
+ * The kept key for `kid`, or leave to look it up: given unless another key was looked up within
+ * the last minute. Taking it records the lookup and clears expired rows.
+ */
+export const claimWebhookKey = internalMutation({
+	args: { kid: v.string() },
+	returns: v.union(
+		v.object({ kind: v.literal('kept'), key: webhookKeyValidator }),
+		v.object({ kind: v.union(v.literal('lookup'), v.literal('limited')) })
+	),
+	handler: async (ctx, { kid }): Promise<WebhookKeyClaim> => {
+		const now = Date.now();
+		const kept = await ctx.db
+			.query('webhookKeys')
+			.withIndex('by_kid', (q) => q.eq('kid', kid))
+			.unique();
+		if (kept?.key && kept.checkedAt > now - KEY_TTL_MS)
+			return { kind: 'kept' as const, key: kept.key };
+		const latest = await ctx.db
+			.query('webhookKeys')
+			.withIndex('by_checkedAt')
+			.order('desc')
+			.first();
+		if (latest !== null && latest.checkedAt > now - KEY_LOOKUP_INTERVAL_MS) {
+			return { kind: 'limited' as const };
+		}
+		if (kept === null) await ctx.db.insert('webhookKeys', { kid, key: null, checkedAt: now });
+		else await ctx.db.patch('webhookKeys', kept._id, { key: null, checkedAt: now });
+		const expired = await ctx.db
+			.query('webhookKeys')
+			.withIndex('by_checkedAt', (q) => q.lt('checkedAt', now - KEY_TTL_MS))
+			.take(EXPIRED_KEYS_CLEARED);
+		for (const row of expired) await ctx.db.delete('webhookKeys', row._id);
+		return { kind: 'lookup' as const };
+	}
+});
+
+/** Keeps the key Plaid gave for `kid`, after `claimWebhookKey` recorded the lookup. */
+export const saveWebhookKey = internalMutation({
+	args: { kid: v.string(), key: webhookKeyValidator },
+	returns: v.null(),
+	handler: async (ctx, { kid, key }) => {
+		const row = await ctx.db
+			.query('webhookKeys')
+			.withIndex('by_kid', (q) => q.eq('kid', kid))
+			.unique();
+		if (row !== null) await ctx.db.patch('webhookKeys', row._id, { key });
+		return null;
+	}
 });
 
 /**

@@ -127,13 +127,15 @@ async function exportAll(owner: Owner, numItems = 2) {
 }
 
 describe('the export', () => {
-	test('covers every table but the rebuildable monthly totals', async () => {
+	test('covers every table but the rebuildable monthly totals and webhook keys', async () => {
 		const { t, owner } = newBackend();
 		await t.run(seedEveryTable);
 
 		const exported = await exportAll(owner);
 
-		expect([...seededTables, 'monthlyTotals'].sort()).toEqual(Object.keys(schema.tables).sort());
+		expect([...seededTables, 'monthlyTotals', 'webhookKeys'].sort()).toEqual(
+			Object.keys(schema.tables).sort()
+		);
 		expect(Object.keys(exported).sort()).toEqual([...seededTables].sort());
 		for (const table of seededTables) {
 			expect(exported[table], table).toHaveLength(1);

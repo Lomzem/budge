@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@effect/vitest';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 
 import { PlaidApi, PlaidClient, type WebhookKey } from './plaidClient';
 import { syncUpdatesBody, webhookSigner, type SignOptions } from './plaidWebhook.helper';
-import { readWebhook, verifyWebhook } from './plaidWebhook';
+import { readWebhook, verifyWebhook, WebhookKeys } from './plaidWebhook';
 
 const encoder = new TextEncoder();
 // An invented Item ID; nothing here is a real Plaid ID or key.
@@ -29,12 +29,18 @@ const verify = Effect.fnUntraced(function* (
 		now: Date.now()
 	}).pipe(
 		Effect.provide(
-			PlaidClient.layerTest({
-				webhookVerificationKey: (kid) => {
-					asked.push(kid);
-					return options.key === undefined ? Effect.succeed(signer.key) : options.key(signer.key);
-				}
-			})
+			WebhookKeys.layerPlaid.pipe(
+				Layer.provide(
+					PlaidClient.layerTest({
+						webhookVerificationKey: (kid) => {
+							asked.push(kid);
+							return options.key === undefined
+								? Effect.succeed(signer.key)
+								: options.key(signer.key);
+						}
+					})
+				)
+			)
 		)
 	);
 	return { verified, asked };

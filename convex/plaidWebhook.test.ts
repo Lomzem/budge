@@ -113,6 +113,9 @@ async function runScheduled({ t }: Backend) {
 	vi.useRealTimers();
 }
 
+const keyLookups = () =>
+	plaid.paths.filter((path) => path === '/webhook_verification_key/get').length;
+
 const scheduled = ({ t }: Backend) =>
 	t.run((ctx) => ctx.db.system.query('_scheduled_functions').collect());
 
@@ -156,6 +159,44 @@ describe('the Plaid webhook', () => {
 		await runScheduled(backend);
 
 		expect(await backend.rows()).toHaveLength(2);
+	});
+
+	test('asks Plaid for a key once, however many webhooks it signs', async () => {
+		const backend = await connectedBudget();
+		const body = syncUpdatesBody(itemId);
+
+		for (let i = 0; i < 3; i++) {
+			expect((await postWebhook(backend, body, await signer.sign(body))).status).toBe(200);
+		}
+
+		expect(keyLookups()).toBe(1);
+	});
+
+	test('asks Plaid about keys it has not seen at most once a minute', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		const backend = await connectedBudget();
+		const body = syncUpdatesBody(itemId);
+		const impostor = await webhookSigner();
+
+		for (let i = 0; i < 5; i++) {
+			const token = await impostor.sign(body, { kid: `key-forged-${String(i)}` });
+			expect((await postWebhook(backend, body, token)).status).toBe(401);
+		}
+		// Plaid's own key, first seen while the limit holds, waits for it too.
+		expect((await postWebhook(backend, body, await signer.sign(body))).status).toBe(401);
+		expect(keyLookups()).toBe(1);
+
+		vi.setSystemTime(Date.now() + 61_000);
+		expect((await postWebhook(backend, body, await signer.sign(body))).status).toBe(200);
+		expect(keyLookups()).toBe(2);
+
+		// A day on, the next lookup clears the row the forged key left.
+		vi.setSystemTime(Date.now() + 25 * 60 * 60 * 1000);
+		expect((await postWebhook(backend, body, await signer.sign(body))).status).toBe(200);
+		const kids = await backend.t.run(async (ctx) =>
+			(await ctx.db.query('webhookKeys').collect()).map((row) => row.kid)
+		);
+		expect(kids).toEqual(['key-synthetic-1']);
 	});
 
 	test('a webhook while a sync holds the lease does nothing', async () => {
