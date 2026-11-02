@@ -159,7 +159,7 @@ export const webhook = httpAction(async (ctx, request) => {
 			now: Date.now()
 		}).pipe(
 			Effect.catchTag('KeyLookupDeferred', () => Effect.succeed('deferred' as const)),
-			Effect.provide(keptWebhookKeys(ctx))
+			Effect.provide(keptWebhookKeys(ctx, webhook.itemId))
 		)
 	);
 	if (verified === 'deferred') {
@@ -173,14 +173,17 @@ export const webhook = httpAction(async (ctx, request) => {
 	return new Response(null, { status: 200 });
 });
 
-function keptWebhookKeys(ctx: Pick<ActionCtx, 'runMutation'>): Layer.Layer<WebhookKeys> {
+function keptWebhookKeys(
+	ctx: Pick<ActionCtx, 'runMutation'>,
+	itemId: string
+): Layer.Layer<WebhookKeys> {
 	return Layer.effect(
 		WebhookKeys,
 		Effect.map(PlaidClient, (plaid) => ({
 			find: (kid: string) =>
 				Effect.gen(function* () {
 					const claim: WebhookKeyClaim = yield* Effect.promise(() =>
-						ctx.runMutation(internal.bankConnections.claimWebhookKey, { kid })
+						ctx.runMutation(internal.bankConnections.claimWebhookKey, { kid, itemId })
 					);
 					if (claim.kind === 'kept') return Option.some(claim.key);
 					if (claim.kind === 'limited') return yield* new KeyLookupDeferred();
@@ -201,12 +204,12 @@ type WebhookKeyClaim = { kind: 'kept'; key: WebhookKey } | { kind: 'lookup' | 'l
 const EXPIRED_KEYS_CLEARED_PER_LOOKUP = 10;
 
 export const claimWebhookKey = internalMutation({
-	args: { kid: v.string() },
+	args: { kid: v.string(), itemId: v.string() },
 	returns: v.union(
 		v.object({ kind: v.literal('kept'), key: webhookKeyValidator }),
 		v.object({ kind: v.union(v.literal('lookup'), v.literal('limited')) })
 	),
-	handler: async (ctx, { kid }): Promise<WebhookKeyClaim> => {
+	handler: async (ctx, { kid, itemId }): Promise<WebhookKeyClaim> => {
 		const now = Date.now();
 		const kept = await ctx.db
 			.query('webhookKeys')
@@ -214,16 +217,16 @@ export const claimWebhookKey = internalMutation({
 			.unique();
 		if (kept?.key && kept.checkedAt > now - KEY_TTL_MS)
 			return { kind: 'kept' as const, key: kept.key };
-		const latest = await ctx.db
+		const latestForItem = await ctx.db
 			.query('webhookKeys')
-			.withIndex('by_checkedAt')
-			.order('desc')
+			.withIndex('by_checkedForItemId_and_checkedAt', (q) =>
+				q.eq('checkedForItemId', itemId).gt('checkedAt', now - KEY_LOOKUP_INTERVAL_MS)
+			)
 			.first();
-		if (latest !== null && latest.checkedAt > now - KEY_LOOKUP_INTERVAL_MS) {
-			return { kind: 'limited' as const };
-		}
-		if (kept === null) await ctx.db.insert('webhookKeys', { kid, key: null, checkedAt: now });
-		else await ctx.db.patch('webhookKeys', kept._id, { key: null, checkedAt: now });
+		if (latestForItem !== null) return { kind: 'limited' as const };
+		const lookup = { key: null, checkedAt: now, checkedForItemId: itemId };
+		if (kept === null) await ctx.db.insert('webhookKeys', { kid, ...lookup });
+		else await ctx.db.patch('webhookKeys', kept._id, lookup);
 		const expired = await ctx.db
 			.query('webhookKeys')
 			.withIndex('by_checkedAt', (q) => q.lt('checkedAt', now - KEY_TTL_MS))
@@ -254,15 +257,18 @@ export const setup = internalAction({
 		accounts: v.array(v.object({ externalId: v.string(), accountId: v.id('accounts') }))
 	},
 	returns: v.id('bankConnections'),
-	handler: async (ctx, { accessToken, ...input }) =>
-		await runEffect(
+	handler: async (ctx, { accessToken, ...input }) => {
+		const connectionId = await runEffect(
 			setupConnection({
 				...input,
 				accessToken,
 				webhook: `${env.CONVEX_SITE_URL}/plaid/webhook`
 			}).pipe(Effect.provide(liveLayer(ctx))),
 			toPublicError
-		)
+		);
+		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
+		return connectionId;
+	}
 });
 
 function livePlaid() {

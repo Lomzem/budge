@@ -79,6 +79,7 @@ async function connectedBudget() {
 		accessToken,
 		accounts: [{ externalId, accountId: checking }]
 	});
+	await cancelScheduled(backend);
 	plaid.paths.length = 0;
 	const rows = async () =>
 		(
@@ -88,6 +89,29 @@ async function connectedBudget() {
 			})
 		).page.filter((row) => row.payeeName !== 'Starting Balance');
 	return { ...backend, connectionId, rows };
+}
+
+async function connectAnotherItem({ owner, t }: Backend, otherItemId: string) {
+	const savings = await owner.mutation(api.accounts.create, {
+		name: 'Savings',
+		kind: 'cash',
+		startingBalance: 0
+	});
+	await t.action(internal.bankConnections.setup, {
+		name: 'Other Sample Bank',
+		itemId: otherItemId,
+		accessToken: 'access-token-synthetic-other',
+		accounts: [{ externalId: 'account-synthetic-savings', accountId: savings }]
+	});
+}
+
+async function cancelScheduled({ t }: Backend) {
+	await t.run(async (ctx) => {
+		const jobs = await ctx.db.system.query('_scheduled_functions').collect();
+		for (const job of jobs) {
+			if (job.state.kind === 'pending') await ctx.scheduler.cancel(job._id);
+		}
+	});
 }
 
 type Backend = ReturnType<typeof newBackend>;
@@ -113,7 +137,11 @@ const keyLookups = () =>
 	plaid.paths.filter((path) => path === '/webhook_verification_key/get').length;
 
 const scheduled = ({ t }: Backend) =>
-	t.run((ctx) => ctx.db.system.query('_scheduled_functions').collect());
+	t.run(async (ctx) =>
+		(await ctx.db.system.query('_scheduled_functions').collect()).filter(
+			(job) => job.state.kind !== 'canceled'
+		)
+	);
 
 describe('the Plaid webhook', () => {
 	test('SYNC_UPDATES_AVAILABLE runs the sync', async () => {
@@ -168,7 +196,7 @@ describe('the Plaid webhook', () => {
 		expect(keyLookups()).toBe(1);
 	});
 
-	test('asks Plaid about keys it has not seen at most once a minute, answering 429 with Retry-After so Plaid retries', async () => {
+	test('asks Plaid about keys it has not seen at most once a minute for each Item, answering 429 with Retry-After so Plaid retries', async () => {
 		vi.useFakeTimers({ toFake: ['Date'] });
 		const backend = await connectedBudget();
 		const body = syncUpdatesBody(itemId);
@@ -211,6 +239,26 @@ describe('the Plaid webhook', () => {
 		vi.setSystemTime(Date.now() + 61_000);
 		expect((await postWebhook(backend, body, await signer.sign(body))).status).toBe(200);
 		expect(keyLookups()).toBe(2);
+	});
+
+	test('a flood of forged keys naming one Item does not hold up webhooks for another', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		const backend = await connectedBudget();
+		const otherItemId = 'item-synthetic-2';
+		await connectAnotherItem(backend, otherItemId);
+		await cancelScheduled(backend);
+		const impostor = await webhookSigner();
+		const forged = syncUpdatesBody(itemId);
+
+		const statuses: number[] = [];
+		for (let i = 0; i < 2; i++) {
+			const token = await impostor.sign(forged, { kid: `key-forged-${String(i)}` });
+			statuses.push((await postWebhook(backend, forged, token)).status);
+		}
+		expect(statuses).toEqual([401, 429]);
+
+		const other = syncUpdatesBody(otherItemId);
+		expect((await postWebhook(backend, other, await signer.sign(other))).status).toBe(200);
 	});
 
 	async function webhookDuringHeldLease() {
@@ -281,6 +329,33 @@ describe('the Plaid webhook', () => {
 
 		expect((await postWebhook(backend, 'not json', null)).status).toBe(400);
 		expect(plaid.paths).toEqual([]);
+	});
+});
+
+describe('setting up a Bank Connection', () => {
+	test('syncs it at once, so an update Plaid sent before it was saved is not lost', async () => {
+		const backend = newBackend();
+		const { owner, t } = backend;
+		await owner.mutation(api.settings.setCutoverDate, { cutoverDate });
+		const checking = await owner.mutation(api.accounts.create, {
+			name: 'Checking',
+			kind: 'cash',
+			startingBalance: 0
+		});
+
+		await t.action(internal.bankConnections.setup, {
+			name: 'Sample Bank',
+			itemId,
+			accessToken,
+			accounts: [{ externalId, accountId: checking }]
+		});
+		await runScheduled(backend);
+
+		const { page } = await owner.query(api.transactions.list, {
+			accountId: checking,
+			paginationOpts: { numItems: 50, cursor: null }
+		});
+		expect(page.filter((row) => row.payeeName !== 'Starting Balance')).toHaveLength(2);
 	});
 });
 

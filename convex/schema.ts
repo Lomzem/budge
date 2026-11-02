@@ -151,10 +151,12 @@ export default defineSchema({
 	webhookKeys: defineTable({
 		kid: v.string(),
 		key: v.union(webhookKeyValidator, v.null()),
-		checkedAt: v.number()
+		checkedAt: v.number(),
+		checkedForItemId: v.string()
 	})
 		.index('by_kid', ['kid'])
-		.index('by_checkedAt', ['checkedAt']),
+		.index('by_checkedAt', ['checkedAt'])
+		.index('by_checkedForItemId_and_checkedAt', ['checkedForItemId', 'checkedAt']),
 
 	connectionAccounts: defineTable(
 		v.union(
