@@ -178,12 +178,17 @@ describe('the Plaid webhook', () => {
 		const body = syncUpdatesBody(itemId);
 		const impostor = await webhookSigner();
 
+		const statuses: number[] = [];
 		for (let i = 0; i < 5; i++) {
 			const token = await impostor.sign(body, { kid: `key-forged-${String(i)}` });
-			expect((await postWebhook(backend, body, token)).status).toBe(401);
+			statuses.push((await postWebhook(backend, body, token)).status);
 		}
-		// Plaid's own key, first seen while the limit holds, waits for it too.
-		expect((await postWebhook(backend, body, await signer.sign(body))).status).toBe(401);
+		// The first is looked up and refused; the rest are told to come back once the limit lifts.
+		expect(statuses).toEqual([401, 429, 429, 429, 429]);
+		// Plaid's own key, first seen while the limit holds, waits for it too, and Plaid retries a 429.
+		const limited = await postWebhook(backend, body, await signer.sign(body));
+		expect(limited.status).toBe(429);
+		expect(limited.headers.get('retry-after')).toBe('60');
 		expect(keyLookups()).toBe(1);
 
 		vi.setSystemTime(Date.now() + 61_000);

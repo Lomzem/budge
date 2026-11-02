@@ -21,6 +21,7 @@ import { ImportedPayees } from './lib/payees';
 import { PlaidClient, type WebhookKey } from './lib/plaidClient';
 import {
 	KEY_LOOKUP_INTERVAL_MS,
+	KeyLookupLimited,
 	KEY_TTL_MS,
 	readWebhook,
 	verifyWebhook,
@@ -149,8 +150,8 @@ export const webhookTarget = internalQuery({
 /**
  * Plaid's webhook. A webhook for an Item with no stored token is acknowledged at once, without
  * calling Plaid; any other is refused unless Plaid signed it, under a key found as
- * `keptWebhookKeys` says. `SYNC_UPDATES_AVAILABLE` schedules a
- * sync, which a sync already running makes a no-op.
+ * `keptWebhookKeys` says, or told to retry while its key can't be looked up yet.
+ * `SYNC_UPDATES_AVAILABLE` schedules a sync, which a sync already running makes a no-op.
  */
 export const webhook = httpAction(async (ctx, request) => {
 	const body = new Uint8Array(await request.arrayBuffer());
@@ -166,8 +167,16 @@ export const webhook = httpAction(async (ctx, request) => {
 			body,
 			token: request.headers.get('plaid-verification'),
 			now: Date.now()
-		}).pipe(Effect.provide(keptWebhookKeys(ctx)))
+		}).pipe(
+			Effect.catchTag('KeyLookupLimited', () => Effect.succeed('limited' as const)),
+			Effect.provide(keptWebhookKeys(ctx))
+		)
 	);
+	if (verified === 'limited') {
+		// Plaid retries a 429, honoring `Retry-After`; any other 4xx it drops.
+		const retryAfter = String(KEY_LOOKUP_INTERVAL_MS / 1000);
+		return new Response(null, { status: 429, headers: { 'retry-after': retryAfter } });
+	}
 	if (!verified) return new Response(null, { status: 401 });
 	if (webhook.type === 'TRANSACTIONS' && webhook.code === 'SYNC_UPDATES_AVAILABLE') {
 		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
@@ -178,8 +187,8 @@ export const webhook = httpAction(async (ctx, request) => {
 /**
  * Plaid's webhook keys, kept a day after each lookup so a webhook rarely costs a Plaid call. A key
  * not kept is looked up at most once a minute across the deployment, so forged tokens naming
- * made-up keys can't each cost a call. A real webhook refused meanwhile is retried by Plaid, and
- * the daily sync covers any it gives up on.
+ * made-up keys can't each cost a call. A webhook whose key waits on the limit is answered 429, which
+ * Plaid retries for up to a day; the daily sync covers any it gives up on.
  */
 function keptWebhookKeys(ctx: Pick<ActionCtx, 'runMutation'>): Layer.Layer<WebhookKeys> {
 	return Layer.effect(
@@ -191,7 +200,7 @@ function keptWebhookKeys(ctx: Pick<ActionCtx, 'runMutation'>): Layer.Layer<Webho
 						ctx.runMutation(internal.bankConnections.claimWebhookKey, { kid })
 					);
 					if (claim.kind === 'kept') return Option.some(claim.key);
-					if (claim.kind === 'limited') return Option.none();
+					if (claim.kind === 'limited') return yield* new KeyLookupLimited();
 					const key = yield* Effect.option(plaid.webhookVerificationKey(kid));
 					if (Option.isSome(key)) {
 						yield* Effect.promise(() =>

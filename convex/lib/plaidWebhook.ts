@@ -3,7 +3,7 @@
 // https://plaid.com/docs/api/webhooks/webhook-verification/
 
 import { v } from 'convex/values';
-import { Context, Effect, Layer, Option } from 'effect';
+import { Context, Effect, Layer, Option, Schema } from 'effect';
 
 import { PlaidClient, type WebhookKey } from './plaidClient';
 
@@ -24,10 +24,21 @@ export const webhookKeyValidator = v.object({
 	expiredAt: v.union(v.number(), v.null())
 });
 
-/** Where `verifyWebhook` finds the key a token names. `None` refuses the webhook. */
+/** A key isn't known yet and can't be looked up until the lookup limit lifts. */
+export class KeyLookupLimited extends Schema.TaggedError<
+	KeyLookupLimited,
+	{ readonly brand: unique symbol }
+>()('KeyLookupLimited', {}) {}
+
+/**
+ * Where `verifyWebhook` finds the key a token names. `None` refuses the webhook; `KeyLookupLimited`
+ * leaves it undecided.
+ */
 export class WebhookKeys extends Context.Service<
 	WebhookKeys,
-	{ readonly find: (kid: string) => Effect.Effect<Option.Option<WebhookKey>> }
+	{
+		readonly find: (kid: string) => Effect.Effect<Option.Option<WebhookKey>, KeyLookupLimited>;
+	}
 >()('budge/WebhookKeys') {
 	/** Asks Plaid every time; any failure is `None`. */
 	static readonly layerPlaid: Layer.Layer<WebhookKeys, never, PlaidClient> = Layer.effect(
@@ -62,14 +73,15 @@ export function readWebhook(body: Uint8Array): Webhook | null {
 /**
  * Whether Plaid signed `body`: the token names an ES256 key Plaid still uses, its signature holds
  * under that key, it was issued within five minutes of `now`, and it carries the body's hash. Any
- * failure, including no key being found, is a refusal.
+ * failure, including no key being found, is a refusal. Fails with `KeyLookupLimited` when the key
+ * can't be looked up yet, so the webhook is neither accepted nor refused.
  */
 export const verifyWebhook = Effect.fnUntraced(function* (input: {
 	body: Uint8Array<ArrayBuffer>;
 	token: string | null;
 	/** Milliseconds since the epoch. */
 	now: number;
-}): Effect.fn.Return<boolean, never, WebhookKeys> {
+}): Effect.fn.Return<boolean, KeyLookupLimited, WebhookKeys> {
 	const parts = input.token?.split('.') ?? [];
 	const [encodedHeader, encodedPayload, encodedSignature] = parts;
 	if (
