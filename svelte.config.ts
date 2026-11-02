@@ -13,7 +13,12 @@ const config = {
 		typescript: {
 			config: (tsconfig) => {
 				const include = tsconfig.include as string[];
-				include.push('../svelte.config.ts', '../playwright.config.ts', '../e2e/**/*.ts');
+				include.push(
+					'../svelte.config.ts',
+					'../playwright.config.ts',
+					'../e2e/**/*.ts',
+					'../scripts/**/*.ts'
+				);
 			}
 		}
 	}

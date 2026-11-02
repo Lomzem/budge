@@ -34,6 +34,14 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'scripts',
+					environment: 'node',
+					include: ['scripts/**/*.test.ts'],
+					testTimeout: 30_000
+				}
+			},
+			{
+				test: {
 					name: 'eslint',
 					environment: 'node',
 					include: ['eslint/**/*.test.js']

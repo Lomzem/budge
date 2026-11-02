@@ -25,6 +25,10 @@ Before exploring the codebase, read `docs/agents/domain.md` for the single-conte
 
 Before running Playwright E2E or changing Clerk setup, sign-in, or CI authentication, read `docs/agents/authentication.md`.
 
+## Checking UI work in a browser
+
+Before calling a UI change done, look at it in a running app: from a worktree, `bun run app up`, `bun run app login`, then `bun run app seed <fixture>`. Drive the pages with Playwright using the storage state `login` prints, and finish with `bun run app down`. When the app misbehaves, start with `bun run app doctor`. `bun run app` lists every verb.
+
 ## Pull requests
 
 **Local review per ticket:** before a ticket enters a PR, review it locally with the `code-review` skill and fix or answer every finding.
