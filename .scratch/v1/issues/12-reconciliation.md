@@ -4,13 +4,13 @@
 
 **Blocked by:** 10 (Credit Card Accounts)
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** [Budge v1](../../v1-spec/spec.md): stories 107–110; Domain module (reconciliation adjustment)
 
-- [ ] `cleared` becomes three states (`uncleared` / `cleared` / `reconciled`), and Accounts gain `lastReconciledOn?`.
-- [ ] Reconcile takes the bank balance and the date. A matching balance marks every Cleared Transaction in the Account Reconciled. A difference creates the adjustment Transaction (Payee "Reconciliation Adjustment", dated that day, categorized to Ready to Assign) and then locks.
-- [ ] Reconciled Transactions refuse amount, date, and Account edits, and refuse deletion, with `INVALID_INPUT` until the owner explicitly unlocks one. Category, Payee, and memo stay editable.
-- [ ] On a Cash Account the adjustment changes Ready to Assign. On a Credit Card Account it follows the full-amount move.
-- [ ] `convex-test`: both outcomes on a Cash Account and on a Credit Card Account, plus the lock.
-- [ ] The Reconcile flow is keyboard reachable, and the last-reconciled date appears beside the Account.
+- [x] `cleared` becomes three states (`uncleared` / `cleared` / `reconciled`), and Accounts gain `lastReconciledOn?`.
+- [x] Reconcile takes the bank balance and the date. A matching balance marks every Cleared Transaction in the Account Reconciled. A difference creates the adjustment Transaction (Payee "Reconciliation Adjustment", dated that day, categorized to Ready to Assign) and then locks.
+- [x] Reconciled Transactions refuse amount, date, and Account edits, and refuse deletion, with `INVALID_INPUT` until the owner explicitly unlocks one. Category, Payee, and memo stay editable.
+- [x] On a Cash Account the adjustment changes Ready to Assign. On a Credit Card Account it follows the full-amount move.
+- [x] `convex-test`: both outcomes on a Cash Account and on a Credit Card Account, plus the lock.
+- [x] The Reconcile flow is keyboard reachable, and the last-reconciled date appears beside the Account.

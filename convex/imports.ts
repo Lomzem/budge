@@ -6,7 +6,7 @@ import { applyBankRows, fileRow, fileSource, insertImported, planImport } from '
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { ImportedPayees } from './lib/payees';
-import { bankRowsOf } from './lib/transactions';
+import { bankRowsOf, requireUnlocked } from './lib/transactions';
 
 const candidate = v.object({
 	_id: v.id('transactions'),
@@ -83,11 +83,17 @@ export const commit = mutation({
 	returns: v.object({ added: v.number(), matched: v.number(), skipped: v.number() }),
 	handler: async (ctx, { accountId, source, rows: input }) => {
 		await requireOwner(ctx);
-		const { rows, decisions } = await planImport(ctx, accountId, source, input);
+		const { rows, decisions, candidates } = await planImport(ctx, accountId, source, input);
 		if (decisions.some((decision) => decision.kind === 'ask')) {
 			throw publicError('INVALID_INPUT', 'Pick a Match for every row that has more than one.');
 		}
-		return await applyBankRows(ctx, accountId, source, { rows, decisions }, new ImportedPayees());
+		return await applyBankRows(
+			ctx,
+			accountId,
+			source,
+			{ rows, decisions, candidates },
+			new ImportedPayees()
+		);
 	}
 });
 
@@ -106,6 +112,9 @@ export const unmatch = mutation({
 		if (!bankRow.matched || matchedId === undefined) {
 			throw publicError('INVALID_INPUT', 'This bank row is not Matched.');
 		}
+		// Unmatching takes the Transaction back to uncleared, so a Reconciled one is unlocked first.
+		const matchedTransaction = await ctx.db.get('transactions', matchedId);
+		if (matchedTransaction !== null) requireUnlocked(matchedTransaction, 'to unmatch it');
 		const transactionId = await insertImported(ctx, bankRow.accountId, bankRow);
 		await ctx.db.patch('imports', importId, { transactionId, matched: false });
 		const stillLinked = await bankRowsOf(ctx, matchedId);

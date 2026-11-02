@@ -157,7 +157,7 @@ export async function applyBankRows(
 	ctx: MutationCtx,
 	accountId: Id<'accounts'>,
 	source: BankSource,
-	{ rows, decisions }: Pick<ImportPlan<IncomingRow>, 'rows' | 'decisions'>,
+	{ rows, decisions, candidates }: ImportPlan<IncomingRow>,
 	payees: ImportedPayees,
 	connectionAccountId?: Id<'connectionAccounts'>
 ): Promise<ImportCounts> {
@@ -176,8 +176,10 @@ export async function applyBankRows(
 			state: 'linked' as const
 		};
 		if (decision.kind === 'match') {
+			// A row can Match a Transaction Reconciled already; it stays locked.
+			const reconciled = candidates.get(decision.transactionId)?.cleared === 'reconciled';
 			await ctx.db.patch('transactions', decision.transactionId, {
-				cleared: 'cleared',
+				cleared: reconciled ? 'reconciled' : 'cleared',
 				approved: false
 			});
 			await ctx.db.insert('imports', {
