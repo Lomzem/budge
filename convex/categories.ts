@@ -209,7 +209,7 @@ export const setGroupHidden = mutation({
 });
 
 /**
- * Deletes a Category after moving its Transactions and Assigned amounts to `destinationId`, so
+ * Deletes a Category after moving its Transactions, split lines, and Assigned amounts to `destinationId`, so
  * every month's Available and Ready to Assign come out as if they had been there all along.
  * Assigned sums into the destination's rows; a sum of zero removes the row.
  */
@@ -224,7 +224,7 @@ export const remove = mutation({
 			throw publicError('INVALID_INPUT', 'Pick another Category to move its history to.');
 		}
 
-		// Each Transaction moves under the same month and Account, so only both Categories' totals
+		// Each Transaction and split line moves under the same month and Account, so only both Categories' totals
 		// for those keys change, and they are rebuilt from the Transactions.
 		const keys = new Map<string, { month: string; accountId: Id<'accounts'> }>();
 		const transactions = ctx.db
@@ -234,6 +234,16 @@ export const remove = mutation({
 			const key = { month: monthOf(transaction.date), accountId: transaction.accountId };
 			keys.set(`${key.month}|${key.accountId}`, key);
 			await ctx.db.patch('transactions', transaction._id, { categoryId: destination._id });
+		}
+		const lines = ctx.db
+			.query('transactionSplits')
+			.withIndex('by_category_date', (q) => q.eq('categoryId', category._id));
+		for await (const line of lines) {
+			const parent = await ctx.db.get('transactions', line.transactionId);
+			if (parent === null) continue;
+			const key = { month: monthOf(line.date), accountId: parent.accountId };
+			keys.set(`${key.month}|${key.accountId}`, key);
+			await ctx.db.patch('transactionSplits', line._id, { categoryId: destination._id });
 		}
 		await rebuildTotals(ctx, [category._id, destination._id], keys.values());
 

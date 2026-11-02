@@ -4,7 +4,7 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
 
 type Counted = Pick<
 	Doc<'transactions'>,
-	'accountId' | 'date' | 'amount' | 'categoryId' | 'transferTransactionId'
+	'accountId' | 'date' | 'amount' | 'categoryId' | 'transferTransactionId' | 'split'
 >;
 type Key = Pick<Doc<'monthlyTotals'>, 'month' | 'accountId' | 'bucket'>;
 
@@ -20,11 +20,26 @@ function keyOf(transaction: Counted): Key {
 	};
 }
 
+/** A split line, counted as a Transaction of its own in its parent's Account. */
+export function lineCounted(
+	parent: Pick<Doc<'transactions'>, 'accountId'>,
+	line: Pick<Doc<'transactionSplits'>, 'date' | 'amount' | 'categoryId'>
+): Counted {
+	return {
+		accountId: parent.accountId,
+		date: line.date,
+		amount: line.amount,
+		categoryId: line.categoryId
+	};
+}
+
 /**
  * Adds a Transaction to its monthly total (`sign` 1), or takes it back out (`sign` -1). A total
- * left summing no Transactions is deleted, as the rebuild never writes one.
+ * left summing no Transactions is deleted, as the rebuild never writes one. A split Transaction
+ * counts nothing itself; each of its lines is counted with `lineCounted`.
  */
 export async function countTransaction(ctx: MutationCtx, transaction: Counted, sign: 1 | -1) {
+	if (transaction.split === true) return;
 	const key = keyOf(transaction);
 	const delta = sign * transaction.amount;
 	const row = await ctx.db
@@ -50,13 +65,23 @@ export async function rebuildMonthlyTotals(ctx: MutationCtx) {
 		await ctx.db.delete('monthlyTotals', row._id);
 	}
 	const totals = new Map<string, Key & { amount: number; count: number }>();
-	for await (const transaction of ctx.db.query('transactions')) {
-		const key = keyOf(transaction);
+	const add = (counted: Counted) => {
+		const key = keyOf(counted);
 		const id = `${key.month}|${key.accountId}|${key.bucket}`;
 		const total = totals.get(id) ?? { ...key, amount: 0, count: 0 };
-		total.amount += transaction.amount;
+		total.amount += counted.amount;
 		total.count += 1;
 		totals.set(id, total);
+	};
+	for await (const transaction of ctx.db.query('transactions')) {
+		if (transaction.split !== true) {
+			add(transaction);
+			continue;
+		}
+		const lines = ctx.db
+			.query('transactionSplits')
+			.withIndex('by_transaction', (q) => q.eq('transactionId', transaction._id));
+		for await (const line of lines) add(lineCounted(transaction, line));
 	}
 	for (const total of totals.values()) await ctx.db.insert('monthlyTotals', total);
 }
@@ -71,7 +96,7 @@ export async function accountBalances(ctx: QueryCtx): Promise<Map<Id<'accounts'>
 }
 
 /**
- * Rebuilds, from the Transactions, the totals of each Category in `buckets` for each (month,
+ * Rebuilds, from the Transactions and split lines, the totals of each Category in `buckets` for each (month,
  * Account) in `keys`. For a change that touches a few Categories, it writes what the full
  * rebuild would for them, without reading the whole history.
  */
@@ -102,6 +127,18 @@ export async function rebuildTotals(
 			for await (const transaction of transactions) {
 				if (transaction.accountId !== accountId) continue;
 				amount += transaction.amount;
+				count += 1;
+			}
+			const lines = ctx.db.query('transactionSplits').withIndex('by_category_date', (q) =>
+				q
+					.eq('categoryId', bucket)
+					.gte('date', `${month}-01`)
+					.lt('date', `${addMonths(month, 1)}-01`)
+			);
+			for await (const line of lines) {
+				const parent = await ctx.db.get('transactions', line.transactionId);
+				if (parent?.accountId !== accountId) continue;
+				amount += line.amount;
 				count += 1;
 			}
 			if (count > 0) await ctx.db.insert('monthlyTotals', { ...key, amount, count });

@@ -22,6 +22,9 @@ export async function fetchExport(client: ConvexClient): Promise<BudgetExport> {
 	return data;
 }
 
+/** The pause between CSV files. */
+const CSV_SPACING_MS = 200;
+
 function download(name: string, type: string, text: string) {
 	const url = URL.createObjectURL(new Blob([text], { type }));
 	const link = document.createElement('a');
@@ -40,8 +43,10 @@ export function downloadJson(data: BudgetExport, date: string) {
 }
 
 /** Downloads one CSV file per table, `budge-<date>-<table>.csv`, empty tables included. */
-export function downloadCsv(data: BudgetExport, date: string) {
-	for (const [table, rows] of Object.entries(data)) {
+export async function downloadCsv(data: BudgetExport, date: string) {
+	for (const [index, [table, rows]] of Object.entries(data).entries()) {
+		// Chromium drops downloads past ten started at once, so the files go one at a time.
+		if (index > 0) await new Promise((resolve) => setTimeout(resolve, CSV_SPACING_MS));
 		download(`budge-${date}-${table}.csv`, 'text/csv', toCsv(rows));
 	}
 }

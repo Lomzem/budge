@@ -11,21 +11,41 @@
 	const client = useConvexClient();
 	let busy = $state(false);
 	let error = $state('');
+	/** CSV files start one at a time, so leaving the page partway would drop the rest. */
+	let downloading = $state(false);
 
-	async function exportAs(save: (data: BudgetExport, date: string) => void) {
+	async function exportAs(save: (data: BudgetExport, date: string) => void | Promise<void>) {
 		busy = true;
 		error = '';
 		try {
-			save(await fetchExport(client), localToday());
+			const data = await fetchExport(client);
+			downloading = true;
+			await save(data, localToday());
 		} catch {
 			error = "Budge couldn't export. Try again.";
 		} finally {
 			busy = false;
+			downloading = false;
 		}
 	}
 </script>
 
-<Dialog.Root bind:open onOpenChange={() => (error = '')}>
+<svelte:window
+	onbeforeunload={(event: BeforeUnloadEvent) => {
+		if (downloading) event.preventDefault();
+	}}
+/>
+
+<Dialog.Root
+	bind:open={
+		() => open,
+		(next: boolean) => {
+			// The dialog stays open until every file has started.
+			if (!downloading) open = next;
+		}
+	}
+	onOpenChange={() => (error = '')}
+>
 	<Dialog.Content>
 		<Dialog.Header>
 			<Dialog.Title>Export</Dialog.Title>
@@ -37,6 +57,11 @@
 			JSON is one file. CSV is one file per table, so your browser may ask to allow several
 			downloads.
 		</p>
+		{#if downloading}
+			<p role="status" class="text-sm text-muted-foreground">
+				Downloading… Keep this page open until every file has started.
+			</p>
+		{/if}
 		{#if error}
 			<p role="alert" class="text-sm text-destructive">{error}</p>
 		{/if}
