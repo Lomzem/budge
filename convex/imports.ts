@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
+import { resolveBankChange as resolve } from './lib/bankChanges';
 import { applyBankRows, fileRow, fileSource, insertImported, planImport } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
@@ -98,8 +99,9 @@ export const commit = mutation({
 });
 
 /**
- * Splits a Matched Bank Row back into its own Cleared, Unapproved Transaction. The Transaction it
- * Matched goes back to uncleared and approved once no other Bank Row is linked to it.
+ * Splits a Matched Bank Row back into its own Cleared, Unapproved Transaction, with the bank's
+ * newest values; a row the bank removed is refused. The Transaction it Matched goes back to
+ * uncleared and approved once no other Bank Row is linked to it.
  */
 export const unmatch = mutation({
 	args: { importId: v.id('imports') },
@@ -112,16 +114,35 @@ export const unmatch = mutation({
 		if (!bankRow.matched || matchedId === undefined) {
 			throw publicError('INVALID_INPUT', 'This bank row is not Matched.');
 		}
+		if (bankRow.state === 'removed') {
+			throw publicError('INVALID_INPUT', 'The bank removed this row. Resolve that instead.');
+		}
 		// Unmatching takes the Transaction back to uncleared, so a Reconciled one is unlocked first.
 		const matchedTransaction = await ctx.db.get('transactions', matchedId);
 		if (matchedTransaction !== null) requireUnlocked(matchedTransaction, 'to unmatch it');
 		const transactionId = await insertImported(ctx, bankRow.accountId, bankRow);
-		await ctx.db.patch('imports', importId, { transactionId, matched: false });
+		// The new Transaction has the bank's newest values, so there is no change left to resolve.
+		await ctx.db.patch('imports', importId, { transactionId, matched: false, state: 'linked' });
 		const stillLinked = await bankRowsOf(ctx, matchedId);
 		if (stillLinked.length === 0) {
 			await ctx.db.patch('transactions', matchedId, { cleared: 'uncleared', approved: true });
 		}
 		return transactionId;
+	}
+});
+
+/**
+ * Resolves "bank changed this" or "bank removed this" on a Bank Row: `bank` gives the Transaction
+ * the bank's date and amount, or deletes it; `mine` keeps the Transaction as it is. Either clears
+ * the flag and approves the Transaction.
+ */
+export const resolveBankChange = mutation({
+	args: { importId: v.id('imports'), keep: v.union(v.literal('bank'), v.literal('mine')) },
+	returns: v.null(),
+	handler: async (ctx, { importId, keep }) => {
+		await requireOwner(ctx);
+		await resolve(ctx, importId, keep);
+		return null;
 	}
 });
 

@@ -32,8 +32,20 @@ const transactionRow = v.object({
 	cleared: v.boolean(),
 	reconciled: v.boolean(),
 	approved: v.boolean(),
-	/** What the bank reported for it, read-only. */
-	bankRows: v.array(v.object({ _id: v.id('imports'), bankText: v.string(), matched: v.boolean() })),
+	/**
+	 * What the bank reported for it, read-only. `changed` and `removed` are the bank's changes the
+	 * owner hasn't resolved; `date` and `amount` are the bank's newest.
+	 */
+	bankRows: v.array(
+		v.object({
+			_id: v.id('imports'),
+			bankText: v.string(),
+			matched: v.boolean(),
+			state: v.union(v.literal('linked'), v.literal('changed'), v.literal('removed')),
+			date: v.string(),
+			amount: v.number()
+		})
+	),
 	/** The other side's Account, for a Transfer. */
 	transfer: v.union(v.object({ accountId: v.id('accounts'), accountName: v.string() }), v.null()),
 	/** A split's lines, in the order entered; `null` when it isn't split. */
@@ -302,7 +314,11 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		bankRows: (await bankRowsOf(ctx, transaction._id)).map((bankRow) => ({
 			_id: bankRow._id,
 			bankText: bankRow.bankText,
-			matched: bankRow.matched
+			matched: bankRow.matched,
+			// A held row is never linked to a Transaction.
+			state: bankRow.state === 'held' ? ('linked' as const) : bankRow.state,
+			date: bankRow.date,
+			amount: bankRow.amount
 		})),
 		transfer: await transferOf(ctx, transaction),
 		splits: await splitsOf(ctx, transaction)

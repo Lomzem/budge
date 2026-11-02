@@ -21,6 +21,13 @@
 	let { accountId }: { accountId?: Id<'accounts'> | undefined } = $props();
 
 	const PAGE_SIZE = 50;
+
+	/** "Bank changed this" or "bank removed this", while the owner hasn't resolved it. */
+	function bankFlag(row: Row) {
+		if (row.bankRows.some((bankRow) => bankRow.state === 'removed')) return 'Bank removed this';
+		if (row.bankRows.some((bankRow) => bankRow.state === 'changed')) return 'Bank changed this';
+		return undefined;
+	}
 	const scope = $derived(accountId === undefined ? {} : { accountId });
 	// Unapproved first: the approved list starts once every Unapproved row is on screen.
 	const unapproved = usePaginatedQuery(
@@ -134,6 +141,7 @@
 						: row.splits
 							? 'Split'
 							: (row.categoryName ?? 'Uncategorized')}
+					{@const flag = bankFlag(row)}
 					{@const categoryClass =
 						row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
 					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
@@ -164,6 +172,9 @@
 									, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(row.date)}
 								</span>
 							</button>
+							{#if flag}
+								<span class="block truncate text-xs font-normal text-warning">{flag}</span>
+							{/if}
 							<span class="block truncate text-xs font-normal text-muted-foreground @lg:hidden">
 								<span class={categoryClass}>{category}</span>
 							</span>

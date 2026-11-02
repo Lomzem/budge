@@ -36,6 +36,7 @@
 	const remove = useMutation(api.transactions.remove);
 	const approve = useMutation(api.transactions.approve);
 	const unmatch = useMutation(api.imports.unmatch);
+	const resolveBankChange = useMutation(api.imports.resolveBankChange);
 	const unlock = useMutation(api.transactions.unlock);
 	const categories = useQuery(api.categories.list, () => (open ? {} : 'skip'));
 
@@ -365,6 +366,20 @@
 		}
 	}
 
+	/** Takes the bank's version of a change or removal, or keeps the owner's, clearing the flag. */
+	async function resolveBankRow(importId: Id<'imports'>, keep: 'bank' | 'mine') {
+		saving = true;
+		try {
+			await resolveBankChange({ importId, keep });
+			open = false;
+		} catch (thrown) {
+			error =
+				readPublicError(thrown)?.message ?? "Budge couldn't resolve the bank's change. Try again.";
+		} finally {
+			saving = false;
+		}
+	}
+
 	async function unlockTransaction() {
 		if (!transaction) return;
 		saving = true;
@@ -656,7 +671,7 @@
 						{#each transaction.bankRows as bankRow (bankRow._id)}
 							<li class="flex flex-wrap items-center justify-between gap-2 text-sm">
 								<span class="min-w-0 break-words text-muted-foreground">{bankRow.bankText}</span>
-								{#if bankRow.matched}
+								{#if bankRow.matched && bankRow.state !== 'removed'}
 									<Button
 										type="button"
 										size="sm"
@@ -666,6 +681,39 @@
 									>
 										Unmatch
 									</Button>
+								{/if}
+								{#if bankRow.state !== 'linked'}
+									<div class="flex w-full flex-col gap-2 rounded-md border p-3">
+										<p class="text-warning">
+											{#if bankRow.state === 'changed'}
+												Bank changed this: {formatCents(bankRow.amount)} on {formatDate(
+													bankRow.date
+												)}.
+											{:else}
+												Bank removed this.
+											{/if}
+										</p>
+										<div class="flex flex-wrap gap-2">
+											<Button
+												type="button"
+												size="sm"
+												variant="outline"
+												disabled={saving}
+												onclick={() => resolveBankRow(bankRow._id, 'bank')}
+											>
+												{bankRow.state === 'changed' ? "Use the bank's version" : 'Delete it'}
+											</Button>
+											<Button
+												type="button"
+												size="sm"
+												variant="outline"
+												disabled={saving}
+												onclick={() => resolveBankRow(bankRow._id, 'mine')}
+											>
+												Keep mine
+											</Button>
+										</div>
+									</div>
 								{/if}
 							</li>
 						{/each}

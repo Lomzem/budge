@@ -12,6 +12,7 @@ import {
 	type ActionCtx,
 	type MutationCtx
 } from './_generated/server';
+import { applyBankChange, applyBankRemoval, syncedBankRow } from './lib/bankChanges';
 import { applyBankRows, planBankRows, requireBankRow, type IncomingRow } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { ImportedPayees } from './lib/payees';
@@ -162,14 +163,18 @@ export const takeLease = internalMutation({
 
 /**
  * Applies one batch of synced rows and moves the cursor past it, in one transaction, so a batch is
- * applied once or not at all. Rows from a bank Account not yet mapped to a Budge Account are held:
+ * applied once or not at all. New rows come first, then the bank's changes and removals; a change
+ * to a row Budge never imported arrives as a new row. Applying a batch again changes nothing. Rows from a bank Account not yet mapped to a Budge Account are held:
  * the Account is recorded for the owner to map, and its rows come back when its cursor is reset.
  * Refuses, writing nothing, once the lease or cursor is no longer the sync's.
  */
 export const apply = internalMutation({
 	args: applyArgs,
 	returns: applyResult,
-	handler: async (ctx, { connectionId, lease, fromCursor, nextCursor, hasMore, rows, release }) => {
+	handler: async (
+		ctx,
+		{ connectionId, lease, fromCursor, nextCursor, hasMore, rows, modified, removed, release }
+	) => {
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (
 			connection?.provider.kind !== 'plaid' ||
@@ -178,7 +183,7 @@ export const apply = internalMutation({
 		) {
 			return { kind: 'stale' as const };
 		}
-		if (rows.length > MAX_SYNC_ROWS) {
+		if (rows.length + modified.length + removed.length > MAX_SYNC_ROWS) {
 			throw new Error(`A sync batch holds at most ${String(MAX_SYNC_ROWS)} rows.`);
 		}
 		const cutoverDate = await requireCutoverDate(ctx);
@@ -203,6 +208,26 @@ export const apply = internalMutation({
 			const counts = await applyBankRows(ctx, target.accountId, 'plaid', plan, payees, target._id);
 			totals.added += counts.added;
 			totals.matched += counts.matched;
+		}
+		for (const { externalAccountId, ...row } of modified) {
+			const target = await findConnectionAccount(ctx, connectionId, externalAccountId);
+			if (target?.state !== 'mapped') continue;
+			const checked = requireBankRow(row, cutoverDate);
+			const bankRow = await syncedBankRow(ctx, target.accountId, checked.sourceId);
+			if (bankRow !== null) {
+				await applyBankChange(ctx, bankRow, checked, payees);
+				continue;
+			}
+			const plan = await planBankRows(ctx, target.accountId, 'plaid', [checked]);
+			const counts = await applyBankRows(ctx, target.accountId, 'plaid', plan, payees, target._id);
+			totals.added += counts.added;
+			totals.matched += counts.matched;
+		}
+		for (const { externalAccountId, sourceId } of removed) {
+			const target = await findConnectionAccount(ctx, connectionId, externalAccountId);
+			if (target?.state !== 'mapped') continue;
+			const bankRow = await syncedBankRow(ctx, target.accountId, sourceId);
+			if (bankRow !== null) await applyBankRemoval(ctx, bankRow);
 		}
 
 		const now = Date.now();

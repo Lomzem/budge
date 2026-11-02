@@ -293,6 +293,8 @@ describe('syncing a Bank Connection', () => {
 					bankText: 'SAMPLE STALE'
 				}
 			],
+			modified: [],
+			removed: [],
 			release: true
 		};
 
@@ -344,6 +346,8 @@ describe('syncing a Bank Connection', () => {
 		const { sync, connection } = await connectedBudget();
 		const more = (n: number): SyncPage => ({
 			added: [],
+			modified: [],
+			removed: [],
 			nextCursor: `cursor-synthetic-page-${String(n)}`,
 			hasMore: true
 		});
@@ -394,6 +398,8 @@ describe('syncing a Bank Connection', () => {
 		);
 	const morePage = (n: number): SyncPage => ({
 		added: [],
+		modified: [],
+		removed: [],
 		nextCursor: `cursor-synthetic-page-${String(n)}`,
 		hasMore: true
 	});

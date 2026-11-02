@@ -17,7 +17,7 @@ describe('decoding a Plaid sync page', () => {
 
 			expect(decoded.nextCursor).toBe('cursor-synthetic-2');
 			expect(decoded.hasMore).toBe(false);
-			expect(syncRowsOf(decoded, '2026-08-01')).toEqual([
+			expect(syncRowsOf(decoded, '2026-08-01').added).toEqual([
 				// Plaid writes outflows positive; Budge writes them negative. The original bank wording
 				// is the Bank Text, and the merchant name names the Payee.
 				{
@@ -56,6 +56,39 @@ describe('decoding a Plaid sync page', () => {
 			);
 
 			expect(Exit.isFailure(exit)).toBe(true);
+		})
+	);
+
+	it.effect('keeps modified rows as Bank Rows, and every removed ID with its Account', () =>
+		Effect.gen(function* () {
+			const base = (page as { added: object[] }).added;
+			const decoded = yield* decodeSyncPage({
+				added: [],
+				modified: [
+					{ ...base[0], amount: 45.5 },
+					// Pending and pre-cutover changes are dropped, as new rows are.
+					base[2],
+					base[3]
+				],
+				removed: [{ transaction_id: 'txn-synthetic-2', account_id: 'account-synthetic-checking' }],
+				next_cursor: 'c',
+				has_more: false
+			});
+
+			expect(syncRowsOf(decoded, '2026-08-01')).toEqual({
+				added: [],
+				modified: [
+					{
+						externalAccountId: 'account-synthetic-checking',
+						sourceId: 'txn-synthetic-1',
+						date: '2026-08-14',
+						amount: -4_550,
+						bankText: 'DEBIT CARD PURCHASE SAMPLE GROCER 0193',
+						merchantName: 'Sample Grocer'
+					}
+				],
+				removed: [{ externalAccountId: 'account-synthetic-checking', sourceId: 'txn-synthetic-2' }]
+			});
 		})
 	);
 });
