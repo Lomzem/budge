@@ -1,0 +1,62 @@
+{
+	"accounts": [
+		{ "account_id": "account-synthetic-checking", "name": "Sample Checking", "type": "depository" }
+	],
+	"added": [
+		{
+			"transaction_id": "txn-synthetic-1",
+			"account_id": "account-synthetic-checking",
+			"amount": 42.5,
+			"iso_currency_code": "USD",
+			"date": "2026-08-14",
+			"name": "SAMPLE GROCER",
+			"original_description": "DEBIT CARD PURCHASE SAMPLE GROCER 0193",
+			"merchant_name": "Sample Grocer",
+			"pending": false,
+			"pending_transaction_id": null,
+			"category": ["Shops"]
+		},
+		{
+			"transaction_id": "txn-synthetic-2",
+			"account_id": "account-synthetic-checking",
+			"amount": -2310.42,
+			"iso_currency_code": "USD",
+			"date": "2026-08-15",
+			"name": "SAMPLE PAYROLL",
+			"original_description": null,
+			"merchant_name": null,
+			"pending": false,
+			"pending_transaction_id": null
+		},
+		{
+			"transaction_id": "txn-synthetic-3",
+			"account_id": "account-synthetic-checking",
+			"amount": 4.5,
+			"iso_currency_code": "USD",
+			"date": "2026-08-16",
+			"name": "SAMPLE COFFEE",
+			"original_description": "SAMPLE COFFEE 0042",
+			"merchant_name": "Sample Coffee",
+			"pending": true,
+			"pending_transaction_id": null
+		},
+		{
+			"transaction_id": "txn-synthetic-4",
+			"account_id": "account-synthetic-checking",
+			"amount": 0.1,
+			"iso_currency_code": "USD",
+			"date": "2026-07-31",
+			"name": "SAMPLE BEFORE CUTOVER",
+			"original_description": null,
+			"merchant_name": null,
+			"pending": false,
+			"pending_transaction_id": null
+		}
+	],
+	"modified": [],
+	"removed": [{ "transaction_id": "txn-synthetic-0", "account_id": "account-synthetic-checking" }],
+	"next_cursor": "cursor-synthetic-2",
+	"has_more": false,
+	"request_id": "request-synthetic-1",
+	"transactions_update_status": "HISTORICAL_UPDATE_COMPLETE"
+}

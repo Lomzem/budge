@@ -114,8 +114,51 @@ async function splitLines(
 }
 
 /**
+ * Refuses a change to a Reconciled Transaction other than its Category, Payee, or memo, until the
+ * owner unlocks it. `action` finishes "Unlock it …"; `otherSide` says the lock is on the other side
+ * of the Transfer the owner is changing, which is unlocked in its own Account.
+ */
+export function requireUnlocked(
+	transaction: Pick<Doc<'transactions'>, 'cleared'>,
+	action: string,
+	otherSide = false
+) {
+	if (transaction.cleared === 'reconciled') {
+		throw publicError(
+			'INVALID_INPUT',
+			otherSide
+				? `The other side of this Transfer is Reconciled. Unlock it in its Account ${action}.`
+				: `This Transaction is Reconciled. Unlock it ${action}.`
+		);
+	}
+}
+
+/** Refuses saving `fields` over a Reconciled Transaction with another amount, date, or Account. */
+function requireLockKept(
+	existing: Doc<'transactions'> | null,
+	fields: Pick<TransactionFields, 'accountId' | 'date' | 'amount'>,
+	otherSide = false
+) {
+	if (
+		existing !== null &&
+		(existing.accountId !== fields.accountId ||
+			existing.date !== fields.date ||
+			existing.amount !== fields.amount)
+	) {
+		requireUnlocked(
+			existing,
+			otherSide
+				? "to change this Transfer's amount or date"
+				: 'to change its amount, date, or Account',
+			otherSide
+		);
+	}
+}
+
+/**
  * Saves what the owner entered, as a new Transaction or over `existing`, which keeps whether it
- * is Cleared. Saving approves it. With `transferAccountId` it saves both sides of a Transfer,
+ * is Cleared. A Reconciled one, or the Reconciled other side of a Transfer, keeps its amount, date,
+ * and Account. Saving approves it. With `transferAccountId` it saves both sides of a Transfer,
  * creating the other side uncleared and approved if there is none yet; an existing other side keeps
  * whether it is Cleared and approved. With `transferTransactionId` as well, that imported
  * Transaction becomes the other side, approved, in place of any other side there was. Without
@@ -136,6 +179,7 @@ export async function saveTransaction(
 		cleared: existing?.cleared ?? 'uncleared',
 		approved: true
 	};
+	requireLockKept(existing, fields);
 	if (fields.payeeId !== undefined) {
 		if (fields.categoryId !== undefined) {
 			await rememberCategory(ctx, fields.payeeId, fields.categoryId);
@@ -154,7 +198,7 @@ export async function saveTransaction(
 		if (transferTransactionId !== undefined) {
 			throw publicError('INVALID_INPUT', 'Pick the Account to transfer with.');
 		}
-		if (counterpart !== null) await deleteOne(ctx, counterpart);
+		if (counterpart !== null) await deleteOtherSide(ctx, counterpart);
 		if (existing === null) return await insertTransaction(ctx, fields, lines);
 		await replaceTransaction(ctx, existing, fields, lines);
 		return existing._id;
@@ -194,7 +238,7 @@ export async function saveTransaction(
 				'Link an imported Transaction with the opposite amount, within 10 days.'
 			);
 		}
-		if (counterpart !== null) await deleteOne(ctx, counterpart);
+		if (counterpart !== null) await deleteOtherSide(ctx, counterpart);
 		otherSide = linked;
 		linking = true;
 	}
@@ -207,6 +251,7 @@ export async function saveTransaction(
 		// Picking the import to link reviews it.
 		approved: linking || otherSide?.approved !== false
 	};
+	requireLockKept(otherSide, other, true);
 	return await writeTransfer(ctx, { existing, fields }, { existing: otherSide, fields: other });
 }
 
@@ -347,13 +392,23 @@ export async function splitLinesOf(ctx: QueryCtx, transactionId: Id<'transaction
 		.take(SPLIT_LINE_LIMIT);
 }
 
-/** Deletes a Transaction, and both sides when it is a Transfer. */
+/** Deletes a Transaction, and both sides when it is a Transfer; neither may be Reconciled. */
 export async function deleteTransaction(ctx: MutationCtx, existing: Doc<'transactions'>) {
+	requireUnlocked(existing, 'to delete it');
 	if (existing.transferTransactionId !== undefined) {
 		const counterpart = await ctx.db.get('transactions', existing.transferTransactionId);
-		if (counterpart !== null) await deleteOne(ctx, counterpart);
+		if (counterpart !== null) {
+			requireUnlocked(counterpart, 'to delete this Transfer', true);
+			await deleteOne(ctx, counterpart);
+		}
 	}
 	await deleteOne(ctx, existing);
+}
+
+/** Deletes the other side of a Transfer the owner is changing into something else. */
+async function deleteOtherSide(ctx: MutationCtx, counterpart: Doc<'transactions'>) {
+	requireUnlocked(counterpart, 'to change this Transfer', true);
+	await deleteOne(ctx, counterpart);
 }
 
 async function deleteOne(ctx: MutationCtx, existing: Doc<'transactions'>) {

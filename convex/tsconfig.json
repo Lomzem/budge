@@ -23,6 +23,11 @@
 					{
 						"include": ["**/*.test.ts", "../src/**/*.test.ts"],
 						"options": { "diagnosticSeverity": { "unstableApiUsage": "off" } }
+					},
+					/* PlaidClient is built on `effect/http`, which Effect still marks unstable. */
+					{
+						"include": ["./lib/plaidClient.ts"],
+						"options": { "diagnosticSeverity": { "unstableApiUsage": "off" } }
 					}
 				]
 			}

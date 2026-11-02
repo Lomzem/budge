@@ -21,8 +21,9 @@ function sampleArgs(ids: {
 	categoryId: Id<'categories'>;
 	importId: Id<'imports'>;
 	payeeId: Id<'payees'>;
+	connectionId: Id<'bankConnections'>;
 }) {
-	const { accountId, transactionId, groupId, categoryId, importId, payeeId } = ids;
+	const { accountId, transactionId, groupId, categoryId, importId, payeeId, connectionId } = ids;
 	const entry = { accountId, date: '2026-08-14', amount: -500, payee: 'Corner Grocer', memo: '' };
 	const args: Record<string, Record<string, unknown>> = {
 		'owner:whoami': {},
@@ -39,9 +40,12 @@ function sampleArgs(ids: {
 		'transactions:update': { transactionId, ...entry },
 		'transactions:remove': { transactionId },
 		'transactions:setCleared': { transactionId, cleared: true },
+		'transactions:unlock': { transactionId },
 		'transactions:approve': { transactionId },
 		'transactions:approveAll': {},
 		'transactions:unapprovedCount': {},
+		'reconciliation:clearedBalance': { accountId },
+		'reconciliation:reconcile': { accountId, balance: 0, date: '2026-08-14' },
 		'transactions:transferCandidates': {
 			transferAccountId: accountId,
 			date: '2026-08-01',
@@ -50,6 +54,8 @@ function sampleArgs(ids: {
 		'imports:preview': { accountId, source: 'csv', rows: [] },
 		'imports:commit': { accountId, source: 'csv', rows: [] },
 		'imports:unmatch': { importId },
+		'bankConnections:list': {},
+		'bankConnections:syncNow': { connectionId },
 		'payees:lastCategory': { name: 'Corner Grocer' },
 		'payees:list': {},
 		'payees:rename': { payeeId, name: 'Corner Market' },
@@ -165,7 +171,12 @@ describe('the owner guard', () => {
 				state: 'linked'
 			});
 			const payeeId = await ctx.db.insert('payees', { name: 'Corner Grocer' });
-			return { accountId, transactionId, groupId, categoryId, importId, payeeId };
+			const connectionId = await ctx.db.insert('bankConnections', {
+				name: 'Sample Bank (Sandbox)',
+				status: 'ok',
+				provider: { kind: 'sandbox' }
+			});
+			return { accountId, transactionId, groupId, categoryId, importId, payeeId, connectionId };
 		});
 		const sample = sampleArgs(ids);
 		const callers = {

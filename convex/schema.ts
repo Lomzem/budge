@@ -14,7 +14,9 @@ export default defineSchema({
 	accounts: defineTable({
 		name: v.string(),
 		kind: v.union(v.literal('cash'), v.literal('creditCard')),
-		position: v.number()
+		position: v.number(),
+		// The date of the last Reconciliation; left out until the first.
+		lastReconciledOn: v.optional(v.string())
 	}),
 
 	// Ready to Assign is a system Category in a hidden system group, and each Credit Card Account
@@ -75,7 +77,9 @@ export default defineSchema({
 		// Its amount is split across lines in `transactionSplits`, each with its own Category.
 		split: v.optional(v.literal(true)),
 		memo: v.optional(v.string()),
-		cleared: v.union(v.literal('uncleared'), v.literal('cleared')),
+		// A Reconciled Transaction is Cleared and locked: its amount, date, and Account can't
+		// change, and it can't be deleted, until the owner unlocks it back to Cleared.
+		cleared: v.union(v.literal('uncleared'), v.literal('cleared'), v.literal('reconciled')),
 		// Imported Transactions arrive Unapproved (`false`). Left out on Transactions written before
 		// imports existed, which read as approved.
 		approved: v.optional(v.boolean()),
@@ -88,6 +92,8 @@ export default defineSchema({
 		searchText: v.optional(v.string())
 	})
 		.index('by_account_date', ['accountId', 'date'])
+		// Reconciliation reads only the uncleared and Cleared ones, never the Reconciled history.
+		.index('by_account_cleared_date', ['accountId', 'cleared', 'date'])
 		.index('by_date', ['date'])
 		.index('by_category_date', ['categoryId', 'date'])
 		.index('by_payee_date', ['payeeId', 'date'])
@@ -122,8 +128,8 @@ export default defineSchema({
 		// The bank's import ID, unique within the Account and source. CSV rows have none.
 		sourceId: v.optional(v.string()),
 		accountId: v.id('accounts'),
-		// Bank sync's Plaid Account the row arrived through; ticket 17 narrows it to an ID.
-		connectionAccountId: v.optional(v.string()),
+		// The bank's Account the row arrived through, for synced rows.
+		connectionAccountId: v.optional(v.id('connectionAccounts')),
 		date: v.string(),
 		amount: v.number(),
 		bankText: v.string(),
@@ -141,6 +147,52 @@ export default defineSchema({
 		.index('by_account_source_sourceId_date', ['accountId', 'source', 'sourceId', 'date'])
 		.index('by_transactionId', ['transactionId'])
 		.index('by_connectionAccountId_state', ['connectionAccountId', 'state']),
+
+	// A Bank Connection: one login at one bank, synced through a provider. `status` and the fields
+	// beside it are provider-neutral; `provider` holds what only that provider understands. The
+	// access token is stored sealed (TokenCipher) and `provider` never leaves the server. The
+	// `sandbox` kind is the synthetic seed's connection: it has no token and never syncs.
+	bankConnections: defineTable({
+		name: v.string(),
+		status: v.union(v.literal('ok'), v.literal('needsAttention')),
+		lastSyncedAt: v.optional(v.number()),
+		// The last sync's failure, worded for the owner; cleared by the next sync that succeeds.
+		lastError: v.optional(v.object({ at: v.number(), message: v.string() })),
+		// While in the future, a sync holds this connection and any other sync request is ignored.
+		syncLeaseUntil: v.optional(v.number()),
+		consentExpiresAt: v.optional(v.number()),
+		provider: v.union(
+			v.object({
+				kind: v.literal('plaid'),
+				itemId: v.string(),
+				encryptedToken: v.string(),
+				// Where the last committed sync stopped; left out before the first.
+				cursor: v.optional(v.string()),
+				// While Plaid is still paging an update, the cursor from before its first page (`null`:
+				// the first sync's). Plaid restarts an update from here if the bank changes mid-way.
+				updateStart: v.optional(v.union(v.string(), v.null()))
+			}),
+			v.object({ kind: v.literal('sandbox') })
+		)
+	}).index('by_itemId', ['provider.itemId']),
+
+	// The bank's Accounts under a Bank Connection. A mapped one feeds a Budge Account; rows from a
+	// held one wait for the owner to map it, and an ignored one's rows are dropped.
+	connectionAccounts: defineTable(
+		v.union(
+			v.object({
+				connectionId: v.id('bankConnections'),
+				externalId: v.string(),
+				state: v.literal('mapped'),
+				accountId: v.id('accounts')
+			}),
+			v.object({
+				connectionId: v.id('bankConnections'),
+				externalId: v.string(),
+				state: v.union(v.literal('held'), v.literal('ignored'))
+			})
+		)
+	).index('by_connection_externalId', ['connectionId', 'externalId']),
 
 	// A rebuildable cache of summed Transactions per month, Account, and bucket (ADR 0002). Every
 	// Transaction write keeps it in the same mutation; no rule reads it as a source of truth.
