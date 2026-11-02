@@ -33,10 +33,12 @@ pre-commit:
     - name: gitleaks
       run: gitleaks git --staged --redact --no-banner
 
+# SSR tests regenerate SvelteKit types with deliberately incomplete env settings.
+# Typecheck syncs them back afterward; running these in parallel races that sync.
 pre-push:
-  parallel: true
+  piped: true
   jobs:
-    - name: typecheck
-      run: bun run typecheck
     - name: test
       run: bun run test
+    - name: typecheck
+      run: bun run typecheck
