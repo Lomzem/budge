@@ -1,12 +1,12 @@
 import { v } from 'convex/values';
 
 import type { Doc, Id } from './_generated/dataModel';
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
-import { fileRow, fileSource, planImport } from './lib/imports';
+import { mutation, query, type QueryCtx } from './_generated/server';
+import { applyBankRows, fileRow, fileSource, insertImported, planImport } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import { importedPayee, ImportedPayees } from './lib/payees';
-import { bankRowsOf, insertTransaction, requireUnlocked } from './lib/transactions';
+import { ImportedPayees } from './lib/payees';
+import { bankRowsOf, requireUnlocked } from './lib/transactions';
 
 const candidate = v.object({
 	_id: v.id('transactions'),
@@ -87,42 +87,13 @@ export const commit = mutation({
 		if (decisions.some((decision) => decision.kind === 'ask')) {
 			throw publicError('INVALID_INPUT', 'Pick a Match for every row that has more than one.');
 		}
-		const counts = { added: 0, matched: 0, skipped: 0 };
-		const payees = new ImportedPayees();
-		for (const [index, decision] of decisions.entries()) {
-			const row = rows[index];
-			if (row === undefined) continue;
-			const bankRow = {
-				source,
-				...(row.sourceId === undefined ? {} : { sourceId: row.sourceId }),
-				accountId,
-				date: row.date,
-				amount: row.amount,
-				bankText: row.bankText,
-				state: 'linked' as const
-			};
-			if (decision.kind === 'match') {
-				// A file row can Match one sync imported and Reconciled already; it stays locked.
-				const reconciled = candidates.get(decision.transactionId)?.cleared === 'reconciled';
-				await ctx.db.patch('transactions', decision.transactionId, {
-					cleared: reconciled ? 'reconciled' : 'cleared',
-					approved: false
-				});
-				await ctx.db.insert('imports', {
-					...bankRow,
-					transactionId: decision.transactionId,
-					matched: true
-				});
-				counts.matched++;
-			} else if (decision.kind === 'new') {
-				const transactionId = await insertImported(ctx, accountId, row, payees);
-				await ctx.db.insert('imports', { ...bankRow, transactionId, matched: false });
-				counts.added++;
-			} else {
-				counts.skipped++;
-			}
-		}
-		return counts;
+		return await applyBankRows(
+			ctx,
+			accountId,
+			source,
+			{ rows, decisions, candidates },
+			new ImportedPayees()
+		);
 	}
 });
 
@@ -153,26 +124,6 @@ export const unmatch = mutation({
 		return transactionId;
 	}
 });
-
-/**
- * A Transaction for a Bank Row of its own: Cleared and Unapproved, with the Payee and Category that
- * rename and Payee memory give its Bank Text.
- */
-async function insertImported(
-	ctx: MutationCtx,
-	accountId: Id<'accounts'>,
-	row: { date: string; amount: number; bankText: string },
-	payees?: ImportedPayees
-) {
-	return await insertTransaction(ctx, {
-		accountId,
-		date: row.date,
-		amount: row.amount,
-		...(await importedPayee(ctx, row, payees)),
-		cleared: 'cleared',
-		approved: false
-	});
-}
 
 async function describeCandidate(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 	const payee =
