@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# CodeRabbit reviews every ticket PR. The merge rule lives in AGENTS.md ("Pull requests").
+# CodeRabbit reviews each feature-slice PR. The merge rule lives in AGENTS.md ("Pull requests").
 language: en-US
 
 reviews:
@@ -11,7 +11,7 @@ reviews:
     # An author's `@coderabbitai approve` must not stand in for a review.
     allow_author_approval: false
   auto_review:
-    enabled: true
+    enabled: false
     drafts: false
     # Dependency bumps are checked by CI; skipping them saves the free plan's rate limit.
     ignore_usernames:

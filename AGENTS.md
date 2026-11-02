@@ -27,7 +27,9 @@ Before running Playwright E2E or changing Clerk setup, sign-in, or CI authentica
 
 ## Pull requests
 
-Every ticket from 02 onward is a branch and a PR into `main`, squash-merged once CodeRabbit approves. Docs, `.scratch/`, ticket 01 (the scaffold), and small fixes outside a ticket are committed straight to `main`. When unsure, open a PR.
+**Local review per ticket:** before a ticket enters a PR, review it locally with the `code-review` skill and fix or answer every finding.
+
+**Feature-slice PRs:** group related tickets (typically 3–5) into one branch and PR into `main`, squash-merged once CodeRabbit approves. This fits CodeRabbit's review limit of about one per hour. Docs, `.scratch/`, ticket 01 (the scaffold), and small fixes outside a ticket are committed straight to `main`. When unsure, open a PR.
 
 `main` has no branch protection, so this merge rule is the gate:
 
