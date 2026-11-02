@@ -2,8 +2,9 @@ import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { addDays } from '../../src/lib/domain/dates';
 import { MATCH_WINDOW_DAYS } from '../../src/lib/domain/matcher';
+import { SPLIT_LINE_LIMIT } from '../../src/lib/domain/splits';
 import { requireCents } from './input';
-import { countTransaction } from './monthlyTotals';
+import { countTransaction, lineCounted } from './monthlyTotals';
 import { payeeNamed, rememberCategory, rememberRename } from './payees';
 import { requireCutoverDate, requireIsoDate } from './settings';
 import { publicError } from './publicError';
@@ -13,15 +14,27 @@ export type TransactionFields = Omit<Doc<'transactions'>, '_id' | '_creationTime
 	approved: boolean;
 };
 
+/** One line of a split Transaction, as the owner enters it. */
+export interface SplitInput {
+	categoryId: Id<'categories'>;
+	amount: number;
+	memo: string;
+}
+
+/** A checked split line, before it takes its Transaction's ID and date. */
+export type SplitLine = Pick<Doc<'transactionSplits'>, 'categoryId' | 'amount' | 'memo'>;
+
 /** What the owner enters for a Transaction; the Payee is a name, blank for none. */
 export interface TransactionInput {
 	accountId: Id<'accounts'>;
 	date: string;
 	amount: number;
 	payee: string;
-	/** Left out for Uncategorized. */
+	/** Left out for Uncategorized, and for a split. */
 	categoryId?: Id<'categories'> | undefined;
 	memo: string;
+	/** Two or more lines summing to `amount`, which split the Transaction across Categories. */
+	splits?: readonly SplitInput[] | undefined;
 	/** The other Account, which makes this a Transfer; it then has no Category and no Payee. */
 	transferAccountId?: Id<'accounts'> | undefined;
 	/**
@@ -34,7 +47,7 @@ export interface TransactionInput {
 /** Checks a hand-entered Transaction and resolves its Payee, creating it on first use. */
 export async function transactionFields(
 	ctx: MutationCtx,
-	input: Omit<TransactionInput, 'transferAccountId' | 'transferTransactionId'>
+	input: Omit<TransactionInput, 'transferAccountId' | 'transferTransactionId' | 'splits'>
 ): Promise<Omit<TransactionFields, 'cleared' | 'approved'>> {
 	if ((await ctx.db.get('accounts', input.accountId)) === null) throw publicError('NOT_FOUND');
 	requireIsoDate(input.date);
@@ -42,12 +55,7 @@ export async function transactionFields(
 		throw publicError('INVALID_INPUT', 'Budge starts on the cutover date; pick a later date.');
 	}
 	if (input.categoryId !== undefined) {
-		const category = await ctx.db.get('categories', input.categoryId);
-		if (category === null) throw publicError('NOT_FOUND');
-		// Only a card's starting debt sits in its Payment Category, where the card's move cancels it.
-		if (category.kind === 'creditCardPayment' && category.accountId !== input.accountId) {
-			throw publicError('INVALID_INPUT', "A Payment Category takes only its card's starting debt.");
-		}
+		await requireCategoryFor(ctx, input.categoryId, input.accountId);
 	}
 	const payeeId = await payeeNamed(ctx, input.payee);
 	const memo = input.memo.trim();
@@ -61,23 +69,70 @@ export async function transactionFields(
 	};
 }
 
+/** Checks that a Transaction in `accountId`, or one of its split lines, may take this Category. */
+async function requireCategoryFor(
+	ctx: MutationCtx,
+	categoryId: Id<'categories'>,
+	accountId: Id<'accounts'>
+) {
+	const category = await ctx.db.get('categories', categoryId);
+	if (category === null) throw publicError('NOT_FOUND');
+	// Only a card's starting debt sits in its Payment Category, where the card's move cancels it.
+	if (category.kind === 'creditCardPayment' && category.accountId !== accountId) {
+		throw publicError('INVALID_INPUT', "A Payment Category takes only its card's starting debt.");
+	}
+}
+
+/**
+ * Checks a split's lines: two or more, each with a Category it may take, summing to the
+ * Transaction's amount. No lines means the Transaction isn't split.
+ */
+async function splitLines(
+	ctx: MutationCtx,
+	input: Omit<TransactionInput, 'transferAccountId'>
+): Promise<SplitLine[]> {
+	if (input.splits === undefined || input.splits.length === 0) return [];
+	if (input.categoryId !== undefined) {
+		throw publicError('INVALID_INPUT', 'A split Transaction takes its Categories on its lines.');
+	}
+	if (input.splits.length < 2 || input.splits.length > SPLIT_LINE_LIMIT) {
+		throw publicError('INVALID_INPUT', `A split takes 2 to ${String(SPLIT_LINE_LIMIT)} lines.`);
+	}
+	const lines: SplitLine[] = [];
+	let sum = 0;
+	for (const split of input.splits) {
+		await requireCategoryFor(ctx, split.categoryId, input.accountId);
+		const amount = requireCents(split.amount);
+		sum += amount;
+		const memo = split.memo.trim();
+		lines.push({ categoryId: split.categoryId, amount, ...(memo === '' ? {} : { memo }) });
+	}
+	if (sum !== requireCents(input.amount)) {
+		throw publicError('INVALID_INPUT', "The split lines must add up to the Transaction's amount.");
+	}
+	return lines;
+}
+
 /**
  * Saves what the owner entered, as a new Transaction or over `existing`, which keeps whether it
  * is Cleared. Saving approves it. With `transferAccountId` it saves both sides of a Transfer,
  * creating the other side uncleared and approved if there is none yet; an existing other side keeps
  * whether it is Cleared and approved. With `transferTransactionId` as well, that imported
  * Transaction becomes the other side, approved, in place of any other side there was. Without
- * `transferAccountId`, an existing Transfer's other side is deleted. Giving the Payee a Category
- * updates Payee memory, and renaming the Payee of an imported Transaction updates rename memory
- * for each of its Bank Texts.
+ * `transferAccountId`, an existing Transfer's other side is deleted. With `splits` it saves the
+ * lines in place of any it had; without them, an existing split's lines are deleted. Giving the
+ * Payee a Category updates Payee memory, and renaming the Payee of an imported Transaction updates
+ * rename memory for each of its Bank Texts.
  */
 export async function saveTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'> | null,
 	{ transferAccountId, transferTransactionId, ...input }: TransactionInput
 ): Promise<Id<'transactions'>> {
-	const fields = {
+	const lines = await splitLines(ctx, input);
+	const fields: TransactionFields = {
 		...(await transactionFields(ctx, input)),
+		...(lines.length === 0 ? {} : { split: true }),
 		cleared: existing?.cleared ?? 'uncleared',
 		approved: true
 	};
@@ -100,8 +155,8 @@ export async function saveTransaction(
 			throw publicError('INVALID_INPUT', 'Pick the Account to transfer with.');
 		}
 		if (counterpart !== null) await deleteOne(ctx, counterpart);
-		if (existing === null) return await insertTransaction(ctx, fields);
-		await replaceTransaction(ctx, existing, fields);
+		if (existing === null) return await insertTransaction(ctx, fields, lines);
+		await replaceTransaction(ctx, existing, fields, lines);
 		return existing._id;
 	}
 
@@ -120,7 +175,7 @@ export async function saveTransaction(
 	if ((source?.kind !== 'cash' || target.kind !== 'cash') && cashSideAmount > 0) {
 		throw publicError('INVALID_INPUT', 'A card payment moves money from a Cash Account.');
 	}
-	if (fields.categoryId !== undefined || fields.payeeId !== undefined) {
+	if (fields.categoryId !== undefined || fields.payeeId !== undefined || lines.length > 0) {
 		throw publicError('INVALID_INPUT', 'A Transfer has no Category or Payee.');
 	}
 	let otherSide = counterpart;
@@ -190,7 +245,7 @@ interface Side {
 /** Writes both sides of a Transfer, each pointing at the other, and returns the first side. */
 async function writeTransfer(ctx: MutationCtx, first: Side, second: Side) {
 	for (const side of [first, second]) {
-		if (side.existing !== null) await countTransaction(ctx, side.existing, -1);
+		if (side.existing !== null) await takeOut(ctx, side.existing);
 	}
 	const firstId = first.existing?._id ?? (await ctx.db.insert('transactions', first.fields));
 	const secondFields = { ...second.fields, transferTransactionId: firstId };
@@ -208,22 +263,61 @@ async function writeTransfer(ctx: MutationCtx, first: Side, second: Side) {
 	return firstId;
 }
 
-// Every Transaction write goes through these three, so the monthly totals stay in step.
+// Every Transaction write goes through these three, so the monthly totals and split lines stay in
+// step. `lines` are a split's, given with `split: true` in `fields`.
 
-export async function insertTransaction(ctx: MutationCtx, fields: TransactionFields) {
+export async function insertTransaction(
+	ctx: MutationCtx,
+	fields: TransactionFields,
+	lines: readonly SplitLine[] = []
+) {
 	const id = await ctx.db.insert('transactions', fields);
-	await countTransaction(ctx, fields, 1);
+	await putIn(ctx, id, fields, lines);
 	return id;
 }
 
+/** Writes `fields` over `existing`, with `lines` in place of the lines it had. */
 export async function replaceTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'>,
-	fields: TransactionFields
+	fields: TransactionFields,
+	lines: readonly SplitLine[] = []
 ) {
-	await countTransaction(ctx, existing, -1);
+	await takeOut(ctx, existing);
 	await ctx.db.replace('transactions', existing._id, fields);
+	await putIn(ctx, existing._id, fields, lines);
+}
+
+/** Counts a written Transaction, and writes its split lines with its date and counts them. */
+async function putIn(
+	ctx: MutationCtx,
+	transactionId: Id<'transactions'>,
+	fields: TransactionFields,
+	lines: readonly SplitLine[]
+) {
 	await countTransaction(ctx, fields, 1);
+	for (const line of lines) {
+		const written = { ...line, transactionId, date: fields.date };
+		await ctx.db.insert('transactionSplits', written);
+		await countTransaction(ctx, lineCounted(fields, written), 1);
+	}
+}
+
+/** Takes a Transaction out of the monthly totals, and deletes its split lines. */
+async function takeOut(ctx: MutationCtx, existing: Doc<'transactions'>) {
+	await countTransaction(ctx, existing, -1);
+	for (const line of await splitLinesOf(ctx, existing._id)) {
+		await countTransaction(ctx, lineCounted(existing, line), -1);
+		await ctx.db.delete('transactionSplits', line._id);
+	}
+}
+
+/** A split Transaction's lines, in the order they were entered. */
+export async function splitLinesOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	return await ctx.db
+		.query('transactionSplits')
+		.withIndex('by_transaction', (q) => q.eq('transactionId', transactionId))
+		.take(SPLIT_LINE_LIMIT);
 }
 
 /** Deletes a Transaction, and both sides when it is a Transfer. */
@@ -236,7 +330,7 @@ export async function deleteTransaction(ctx: MutationCtx, existing: Doc<'transac
 }
 
 async function deleteOne(ctx: MutationCtx, existing: Doc<'transactions'>) {
-	await countTransaction(ctx, existing, -1);
+	await takeOut(ctx, existing);
 	await ctx.db.delete('transactions', existing._id);
 	// Its Bank Rows stay, unlinked, so importing the same file again doesn't bring it back.
 	for (const bankRow of await bankRowsOf(ctx, existing._id)) {

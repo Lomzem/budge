@@ -9,8 +9,8 @@ import { replaceTransaction } from './lib/transactions';
 /**
  * Gives each Credit Card Account made before Credit Card Accounts arrived what a new card gets: its
  * Payment Category, holding its starting debt. Returns how many cards it repaired, and the cards whose
- * starting debt it couldn't find because the owner has since changed its date or Payee; the owner moves
- * those into the Payment Category by hand. Running it again repairs none.
+ * starting debt it couldn't find because the owner has since changed its date or Payee, or split it; the
+ * owner moves those into the Payment Category by hand. Running it again repairs none.
  */
 export const backfillPaymentCategories = internalMutation({
 	args: {},
@@ -38,7 +38,9 @@ export const backfillPaymentCategories = internalMutation({
 				if (
 					startingBalance === null ||
 					transaction.payeeId !== startingBalance._id ||
-					transaction.categoryId !== undefined
+					transaction.categoryId !== undefined ||
+					// A split's lines hold its Categories, so a split starting debt stays as the owner left it.
+					transaction.split === true
 				) {
 					continue;
 				}

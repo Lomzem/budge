@@ -45,6 +45,8 @@ test.each([1, 2, 3, 4, 5])(
 			await owner.mutation(api.categories.create, { groupId, name: 'Groceries' }),
 			await owner.mutation(api.categories.create, { groupId, name: 'Transit' })
 		];
+		const lineCategories = categories.filter((c) => c !== undefined);
+		let splitsEntered = 0;
 		const live: Id<'transactions'>[] = [];
 		const entry = () => {
 			const accountId = rand.pick(accounts);
@@ -70,6 +72,19 @@ test.each([1, 2, 3, 4, 5])(
 					};
 				}
 			}
+			// About one in five of the rest is split in two lines across Categories.
+			if (rand.int(5) === 0) {
+				splitsEntered++;
+				const first = rand.pick([-250, 0, 300]);
+				return {
+					...shared,
+					payee: rand.pick(payees),
+					splits: [
+						{ categoryId: rand.pick(lineCategories), amount: first, memo: '' },
+						{ categoryId: rand.pick(lineCategories), amount: shared.amount - first, memo: '' }
+					]
+				};
+			}
 			const categoryId = rand.pick(categories);
 			return {
 				...shared,
@@ -78,7 +93,7 @@ test.each([1, 2, 3, 4, 5])(
 			};
 		};
 
-		for (let step = 0; step < 80; step++) {
+		for (let step = 0; step < 100; step++) {
 			const action = live.length === 0 ? 0 : rand.int(4);
 			if (action <= 1) {
 				live.push(await owner.mutation(api.transactions.create, entry()));
@@ -114,5 +129,6 @@ test.each([1, 2, 3, 4, 5])(
 		expect(await readTotals()).toEqual(kept);
 		expect(kept.every((row) => row.count > 0)).toBe(true);
 		expect(kept.some((row) => row.bucket === 'transfer')).toBe(true);
+		expect(splitsEntered).toBeGreaterThan(0);
 	}
 );

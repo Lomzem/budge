@@ -127,12 +127,14 @@
 			<Table.Body>
 				{#each rows as row (row._id)}
 					{@const payee = row.payeeName ?? (row.transfer ? 'Transfer' : 'No Payee')}
-					<!-- A Transfer shows the other Account in place of a Category. -->
+					<!-- A Transfer shows the other Account in place of a Category, and a split "Split". -->
 					{@const category = row.transfer
 						? `${row.amount < 0 ? 'To' : 'From'} ${row.transfer.accountName}`
-						: (row.categoryName ?? 'Uncategorized')}
+						: row.splits
+							? 'Split'
+							: (row.categoryName ?? 'Uncategorized')}
 					{@const categoryClass =
-						row.categoryName === null && !row.transfer ? 'text-warning' : undefined}
+						row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
 					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
 						<Table.Cell numeric>
 							<time datetime={row.date}>

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
 
@@ -267,3 +267,53 @@ test.each(['create-then-import', 'link-existing'] as const)(
 		expect(await budget()).toEqual(await byHand.budget());
 	}
 );
+
+test('linking a split import as the other side leaves no split lines behind', async () => {
+	const { owner, t, checking, savings, rows, importCsv } = await budgetWithTwoCashAccounts();
+	const everyday = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
+	const category = (name: string) =>
+		owner.mutation(api.categories.create, { groupId: everyday, name });
+	const [groceries, household] = [await category('Groceries'), await category('Household')];
+	await importCsv(checking, outOfChecking);
+	await importCsv(savings, intoSavings);
+	const [fromChecking] = await rows(checking);
+	const [toSavings] = await rows(savings);
+	if (fromChecking === undefined || toSavings === undefined) throw new Error('No import');
+	await owner.mutation(api.transactions.update, {
+		transactionId: toSavings._id,
+		accountId: savings,
+		date: toSavings.date,
+		amount: toSavings.amount,
+		payee: 'Sample Payee',
+		memo: '',
+		splits: [
+			{ categoryId: groceries, amount: 20_000, memo: '' },
+			{ categoryId: household, amount: 5_000, memo: '' }
+		]
+	});
+
+	await owner.mutation(api.transactions.update, {
+		...asTransfer(fromChecking, savings),
+		transferTransactionId: toSavings._id
+	});
+
+	expect(await rows(savings)).toMatchObject([
+		{ _id: toSavings._id, splits: null, transfer: { accountId: checking } }
+	]);
+	expect(await t.run((ctx) => ctx.db.query('transactionSplits').collect())).toEqual([]);
+	const totals = async () =>
+		(await t.run((ctx) => ctx.db.query('monthlyTotals').collect()))
+			.map(({ month, accountId, bucket, amount, count }) => ({
+				month,
+				accountId,
+				bucket,
+				amount,
+				count
+			}))
+			.sort((a, b) =>
+				`${a.month}${a.accountId}${a.bucket}`.localeCompare(`${b.month}${b.accountId}${b.bucket}`)
+			);
+	const kept = await totals();
+	await t.mutation(internal.monthlyTotals.rebuild, {});
+	expect(await totals()).toEqual(kept);
+});

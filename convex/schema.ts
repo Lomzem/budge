@@ -70,8 +70,10 @@ export default defineSchema({
 		date: v.string(),
 		amount: v.number(),
 		payeeId: v.optional(v.id('payees')),
-		// No Category means Uncategorized.
+		// No Category means Uncategorized, unless it is split.
 		categoryId: v.optional(v.id('categories')),
+		// Its amount is split across lines in `transactionSplits`, each with its own Category.
+		split: v.optional(v.literal(true)),
 		memo: v.optional(v.string()),
 		cleared: v.union(v.literal('uncleared'), v.literal('cleared')),
 		// Imported Transactions arrive Unapproved (`false`). Left out on Transactions written before
@@ -87,6 +89,19 @@ export default defineSchema({
 		// Unapproved first: `approved: false` ranges for the review list.
 		.index('by_approved_date', ['approved', 'date'])
 		.index('by_account_approved_date', ['accountId', 'approved', 'date']),
+
+	// One line of a split Transaction. The lines sum to the Transaction's amount, and each follows
+	// the budget rules on its own. `date` is the Transaction's, kept in step for the
+	// Category-by-date reads.
+	transactionSplits: defineTable({
+		transactionId: v.id('transactions'),
+		categoryId: v.id('categories'),
+		amount: v.number(),
+		memo: v.optional(v.string()),
+		date: v.string()
+	})
+		.index('by_category_date', ['categoryId', 'date'])
+		.index('by_transaction', ['transactionId']),
 
 	// Bank Rows: what a bank reported, kept apart from what the owner entered. A Bank Row links to
 	// the Transaction it created or Matched. Rows are never deleted, so a known import ID (or, for

@@ -14,6 +14,7 @@
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { formatDate, isIsoDate, localIsoDate } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
+	import { SPLIT_LINE_LIMIT } from '$lib/domain/splits';
 	import { readPublicError } from '$lib/publicError';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
@@ -41,10 +42,14 @@
 	let date = $state('');
 	let payee = $state('');
 	/**
-	 * What the form opened with or the owner picked: a Category ID, `''` for Uncategorized, or
-	 * `transfer:` and the other Account's ID. Payee memory can stand in for it until the owner picks.
+	 * What the form opened with or the owner picked: a Category ID, `''` for Uncategorized, `split`
+	 * for a split, or `transfer:` and the other Account's ID. Payee memory can stand in for it until
+	 * the owner picks.
 	 */
 	let chosenCategoryId = $state('');
+	/** A split's lines. Amounts follow the Direction; a minus sign turns a line the other way. */
+	let lines: { key: number; categoryId: string; amount: string; memo: string }[] = $state([]);
+	let nextLineKey = 0;
 	let direction: 'outflow' | 'inflow' = $state('outflow');
 	let amount = $state('');
 	let memo = $state('');
@@ -102,6 +107,23 @@
 	const categoryId = $derived(prefillsCategory ? rememberedCategoryId : chosenCategoryId);
 
 	const TRANSFER = 'transfer:';
+	const SPLIT = 'split';
+	const isSplit = $derived(categoryId === SPLIT);
+	/** What is left to split, in the Direction's terms, or `undefined` while an amount isn't one. */
+	const remainder = $derived.by(() => {
+		const total = parseCents(amount);
+		if (total === undefined) return undefined;
+		let left = Math.abs(total);
+		for (const line of lines) {
+			// A line not filled in yet holds nothing.
+			const cents = line.amount.trim() === '' ? 0 : parseCents(line.amount);
+			if (cents === undefined) return undefined;
+			left -= cents;
+		}
+		return left;
+	});
+	/** Whether a line has no amount yet, so a zero remainder isn't a finished split. */
+	const blankLine = $derived(lines.some((line) => line.amount.trim() === ''));
 	/** The other Account picked for a Transfer, or `undefined` for an ordinary Transaction. */
 	const transferAccountId = $derived(
 		categoryId.startsWith(TRANSFER) ? categoryId.slice(TRANSFER.length) : undefined
@@ -118,14 +140,12 @@
 			!(isCash && accounts.cash.some((account) => account._id === transferAccountId))
 	);
 	// A Payment Category isn't offered, so keep a card's starting debt in the one it sits in.
-	const savedCategoryUnlisted = $derived(
-		transaction?.categoryId !== undefined &&
-			categories.data !== undefined &&
-			transaction.categoryId !== categories.data.readyToAssignId &&
-			!categories.data.groups.some((group) =>
-				group.categories.some((c) => c._id === transaction.categoryId)
-			)
-	);
+	const isUnlisted = (id: string | null | undefined) =>
+		id !== null &&
+		id !== undefined &&
+		categories.data !== undefined &&
+		id !== categories.data.readyToAssignId &&
+		!categories.data.groups.some((group) => group.categories.some((c) => c._id === id));
 
 	const LINK_NONE = 'new';
 	/** What the owner picked for the other side; left unset, Budge picks. */
@@ -181,10 +201,19 @@
 			payee = transaction.payeeName ?? '';
 			chosenCategoryId = transaction.transfer
 				? TRANSFER + transaction.transfer.accountId
-				: (transaction.categoryId ?? '');
+				: transaction.splits
+					? SPLIT
+					: (transaction.categoryId ?? '');
 			direction = transaction.amount < 0 ? 'outflow' : 'inflow';
 			amount = formatCents(Math.abs(transaction.amount)).replace('$', '');
 			memo = transaction.memo ?? '';
+			const sign = transaction.amount < 0 ? -1 : 1;
+			lines = (transaction.splits ?? []).map((line) => ({
+				key: nextLineKey++,
+				categoryId: line.categoryId,
+				amount: formatCents(sign * line.amount).replace('$', ''),
+				memo: line.memo ?? ''
+			}));
 		} else {
 			accountId = defaultAccountId ?? accounts.all[0]?._id ?? '';
 			date = localIsoDate(new Date());
@@ -193,9 +222,26 @@
 			direction = 'outflow';
 			amount = '';
 			memo = '';
+			lines = [];
 		}
 		filledCategoryId = chosenCategoryId;
 		categoryPicked = false;
+	}
+
+	function addLine(lineAmount = '') {
+		if (lines.length >= SPLIT_LINE_LIMIT) return;
+		lines.push({ key: nextLineKey++, categoryId: '', amount: lineAmount, memo: '' });
+	}
+
+	/** Picking Split starts two lines, the first holding the whole amount and any Category. */
+	function startSplit(previous: string) {
+		if (lines.length > 0) return;
+		// The amount's Direction is set apart, so the first line takes its size alone.
+		const total = parseCents(amount);
+		addLine(total === undefined ? amount : formatCents(Math.abs(total)).replace('$', ''));
+		addLine();
+		const first = lines[0];
+		if (first && previous !== '' && !previous.startsWith(TRANSFER)) first.categoryId = previous;
 	}
 
 	/** The Category picked, or `undefined` for Uncategorized. */
@@ -203,6 +249,8 @@
 		if (id === '') return undefined;
 		const list = categories.data;
 		if (id === transaction?.categoryId) return transaction.categoryId;
+		const savedLine = transaction?.splits?.find((line) => line.categoryId === id);
+		if (savedLine) return savedLine.categoryId;
 		if (!list) return undefined;
 		if (id === list.readyToAssignId) return list.readyToAssignId;
 		return list.groups.flatMap((group) => group.categories).find((c) => c._id === id)?._id;
@@ -228,7 +276,32 @@
 			memo
 		};
 		let fields;
-		if (transferAccountId === undefined) {
+		if (isSplit) {
+			const splits = [];
+			for (const line of lines) {
+				const category = findCategory(line.categoryId);
+				const cents = parseCents(line.amount);
+				if (category === undefined) {
+					error = 'Pick a Category for each line.';
+					return;
+				}
+				if (cents === undefined) {
+					error = "Enter each line's amount, such as 12.50.";
+					return;
+				}
+				const signed = direction === 'outflow' ? -cents : cents;
+				splits.push({ categoryId: category, amount: signed, memo: line.memo });
+			}
+			if (splits.length < 2) {
+				error = 'A split needs two or more lines.';
+				return;
+			}
+			if (remainder !== 0) {
+				error = 'The lines must add up to the amount.';
+				return;
+			}
+			fields = { ...shared, payee, splits };
+		} else if (transferAccountId === undefined) {
 			const category = findCategory(categoryId);
 			fields = { ...shared, payee, ...(category === undefined ? {} : { categoryId: category }) };
 		} else {
@@ -304,6 +377,112 @@
 	}
 </script>
 
+{#snippet categoryOptions(savedId: string | undefined, savedName: string | undefined)}
+	{#if categories.data}
+		{#if isUnlisted(savedId) && savedId}
+			<option value={savedId}>{savedName}</option>
+		{/if}
+		{#if categories.data.readyToAssignId !== null}
+			<option value={categories.data.readyToAssignId}>Ready to Assign</option>
+		{/if}
+		{#each categories.data.groups as group (group._id)}
+			<optgroup label={group.name}>
+				{#each group.categories as category (category._id)}
+					<option value={category._id}>{category.name}</option>
+				{/each}
+			</optgroup>
+		{/each}
+	{:else if savedId}
+		<!-- Keeps the saved Category selected while the list loads. -->
+		<option value={savedId}>{savedName}</option>
+	{/if}
+{/snippet}
+
+{#snippet splitLines()}
+	<fieldset class="flex flex-col gap-3 rounded-lg border border-border p-3">
+		<legend class="px-1 text-sm font-medium">Split lines</legend>
+		<ol class="flex flex-col gap-3">
+			{#each lines as line, index (line.key)}
+				{@const saved = transaction?.splits?.find((s) => s.categoryId === line.categoryId)}
+				{@const number = index + 1}
+				<li class="flex flex-col gap-2">
+					<div class="flex items-end gap-2">
+						<div class="flex min-w-0 flex-1 flex-col gap-1">
+							<Label for={`split-category-${String(line.key)}`}>Line {number} Category</Label>
+							<select
+								id={`split-category-${String(line.key)}`}
+								bind:value={line.categoryId}
+								required
+								class="h-8 min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+							>
+								<option value="" disabled>Pick a Category</option>
+								{@render categoryOptions(saved?.categoryId, saved?.categoryName)}
+							</select>
+						</div>
+						<div class="flex w-28 flex-col gap-1">
+							<Label for={`split-amount-${String(line.key)}`}>Line {number} amount</Label>
+							<Input
+								id={`split-amount-${String(line.key)}`}
+								bind:value={line.amount}
+								inputmode="decimal"
+								placeholder="0.00"
+								autocomplete="off"
+								required
+							/>
+						</div>
+					</div>
+					<div class="flex items-end gap-2">
+						<div class="flex min-w-0 flex-1 flex-col gap-1">
+							<Label for={`split-memo-${String(line.key)}`}>Line {number} memo</Label>
+							<Input
+								id={`split-memo-${String(line.key)}`}
+								bind:value={line.memo}
+								autocomplete="off"
+							/>
+						</div>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							disabled={lines.length <= 2}
+							onclick={() => lines.splice(index, 1)}
+						>
+							Remove<span class="sr-only"> line {number}</span>
+						</Button>
+					</div>
+				</li>
+			{/each}
+		</ol>
+		<div class="flex flex-wrap items-center justify-between gap-2">
+			<Button
+				type="button"
+				variant="outline"
+				size="sm"
+				disabled={lines.length >= SPLIT_LINE_LIMIT}
+				onclick={() => {
+					addLine();
+				}}>Add line</Button
+			>
+			<p aria-live="polite" class="text-sm font-medium">
+				{#if remainder === undefined}
+					Enter amounts such as 12.50 to see what is left.
+				{:else if remainder === 0 && blankLine}
+					Nothing left for the empty line
+				{:else if remainder === 0}
+					Fully split
+				{:else if remainder > 0}
+					{formatCents(remainder)} left to split
+				{:else}
+					{formatCents(-remainder)} over the amount
+				{/if}
+			</p>
+		</div>
+		<p class="text-sm text-muted-foreground">
+			Line amounts follow the Direction; a minus sign turns a line the other way.
+		</p>
+	</fieldset>
+{/snippet}
+
 <Dialog.Root bind:open>
 	<Dialog.Content>
 		<Dialog.Header>
@@ -340,6 +519,7 @@
 					bind:value={
 						() => categoryId,
 						(value: string) => {
+							if (value === SPLIT) startSplit(categoryId === UNRESOLVED ? '' : categoryId);
 							chosenCategoryId = value;
 							categoryPicked = true;
 						}
@@ -355,24 +535,11 @@
 						</option>
 					{/if}
 					<option value="">Uncategorized</option>
-					{#if categories.data}
-						{#if savedCategoryUnlisted && transaction?.categoryId}
-							<option value={transaction.categoryId}>{transaction.categoryName}</option>
-						{/if}
-						{#if categories.data.readyToAssignId !== null}
-							<option value={categories.data.readyToAssignId}>Ready to Assign</option>
-						{/if}
-						{#each categories.data.groups as group (group._id)}
-							<optgroup label={group.name}>
-								{#each group.categories as category (category._id)}
-									<option value={category._id}>{category.name}</option>
-								{/each}
-							</optgroup>
-						{/each}
-					{:else if transaction?.categoryId}
-						<!-- Keeps the saved Category selected while the list loads. -->
-						<option value={transaction.categoryId}>{transaction.categoryName}</option>
-					{/if}
+					<option value={SPLIT}>Split across Categories</option>
+					{@render categoryOptions(
+						transaction?.categoryId ?? undefined,
+						transaction?.categoryName ?? undefined
+					)}
 					{#if transferAccounts.length > 0}
 						<optgroup label="Transfer to or from">
 							{#each transferAccounts as account (account._id)}
@@ -383,6 +550,9 @@
 				</select>
 				{#if recallFailed !== undefined}
 					<p class="text-sm text-destructive" role="alert">{recallFailed}</p>
+				{/if}
+				{#if isSplit}
+					{@render splitLines()}
 				{/if}
 				{#if isTransfer}
 					<p class="text-sm text-muted-foreground">
