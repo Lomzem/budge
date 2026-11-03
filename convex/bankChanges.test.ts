@@ -343,6 +343,16 @@ describe('a bank removal of an Unapproved, unedited Transaction', () => {
 		await budget.expectTotalsRebuild();
 	});
 
+	test('a change that moves it before the Cutover Date removes it the same way', async () => {
+		const budget = await syncedBudget();
+
+		await syncTwice(budget, changes({ modified: [{ ...grocer, date: '2026-07-30' }] }));
+
+		expect((await budget.rows()).map((row) => row.payeeName)).toEqual(['SAMPLE PAYROLL']);
+		expect(await budget.balance()).toBe(100_000 + 231_042);
+		await budget.expectTotalsRebuild();
+	});
+
 	test('the removed row is never imported again', async () => {
 		const budget = await syncedBudget();
 		await budget.sync(changes({ removed: [grocer.transaction_id] }));
