@@ -43,3 +43,12 @@ test('renaming or namespacing the import does not get around the list-row rule',
 		[]
 	);
 });
+
+test('local aliases cannot hide display-capped reads', async () => {
+	expect(await restrictedSyntax(`${named} const read = bankRowsShown;`)).toEqual([capped]);
+	expect(
+		await restrictedSyntax(
+			"import * as transactions from './transactions'; const read = transactions.bankRowsShown;"
+		)
+	).toEqual([capped]);
+});

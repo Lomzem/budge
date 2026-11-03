@@ -9,11 +9,16 @@ const eslint = new ESLint({
 	}
 });
 
-test.each(['test', 'expect'])('E2E specs must import %s through the fixture', async (name) => {
+test.each([
+	['test', 'test'],
+	['expect', 'test'],
+	['test', 'spec'],
+	['expect', 'spec']
+])('E2E %s imports in .%s files use the fixture', async (name, extension) => {
 	const lint = async (source) => {
 		const [result] = await eslint.lintText(
 			`import { ${name} } from '${source}';\nexport { ${name} };\n`,
-			{ filePath: 'e2e/import.test.ts' }
+			{ filePath: `e2e/import.${extension}.ts` }
 		);
 		return result.messages.filter((message) => message.ruleId === 'no-restricted-imports');
 	};
