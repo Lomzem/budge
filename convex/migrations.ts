@@ -128,6 +128,7 @@ const MUTATION_TIME_LIMIT_MS = 1_000;
 function genuineLegacyRow(account: Doc<'accounts'>, rows: readonly Doc<'transactions'>[] = []) {
 	const [only, ...others] = rows;
 	if (only === undefined || others.length > 0 || only.split === true) return null;
-	const madeWithItsAccount = only._creationTime - account._creationTime < MUTATION_TIME_LIMIT_MS;
+	const sinceAccount = only._creationTime - account._creationTime;
+	const madeWithItsAccount = sinceAccount >= 0 && sinceAccount < MUTATION_TIME_LIMIT_MS;
 	return madeWithItsAccount ? only : null;
 }

@@ -454,10 +454,9 @@ export const takeLease = internalMutation({
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (connection === null) return { kind: 'missing' as const };
 		const now = Date.now();
-		const accountsCheckRequestedAt = discover ? now : (connection.accountsCheckRequestedAt ?? null);
-		if (discover) {
-			await ctx.db.patch('bankConnections', connectionId, { accountsCheckRequestedAt: now });
-		}
+		const accountsCheckRequestedAt = discover
+			? await requestAccountsCheck(ctx, connection)
+			: (connection.accountsCheckRequestedAt ?? null);
 		if ((connection.syncLeaseUntil ?? 0) > now) {
 			await ctx.db.patch('bankConnections', connectionId, { syncRequestedDuringLease: true });
 			return { kind: 'busy' as const };
@@ -822,12 +821,14 @@ async function connectionAccountOf(
 	if (known !== null) return known;
 	const held = { connectionId, externalId, state: 'held' as const };
 	const heldId = await ctx.db.insert('connectionAccounts', held);
-	await requestAccountsCheck(ctx, connectionId);
+	const connection = await ctx.db.get('bankConnections', connectionId);
+	if (connection !== null) await requestAccountsCheck(ctx, connection);
 	return { _id: heldId, ...held };
 }
 
-async function requestAccountsCheck(ctx: MutationCtx, connectionId: Id<'bankConnections'>) {
-	const connection = await ctx.db.get('bankConnections', connectionId);
-	if (connection === null || connection.accountsCheckRequestedAt !== undefined) return;
-	await ctx.db.patch('bankConnections', connectionId, { accountsCheckRequestedAt: Date.now() });
+async function requestAccountsCheck(ctx: MutationCtx, connection: Doc<'bankConnections'>) {
+	const pending = connection.accountsCheckRequestedAt;
+	const newer = pending === undefined ? Date.now() : Math.max(Date.now(), pending + 1);
+	await ctx.db.patch('bankConnections', connection._id, { accountsCheckRequestedAt: newer });
+	return newer;
 }

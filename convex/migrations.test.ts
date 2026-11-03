@@ -390,6 +390,39 @@ describe('backfilling the Starting Balance kind', () => {
 		expect(await legacy.view()).toEqual(before);
 	});
 
+	test('reports an Account whose only legacy-named row was entered before the Account was made and moved into it', async () => {
+		vi.useFakeTimers({ now: new Date('2026-08-01T12:00:00Z'), toFake: ['Date'] });
+		const legacy = await legacyBudget();
+		const { owner, t, checking } = legacy;
+		const deposit = {
+			date: '2026-08-03',
+			amount: 5_000,
+			payee: 'Starting Balance',
+			memo: 'owner-named deposit'
+		};
+		const depositId = await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			...deposit
+		});
+		vi.setSystemTime(new Date('2026-08-09T12:00:00Z'));
+		const savings = await owner.mutation(api.accounts.create, {
+			name: 'Savings',
+			kind: 'cash',
+			startingBalance: 40_000
+		});
+		await makeLegacyStartingBalance(t, savings);
+		const [genuine] = await legacy.rows(savings);
+		assert(genuine !== undefined, 'expected the legacy starting balance');
+		await owner.mutation(api.transactions.remove, { transactionId: genuine._id });
+		await owner.mutation(api.transactions.update, {
+			transactionId: depositId,
+			accountId: savings,
+			...deposit
+		});
+
+		expect(await legacy.backfill()).toEqual({ converted: 0, unresolved: [savings] });
+	});
+
 	test('reports an Account that already has a starting balance beside a legacy one', async () => {
 		const legacy = await legacyBudget();
 		const { owner, t, checking } = legacy;

@@ -211,6 +211,43 @@ describe('a bank Account Budge does not know', () => {
 		]);
 	});
 
+	test("is named on a later sync when an overlapping sync's older answer left it out", async () => {
+		const { syncWith, held } = await connectedBudget();
+		const cardId = 'account-synthetic-card';
+		const bankDown = new PlaidApi({
+			error_code: 'INSTITUTION_NOT_RESPONDING',
+			status: 400,
+			request_id: 'request-synthetic-overlap'
+		});
+		const quiet = { ...page, added: [], modified: [], removed: [] };
+		await syncWith({
+			transactionsSync: () => Effect.succeed(rowsFor(savingsId)),
+			accountsGet: () =>
+				Effect.promise(() =>
+					syncWith({
+						transactionsSync: () =>
+							Effect.succeed({ ...rowsFor(cardId), nextCursor: 'cursor-synthetic-b' }),
+						accountsGet: () => Effect.fail(bankDown)
+					})
+				).pipe(Effect.as(bankAccounts))
+		});
+		expect(await held()).toContainEqual(expect.objectContaining({ name: null, rows: 2 }));
+
+		await syncWith({
+			transactionsSync: () => Effect.succeed({ ...quiet, nextCursor: 'cursor-synthetic-c' }),
+			accountsGet: () =>
+				Effect.succeed([
+					...bankAccounts,
+					{ externalId: cardId, name: 'Sample Card', mask: '7310', balance: -89_990 }
+				])
+		});
+
+		expect((await held()).map(({ name }) => name).sort()).toEqual([
+			'Sample Card',
+			'Sample Savings'
+		]);
+	});
+
 	test('a batch applied again, after the bank changed mid-update, holds its rows once', async () => {
 		const { sync, held } = await connectedBudget();
 		const more = (n: number): SyncPage => ({
