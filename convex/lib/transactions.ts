@@ -5,7 +5,7 @@ import { MATCH_WINDOW_DAYS } from '../../src/lib/domain/matcher';
 import { SPLIT_LINE_LIMIT } from '../../src/lib/domain/splits';
 import { requireCents } from './input';
 import { countTransaction, lineCounted } from './monthlyTotals';
-import { payeeNamed, rememberCategory, rememberRename } from './payees';
+import { payeeNamed, rememberCategory, rememberRename, STARTING_BALANCE } from './payees';
 import { requireCutoverDate, requireIsoDate } from './settings';
 import { publicError } from './publicError';
 
@@ -135,11 +135,35 @@ function requireLockKept(
 	}
 }
 
+async function requireStartingBalanceKept(
+	ctx: QueryCtx,
+	existing: Doc<'transactions'> | null,
+	input: Pick<TransactionInput, 'accountId' | 'payee'>
+) {
+	const payee =
+		existing?.payeeId === undefined ? null : await ctx.db.get('payees', existing.payeeId);
+	const wasStartingBalance = payee?.name === STARTING_BALANCE;
+	const isStartingBalance = input.payee.trim() === STARTING_BALANCE;
+	if (isStartingBalance && !wasStartingBalance) {
+		throw publicError(
+			'INVALID_INPUT',
+			'Budge keeps the Starting Balance Payee for starting balances. Pick another Payee.'
+		);
+	}
+	if (wasStartingBalance && (!isStartingBalance || input.accountId !== existing?.accountId)) {
+		throw publicError(
+			'INVALID_INPUT',
+			'A starting balance keeps its Payee and Account. Change its amount instead.'
+		);
+	}
+}
+
 export async function saveTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'> | null,
 	{ transferAccountId, transferTransactionId, ...input }: TransactionInput
 ): Promise<Id<'transactions'>> {
+	await requireStartingBalanceKept(ctx, existing, input);
 	const lines = await splitLines(ctx, input);
 	const fields: TransactionFields = {
 		...(await transactionFields(ctx, input)),
@@ -403,14 +427,19 @@ async function deleteOtherSide(ctx: MutationCtx, counterpart: Doc<'transactions'
 async function deleteOne(ctx: MutationCtx, existing: Doc<'transactions'>) {
 	await takeOut(ctx, existing);
 	await ctx.db.delete('transactions', existing._id);
-	for (const bankRow of await bankRowsOf(ctx, existing._id)) {
-		await ctx.db.patch('imports', bankRow._id, { transactionId: undefined, matched: false });
+	const detached: Id<'imports'>[] = [];
+	for await (const bankRow of allBankRowsOf(ctx, existing._id)) detached.push(bankRow._id);
+	for (const bankRowId of detached) {
+		await ctx.db.patch('imports', bankRowId, { transactionId: undefined, matched: false });
 	}
 }
 
-export async function bankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
-	return await ctx.db
+export function allBankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	return ctx.db
 		.query('imports')
-		.withIndex('by_transactionId', (q) => q.eq('transactionId', transactionId))
-		.take(10);
+		.withIndex('by_transactionId', (q) => q.eq('transactionId', transactionId));
+}
+
+export async function bankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	return await allBankRowsOf(ctx, transactionId).take(10);
 }

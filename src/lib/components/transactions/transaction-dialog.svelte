@@ -181,6 +181,33 @@
 		if (open) untrack(fill);
 	});
 
+	let filledFromRow = { date: '', amount: 0 };
+
+	$effect(() => {
+		if (!open || transaction === undefined) return;
+		const live = { date: transaction.date, amount: transaction.amount };
+		untrack(() => {
+			refreshUntouched(live);
+		});
+	});
+
+	function shownAmount(cents: number) {
+		return formatCents(Math.abs(cents)).replace('$', '');
+	}
+
+	function refreshUntouched(live: { date: string; amount: number }) {
+		const before = filledFromRow;
+		filledFromRow = live;
+		if (date === before.date) date = live.date;
+		const amountUntouched =
+			amount === shownAmount(before.amount) &&
+			direction === (before.amount < 0 ? 'outflow' : 'inflow');
+		if (amountUntouched) {
+			amount = shownAmount(live.amount);
+			direction = live.amount < 0 ? 'outflow' : 'inflow';
+		}
+	}
+
 	function choiceOf(saved: Row) {
 		if (saved.transfer) return TRANSFER + saved.transfer.accountId;
 		if (saved.splits) return SPLIT;
@@ -197,8 +224,9 @@
 			payee = transaction.payeeName ?? '';
 			chosenCategoryId = choiceOf(transaction);
 			direction = transaction.amount < 0 ? 'outflow' : 'inflow';
-			amount = formatCents(Math.abs(transaction.amount)).replace('$', '');
+			amount = shownAmount(transaction.amount);
 			memo = transaction.memo ?? '';
+			filledFromRow = { date: transaction.date, amount: transaction.amount };
 			const sign = transaction.amount < 0 ? -1 : 1;
 			lines = (transaction.splits ?? []).map((line) => ({
 				key: nextLineKey++,

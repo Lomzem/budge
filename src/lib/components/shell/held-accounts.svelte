@@ -85,9 +85,14 @@
 		if (outcome.kind === 'suggested') {
 			const shown =
 				mappedKind === 'creditCard' ? -outcome.startingBalance : outcome.startingBalance;
-			if (balance === typedBefore) balance = typed(shown);
-			suggestion =
-				"Budge suggests this from the bank's current balance, less the Transactions imported since the cutover date.";
+			const basis =
+				"from the bank's current balance, less the Transactions imported since the cutover date.";
+			if (balance === typedBefore) {
+				balance = typed(shown);
+				suggestion = `Budge suggests this ${basis}`;
+			} else {
+				suggestion = `Budge suggests ${typed(shown)} ${basis} Your entry stays.`;
+			}
 		} else if (outcome.kind === 'importing') {
 			suggestion =
 				"Budge is still bringing in this Account's rows. Suggest again in a moment, or enter the starting balance.";

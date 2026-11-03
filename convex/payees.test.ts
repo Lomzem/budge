@@ -134,7 +134,7 @@ describe('Payee memory', () => {
 			})
 		).page.filter((row) => row.amount === 5_000);
 		expect(imported).toMatchObject({
-			payeeName: 'Starting Balance',
+			payeeName: null,
 			categoryId: null,
 			approved: false
 		});

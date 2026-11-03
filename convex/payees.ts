@@ -1,8 +1,7 @@
 import { v } from 'convex/values';
 
 import { internalMutation, mutation, query } from './_generated/server';
-import { STARTING_BALANCE } from './lib/accounts';
-import { findPayeeNamed, lastCategoryOf } from './lib/payees';
+import { findPayeeNamed, lastCategoryOf, STARTING_BALANCE } from './lib/payees';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { refreshPayeeSearchText } from './lib/search';

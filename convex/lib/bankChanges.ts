@@ -4,6 +4,7 @@ import type { IncomingRow } from './imports';
 import { importedPayee, type ImportedPayees } from './payees';
 import { publicError } from './publicError';
 import {
+	allBankRowsOf,
 	bankRowsOf,
 	deleteTransaction,
 	refreshSearchText,
@@ -177,7 +178,7 @@ async function requireNoOtherBacking(
 	if (transaction.transferTransactionId !== undefined)
 		sides.push(transaction.transferTransactionId);
 	for (const side of sides) {
-		for (const other of await bankRowsOf(ctx, side)) {
+		for await (const other of allBankRowsOf(ctx, side)) {
 			if (other._id === removed._id || other.state === 'removed') continue;
 			throw publicError(
 				'INVALID_INPUT',

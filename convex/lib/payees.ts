@@ -1,6 +1,8 @@
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
+export const STARTING_BALANCE = 'Starting Balance';
+
 export async function findPayeeNamed(ctx: QueryCtx, name: string): Promise<Doc<'payees'> | null> {
 	const trimmed = name.trim();
 	if (trimmed === '') return null;
@@ -88,7 +90,7 @@ async function resolveImportedPayee(
 		if (payee !== null) return await withMemory(ctx, payee, resolved);
 	}
 	const name = (merchantName === '' ? bankText : merchantName).trim();
-	if (name === '') return {};
+	if (name === '' || name === STARTING_BALANCE) return {};
 	const payee = await findPayeeNamed(ctx, name);
 	if (payee === null) {
 		const newPayeeWithNoCategoryToRemember = {

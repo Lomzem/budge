@@ -2,18 +2,15 @@ import type { Id } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
 import { createPaymentCategory, ensureReadyToAssign, readPaymentCategory } from './categories';
 import { requireCents, requireName } from './input';
-import { findPayeeNamed } from './payees';
+import { findPayeeNamed, STARTING_BALANCE } from './payees';
 import { publicError } from './publicError';
 import { requireCutoverDate } from './settings';
 import {
-	bankRowsOf,
 	insertTransaction,
 	replaceTransaction,
 	requireUnlocked,
 	transactionFields
 } from './transactions';
-
-export const STARTING_BALANCE = 'Starting Balance';
 
 export async function insertAccount(
 	ctx: MutationCtx,
@@ -84,10 +81,9 @@ async function startingBalanceOf(ctx: MutationCtx, accountId: Id<'accounts'>) {
 		.query('transactions')
 		.withIndex('by_payee_date', (q) => q.eq('payeeId', payee._id));
 	for await (const transaction of named) {
-		if (transaction.accountId !== accountId || transaction.transferTransactionId !== undefined) {
-			continue;
+		if (transaction.accountId === accountId && transaction.transferTransactionId === undefined) {
+			return transaction;
 		}
-		if ((await bankRowsOf(ctx, transaction._id)).length === 0) return transaction;
 	}
 	return null;
 }

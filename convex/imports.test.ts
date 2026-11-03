@@ -63,6 +63,27 @@ describe('importing a bank file', () => {
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(2);
 	});
 
+	test("a row whose Bank Text is Starting Balance gets no Payee, so the Account's starting balance stays its own", async () => {
+		const { owner, checking, balance } = await budgetWithChecking();
+		await owner.mutation(api.imports.commit, {
+			accountId: checking,
+			source: 'csv',
+			rows: [{ ...coffee, bankText: 'Starting Balance' }]
+		});
+
+		await owner.mutation(api.accounts.setStartingBalance, {
+			accountId: checking,
+			startingBalance: 90_000
+		});
+
+		expect(await balance()).toBe(90_000 - 450);
+		const listed = await owner.query(api.transactions.list, {
+			accountId: checking,
+			paginationOpts: { numItems: 50, cursor: null }
+		});
+		expect(listed.page.find((row) => row.amount === -450)).toMatchObject({ payeeName: null });
+	});
+
 	test('the same QFX file twice adds nothing the second time', async () => {
 		const { owner, checking, rows } = await budgetWithChecking();
 		const { source, rows: bankRows } = decode(checkingQfx);

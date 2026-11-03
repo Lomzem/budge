@@ -134,6 +134,71 @@ describe("changing an Account's starting balance", () => {
 		expect((await owner.query(api.accounts.list, {}))[0]?.balance).toBe(180_000);
 	});
 
+	test('after a bank row matches the starting balance, still replaces that one starting balance', async () => {
+		const { t, owner, accountId, startingBalances } = await checkingWithStartingBalance();
+		const [existing] = await startingBalances();
+		assert(existing !== undefined, 'expected the starting balance');
+		await t.run(async (ctx) => {
+			await ctx.db.insert('imports', {
+				source: 'csv',
+				accountId,
+				date: existing.date,
+				amount: existing.amount,
+				bankText: 'OPENING DEPOSIT',
+				transactionId: existing._id,
+				matched: true,
+				state: 'linked'
+			});
+		});
+
+		await owner.mutation(api.accounts.setStartingBalance, { accountId, startingBalance: 180_000 });
+
+		expect(await startingBalances()).toMatchObject([{ _id: existing._id, amount: 180_000 }]);
+	});
+
+	test('no other Transaction can take the Starting Balance Payee', async () => {
+		const { owner, accountId } = await checkingWithStartingBalance();
+
+		expect(
+			await publicErrorCode(
+				owner.mutation(api.transactions.create, {
+					accountId,
+					date: '2026-08-02',
+					amount: -1_000,
+					payee: 'Starting Balance',
+					memo: ''
+				})
+			)
+		).toBe('INVALID_INPUT');
+	});
+
+	test.each([
+		['its Payee', { payee: 'Opening' }],
+		['its Account', { moveToSavings: true }]
+	])('the starting balance keeps %s', async (_label, change) => {
+		const { owner, accountId, startingBalances } = await checkingWithStartingBalance();
+		const savingsId = await owner.mutation(api.accounts.create, {
+			name: 'Savings',
+			kind: 'cash',
+			startingBalance: 0
+		});
+		const [existing] = await startingBalances();
+		assert(existing !== undefined, 'expected the starting balance');
+
+		expect(
+			await publicErrorCode(
+				owner.mutation(api.transactions.update, {
+					transactionId: existing._id,
+					accountId: 'moveToSavings' in change ? savingsId : accountId,
+					date: existing.date,
+					amount: existing.amount,
+					payee: 'payee' in change ? change.payee : 'Starting Balance',
+					memo: ''
+				})
+			)
+		).toBe('INVALID_INPUT');
+	});
+
 	test('the Starting Balance Payee keeps its name', async () => {
 		const { owner } = await checkingWithStartingBalance();
 		const payees = await owner.query(api.payees.list, {});

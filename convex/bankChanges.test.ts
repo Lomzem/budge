@@ -476,31 +476,33 @@ describe('resolving a bank change', () => {
 			bankRows: [{ state: 'changed' }]
 		});
 	});
-	test("the bank's version on a Transfer flags the other side's statement row that no longer agrees", async () => {
-		const budget = await syncedBudget();
-		const { savings, savingsSide } = await grocerAsTransfer(budget);
-		await backWithStatementRow(budget, savingsSide._id, {
-			accountId: savings,
-			date: '2026-08-14',
-			amount: 4_250
-		});
-		await budget.sync(changes({ modified: [grocerChanged] }));
-		const importId = (await budget.row(null)).bankRows[0]?._id;
-		assert(importId !== undefined, 'No Bank Row');
+	test.each([
+		['flags', 'no longer agrees', { date: '2026-08-14', amount: 4_250 }, 'changed'],
+		['leaves linked', 'agrees', { date: '2026-08-16', amount: 4_550 }, 'linked']
+	] as const)(
+		"the bank's version on a Transfer %s the other side's statement row that %s",
+		async (_does, _agreement, statementRow, state) => {
+			const budget = await syncedBudget();
+			const { savings, savingsSide } = await grocerAsTransfer(budget);
+			await backWithStatementRow(budget, savingsSide._id, { accountId: savings, ...statementRow });
+			await budget.sync(changes({ modified: [grocerChanged] }));
+			const importId = (await budget.row(null)).bankRows[0]?._id;
+			assert(importId !== undefined, 'No Bank Row');
 
-		await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' });
+			await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' });
 
-		const otherSide = (
-			await budget.owner.query(api.transactions.list, {
-				accountId: savings,
-				paginationOpts: { numItems: 50, cursor: null }
-			})
-		).page.find((row) => row._id === savingsSide._id);
-		expect(otherSide).toMatchObject({
-			amount: 4_550,
-			bankRows: [{ state: 'changed', amount: 4_250 }]
-		});
-	});
+			const otherSide = (
+				await budget.owner.query(api.transactions.list, {
+					accountId: savings,
+					paginationOpts: { numItems: 50, cursor: null }
+				})
+			).page.find((row) => row._id === savingsSide._id);
+			expect(otherSide).toMatchObject({
+				amount: 4_550,
+				bankRows: [{ state, amount: statementRow.amount }]
+			});
+		}
+	);
 
 	test("the bank's version is refused on a reconciled Transaction", async () => {
 		const { budget, importId } = await flaggedChange();
@@ -575,6 +577,36 @@ describe('resolving a bank removal', () => {
 			)
 		).toMatch(/still/);
 		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({ amount: -4_250 });
+	});
+
+	test("the bank's version is refused while a statement row behind many removed ones still backs the Transaction", async () => {
+		const { budget, importId } = await flaggedRemoval();
+		const grocerRow = await budget.row('SAMPLE GROCER 0193');
+		await budget.t.run(async (ctx) => {
+			for (let index = 0; index < 10; index++) {
+				await ctx.db.insert('imports', {
+					source: 'csv',
+					accountId: budget.checking,
+					date: grocerRow.date,
+					amount: grocerRow.amount,
+					bankText: 'SAMPLE STATEMENT ROW',
+					transactionId: grocerRow._id,
+					matched: true,
+					state: 'removed'
+				});
+			}
+		});
+		await backWithStatementRow(budget, grocerRow._id, {
+			accountId: budget.checking,
+			date: grocerRow.date,
+			amount: grocerRow.amount
+		});
+
+		expect(
+			await publicErrorMessage(
+				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
+			)
+		).toMatch(/still/);
 	});
 
 	test("the bank's version on a Transfer is refused while the other side has its own statement row", async () => {
