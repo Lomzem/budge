@@ -316,6 +316,23 @@ describe('importing a bank file', () => {
 		});
 	});
 
+	test('a file of 250 rows previews, and one row more is refused', async () => {
+		const { owner, checking } = await budgetWithChecking();
+		const rows = Array.from({ length: 251 }, (_, index) => ({
+			...coffee,
+			bankText: `SAMPLE SHOP ${String(index)}`
+		}));
+		const preview = (count: number) =>
+			owner.query(api.imports.preview, {
+				accountId: checking,
+				source: 'csv',
+				rows: rows.slice(0, count)
+			});
+
+		expect(await preview(250)).toHaveLength(250);
+		expect(await publicErrorCode(preview(251))).toBe('INVALID_INPUT');
+	});
+
 	test('a deleted imported Transaction does not come back with the same file', async () => {
 		const { owner, checking, rows } = await budgetWithChecking();
 		const { source, rows: bankRows } = decode(checkingQfx);

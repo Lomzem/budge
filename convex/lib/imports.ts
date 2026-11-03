@@ -29,7 +29,7 @@ export const fileRow = v.object({
 });
 export type FileRow = Infer<typeof fileRow>;
 
-export const MAX_FILE_ROWS = 1_000;
+export const MAX_FILE_ROWS = 250;
 
 const MAX_BANK_TEXT = 500;
 
