@@ -11,28 +11,30 @@ import { formatCents, parseCents } from './src/lib/domain/money';
 const running = JSON.parse(readFileSync('.local-app/running.json', 'utf8'));
 const evidence = resolve('test-results/verify-budge', new Date().toISOString().replaceAll(':', '-'));
 mkdirSync(evidence, { recursive: true });
+const report = { feature: 'budget', appUrl: running.appUrl, fixture: 'budget-with-accounts', steps: [] };
 const browser = await chromium.launch();
-const context = await browser.newContext({
-	baseURL: running.appUrl,
-	storageState: process.argv[2] ?? '.local-app/storage-state.json',
-	viewport: { width: 1280, height: 800 }
-});
-const page = await context.newPage();
-page.setDefaultTimeout(30_000);
+let page;
 const capture = async (name) => {
 	await page.screenshot({ path: resolve(evidence, `${name}.png`), fullPage: true });
 	writeFileSync(resolve(evidence, `${name}.aria.txt`), await page.locator('body').ariaSnapshot());
+	report.steps.push(name);
 };
-const assigned = page.getByRole('textbox', { name: 'Assigned for Groceries', exact: true });
-const ready = page.getByTestId('ready-to-assign');
-const cents = (text) => {
-	const value = parseCents(text ?? '');
-	if (value === undefined) throw new Error('Expected an on-screen money amount');
-	return value;
-};
-const amount = (value) => formatCents(value).replace('$', '');
-const report = { feature: 'budget', appUrl: running.appUrl, fixture: 'budget-with-accounts', steps: [] };
 try {
+	const context = await browser.newContext({
+		baseURL: running.appUrl,
+		storageState: process.argv[2] ?? '.local-app/storage-state.json',
+		viewport: { width: 1280, height: 800 }
+	});
+	page = await context.newPage();
+	page.setDefaultTimeout(30_000);
+	const assigned = page.getByRole('textbox', { name: 'Assigned for Groceries', exact: true });
+	const ready = page.getByTestId('ready-to-assign');
+	const cents = (text) => {
+		const value = parseCents(text ?? '');
+		if (value === undefined) throw new Error('Expected an on-screen money amount');
+		return value;
+	};
+	const amount = (value) => formatCents(value).replace('$', '');
 	await page.goto('/');
 	await expect(page.getByRole('heading', { level: 1, name: 'Budget', exact: true })).toBeVisible();
 	await expect(assigned).toBeVisible();
@@ -73,15 +75,18 @@ try {
 	await assigned.press('Enter');
 	await expect.poll(async () => cents(await ready.textContent())).toBe(before.ready);
 	await capture('08-restored');
-	report.steps = ['budget-entry: direct/sidebar/mobile', 'budget-assign', 'budget-persist', 'budget-month', 'budget-mobile', 'restored'];
 	report.result = 'passed';
-} catch {
-	report.result = 'failed; inspect failure screenshot and rerun doctor';
-	await capture('failure').catch(() => undefined);
+} catch (error) {
+	report.result = 'failed; see error and the steps reached, then rerun doctor before retrying';
+	report.error = error instanceof Error ? error.message : String(error);
 	process.exitCode = 1;
+	if (page) await capture('failure').catch(() => undefined);
 } finally {
-	writeFileSync(resolve(evidence, 'result.json'), JSON.stringify(report, null, 2));
-	await browser.close();
-	console.log(evidence);
+	try {
+		writeFileSync(resolve(evidence, 'result.json'), JSON.stringify(report, null, 2));
+		console.log(evidence);
+	} finally {
+		await browser.close();
+	}
 }
 JS
