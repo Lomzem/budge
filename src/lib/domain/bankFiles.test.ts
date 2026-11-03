@@ -155,6 +155,11 @@ describe('decoding a bank file', () => {
 			'Row 2 opens a quote'
 		],
 		[
+			'text after a closing quote',
+			'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,"SAMPLE TACO"STAND,18.25,Restaurants\n',
+			'Row 2 has text after a closing quote'
+		],
+		[
 			'a header that names a column twice',
 			'Trans. Date,Post Date,Description,Amount, Amount\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,99.00\n',
 			'“Amount” more than once'

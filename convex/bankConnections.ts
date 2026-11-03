@@ -303,17 +303,21 @@ export const syncAfterReconnect = action({
 	returns: ownerSyncResult,
 	handler: async (ctx, { connectionId }) => {
 		await requireOwner(ctx);
-		return await ownerSync(ctx, connectionId, { refresh: false, discover: true });
+		return await ownerSync(ctx, connectionId, { refresh: false, resume: true, discover: true });
 	}
 });
 
 async function ownerSync(
 	ctx: ActionCtx,
 	connectionId: Id<'bankConnections'>,
-	{ refresh, discover = false }: { refresh: boolean; discover?: boolean }
+	{
+		refresh,
+		resume = false,
+		discover = false
+	}: { refresh: boolean; resume?: boolean; discover?: boolean }
 ): Promise<Infer<typeof ownerSyncResult>> {
 	const outcome = await runEffect(
-		syncConnection(connectionId, { refresh, resume: true, discover }).pipe(
+		syncConnection(connectionId, { refresh, resume, discover }).pipe(
 			Effect.provide(liveLayer(ctx))
 		),
 		toPublicError

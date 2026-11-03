@@ -481,8 +481,13 @@ function bankRowsIn(
 		);
 }
 
+const BACKING_STATES = ['linked', 'changed'] as const;
+
 export async function hasBankRow(ctx: QueryCtx, transactionId: Id<'transactions'>) {
-	return (await allBankRowsOf(ctx, transactionId).first()) !== null;
+	for (const state of BACKING_STATES) {
+		if ((await bankRowsIn(ctx, transactionId, state).first()) !== null) return true;
+	}
+	return false;
 }
 
 async function bankTextsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {

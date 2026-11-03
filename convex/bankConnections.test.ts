@@ -23,7 +23,7 @@ import {
 } from './lib/sync';
 import { MAX_BANK_CONNECTIONS } from './bankConnections';
 import { TokenCipher } from './lib/tokenCipher';
-import { newBackend, publicErrorOf, useOwnerEnv } from './test.helper';
+import { newBackend, publicErrorCode, publicErrorOf, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -513,6 +513,15 @@ describe('syncing a Bank Connection', () => {
 				lastError: { message: 'The bank needs you to reconnect (ITEM_LOGIN_REQUIRED).' }
 			}
 		]);
+	});
+
+	test('Sync now on a Bank Connection that needs a login asks the owner to reconnect', async () => {
+		const { owner, sync, connectionId } = await connectedBudget();
+		await sync({ transactionsSync: () => Effect.fail(needsLogin) });
+
+		expect(await publicErrorCode(owner.action(api.bankConnections.syncNow, { connectionId }))).toBe(
+			'BANK_CONNECTION_NEEDS_LOGIN'
+		);
 	});
 
 	const bankDown = new PlaidApi({

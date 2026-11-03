@@ -200,6 +200,10 @@ function startsField(text: string, index: number) {
 	return index === 0 || ',\n\r'.includes(text.charAt(index - 1));
 }
 
+function endsField(text: string, index: number) {
+	return index === text.length || ',\n\r'.includes(text.charAt(index));
+}
+
 function readQuoted(text: string, start: number): { value: string; end: number } | undefined {
 	let value = '';
 	for (let i = start; i < text.length; i++) {
@@ -228,6 +232,13 @@ function parseCsv(text: string): Effect.Effect<string[][], BankFileError> {
 				return Effect.fail(
 					new BankFileError({
 						message: `Row ${String(rows.length + 1)} opens a quote that never closes, so the file may be cut off. Download it from your bank again.`
+					})
+				);
+			}
+			if (!endsField(text, quoted.end + 1)) {
+				return Effect.fail(
+					new BankFileError({
+						message: `Row ${String(rows.length + 1)} has text after a closing quote, so the file may be damaged. Download it from your bank again.`
 					})
 				);
 			}

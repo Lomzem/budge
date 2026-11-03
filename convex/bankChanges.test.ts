@@ -807,6 +807,23 @@ describe('Unmatching a flagged Bank Row', () => {
 			)
 		).toMatch(/removed/);
 	});
+
+	test('the Transaction it leaves is no longer Cleared when the bank removed its only other row', async () => {
+		const { budget, importId } = await flaggedRemoval();
+		const grocerRow = await budget.row('SAMPLE GROCER 0193');
+		const statementRowId = await backWithStatementRow(budget, grocerRow._id, {
+			accountId: budget.checking,
+			date: grocerRow.date,
+			amount: grocerRow.amount
+		});
+
+		await budget.owner.mutation(api.imports.unmatch, { importId: statementRowId });
+
+		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({
+			cleared: false,
+			bankRows: [{ _id: importId, state: 'removed' }]
+		});
+	});
 });
 
 describe('a Transaction backed by more than ten Bank Rows', () => {
