@@ -72,9 +72,12 @@ export default defineSchema({
 
 		transferTransactionId: v.optional(v.id('transactions')),
 
+		kind: v.optional(v.literal('startingBalance')),
+
 		searchText: v.optional(v.string())
 	})
 		.index('by_account_date', ['accountId', 'date'])
+		.index('by_accountId_and_kind', ['accountId', 'kind'])
 
 		.index('by_account_cleared_date', ['accountId', 'cleared', 'date'])
 		.index('by_date', ['date'])
@@ -103,13 +106,12 @@ export default defineSchema({
 		source: v.union(v.literal('plaid'), v.literal('qfx'), v.literal('csv')),
 
 		sourceId: v.optional(v.string()),
-		accountId: v.id('accounts'),
-
+		accountId: v.optional(v.id('accounts')),
 		connectionAccountId: v.optional(v.id('connectionAccounts')),
 		date: v.string(),
 		amount: v.number(),
 		bankText: v.string(),
-
+		merchantName: v.optional(v.string()),
 		transactionId: v.optional(v.id('transactions')),
 
 		matched: v.boolean(),
@@ -121,8 +123,9 @@ export default defineSchema({
 		)
 	})
 		.index('by_account_source_sourceId_date', ['accountId', 'source', 'sourceId', 'date'])
-		.index('by_transactionId', ['transactionId'])
-		.index('by_connectionAccountId_state', ['connectionAccountId', 'state']),
+		.index('by_transactionId_state', ['transactionId', 'state'])
+		.index('by_connectionAccountId_state', ['connectionAccountId', 'state'])
+		.index('by_connectionAccountId_sourceId', ['connectionAccountId', 'sourceId']),
 
 	bankConnections: defineTable({
 		name: v.string(),
@@ -133,7 +136,10 @@ export default defineSchema({
 
 		syncLeaseUntil: v.optional(v.number()),
 		syncRequestedDuringLease: v.optional(v.boolean()),
+		attentionNotices: v.optional(v.number()),
+		accountsCheckRequestedAt: v.optional(v.number()),
 		consentExpiresAt: v.optional(v.number()),
+		consentCheckedByLease: v.optional(v.number()),
 		provider: v.union(
 			v.object({
 				kind: v.literal('plaid'),
@@ -168,16 +174,23 @@ export default defineSchema({
 			v.object({
 				connectionId: v.id('bankConnections'),
 				externalId: v.string(),
+				name: v.optional(v.string()),
+				mask: v.optional(v.string()),
 				state: v.literal('mapped'),
 				accountId: v.id('accounts')
 			}),
 			v.object({
 				connectionId: v.id('bankConnections'),
 				externalId: v.string(),
+				name: v.optional(v.string()),
+				mask: v.optional(v.string()),
 				state: v.union(v.literal('held'), v.literal('ignored'))
 			})
 		)
-	).index('by_connection_externalId', ['connectionId', 'externalId']),
+	)
+		.index('by_connection_externalId', ['connectionId', 'externalId'])
+		.index('by_state', ['state'])
+		.index('by_accountId', ['accountId']),
 
 	monthlyTotals: defineTable({
 		month: v.string(),

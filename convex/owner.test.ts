@@ -20,8 +20,19 @@ function sampleArgs(ids: {
 	importId: Id<'imports'>;
 	payeeId: Id<'payees'>;
 	connectionId: Id<'bankConnections'>;
+	connectionAccountId: Id<'connectionAccounts'>;
 }) {
-	const { accountId, transactionId, groupId, categoryId, importId, payeeId, connectionId } = ids;
+	const {
+		accountId,
+		transactionId,
+		groupId,
+		categoryId,
+		importId,
+		payeeId,
+		connectionId,
+		connectionAccountId
+	} = ids;
+
 	const entry = { accountId, date: '2026-08-14', amount: -500, payee: 'Corner Grocer', memo: '' };
 	const args: Record<string, Record<string, unknown>> = {
 		'owner:whoami': {},
@@ -33,6 +44,8 @@ function sampleArgs(ids: {
 		'accounts:create': { name: 'Wallet', kind: 'cash', startingBalance: 0 },
 		'accounts:rename': { accountId, name: 'Wallet' },
 		'accounts:reorder': { accountIds: [accountId] },
+		'accounts:setStartingBalance': { accountId, startingBalance: 0 },
+		'accounts:startingBalance': { accountId },
 		'transactions:list': { paginationOpts: { numItems: 10, cursor: null } },
 		'transactions:create': entry,
 		'transactions:update': { transactionId, ...entry },
@@ -52,8 +65,17 @@ function sampleArgs(ids: {
 		'imports:preview': { accountId, source: 'csv', rows: [] },
 		'imports:commit': { accountId, source: 'csv', rows: [] },
 		'imports:unmatch': { importId },
-		'bankConnections:list': {},
+		'imports:resolveBankChange': { importId, keep: 'mine' },
+		'bankConnections:list': { now: 0 },
+
 		'bankConnections:syncNow': { connectionId },
+		'bankConnections:reconnect': { connectionId },
+		'bankConnections:syncAfterReconnect': { connectionId },
+		'heldAccounts:list': {},
+		'heldAccounts:map': { connectionAccountId, accountId },
+		'heldAccounts:createAccount': { connectionAccountId, name: 'Savings', kind: 'cash' },
+		'heldAccounts:ignore': { connectionAccountId },
+		'heldAccounts:suggestStartingBalance': { accountId },
 		'payees:lastCategory': { name: 'Corner Grocer' },
 		'payees:list': {},
 		'payees:rename': { payeeId, name: 'Corner Market' },
@@ -187,7 +209,21 @@ describe('the owner guard', () => {
 				status: 'ok',
 				provider: { kind: 'sandbox' }
 			});
-			return { accountId, transactionId, groupId, categoryId, importId, payeeId, connectionId };
+			const connectionAccountId = await ctx.db.insert('connectionAccounts', {
+				connectionId,
+				externalId: 'account-synthetic-savings',
+				state: 'held'
+			});
+			return {
+				accountId,
+				transactionId,
+				groupId,
+				categoryId,
+				importId,
+				payeeId,
+				connectionId,
+				connectionAccountId
+			};
 		});
 		const sample = sampleArgs(ids);
 		const callers = {

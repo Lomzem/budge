@@ -1,5 +1,5 @@
 import { clerk } from '@clerk/testing/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 

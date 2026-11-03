@@ -135,11 +135,56 @@ function requireLockKept(
 	}
 }
 
+const STARTING_BALANCE_LABEL = 'Starting Balance';
+
+export async function payeeNameOf(
+	ctx: QueryCtx,
+	transaction: Pick<Doc<'transactions'>, 'kind' | 'payeeId'>,
+	readPayee: (payeeId: Id<'payees'>) => Promise<Doc<'payees'> | null> = (payeeId) =>
+		ctx.db.get('payees', payeeId)
+): Promise<string | null> {
+	if (transaction.kind === 'startingBalance') return STARTING_BALANCE_LABEL;
+	if (transaction.payeeId === undefined) return null;
+	return (await readPayee(transaction.payeeId))?.name ?? null;
+}
+
+function requireStartingBalanceEditable(
+	existing: Doc<'transactions'>,
+	input: Pick<TransactionInput, 'accountId' | 'payee' | 'splits' | 'transferAccountId'>
+) {
+	const payee = input.payee.trim();
+	const refusals: readonly (readonly [boolean, string])[] = [
+		[
+			input.accountId !== existing.accountId,
+			"A starting balance stays in its Account. Set the other Account's starting balance instead."
+		],
+		[
+			(input.splits ?? []).length > 0,
+			'A starting balance takes one Category. Record the rest as its own Transaction.'
+		],
+		[
+			input.transferAccountId !== undefined,
+			'A starting balance cannot be a Transfer. Record the Transfer as its own Transaction.'
+		],
+		[
+			payee !== '' && payee !== STARTING_BALANCE_LABEL,
+			'A starting balance has no Payee. Record a Transaction with that Payee instead.'
+		]
+	];
+	const refused = refusals.find(([applies]) => applies);
+	if (refused !== undefined) throw publicError('INVALID_INPUT', refused[1]);
+}
+
 export async function saveTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'> | null,
-	{ transferAccountId, transferTransactionId, ...input }: TransactionInput
+	{ transferAccountId, transferTransactionId, ...given }: TransactionInput
 ): Promise<Id<'transactions'>> {
+	const startingBalance = existing?.kind === 'startingBalance' ? existing : null;
+	if (startingBalance !== null) {
+		requireStartingBalanceEditable(startingBalance, { ...given, transferAccountId });
+	}
+	const input = startingBalance === null ? given : { ...given, payee: '' };
 	const lines = await splitLines(ctx, input);
 	const fields: TransactionFields = {
 		...(await transactionFields(ctx, input)),
@@ -189,7 +234,7 @@ async function rememberPayee(
 	if (payeeId === undefined) return;
 	if (categoryId !== undefined) await rememberCategory(ctx, payeeId, categoryId);
 	if (existing === null || existing.payeeId === payeeId) return;
-	for (const bankRow of await bankRowsOf(ctx, existing._id)) {
+	for await (const bankRow of allBankRowsOf(ctx, existing._id)) {
 		await rememberRename(ctx, bankRow.bankText, payeeId);
 	}
 }
@@ -277,8 +322,14 @@ export async function transferCandidatesOf(
 				.lte('date', addDays(date, MATCH_WINDOW_DAYS))
 		);
 	for await (const transaction of nearby) {
-		if (transaction.amount !== -amount || transaction.transferTransactionId !== undefined) continue;
-		if ((await bankRowsOf(ctx, transaction._id)).length === 0) continue;
+		if (
+			transaction.amount !== -amount ||
+			transaction.transferTransactionId !== undefined ||
+			transaction.kind !== undefined
+		) {
+			continue;
+		}
+		if (!(await hasBankRow(ctx, transaction._id))) continue;
 		candidates.push(transaction);
 	}
 	return candidates;
@@ -327,10 +378,14 @@ export async function replaceTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'>,
 	fields: TransactionFields,
-	lines: readonly SplitLine[] = []
+	lines: readonly SplitLine[]
 ) {
 	await takeOut(ctx, existing);
-	await ctx.db.replace('transactions', existing._id, fields);
+	await ctx.db.replace(
+		'transactions',
+		existing._id,
+		existing.kind === undefined ? fields : { ...fields, kind: existing.kind }
+	);
 	await putIn(ctx, existing._id, fields, lines);
 	await refreshSearchText(ctx, existing._id);
 }
@@ -338,16 +393,14 @@ export async function replaceTransaction(
 export async function refreshSearchText(ctx: MutationCtx, transactionId: Id<'transactions'>) {
 	const transaction = await ctx.db.get('transactions', transactionId);
 	if (transaction === null) return;
-	const payee =
-		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
 	const lines = transaction.split === true ? await splitLinesOf(ctx, transactionId) : [];
 	const searchText = [
-		payee?.name,
+		await payeeNameOf(ctx, transaction),
 		transaction.memo,
 		...lines.map((line) => line.memo),
-		...(await bankRowsOf(ctx, transactionId)).map((bankRow) => bankRow.bankText)
+		...(await bankTextsOf(ctx, transactionId))
 	]
-		.filter((part) => part !== undefined && part !== '')
+		.filter((part) => part !== undefined && part !== null && part !== '')
 		.join(' ');
 	if (transaction.searchText !== searchText) {
 		await ctx.db.patch('transactions', transactionId, { searchText });
@@ -403,14 +456,53 @@ async function deleteOtherSide(ctx: MutationCtx, counterpart: Doc<'transactions'
 async function deleteOne(ctx: MutationCtx, existing: Doc<'transactions'>) {
 	await takeOut(ctx, existing);
 	await ctx.db.delete('transactions', existing._id);
-	for (const bankRow of await bankRowsOf(ctx, existing._id)) {
-		await ctx.db.patch('imports', bankRow._id, { transactionId: undefined, matched: false });
+	const detached: Id<'imports'>[] = [];
+	for await (const bankRow of allBankRowsOf(ctx, existing._id)) detached.push(bankRow._id);
+	for (const bankRowId of detached) {
+		await ctx.db.patch('imports', bankRowId, { transactionId: undefined, matched: false });
 	}
 }
 
-export async function bankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
-	return await ctx.db
+export function allBankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	return ctx.db
 		.query('imports')
-		.withIndex('by_transactionId', (q) => q.eq('transactionId', transactionId))
-		.take(10);
+		.withIndex('by_transactionId_state', (q) => q.eq('transactionId', transactionId));
+}
+
+function bankRowsIn(
+	ctx: QueryCtx,
+	transactionId: Id<'transactions'>,
+	state: Doc<'imports'>['state']
+) {
+	return ctx.db
+		.query('imports')
+		.withIndex('by_transactionId_state', (q) =>
+			q.eq('transactionId', transactionId).eq('state', state)
+		);
+}
+
+export async function hasBankRow(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	return (await allBankRowsOf(ctx, transactionId).first()) !== null;
+}
+
+async function bankTextsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	const bankTexts: string[] = [];
+	for await (const bankRow of allBankRowsOf(ctx, transactionId)) bankTexts.push(bankRow.bankText);
+	return bankTexts;
+}
+
+const BANK_ROWS_SHOWN = 10;
+
+export async function bankRowsShown(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	const read: Doc<'imports'>[] = [];
+	for (const state of ['changed', 'removed', 'linked'] as const) {
+		if (read.length > BANK_ROWS_SHOWN) break;
+		read.push(
+			...(await bankRowsIn(ctx, transactionId, state).take(BANK_ROWS_SHOWN + 1 - read.length))
+		);
+	}
+	return {
+		bankRows: read.slice(0, BANK_ROWS_SHOWN),
+		moreBankRows: read.length > BANK_ROWS_SHOWN
+	};
 }

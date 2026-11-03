@@ -86,7 +86,13 @@ describe('PlaidClient', () => {
 			return Effect.gen(function* () {
 				const page = yield* sync;
 
-				expect(page).toEqual({ added: [], nextCursor: 'cursor-synthetic-1', hasMore: false });
+				expect(page).toEqual({
+					added: [],
+					modified: [],
+					removed: [],
+					nextCursor: 'cursor-synthetic-1',
+					hasMore: false
+				});
 				expect(plaid.sent).toHaveLength(1);
 				const [request] = plaid.sent;
 				expect(request?.url).toBe('https://sandbox.plaid.com/transactions/sync');
@@ -100,6 +106,52 @@ describe('PlaidClient', () => {
 			}).pipe(Effect.provide(plaid.layer));
 		}
 	);
+
+	it.effect("reads when the bank's consent ends from the Item", () => {
+		const item = (consent: string | null) =>
+			json(200, {
+				item: { item_id: 'item-synthetic-1', consent_expiration_time: consent, error: null },
+				status: null,
+				request_id: 'request-synthetic-1'
+			});
+		const plaid = fakePlaid((attempt) =>
+			Promise.resolve(item(attempt === 1 ? '2026-11-20T15:00:00Z' : null))
+		);
+		const itemGet = PlaidClient.use((client) => client.itemGet(accessToken));
+		return Effect.gen(function* () {
+			expect(yield* itemGet).toEqual({ consentExpiresAt: Date.UTC(2026, 10, 20, 15) });
+			expect(yield* itemGet).toEqual({ consentExpiresAt: null });
+			expect(plaid.sent[0]?.url).toBe('https://sandbox.plaid.com/item/get');
+			expect(plaid.sent[0]?.body).toEqual({ access_token: accessToken });
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
+	it.effect('asks for an update-mode Link token with the access token and no products', () => {
+		const plaid = fakePlaid(() =>
+			Promise.resolve(
+				json(200, {
+					link_token: 'link-token-synthetic-1',
+					expiration: '2026-11-02T04:00:00Z',
+					request_id: 'request-synthetic-1'
+				})
+			)
+		);
+		return Effect.gen(function* () {
+			const token = yield* PlaidClient.use((client) =>
+				client.linkTokenCreate({ accessToken, clientUserId: 'connection-synthetic-1' })
+			);
+
+			expect(token).toBe('link-token-synthetic-1');
+			expect(plaid.sent[0]?.url).toBe('https://sandbox.plaid.com/link/token/create');
+			expect(plaid.sent[0]?.body).toEqual({
+				access_token: accessToken,
+				client_name: 'Budge',
+				language: 'en',
+				country_codes: ['US'],
+				user: { client_user_id: 'connection-synthetic-1' }
+			});
+		}).pipe(Effect.provide(plaid.layer));
+	});
 
 	it.effect(
 		'retries a network failure, making at most three attempts, with no request, token, or cause in the error',
@@ -245,6 +297,44 @@ describe('PlaidClient', () => {
 				[
 					'https://sandbox.plaid.com/item/webhook/update',
 					{ access_token: accessToken, webhook: 'https://example.invalid/plaid/webhook' }
+				]
+			]);
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
+	it.effect("reads the Item's Accounts, optionally only some", () => {
+		const plaid = fakePlaid(() =>
+			Promise.resolve(
+				json(200, {
+					accounts: [
+						{
+							account_id: 'account-synthetic-card',
+							balances: { available: null, current: 12.5, limit: 500 },
+							mask: '7310',
+							name: 'Sample Card',
+							official_name: null,
+							subtype: 'credit card',
+							type: 'credit'
+						}
+					],
+					item: { item_id: 'item-synthetic-1' },
+					request_id: 'request-synthetic-4'
+				})
+			)
+		);
+		return Effect.gen(function* () {
+			const client = yield* PlaidClient;
+			yield* client.accountsGet(accessToken);
+			const accounts = yield* client.accountsGet(accessToken, ['account-synthetic-card']);
+
+			expect(accounts).toEqual([
+				{ externalId: 'account-synthetic-card', name: 'Sample Card', mask: '7310', balance: -1_250 }
+			]);
+			expect(plaid.sent.map(({ url, body }) => [url, body])).toEqual([
+				['https://sandbox.plaid.com/accounts/get', { access_token: accessToken }],
+				[
+					'https://sandbox.plaid.com/accounts/get',
+					{ access_token: accessToken, options: { account_ids: ['account-synthetic-card'] } }
 				]
 			]);
 		}).pipe(Effect.provide(plaid.layer));

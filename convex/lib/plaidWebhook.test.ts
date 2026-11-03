@@ -139,7 +139,23 @@ describe('reading a Plaid webhook', () => {
 		expect(readWebhook(encoder.encode(body))).toEqual({
 			type: 'TRANSACTIONS',
 			code: 'SYNC_UPDATES_AVAILABLE',
-			itemId: 'item-synthetic-1'
+			itemId: 'item-synthetic-1',
+			errorCode: null
+		});
+	});
+
+	it("reads an ITEM ERROR's error code", () => {
+		const itemError = JSON.stringify({
+			webhook_type: 'ITEM',
+			webhook_code: 'ERROR',
+			item_id: 'item-synthetic-1',
+			error: { error_code: 'ITEM_LOGIN_REQUIRED' }
+		});
+		expect(readWebhook(encoder.encode(itemError))).toEqual({
+			type: 'ITEM',
+			code: 'ERROR',
+			itemId: 'item-synthetic-1',
+			errorCode: 'ITEM_LOGIN_REQUIRED'
 		});
 	});
 

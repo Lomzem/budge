@@ -1,5 +1,5 @@
 import { clerk } from '@clerk/testing/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test';
 
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 

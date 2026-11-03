@@ -30,14 +30,23 @@ const SyncTransaction = Schema.Struct({
 	pending: Schema.Boolean
 });
 
+const RemovedTransaction = Schema.Struct({
+	transaction_id: Schema.String,
+	account_id: Schema.String
+});
+
 const SyncResponse = Schema.Struct({
 	added: Schema.Array(SyncTransaction),
+	modified: Schema.Array(SyncTransaction),
+	removed: Schema.Array(RemovedTransaction),
 	next_cursor: Schema.String,
 	has_more: Schema.Boolean
 });
 
 export interface SyncPage {
 	added: readonly (typeof SyncTransaction.Type)[];
+	modified: readonly (typeof SyncTransaction.Type)[];
+	removed: readonly (typeof RemovedTransaction.Type)[];
 	nextCursor: string;
 	hasMore: boolean;
 }
@@ -52,17 +61,44 @@ export interface SyncRow {
 	merchantName?: string;
 }
 
+export interface SyncRemoval {
+	externalAccountId: string;
+	sourceId: string;
+}
+
+export interface SyncChanges {
+	added: SyncRow[];
+	modified: SyncRow[];
+	removed: SyncRemoval[];
+}
+
 export const decodeSyncPage = (body: unknown): Effect.Effect<SyncPage, Schema.SchemaError> =>
 	Schema.decodeUnknownEffect(SyncResponse)(body).pipe(
 		Effect.map((response) => ({
 			added: response.added,
+			modified: response.modified,
+			removed: response.removed,
 			nextCursor: response.next_cursor,
 			hasMore: response.has_more
 		}))
 	);
 
-export function syncRowsOf(page: SyncPage, cutoverDate: string): SyncRow[] {
-	return page.added.flatMap((transaction) => {
+export function syncRowsOf(page: SyncPage, cutoverDate: string): SyncChanges {
+	return {
+		added: bankRowsOf(page.added, cutoverDate),
+		modified: bankRowsOf(page.modified, cutoverDate),
+		removed: page.removed.map((removal) => ({
+			externalAccountId: removal.account_id,
+			sourceId: removal.transaction_id
+		}))
+	};
+}
+
+function bankRowsOf(
+	transactions: readonly (typeof SyncTransaction.Type)[],
+	cutoverDate: string
+): SyncRow[] {
+	return transactions.flatMap((transaction) => {
 		if (transaction.pending || transaction.date < cutoverDate) return [];
 		const bankText = clean(transaction.original_description) ?? clean(transaction.name);
 		if (bankText === undefined) return [];
@@ -79,6 +115,57 @@ export function syncRowsOf(page: SyncPage, cutoverDate: string): SyncRow[] {
 		];
 	});
 }
+
+const Cents = Schema.Finite.pipe(
+	Schema.decodeTo(Schema.Finite, {
+		decode: SchemaGetter.transformEffect((amount: number) => {
+			const cents = parseCents(String(amount));
+			return cents === undefined
+				? Effect.fail(new SchemaIssue.InvalidValue({ message: 'Expected dollars and cents' }))
+				: Effect.succeed(cents);
+		}),
+		encode: SchemaGetter.transform((cents: number) => cents / 100)
+	})
+);
+
+const PlaidAccount = Schema.Struct({
+	account_id: Schema.String,
+	name: Schema.String,
+	mask: Schema.optionalKey(Schema.NullOr(Schema.String)),
+	type: Schema.String,
+	balances: Schema.Struct({ current: Schema.NullOr(Cents) })
+});
+
+const AccountsResponse = Schema.Struct({ accounts: Schema.Array(PlaidAccount) });
+
+export interface BankAccount {
+	externalId: string;
+	name: string;
+	mask?: string;
+	balance: number | null;
+}
+
+const OWED_TYPES = new Set(['credit', 'loan']);
+
+function budgetSigned(type: string, current: number) {
+	return OWED_TYPES.has(type) && current !== 0 ? -current : current;
+}
+
+export const decodeAccounts = (body: unknown): Effect.Effect<BankAccount[], Schema.SchemaError> =>
+	Schema.decodeUnknownEffect(AccountsResponse)(body).pipe(
+		Effect.map((response) =>
+			response.accounts.map((account) => {
+				const current = account.balances.current;
+				const mask = clean(account.mask);
+				return {
+					externalId: account.account_id,
+					name: clean(account.name) ?? 'Bank account',
+					...(mask === undefined ? {} : { mask }),
+					balance: current === null ? null : budgetSigned(account.type, current)
+				};
+			})
+		)
+	);
 
 function clean(text: string | null | undefined) {
 	const trimmed = text?.replace(/\s+/g, ' ').trim();

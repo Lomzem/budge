@@ -3,7 +3,8 @@ import { v } from 'convex/values';
 import { localIsoDate, monthOf } from '../src/lib/domain/dates';
 import type { Id } from './_generated/dataModel';
 import { env, internalMutation, type MutationCtx } from './_generated/server';
-import { createPaymentCategory, ensureReadyToAssign } from './lib/categories';
+import { saveStartingBalance } from './lib/accounts';
+import { ensureReadyToAssign } from './lib/categories';
 import { rebuildMonthlyTotals } from './lib/monthlyTotals';
 import { publicError } from './lib/publicError';
 import { refreshSearchText } from './lib/transactions';
@@ -77,12 +78,11 @@ export const run = internalMutation({
 		});
 		const savings = await ctx.db.insert('accounts', { name: 'Savings', kind: 'cash', position: 1 });
 		const card = await ctx.db.insert('accounts', { name: 'Card', kind: 'creditCard', position: 2 });
-		const cardPayment = await createPaymentCategory(ctx, { _id: card, name: 'Card' });
 
 		const write = writer(ctx);
-		await write(checking, cutoverDate, 2_418_37, 'Starting Balance', true, readyToAssign);
-		await write(savings, cutoverDate, 8_150_00, 'Starting Balance', true, readyToAssign);
-		await write(card, cutoverDate, -612_48, 'Starting Balance', true, cardPayment);
+		await saveStartingBalance(ctx, checking, 2_418_37);
+		await saveStartingBalance(ctx, savings, 8_150_00);
+		await saveStartingBalance(ctx, card, -612_48);
 
 		let fixedPseudoRandomState = 7;
 		const next = (below: number) => {

@@ -1,0 +1,28 @@
+import { ESLint } from 'eslint';
+import ts from 'typescript-eslint';
+import { expect, test } from 'vitest';
+
+const eslint = new ESLint({
+	overrideConfig: {
+		...ts.configs.disableTypeChecked,
+		languageOptions: { parserOptions: { projectService: false, project: false } }
+	}
+});
+
+test.each(['test', 'expect'])('E2E specs must import %s through the fixture', async (name) => {
+	const lint = async (source) => {
+		const [result] = await eslint.lintText(
+			`import { ${name} } from '${source}';\nexport { ${name} };\n`,
+			{ filePath: 'e2e/import.test.ts' }
+		);
+		return result.messages.filter((message) => message.ruleId === 'no-restricted-imports');
+	};
+	expect(await lint('@playwright/test')).toMatchObject([
+		{
+			message: expect.stringContaining(
+				"Import `test` from './test', which reloads a seed fixture before every test."
+			)
+		}
+	]);
+	expect(await lint('./test')).toEqual([]);
+});
