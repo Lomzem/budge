@@ -546,7 +546,14 @@ export const apply = internalMutation({
 			...(release ? finishedSync(connection, now, attentionNotices) : {})
 		});
 		if (release) await syncAgainIfRequested(ctx, connection);
-		return { kind: 'applied' as const, lease: nextLease ?? null, ...totals };
+		const accountsCheckRequestedAt =
+			(await ctx.db.get('bankConnections', connectionId))?.accountsCheckRequestedAt ?? null;
+		return {
+			kind: 'applied' as const,
+			lease: nextLease ?? null,
+			...totals,
+			accountsCheckRequestedAt
+		};
 	}
 });
 
@@ -814,5 +821,13 @@ async function connectionAccountOf(
 	const known = await findConnectionAccount(ctx, connectionId, externalId);
 	if (known !== null) return known;
 	const held = { connectionId, externalId, state: 'held' as const };
-	return { _id: await ctx.db.insert('connectionAccounts', held), ...held };
+	const heldId = await ctx.db.insert('connectionAccounts', held);
+	await requestAccountsCheck(ctx, connectionId);
+	return { _id: heldId, ...held };
+}
+
+async function requestAccountsCheck(ctx: MutationCtx, connectionId: Id<'bankConnections'>) {
+	const connection = await ctx.db.get('bankConnections', connectionId);
+	if (connection === null || connection.accountsCheckRequestedAt !== undefined) return;
+	await ctx.db.patch('bankConnections', connectionId, { accountsCheckRequestedAt: Date.now() });
 }

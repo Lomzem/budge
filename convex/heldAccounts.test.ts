@@ -181,6 +181,36 @@ describe('a bank Account Budge does not know', () => {
 		expect(await transactions()).toEqual([]);
 	});
 
+	test('is named on the next sync after the bank could not say its name, even with no new rows', async () => {
+		const { syncWith, held } = await connectedBudget();
+		const bankDown = new PlaidApi({
+			error_code: 'INSTITUTION_NOT_RESPONDING',
+			status: 400,
+			request_id: 'request-synthetic-names'
+		});
+		await syncWith({
+			transactionsSync: () => Effect.succeed(rowsFor(savingsId)),
+			accountsGet: () => Effect.fail(bankDown)
+		});
+		expect(await held()).toEqual([expect.objectContaining({ name: null, rows: 2 })]);
+
+		await syncWith({
+			transactionsSync: () =>
+				Effect.succeed({
+					...page,
+					added: [],
+					modified: [],
+					removed: [],
+					nextCursor: 'cursor-synthetic-quiet'
+				}),
+			accountsGet: () => Effect.succeed(bankAccounts)
+		});
+
+		expect(await held()).toEqual([
+			expect.objectContaining({ name: 'Sample Savings', mask: '4321', rows: 2 })
+		]);
+	});
+
 	test('a batch applied again, after the bank changed mid-update, holds its rows once', async () => {
 		const { sync, held } = await connectedBudget();
 		const more = (n: number): SyncPage => ({
