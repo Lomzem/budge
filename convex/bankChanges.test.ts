@@ -7,7 +7,7 @@ import type { Id } from './_generated/dataModel';
 import { PlaidApi, PlaidClient, type SyncRequest } from './lib/plaidClient';
 import { setupConnection, SyncStore, syncConnection } from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
-import { newBackend, publicErrorMessage, useOwnerEnv } from './test.helper';
+import { newBackend, publicErrorMessage, publicErrorOf, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -221,6 +221,28 @@ async function grocerAsTransfer(budget: Budget) {
 	).page.find((row) => row.amount === 4_250);
 	assert(savingsSide !== undefined, 'No Savings side');
 	return { savings, savingsSide };
+}
+
+async function expectRefused(
+	budget: Budget,
+	resolve: { importId: Id<'imports'>; keep: 'bank' | 'mine' },
+	reason?: RegExp
+) {
+	const everyRow = async () =>
+		(
+			await budget.owner.query(api.transactions.list, {
+				paginationOpts: { numItems: 50, cursor: null }
+			})
+		).page;
+	const before = await everyRow();
+
+	const refusal = await publicErrorOf(
+		budget.owner.mutation(api.imports.resolveBankChange, resolve)
+	);
+
+	expect(refusal?.code).toBe('INVALID_INPUT');
+	if (reason !== undefined) expect(refusal?.message).toMatch(reason);
+	expect(await everyRow()).toEqual(before);
 }
 
 async function reconcileChecking(budget: Budget) {
@@ -466,13 +488,10 @@ describe('resolving a bank change', () => {
 		await budget.sync(changes({ modified: [grocerChanged] }));
 		const importId = (await budget.row('SAMPLE GROCER 0193')).bankRows[0]?._id as Id<'imports'>;
 
-		expect(
-			await publicErrorMessage(
-				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
-			)
-		).toMatch(/split/);
+		await expectRefused(budget, { importId, keep: 'bank' }, /split/);
 		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({
 			amount: -4_250,
+			splits: [{ amount: -2_000 }, { amount: -2_250 }],
 			bankRows: [{ state: 'changed' }]
 		});
 	});
@@ -508,13 +527,10 @@ describe('resolving a bank change', () => {
 		const { budget, importId } = await flaggedChange();
 		await reconcileChecking(budget);
 
-		expect(
-			await publicErrorMessage(
-				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
-			)
-		).toMatch(/reconciled/i);
+		await expectRefused(budget, { importId, keep: 'bank' }, /reconciled/i);
 		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({
 			amount: -4_250,
+			reconciled: true,
 			bankRows: [{ state: 'changed' }]
 		});
 	});
@@ -571,12 +587,11 @@ describe('resolving a bank removal', () => {
 			amount: grocerRow.amount
 		});
 
-		expect(
-			await publicErrorMessage(
-				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
-			)
-		).toMatch(/still/);
-		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({ amount: -4_250 });
+		await expectRefused(budget, { importId, keep: 'bank' }, /still/);
+		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({
+			amount: -4_250,
+			bankRows: [{ state: 'removed' }, { state: 'linked', bankText: 'SAMPLE STATEMENT ROW' }]
+		});
 	});
 
 	test("the bank's version is refused while a statement row behind many removed ones still backs the Transaction", async () => {
@@ -621,35 +636,35 @@ describe('resolving a bank removal', () => {
 		const importId = (await budget.row(null)).bankRows[0]?._id;
 		assert(importId !== undefined, 'No Bank Row');
 
-		expect(
-			await publicErrorMessage(
-				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
-			)
-		).toMatch(/still/);
-		expect(await budget.row(null)).toMatchObject({ amount: -4_250 });
+		await expectRefused(budget, { importId, keep: 'bank' }, /still/);
+		expect(await budget.row(null)).toMatchObject({
+			amount: -4_250,
+			transfer: { accountId: savings },
+			bankRows: [{ state: 'removed' }]
+		});
 	});
 
 	test("the bank's version is refused on a reconciled Transaction", async () => {
 		const { budget, importId } = await flaggedRemoval();
 		await reconcileChecking(budget);
 
-		expect(
-			await publicErrorMessage(
-				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
-			)
-		).toMatch(/reconciled/i);
-		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({ amount: -4_250 });
+		await expectRefused(budget, { importId, keep: 'bank' }, /reconciled/i);
+		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({
+			amount: -4_250,
+			reconciled: true,
+			bankRows: [{ state: 'removed' }]
+		});
 	});
 
 	test('a Bank Row with nothing to resolve is refused', async () => {
 		const budget = await syncedBudget();
 		const importId = (await budget.row('SAMPLE PAYROLL')).bankRows[0]?._id as Id<'imports'>;
 
-		expect(
-			await publicErrorMessage(
-				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'mine' })
-			)
-		).toBeDefined();
+		await expectRefused(budget, { importId, keep: 'mine' });
+		expect(await budget.row('SAMPLE PAYROLL')).toMatchObject({
+			approved: false,
+			bankRows: [{ state: 'linked' }]
+		});
 	});
 });
 
