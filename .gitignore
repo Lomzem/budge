@@ -1,7 +1,13 @@
-# Machine-local agent configuration and session data
-/.claude/
+# Machine-local agent configuration and session data, except the shared verify-budge skill
+/.claude/*
+!/.claude/skills/
+/.claude/skills/*
+!/.claude/skills/verify-budge
 /.codex/
-/.agents/
+/.agents/*
+!/.agents/skills/
+/.agents/skills/*
+!/.agents/skills/verify-budge/
 
 # Personal instruction overrides
 /AGENTS.local.md

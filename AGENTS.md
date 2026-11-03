@@ -7,6 +7,8 @@
 
 Work inline when the current model owns the task. Delegate when another model is required, or when an independent task benefits from parallel work or a separate context. Keep routine lookups and small tasks inline.
 
+Every delegate brief lists the `~/.agents/principles/` references whose triggers match the delegated work and requires the delegate to read each one in full before deciding. The delegate's report names the principles that changed a choice and the choice they changed.
+
 ## Agent skills
 
 ### Issue tracker
@@ -27,18 +29,28 @@ Before running Playwright E2E or changing Clerk setup, sign-in, or CI authentica
 
 ## Checking UI work in a browser
 
-Before calling a UI change done, look at it in a running app: from a worktree, `bun run app up`, `bun run app login`, then `bun run app seed <fixture>`. Drive the pages with Playwright using the storage state `login` prints, and finish with `bun run app down`. When the app misbehaves, start with `bun run app doctor`. `bun run app` lists every verb.
+Before checking UI or behavior, use [verify-budge](.agents/skills/verify-budge/SKILL.md) as the required verification path. Follow its feature map, worktree-local `bun run app` lifecycle, Playwright storage state, evidence, and cleanup requirements before calling the change done.
+
+## Every ticket
+
+Run these for each ticket, scoped to the ticket's diff. A ticket is not done until each step has run and its findings are fixed, answered, or deferred with a reason in the ticket:
+
+1. **Principles:** run `/principles` before designing, before writing tests, and before calling the ticket done, and read every matching reference in full.
+2. **Tests:** pass every test the ticket adds or changes through the `test-audit` authoring gate.
+3. **Running app:** prove the ticket's features with the `verify-budge` skill, and update its feature map when a feature changes.
+4. **Review:** run a local `code-review` and fix or answer every finding.
+5. **Corrections:** once the ticket lands on the integration branch, Sol runs `/correct` on it (analysis only). Opus decides on each suggestion, then implements the accepted ones on the same branch.
 
 ## Pull requests
 
-**Local review per ticket:** before a ticket enters a PR, review it locally with the `code-review` skill and fix or answer every finding.
+**One integration PR per spec:** every ticket of a spec, plus its corrections, lands on one integration branch, which has one PR into `main`. Docs, `.scratch/`, ticket 01 (the scaffold), dev-environment changes (tooling, lint rules, hooks, CI), and small fixes outside a ticket are committed straight to `main` after a local `code-review`.
 
-**Feature-slice PRs:** group related tickets (typically 3–5) into one branch and PR into `main`, squash-merged once CodeRabbit approves. This fits CodeRabbit's review limit of about one per hour. Docs, `.scratch/`, ticket 01 (the scaffold), dev-environment changes (tooling, lint rules, hooks, CI), and small fixes outside a ticket are committed straight to `main` after a local `code-review`. When unsure, open a PR.
+**CodeRabbit once, at the end:** request CodeRabbit only when every ticket and correction is on the integration branch, and only after the steps above pass and CI is green. Don't request it per ticket or per push.
 
 `main` has no branch protection, so this merge rule is the gate:
 
-1. CodeRabbit does not review automatically. Once CI and the local ticket reviews pass, comment `@coderabbitai review` and wait for the completed review. A rate-limit or "review skipped" message is neither a review nor an approval: wait out the window, then comment `@coderabbitai review`.
-2. Address every CodeRabbit comment with a fix or a reply, and push.
+1. CodeRabbit does not review automatically. Comment `@coderabbitai review` and wait for the completed review. A rate-limit or "review skipped" message is neither a review nor an approval: wait out the window, then comment `@coderabbitai review` again.
+2. Address every CodeRabbit comment with a fix or a reply. Batch the fixes, push, and request one incremental review.
 3. Merge only when CodeRabbit has approved the latest commit and CI is green.
 
 <!-- convex-ai-start -->
