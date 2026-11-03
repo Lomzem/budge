@@ -359,11 +359,10 @@ describe('syncing a Bank Connection', () => {
 
 		expect(synced(await sync(plaid))).toMatchObject({ kind: 'synced' });
 
-		expect(plaid.requests).toHaveLength(MAX_BATCHES * PAGES_PER_BATCH);
+		const fourBatchesOfThreePages = 12;
+		expect(plaid.requests).toHaveLength(fourBatchesOfThreePages);
 		const saved = await connection();
-		expect(saved?.provider).toMatchObject({
-			cursor: `cursor-synthetic-page-${String(MAX_BATCHES * PAGES_PER_BATCH)}`
-		});
+		expect(saved?.provider).toMatchObject({ cursor: 'cursor-synthetic-page-12' });
 		expect(saved?.syncLeaseUntil).toBeUndefined();
 	});
 
