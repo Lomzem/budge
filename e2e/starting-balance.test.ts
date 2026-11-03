@@ -1,59 +1,10 @@
 import { clerk } from '@clerk/testing/playwright';
+import { holdResponseTo } from './heldResponse';
 import { expect, test, type Page } from './test';
 
 import { formatCents, parseCents } from '../src/lib/domain/money';
 
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
-
-interface SyncMessage {
-	type?: string;
-	requestId?: number;
-	udfPath?: string;
-}
-
-async function delayFromMutationResponse(page: Page, udfPath: RegExp) {
-	const delayed: (() => void)[] = [];
-	let watched: number | undefined;
-	let state: 'waiting' | 'delaying' | 'released' = 'waiting';
-	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (client) => {
-		const server = client.connectToServer();
-		client.onMessage((message) => {
-			const parsed = JSON.parse(String(message)) as SyncMessage;
-			if (
-				watched === undefined &&
-				parsed.type === 'Mutation' &&
-				udfPath.test(parsed.udfPath ?? '')
-			) {
-				watched = parsed.requestId;
-			}
-			server.send(message);
-		});
-		server.onMessage((message) => {
-			const parsed = JSON.parse(String(message)) as SyncMessage;
-			if (
-				state === 'waiting' &&
-				parsed.type === 'MutationResponse' &&
-				parsed.requestId === watched
-			) {
-				state = 'delaying';
-			}
-			if (state !== 'delaying') {
-				client.send(message);
-				return;
-			}
-			delayed.push(() => {
-				client.send(message);
-			});
-		});
-	});
-	return {
-		delaying: () => state === 'delaying',
-		release: () => {
-			state = 'released';
-			for (const send of delayed.splice(0)) send();
-		}
-	};
-}
 
 async function openAccount(page: Page, name: string) {
 	await page
@@ -83,7 +34,7 @@ test("a starting balance saved from a dismissed dialog lands, and leaves the nex
 	if (!ownerEmail) throw new Error('E2E_CLERK_USER_EMAIL is not set.');
 
 	await page.setViewportSize({ width: 1280, height: 800 });
-	const network = await delayFromMutationResponse(page, /^accounts(\.js)?:setStartingBalance$/);
+	const network = await holdResponseTo(page, 'accounts:setStartingBalance');
 	await page.goto('/sign-in');
 	await clerk.signIn({ page, emailAddress: ownerEmail });
 	await page.goto('/');
@@ -95,7 +46,7 @@ test("a starting balance saved from a dismissed dialog lands, and leaves the nex
 	const startAfter = startBefore + 10_000;
 	await checking.getByLabel('Starting balance').fill(formatCents(startAfter).replace('$', ''));
 	await checking.getByRole('button', { name: 'Confirm' }).click();
-	await expect.poll(network.delaying).toBe(true);
+	await network.held;
 	await page.keyboard.press('Escape');
 	await expect(checking).toBeHidden();
 

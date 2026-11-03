@@ -20,14 +20,18 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 		const server = socket.connectToServer();
 		socket.onMessage((frame) => {
 			const message = parse(frame);
-			if (message.type === 'Mutation' && message.udfPath === udfPath) {
+			if (
+				(message.type === 'Mutation' || message.type === 'Action') &&
+				message.udfPath === udfPath
+			) {
 				requestIds.add(message.requestId);
 			}
 			server.send(frame);
 		});
 		server.onMessage((frame) => {
 			const message = parse(frame);
-			if (message.type === 'MutationResponse' && requestIds.has(message.requestId)) {
+			const response = message.type === 'MutationResponse' || message.type === 'ActionResponse';
+			if (response && requestIds.has(message.requestId)) {
 				holding = true;
 				markHeld(undefined);
 			}

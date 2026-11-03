@@ -8,6 +8,7 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { attempt } from '$lib/attempt';
 	import { getBankConnections, type BankConnection } from '$lib/bankConnections.svelte';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { formatSynced } from '$lib/domain/freshness';
@@ -17,10 +18,14 @@
 	const client = useConvexClient();
 	const connections = getBankConnections();
 
-	let openId = $state<Id<'bankConnections'> | null>(null);
-	const opened = $derived(connections.all.find((connection) => connection._id === openId));
-	let syncing = $state(false);
-	let result = $state('');
+	const dialog = new DialogSession<{
+		connectionId: Id<'bankConnections'>;
+		syncing: boolean;
+		result: string;
+	}>();
+	const opened = $derived(
+		connections.all.find((connection) => connection._id === dialog.current?.connectionId)
+	);
 
 	const exactTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 	const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
@@ -32,10 +37,9 @@
 		return formatSynced(connection.lastSyncedAt, connections.now);
 	}
 
-	function open(connectionId: Id<'bankConnections'>) {
-		openId = connectionId;
+	function open(connectionId: Id<'bankConnections'>, result = '') {
+		dialog.open({ connectionId, syncing: false, result });
 		connections.tick();
-		result = '';
 	}
 
 	function describeSync(outcome: SyncOutcome): string {
@@ -46,26 +50,26 @@
 		return `Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`;
 	}
 
-	async function syncNow(connectionId: Id<'bankConnections'>) {
-		syncing = true;
-		result = '';
+	async function syncNow() {
+		const session = dialog.current;
+		if (session === null) return;
+		session.syncing = true;
+		session.result = '';
 		const synced = await attempt(() =>
-			client.action(api.bankConnections.syncNow, { connectionId })
+			client.action(api.bankConnections.syncNow, { connectionId: session.connectionId })
 		);
-		syncing = false;
+		session.syncing = false;
 		connections.tick();
-		result = synced.ok
+		session.result = synced.ok
 			? describeSync(synced.value)
 			: (synced.error?.message ?? "Budge couldn't sync. Try again.");
 	}
 
 	async function reconnect(connectionId: Id<'bankConnections'>) {
-		openId = null;
+		dialog.dismiss();
 		const message = await connections.reconnect(connectionId);
-		if (message !== null) {
-			open(connectionId);
-			result = message;
-		}
+		const noOtherDialogOpenedMeanwhile = dialog.current === null;
+		if (message !== null && noOtherDialogOpenedMeanwhile) open(connectionId, message);
 	}
 </script>
 
@@ -104,7 +108,7 @@
 <Dialog.Root
 	open={opened !== undefined}
 	onOpenChange={(isOpen) => {
-		if (!isOpen) openId = null;
+		if (!isOpen) dialog.dismiss();
 	}}
 >
 	<Dialog.Content>
@@ -133,25 +137,25 @@
 					The sync at {exactTime.format(opened.lastError.at)} failed: {opened.lastError.message}
 				</p>
 			{/if}
-			{#if result}
-				<p role="status" class="text-sm">{result}</p>
+			{#if dialog.current?.result}
+				<p role="status" class="text-sm">{dialog.current.result}</p>
 			{/if}
 			<Dialog.Footer>
 				{#if opened.status === 'needsAttention' || opened.consentEndsAt !== null}
 					<Button
 						variant="outline"
-						disabled={connections.reconnecting !== null || syncing}
+						disabled={connections.reconnecting !== null || (dialog.current?.syncing ?? false)}
 						onclick={() => reconnect(opened._id)}
 					>
 						{connections.reconnecting === opened._id ? 'Reconnecting…' : 'Reconnect'}
 					</Button>
 				{/if}
 				<Button
-					disabled={syncing || connections.reconnecting !== null}
-					onclick={() => syncNow(opened._id)}
+					disabled={(dialog.current?.syncing ?? false) || connections.reconnecting !== null}
+					onclick={syncNow}
 				>
-					<RefreshCwIcon aria-hidden="true" class={syncing ? 'animate-spin' : ''} />
-					{syncing ? 'Syncing…' : 'Sync now'}
+					<RefreshCwIcon aria-hidden="true" class={dialog.current?.syncing ? 'animate-spin' : ''} />
+					{dialog.current?.syncing ? 'Syncing…' : 'Sync now'}
 				</Button>
 			</Dialog.Footer>
 		{/if}
