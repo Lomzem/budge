@@ -29,21 +29,24 @@ const grocer = plaidRow('txn-synthetic-grocer', '2026-08-14', 42.5, 'SAMPLE GROC
 const payroll = plaidRow('txn-synthetic-payroll', '2026-08-15', -2310.42, 'SAMPLE PAYROLL');
 
 let pageNumber = 0;
-function changes({
-	added = [],
-	modified = [],
-	removed = []
-}: {
-	added?: object[];
-	modified?: object[];
-	removed?: string[];
-}) {
+function changes(
+	{
+		added = [],
+		modified = [],
+		removed = []
+	}: {
+		added?: object[];
+		modified?: object[];
+		removed?: string[];
+	},
+	account = externalId
+) {
 	pageNumber++;
 	return Effect.runSync(
 		decodeSyncPage({
 			added,
 			modified,
-			removed: removed.map((id) => ({ transaction_id: id, account_id: externalId })),
+			removed: removed.map((id) => ({ transaction_id: id, account_id: account })),
 			next_cursor: `cursor-synthetic-${String(pageNumber)}`,
 			has_more: false
 		})
@@ -91,12 +94,21 @@ async function syncedBudget() {
 	);
 	assert(connectionId !== null, 'setup failed');
 
-	const syncWith = (transactionsSync: NonNullable<FakePlaid['transactionsSync']>) =>
+	const syncWith = (
+		transactionsSync: NonNullable<FakePlaid['transactionsSync']>,
+		account = externalId
+	) =>
 		run(
-			{ transactionsSync, itemGet: () => Effect.succeed({ consentExpiresAt: null }) },
+			{
+				transactionsSync,
+				itemGet: () => Effect.succeed({ consentExpiresAt: null }),
+				accountsGet: () =>
+					Effect.succeed([{ externalId: account, name: 'Sample Checking', balance: null }])
+			},
 			syncConnection(connectionId, { refresh: false })
 		);
-	const sync = (page: ReturnType<typeof changes>) => syncWith(() => Effect.succeed(page));
+	const sync = (page: ReturnType<typeof changes>, account = externalId) =>
+		syncWith(() => Effect.succeed(page), account);
 	const replay = async (page: ReturnType<typeof changes>, from: string | undefined) => {
 		assert(from !== undefined, 'Replay needs the cursor before the page.');
 		await t.run(async (ctx) => {
@@ -594,34 +606,33 @@ describe('resolving a bank removal', () => {
 		});
 	});
 
-	test("the bank's version is refused while a statement row behind many removed ones still backs the Transaction", async () => {
+	test("the bank's version is refused while a bank row behind many removed ones still backs the Transaction", async () => {
 		const { budget, importId } = await flaggedRemoval();
-		const grocerRow = await budget.row('SAMPLE GROCER 0193');
-		await budget.t.run(async (ctx) => {
-			for (let index = 0; index < 10; index++) {
-				await ctx.db.insert('imports', {
-					source: 'csv',
-					accountId: budget.checking,
-					date: grocerRow.date,
-					amount: grocerRow.amount,
-					bankText: 'SAMPLE STATEMENT ROW',
-					transactionId: grocerRow._id,
-					matched: true,
-					state: 'removed'
-				});
-			}
-		});
-		await backWithStatementRow(budget, grocerRow._id, {
-			accountId: budget.checking,
-			date: grocerRow.date,
-			amount: grocerRow.amount
-		});
+		const underReissuedAccountId = async (reissue: number) => {
+			const account = `account-synthetic-reissued-${String(reissue)}`;
+			const transactionId = `txn-synthetic-grocer-reissued-${String(reissue)}`;
+			const row = { ...grocer, transaction_id: transactionId, account_id: account };
+			expect(await budget.sync(changes({ added: [row] }, account), account)).toMatchObject({
+				held: 1
+			});
+			const [held] = await budget.owner.query(api.heldAccounts.list, {});
+			assert(held !== undefined, 'No held Account');
+			await budget.owner.mutation(api.heldAccounts.map, {
+				connectionAccountId: held._id,
+				accountId: budget.checking
+			});
+			return { account, transactionId };
+		};
+		for (let reissue = 1; reissue <= 10; reissue++) {
+			const { account, transactionId } = await underReissuedAccountId(reissue);
+			await budget.sync(changes({ removed: [transactionId] }, account), account);
+		}
+		await underReissuedAccountId(11);
+		expect(await budget.rows()).toHaveLength(2);
+		const shownBankRows = (await budget.row('SAMPLE GROCER 0193')).bankRows;
+		expect(shownBankRows.map((row) => row.state)).toEqual(Array<string>(10).fill('removed'));
 
-		expect(
-			await publicErrorMessage(
-				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
-			)
-		).toMatch(/still/);
+		await expectRefused(budget, { importId, keep: 'bank' }, /still/);
 	});
 
 	test("the bank's version on a Transfer is refused while the other side has its own statement row", async () => {
