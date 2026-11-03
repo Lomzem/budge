@@ -264,6 +264,15 @@
 		if (first && previous !== '' && !previous.startsWith(TRANSFER)) first.categoryId = previous;
 	}
 
+	function savedCategoryOf(line: { categoryId: string }) {
+		const savedLine = transaction?.splits?.find((s) => s.categoryId === line.categoryId);
+		if (savedLine) return { id: savedLine.categoryId, name: savedLine.categoryName };
+		const seededFromTheParent = transaction?.categoryId === line.categoryId;
+		if (seededFromTheParent)
+			return { id: line.categoryId, name: transaction.categoryName ?? undefined };
+		return undefined;
+	}
+
 	function findCategory(id: string): Id<'categories'> | undefined {
 		if (id === '') return undefined;
 		const list = categories.data;
@@ -430,7 +439,7 @@
 		<legend class="px-1 text-sm font-medium">Split lines</legend>
 		<ol class="flex flex-col gap-3">
 			{#each lines as line, index (line.key)}
-				{@const saved = transaction?.splits?.find((s) => s.categoryId === line.categoryId)}
+				{@const saved = savedCategoryOf(line)}
 				{@const number = index + 1}
 				<li class="flex flex-col gap-2">
 					<div class="flex items-end gap-2">
@@ -443,7 +452,7 @@
 								class="h-8 min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
 							>
 								<option value="" disabled>Pick a Category</option>
-								{@render categoryOptions(saved?.categoryId, saved?.categoryName)}
+								{@render categoryOptions(saved?.id, saved?.name)}
 							</select>
 						</div>
 						<div class="flex w-28 flex-col gap-1">
