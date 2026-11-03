@@ -139,11 +139,13 @@ const STARTING_BALANCE_LABEL = 'Starting Balance';
 
 export async function payeeNameOf(
 	ctx: QueryCtx,
-	transaction: Pick<Doc<'transactions'>, 'kind' | 'payeeId'>
+	transaction: Pick<Doc<'transactions'>, 'kind' | 'payeeId'>,
+	readPayee: (payeeId: Id<'payees'>) => Promise<Doc<'payees'> | null> = (payeeId) =>
+		ctx.db.get('payees', payeeId)
 ): Promise<string | null> {
 	if (transaction.kind === 'startingBalance') return STARTING_BALANCE_LABEL;
 	if (transaction.payeeId === undefined) return null;
-	return (await ctx.db.get('payees', transaction.payeeId))?.name ?? null;
+	return (await readPayee(transaction.payeeId))?.name ?? null;
 }
 
 function requireStartingBalanceEditable(

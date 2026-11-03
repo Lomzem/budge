@@ -62,6 +62,10 @@ and accepts `history 18000` as a doubling control for the rebuild.
 Resource decisions use transaction counters, not billed I/O statistics. Durations
 are observations, not a claim about production latency or CPU headroom.
 
+The counters do not show the 1 s user-code budget. To time the matcher alone,
+run `bun scripts/capacity/matcher.ts`: it matches 13 to 1,000 rows against 1,000
+same-date candidates, three runs each, without a backend.
+
 Do not run two capacity commands concurrently in one checkout: they share the
 same deployment and reset its tables. Use a separate checkout and `app up` for
 independent measurements. After an interrupted run, repeat the command to reseed

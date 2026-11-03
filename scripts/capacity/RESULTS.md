@@ -4,6 +4,108 @@ Branch: `v1-fix/capacity-check`. Measured production source:
 `fdfb099adcbef6674115c0538a4d55bc28a88014` (`origin/19-21-bank-sync` at checkout).
 The handoff reports the final tooling commit SHA. No production files changed.
 
+## Correction I re-measurement
+
+Branch: `v1-fix/import-capacity`. Measured production source:
+`10fa2b3b910d47c7a808e8b9fadfd05fd7d00c3f`, after correction I bounded the
+candidates each Bank Row offers (`0e4a629`) and read each Payee once per preview
+(`10fa2b3`). Same fixture, harness and decision rule as measurement E below;
+measurement E's numbers are kept unchanged. Evidence:
+`test-results/capacity/2026-11-03T11-18-34.733Z/` (gitignored). Load average was
+32.09 at start and 10.86 at end on 12 CPUs.
+
+**Set `MAX_FILE_ROWS` to 250.** The complete workflow (preview and commit, three
+fresh runs, strictly under half of every limit) now holds to 254 QFX rows and 339
+CSV rows. The shared cap is the smaller, 254, rounded down to 250, which is also
+under the commit-only boundary. The refusal still tells the person to download a
+shorter date range.
+
+**The limiter moved from preview read bytes to commit index ranges.** Preview now
+reads 1,012 documents and 252,401 bytes at every file size (1,000 nearby
+candidates, 10 Payees, 2 lookups), against 14,002 documents and 8,293,211 bytes
+for 13 rows in measurement E. Its index ranges are 1,037 for CSV and 1,036 plus
+one per row for QFX (1,286 at 250 rows). Commit counts match measurement E
+exactly: QFX 254 used 2,044 ranges and QFX 255 used 2,048, exactly half and
+rejected; CSV 339 used 2,046 and CSV 340 used 2,049. Commit ranges start near
+1,000 for the candidate Bank Row lookups in `bankRowsOf`, one per nearby
+candidate, then add about 4 per QFX row and 3 per CSV row. Doubling fails the
+rule: commit 500 used 3,028 ranges for QFX and 2,529 for CSV.
+
+**The matcher was also a CPU limiter.** Measurement E's CSV 339 commit timed out
+3/3 under a 1 s user-code budget that the counters do not show. Timing
+`matchBankRows` directly (`bun scripts/capacity/matcher.ts`, 1,000 same-date
+candidates, three runs) found 598–777 ms for 250 rows and 2,405–2,697 ms for
+1,000 rows before correction I, because every row re-derived the window and
+re-parsed dates for every candidate. Correction I filters the candidate pool once
+and parses each date once, with identical decisions; 1,000 rows now take about
+77–307 ms. In this re-measurement every run at 250, 253 and 254 rows passed for
+both functions and both formats, and CSV 339 and 340 commits passed 3/3.
+
+**Remaining failures are 1 s user-code timeouts above the cap:** QFX and CSV
+commits at 1,000 rows failed 0/3, CSV preview at 1,000 passed 1/3, and CSV commit
+at 375 passed 2/3. None are inside the chosen cap.
+
+**Fixture caveat.** Every row and candidate shares one date, so every row offers
+the same ten nearest candidates and the per-preview Payee cache collapses to ten
+reads. Each distinct Payee read costs about one index range and one document.
+With dates spread so that rows offer different candidates, preview can read up
+to one Payee per distinct offered candidate, bounded by nearby history (at most
+1,000 more documents and ranges in this fixture), not by file size. That case and
+the `bankRowsOf` base, which also grows with nearby history, remain unmeasured
+density bounds; 250 is a cap for this fixture, not a universal guarantee.
+
+### All measured points after correction I
+
+Counts/bytes use transaction metrics from completed calls. Failed calls have no final transaction metrics; their partial execution usage is retained in runs.json. Duration is total backend wall time in seconds, including database waits. Ranges show min–max, with identical endpoints collapsed.
+
+| Scenario | Rows | Function | Success/runs |   Docs read | Docs written |  Bytes read | Bytes written | Index ranges | Duration (s), all runs |
+| -------- | ---: | -------- | -----------: | ----------: | -----------: | ----------: | ------------: | -----------: | ---------------------: |
+| qfx      | 1000 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         2036 |            1.625–2.521 |
+| qfx      | 1000 | commit   |          0/3 | unavailable |  unavailable | unavailable |   unavailable |  unavailable |            3.047–3.210 |
+| qfx      |  500 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1536 |            0.906–1.457 |
+| qfx      |  500 | commit   |          3/3 |        5500 |         2000 |     2079213 |       1236390 |         3028 |            2.062–2.631 |
+| qfx      |  250 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1286 |            0.904–1.422 |
+| qfx      |  250 | commit   |          3/3 |        3250 |         1000 |     1162463 |        618140 |         2028 |            2.253–3.139 |
+| qfx      |  375 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1411 |            1.382–1.533 |
+| qfx      |  375 | commit   |          3/3 |        4375 |         1500 |     1620838 |        927265 |         2528 |            2.670–3.060 |
+| qfx      |  312 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1348 |            1.343–1.423 |
+| qfx      |  312 | commit   |          3/3 |        3808 |         1248 |     1389817 |        771466 |         2276 |            2.274–2.420 |
+| qfx      |  281 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1317 |            0.780–1.054 |
+| qfx      |  281 | commit   |          3/3 |        3529 |         1124 |     1276140 |        694803 |         2152 |            1.458–1.574 |
+| qfx      |  265 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1301 |            0.679–1.117 |
+| qfx      |  265 | commit   |          3/3 |        3385 |         1060 |     1217468 |        655235 |         2088 |            1.376–2.155 |
+| qfx      |  257 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1293 |            1.135–1.476 |
+| qfx      |  257 | commit   |          3/3 |        3313 |         1028 |     1188132 |        635451 |         2056 |            1.666–2.878 |
+| qfx      |  253 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1289 |            0.997–1.034 |
+| qfx      |  253 | commit   |          3/3 |        3277 |         1012 |     1173464 |        625559 |         2040 |            1.677–1.889 |
+| qfx      |  255 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1291 |            0.725–1.020 |
+| qfx      |  255 | commit   |          3/3 |        3295 |         1020 |     1180798 |        630505 |         2048 |            1.474–1.824 |
+| qfx      |  254 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1290 |            0.687–1.031 |
+| qfx      |  254 | commit   |          3/3 |        3286 |         1016 |     1177131 |        628032 |         2044 |            1.312–2.128 |
+| csv      | 1000 | preview  |          1/3 |        1012 |            0 |      252401 |             0 |         1037 |            1.774–3.515 |
+| csv      | 1000 | commit   |          0/3 | unavailable |  unavailable | unavailable |   unavailable |  unavailable |            3.257–3.477 |
+| csv      |  500 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1037 |            1.137–2.070 |
+| csv      |  500 | commit   |          3/3 |        5500 |         2000 |     2067823 |       1225000 |         2529 |            2.710–3.356 |
+| csv      |  250 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1037 |            0.640–0.869 |
+| csv      |  250 | commit   |          3/3 |        3250 |         1000 |     1156823 |        612500 |         1779 |            1.302–1.571 |
+| csv      |  375 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1037 |            0.552–1.745 |
+| csv      |  375 | commit   |          2/3 |        4375 |         1500 |     1612323 |        918750 |         2154 |            1.344–3.304 |
+| csv      |  312 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1037 |            0.508–0.584 |
+| csv      |  312 | commit   |          3/3 |        3808 |         1248 |     1382751 |        764400 |         1965 |            0.850–1.722 |
+| csv      |  343 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1037 |            0.562–1.163 |
+| csv      |  343 | commit   |          3/3 |        4087 |         1372 |     1495715 |        840350 |         2058 |            1.067–2.619 |
+| csv      |  327 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1037 |            1.038–1.390 |
+| csv      |  327 | commit   |          3/3 |        3943 |         1308 |     1437411 |        801150 |         2010 |            1.637–2.952 |
+| csv      |  335 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1037 |            0.726–0.779 |
+| csv      |  335 | commit   |          3/3 |        4015 |         1340 |     1466563 |        820750 |         2034 |            1.698–1.908 |
+| csv      |  339 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1037 |            0.579–0.837 |
+| csv      |  339 | commit   |          3/3 |        4051 |         1356 |     1481139 |        830550 |         2046 |            1.247–1.618 |
+| csv      |  341 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1037 |            0.560–0.958 |
+| csv      |  341 | commit   |          3/3 |        4069 |         1364 |     1488427 |        835450 |         2052 |            1.482–1.799 |
+| csv      |  340 | preview  |          3/3 |        1012 |            0 |      252401 |             0 |         1037 |            0.595–0.738 |
+| csv      |  340 | commit   |          3/3 |        4060 |         1360 |     1484783 |        833000 |         2049 |            1.342–1.512 |
+| history  | 9000 | rebuild  |          3/3 |       10920 |          120 |     2583780 |         11640 |          975 |            5.045–6.002 |
+
 ## Decision and recommendation
 
 The [decision rule](README.md#decision-recorded-before-measurement) was recorded

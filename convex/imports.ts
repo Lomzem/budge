@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 
 import type { Doc, Id } from './_generated/dataModel';
-import { mutation, query, type QueryCtx } from './_generated/server';
+import { mutation, query } from './_generated/server';
 import { resolveBankChange as resolve } from './lib/bankChanges';
 import { applyBankRows, fileRow, fileSource, insertImported, planImport } from './lib/imports';
 import { requireOwner } from './lib/owner';
@@ -36,10 +36,24 @@ export const preview = query({
 	handler: async (ctx, { accountId, source, rows }) => {
 		await requireOwner(ctx);
 		const plan = await planImport(ctx, accountId, source, rows);
+		const payees = new Map<Id<'payees'>, Promise<Doc<'payees'> | null>>();
+		const payeeOf = (payeeId: Id<'payees'>) => {
+			const known = payees.get(payeeId);
+			if (known !== undefined) return known;
+			const loading = ctx.db.get('payees', payeeId);
+			payees.set(payeeId, loading);
+			return loading;
+		};
 		const describe = async (transactionId: Id<'transactions'>) => {
 			const transaction = plan.candidates.get(transactionId);
 			if (transaction === undefined) throw publicError('NOT_FOUND');
-			return await describeCandidate(ctx, transaction);
+			return {
+				_id: transaction._id,
+				date: transaction.date,
+				amount: transaction.amount,
+				payeeName: await payeeNameOf(ctx, transaction, payeeOf),
+				memo: transaction.memo ?? null
+			};
 		};
 		const describeAll = async (candidates: Id<'transactions'>[] | undefined) =>
 			candidates === undefined ? {} : { candidates: await Promise.all(candidates.map(describe)) };
@@ -122,13 +136,3 @@ export const resolveBankChange = mutation({
 		return null;
 	}
 });
-
-async function describeCandidate(ctx: QueryCtx, transaction: Doc<'transactions'>) {
-	return {
-		_id: transaction._id,
-		date: transaction.date,
-		amount: transaction.amount,
-		payeeName: await payeeNameOf(ctx, transaction),
-		memo: transaction.memo ?? null
-	};
-}
