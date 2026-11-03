@@ -17,7 +17,7 @@ type Signer = Awaited<ReturnType<typeof webhookSigner>>;
 
 function fakePlaid(signer: Signer) {
 	const paths: string[] = [];
-	const state = { keyOutage: false, accountsOutage: false };
+	const state = { keyOutage: false, accountsOutage: false, moreAccounts: 0 };
 	const fetch = (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = new URL(input instanceof Request ? input.url : input);
 		assert(url.host === 'sandbox.plaid.com', `Unexpected request to ${url.host}`);
@@ -60,7 +60,13 @@ function fakePlaid(signer: Signer) {
 							mask: '1111',
 							type: 'depository',
 							balances: { current: 250 }
-						}
+						},
+						...Array.from({ length: state.moreAccounts }, (_, n) => ({
+							account_id: `account-synthetic-more-${String(n)}`,
+							name: `Sample Savings ${String(n)}`,
+							type: 'depository',
+							balances: { current: 0 }
+						}))
 					]
 				});
 			case '/item/get':
@@ -499,6 +505,23 @@ describe('a bank Account the owner adds at the bank', () => {
 
 		expect(await heldExternalIds(backend)).toEqual([newExternalId]);
 	});
+
+	test.each([
+		{ answered: 50, held: 49 },
+		{ answered: 51, held: 0 }
+	])(
+		'a bank answer of $answered Accounts is taken whole or not at all',
+		async ({ answered, held }) => {
+			const backend = await connectedBudget();
+			plaid.state.moreAccounts = answered - 2;
+
+			await postNewAccounts(backend);
+			await runScheduled(backend);
+
+			expect(plaid.paths).toContain('/accounts/get');
+			expect(await heldExternalIds(backend)).toHaveLength(held);
+		}
+	);
 
 	test('a failed look at the Accounts is tried again on the next sync', async () => {
 		const backend = await connectedBudget();
