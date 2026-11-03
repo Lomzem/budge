@@ -158,12 +158,53 @@ async function requireStartingBalanceKept(
 	}
 }
 
+const STARTING_BALANCE_LABEL = 'Starting Balance';
+
+export async function payeeNameOf(
+	ctx: QueryCtx,
+	transaction: Pick<Doc<'transactions'>, 'kind' | 'payeeId'>
+): Promise<string | null> {
+	if (transaction.kind === 'startingBalance') return STARTING_BALANCE_LABEL;
+	if (transaction.payeeId === undefined) return null;
+	return (await ctx.db.get('payees', transaction.payeeId))?.name ?? null;
+}
+
+function requireStartingBalanceEditable(
+	existing: Doc<'transactions'>,
+	input: Pick<TransactionInput, 'accountId' | 'payee' | 'splits' | 'transferAccountId'>
+) {
+	const payee = input.payee.trim();
+	const refusals: readonly (readonly [boolean, string])[] = [
+		[
+			input.accountId !== existing.accountId,
+			"A starting balance stays in its Account. Set the other Account's starting balance instead."
+		],
+		[
+			(input.splits ?? []).length > 0,
+			'A starting balance takes one Category. Record the rest as its own Transaction.'
+		],
+		[
+			input.transferAccountId !== undefined,
+			'A starting balance cannot be a Transfer. Record the Transfer as its own Transaction.'
+		],
+		[
+			payee !== '' && payee !== STARTING_BALANCE_LABEL,
+			'A starting balance has no Payee. Record a Transaction with that Payee instead.'
+		]
+	];
+	const refused = refusals.find(([applies]) => applies);
+	if (refused !== undefined) throw publicError('INVALID_INPUT', refused[1]);
+}
+
 export async function saveTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'> | null,
-	{ transferAccountId, transferTransactionId, ...input }: TransactionInput
+	{ transferAccountId, transferTransactionId, ...given }: TransactionInput
 ): Promise<Id<'transactions'>> {
-	await requireStartingBalanceKept(ctx, existing, input);
+	const startingBalance = existing?.kind === 'startingBalance' ? existing : null;
+	if (startingBalance === null) await requireStartingBalanceKept(ctx, existing, given);
+	else requireStartingBalanceEditable(startingBalance, { ...given, transferAccountId });
+	const input = startingBalance === null ? given : { ...given, payee: '' };
 	const lines = await splitLines(ctx, input);
 	const fields: TransactionFields = {
 		...(await transactionFields(ctx, input)),
@@ -301,7 +342,13 @@ export async function transferCandidatesOf(
 				.lte('date', addDays(date, MATCH_WINDOW_DAYS))
 		);
 	for await (const transaction of nearby) {
-		if (transaction.amount !== -amount || transaction.transferTransactionId !== undefined) continue;
+		if (
+			transaction.amount !== -amount ||
+			transaction.transferTransactionId !== undefined ||
+			transaction.kind !== undefined
+		) {
+			continue;
+		}
 		if ((await bankRowsOf(ctx, transaction._id)).length === 0) continue;
 		candidates.push(transaction);
 	}
@@ -354,7 +401,11 @@ export async function replaceTransaction(
 	lines: readonly SplitLine[]
 ) {
 	await takeOut(ctx, existing);
-	await ctx.db.replace('transactions', existing._id, fields);
+	await ctx.db.replace(
+		'transactions',
+		existing._id,
+		existing.kind === undefined ? fields : { ...fields, kind: existing.kind }
+	);
 	await putIn(ctx, existing._id, fields, lines);
 	await refreshSearchText(ctx, existing._id);
 }
@@ -362,16 +413,14 @@ export async function replaceTransaction(
 export async function refreshSearchText(ctx: MutationCtx, transactionId: Id<'transactions'>) {
 	const transaction = await ctx.db.get('transactions', transactionId);
 	if (transaction === null) return;
-	const payee =
-		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
 	const lines = transaction.split === true ? await splitLinesOf(ctx, transactionId) : [];
 	const searchText = [
-		payee?.name,
+		await payeeNameOf(ctx, transaction),
 		transaction.memo,
 		...lines.map((line) => line.memo),
 		...(await bankRowsOf(ctx, transactionId)).map((bankRow) => bankRow.bankText)
 	]
-		.filter((part) => part !== undefined && part !== '')
+		.filter((part) => part !== undefined && part !== null && part !== '')
 		.join(' ');
 	if (transaction.searchText !== searchText) {
 		await ctx.db.patch('transactions', transactionId, { searchText });

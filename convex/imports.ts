@@ -7,7 +7,7 @@ import { applyBankRows, fileRow, fileSource, insertImported, planImport } from '
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { ImportedPayees } from './lib/payees';
-import { bankRowsOf, refreshSearchText, requireUnlocked } from './lib/transactions';
+import { bankRowsOf, payeeNameOf, refreshSearchText, requireUnlocked } from './lib/transactions';
 
 const candidate = v.object({
 	_id: v.id('transactions'),
@@ -125,13 +125,11 @@ export const resolveBankChange = mutation({
 });
 
 async function describeCandidate(ctx: QueryCtx, transaction: Doc<'transactions'>) {
-	const payee =
-		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
 	return {
 		_id: transaction._id,
 		date: transaction.date,
 		amount: transaction.amount,
-		payeeName: payee?.name ?? null,
+		payeeName: await payeeNameOf(ctx, transaction),
 		memo: transaction.memo ?? null
 	};
 }

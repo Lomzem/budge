@@ -12,10 +12,6 @@ export const backfillPaymentCategories = internalMutation({
 	returns: v.object({ repaired: v.number(), unmatched: v.array(v.id('accounts')) }),
 	handler: async (ctx) => {
 		const cutoverDate = await requireCutoverDate(ctx);
-		const startingBalance = await ctx.db
-			.query('payees')
-			.withIndex('by_name', (q) => q.eq('name', 'Starting Balance'))
-			.first();
 		let repaired = 0;
 		const unmatched: Id<'accounts'>[] = [];
 		for await (const account of ctx.db.query('accounts')) {
@@ -23,31 +19,26 @@ export const backfillPaymentCategories = internalMutation({
 				continue;
 			}
 			const categoryId = await createPaymentCategory(ctx, account);
-			const onCutover = ctx.db
+			const startingBalance = await ctx.db
 				.query('transactions')
-				.withIndex('by_account_date', (q) =>
-					q.eq('accountId', account._id).eq('date', cutoverDate)
-				);
-			let matched = false;
-			for await (const transaction of onCutover) {
-				if (
-					startingBalance === null ||
-					transaction.payeeId !== startingBalance._id ||
-					transaction.categoryId !== undefined ||
-					transaction.split === true
-				) {
-					continue;
-				}
+				.withIndex('by_accountId_and_kind', (q) =>
+					q.eq('accountId', account._id).eq('kind', 'startingBalance')
+				)
+				.unique();
+			if (
+				startingBalance?.date === cutoverDate &&
+				startingBalance.categoryId === undefined &&
+				startingBalance.split !== true
+			) {
 				await replaceTransaction(
 					ctx,
-					transaction,
-					{ ...transaction, categoryId, approved: transaction.approved !== false },
+					startingBalance,
+					{ ...startingBalance, categoryId, approved: startingBalance.approved !== false },
 					[]
 				);
-				matched = true;
-				break;
+			} else {
+				unmatched.push(account._id);
 			}
-			if (!matched) unmatched.push(account._id);
 			repaired++;
 		}
 		return { repaired, unmatched };

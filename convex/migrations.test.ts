@@ -1,7 +1,7 @@
 import { assert, describe, expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
-import { newBackend, useOwnerEnv } from './test.helper';
+import { makeLegacyStartingBalance, newBackend, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -103,7 +103,7 @@ describe('backfilling Payment Categories', () => {
 		expect(payment?.payment ?? null).not.toBeNull();
 	});
 
-	test('leaves a starting debt the owner has since split, and names its card', async () => {
+	test('leaves a legacy starting debt split under the Starting Balance Payee, and names its card', async () => {
 		const legacy = await budgetWithCard();
 		await makeLegacy(legacy);
 		const { owner, t, card } = legacy;
@@ -114,6 +114,10 @@ describe('backfilling Payment Categories', () => {
 			)
 		);
 		assert(groceries !== undefined && dining !== undefined, 'No Categories.');
+		await makeLegacyStartingBalance(t, card, [
+			{ categoryId: groceries, amount: -15_000 },
+			{ categoryId: dining, amount: -5_000 }
+		]);
 		const startingRow = await t.run(async (ctx) =>
 			ctx.db
 				.query('transactions')
@@ -121,18 +125,6 @@ describe('backfilling Payment Categories', () => {
 				.unique()
 		);
 		assert(startingRow !== null, 'No starting row.');
-		await owner.mutation(api.transactions.update, {
-			transactionId: startingRow._id,
-			accountId: card,
-			date: '2026-08-01',
-			amount: -20_000,
-			payee: 'Starting Balance',
-			memo: '',
-			splits: [
-				{ categoryId: groceries, amount: -15_000, memo: '' },
-				{ categoryId: dining, amount: -5_000, memo: '' }
-			]
-		});
 		const before = await legacy.view();
 
 		expect(await t.mutation(internal.migrations.backfillPaymentCategories, {})).toEqual({

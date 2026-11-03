@@ -1,7 +1,9 @@
 import { convexTest } from 'convex-test';
-import { afterEach, beforeEach, vi } from 'vitest';
+import { afterEach, assert, beforeEach, vi } from 'vitest';
 
 import { readPublicError } from '../src/lib/publicError';
+import { internal } from './_generated/api';
+import type { Id } from './_generated/dataModel';
 import schema from './schema';
 
 export const modules = import.meta.glob('./**/*.ts');
@@ -38,4 +40,42 @@ export async function publicErrorMessage(call: Promise<unknown>) {
 		(thrown: unknown) => thrown
 	);
 	return readPublicError(error)?.message;
+}
+
+type Backend = ReturnType<typeof newBackend>['t'];
+
+export async function makeLegacyStartingBalance(
+	t: Backend,
+	accountId: Id<'accounts'>,
+	splits: readonly { categoryId: Id<'categories'>; amount: number }[] = []
+) {
+	await t.run(async (ctx) => {
+		const startingBalance = await ctx.db
+			.query('transactions')
+			.withIndex('by_accountId_and_kind', (q) =>
+				q.eq('accountId', accountId).eq('kind', 'startingBalance')
+			)
+			.unique();
+		assert(startingBalance !== null, 'expected a starting balance to make legacy');
+		const payeeId =
+			(
+				await ctx.db
+					.query('payees')
+					.withIndex('by_name', (q) => q.eq('name', 'Starting Balance'))
+					.unique()
+			)?._id ?? (await ctx.db.insert('payees', { name: 'Starting Balance' }));
+		await ctx.db.patch('transactions', startingBalance._id, {
+			kind: undefined,
+			payeeId,
+			...(splits.length === 0 ? {} : { split: true, categoryId: undefined })
+		});
+		for (const line of splits) {
+			await ctx.db.insert('transactionSplits', {
+				...line,
+				transactionId: startingBalance._id,
+				date: startingBalance.date
+			});
+		}
+	});
+	await t.mutation(internal.monthlyTotals.rebuild, {});
 }

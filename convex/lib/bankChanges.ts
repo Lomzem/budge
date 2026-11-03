@@ -7,6 +7,7 @@ import {
 	allBankRowsOf,
 	bankRowsOf,
 	deleteTransaction,
+	payeeNameOf,
 	refreshSearchText,
 	replaceTransaction,
 	saveTransaction,
@@ -150,8 +151,6 @@ async function takeBankValues(
 			"This split's lines add up to your amount. Edit the split to the bank's amount, then keep your version."
 		);
 	}
-	const payee =
-		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
 	const counterpart =
 		transaction.transferTransactionId === undefined
 			? null
@@ -160,7 +159,7 @@ async function takeBankValues(
 		accountId: transaction.accountId,
 		date: bankRow.date,
 		amount: bankRow.amount,
-		payee: payee?.name ?? '',
+		payee: (await payeeNameOf(ctx, transaction)) ?? '',
 		categoryId: transaction.categoryId,
 		memo: transaction.memo ?? '',
 		splits: lines.map((line) => ({
