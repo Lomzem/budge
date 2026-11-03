@@ -21,8 +21,9 @@ import {
 	SyncStore,
 	syncConnection
 } from './lib/sync';
+import { MAX_BANK_CONNECTIONS } from './bankConnections';
 import { TokenCipher } from './lib/tokenCipher';
-import { newBackend, useOwnerEnv } from './test.helper';
+import { newBackend, publicErrorOf, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -141,7 +142,7 @@ describe('setting up a Bank Connection', () => {
 		]);
 	});
 
-	test('setting up an Item again replaces its token, however many connections there are', async () => {
+	test('at the Bank Connection limit, setting up an Item again replaces its token and a new Item is refused', async () => {
 		const { owner, t } = newBackend();
 		await owner.mutation(api.settings.setCutoverDate, { cutoverDate });
 		const checking = await owner.mutation(api.accounts.create, {
@@ -150,7 +151,7 @@ describe('setting up a Bank Connection', () => {
 			startingBalance: 0
 		});
 		await t.run(async (ctx) => {
-			for (let i = 0; i < 25; i++) {
+			for (let i = 1; i < MAX_BANK_CONNECTIONS; i++) {
 				await ctx.db.insert('bankConnections', {
 					name: `Other Bank ${String(i)}`,
 					status: 'ok',
@@ -162,16 +163,25 @@ describe('setting up a Bank Connection', () => {
 				});
 			}
 		});
-		const save = (encryptedToken: string) =>
+		const save = (encryptedToken: string, item = itemId) =>
 			t.mutation(internal.bankConnections.save, {
 				name: 'Sample Bank',
-				itemId,
+				itemId: item,
 				encryptedToken,
 				accounts: [{ externalId, accountId: checking }]
 			});
 
 		const first = await save('sealed-token-synthetic-1');
 		expect(await save('sealed-token-synthetic-2')).toBe(first);
+		expect(
+			await publicErrorOf(save('sealed-token-synthetic-3', 'item-synthetic-one-too-many'))
+		).toEqual({
+			code: 'INVALID_INPUT',
+			message: `Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections.`
+		});
+		expect(
+			await t.run(async (ctx) => (await ctx.db.query('bankConnections').collect()).length)
+		).toBe(MAX_BANK_CONNECTIONS);
 		const items = await t.run(async (ctx) =>
 			(await ctx.db.query('bankConnections').collect()).filter(
 				(c) => c.provider.kind === 'plaid' && c.provider.itemId === itemId

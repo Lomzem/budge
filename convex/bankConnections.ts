@@ -55,7 +55,7 @@ import {
 import { failureOf, failureOfPlaidCode } from './lib/syncFailure';
 import { TokenCipher } from './lib/tokenCipher';
 
-const MAX_CONNECTIONS = 20;
+export const MAX_BANK_CONNECTIONS = 20;
 
 export const list = query({
 	args: { now: v.number() },
@@ -72,7 +72,7 @@ export const list = query({
 	),
 	handler: async (ctx, { now }) => {
 		await requireOwner(ctx);
-		const connections = await ctx.db.query('bankConnections').take(MAX_CONNECTIONS);
+		const connections = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
 		return connections.map((connection) => ({
 			_id: connection._id,
 			name: connection.name,
@@ -735,6 +735,13 @@ export const save = internalMutation({
 				provider: { ...existing.provider, encryptedToken }
 			});
 		} else {
+			const held = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
+			if (held.length >= MAX_BANK_CONNECTIONS) {
+				throw publicError(
+					'INVALID_INPUT',
+					`Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections.`
+				);
+			}
 			connectionId = await ctx.db.insert('bankConnections', {
 				name,
 				status: 'ok',
