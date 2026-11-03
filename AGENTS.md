@@ -27,7 +27,7 @@ Before running Playwright E2E or changing Clerk setup, sign-in, or CI authentica
 
 ## Checking UI work in a browser
 
-Before calling a UI change done, look at it in a running app: from a worktree, `bun run app up`, `bun run app login`, then `bun run app seed <fixture>`. Drive the pages with Playwright using the storage state `login` prints, and finish with `bun run app down`. When the app misbehaves, start with `bun run app doctor`. `bun run app` lists every verb.
+Before checking UI or behavior, use [verify-budge](.agents/skills/verify-budge/SKILL.md) as the required verification path. Follow its feature map, worktree-local `bun run app` lifecycle, Playwright storage state, evidence, and cleanup requirements before calling the change done.
 
 ## Pull requests
 
