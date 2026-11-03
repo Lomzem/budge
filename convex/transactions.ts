@@ -14,7 +14,7 @@ import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { requireIsoDate } from './lib/settings';
 import {
-	bankRowsOf,
+	bankRowsShown,
 	deleteTransaction,
 	payeeNameOf,
 	requireUnlocked,
@@ -436,7 +436,7 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		cleared: transaction.cleared !== 'uncleared',
 		reconciled: transaction.cleared === 'reconciled',
 		approved: transaction.approved !== false,
-		bankRows: (await bankRowsOf(ctx, transaction._id)).map((bankRow) => ({
+		bankRows: (await bankRowsShown(ctx, transaction._id)).map((bankRow) => ({
 			_id: bankRow._id,
 			bankText: bankRow.bankText,
 			matched: bankRow.matched,

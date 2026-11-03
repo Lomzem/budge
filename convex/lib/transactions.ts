@@ -232,7 +232,7 @@ async function rememberPayee(
 	if (payeeId === undefined) return;
 	if (categoryId !== undefined) await rememberCategory(ctx, payeeId, categoryId);
 	if (existing === null || existing.payeeId === payeeId) return;
-	for (const bankRow of await bankRowsOf(ctx, existing._id)) {
+	for await (const bankRow of allBankRowsOf(ctx, existing._id)) {
 		await rememberRename(ctx, bankRow.bankText, payeeId);
 	}
 }
@@ -327,7 +327,7 @@ export async function transferCandidatesOf(
 		) {
 			continue;
 		}
-		if ((await bankRowsOf(ctx, transaction._id)).length === 0) continue;
+		if (!(await hasBankRow(ctx, transaction._id))) continue;
 		candidates.push(transaction);
 	}
 	return candidates;
@@ -396,7 +396,7 @@ export async function refreshSearchText(ctx: MutationCtx, transactionId: Id<'tra
 		await payeeNameOf(ctx, transaction),
 		transaction.memo,
 		...lines.map((line) => line.memo),
-		...(await bankRowsOf(ctx, transactionId)).map((bankRow) => bankRow.bankText)
+		...(await bankRowsShown(ctx, transactionId)).map((bankRow) => bankRow.bankText)
 	]
 		.filter((part) => part !== undefined && part !== null && part !== '')
 		.join(' ');
@@ -467,6 +467,10 @@ export function allBankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) 
 		.withIndex('by_transactionId', (q) => q.eq('transactionId', transactionId));
 }
 
-export async function bankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+export async function hasBankRow(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	return (await allBankRowsOf(ctx, transactionId).first()) !== null;
+}
+
+export async function bankRowsShown(ctx: QueryCtx, transactionId: Id<'transactions'>) {
 	return await allBankRowsOf(ctx, transactionId).take(10);
 }

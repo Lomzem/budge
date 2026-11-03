@@ -63,6 +63,41 @@ describe('importing a bank file', () => {
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(2);
 	});
 
+	test('a row never Matches a Transaction whose eleventh Bank Row already came from the same kind of file', async () => {
+		const { owner, t, checking, rows } = await budgetWithChecking();
+		const handEntered = await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			date: coffee.date,
+			amount: coffee.amount,
+			payee: 'Sample Coffee',
+			memo: ''
+		});
+		await t.run(async (ctx) => {
+			const statementRow = {
+				accountId: checking,
+				date: coffee.date,
+				amount: coffee.amount,
+				bankText: 'SAMPLE STATEMENT ROW',
+				transactionId: handEntered,
+				matched: true,
+				state: 'linked' as const
+			};
+			for (let index = 0; index < 10; index++) {
+				await ctx.db.insert('imports', { ...statementRow, source: 'qfx' });
+			}
+			await ctx.db.insert('imports', { ...statementRow, source: 'csv' });
+		});
+
+		expect(
+			await owner.mutation(api.imports.commit, {
+				accountId: checking,
+				source: 'csv',
+				rows: [coffee]
+			})
+		).toEqual({ added: 1, matched: 0, skipped: 0 });
+		expect((await rows()).filter((row) => row.amount === coffee.amount)).toHaveLength(2);
+	});
+
 	test('a row whose Bank Text is Starting Balance gets an ordinary Payee of that name, which renames like any other', async () => {
 		const { owner, checking } = await budgetWithChecking();
 		await owner.mutation(api.imports.commit, {

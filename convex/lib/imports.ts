@@ -14,7 +14,7 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { requireCents } from './input';
 import { importedPayee, ImportedPayees } from './payees';
 import { publicError } from './publicError';
-import { bankRowsOf, insertTransaction, refreshSearchText } from './transactions';
+import { allBankRowsOf, insertTransaction, refreshSearchText } from './transactions';
 import { requireCutoverDate, requireIsoDate } from './settings';
 
 export const fileSource = v.union(v.literal('qfx'), v.literal('csv'));
@@ -112,17 +112,13 @@ export async function planBankRows<R extends IncomingRow>(
 		);
 	for await (const transaction of nearby) {
 		if (!rows.some((row) => row.amount === transaction.amount)) continue;
-		const linked = await bankRowsOf(ctx, transaction._id);
 		candidates.set(transaction._id, transaction);
 		matchCandidates.push({
 			id: transaction._id,
 			date: transaction.date,
 			amount: transaction.amount,
 			cleared: transaction.cleared !== 'uncleared',
-			linkedSources: linked.map((row) => row.source),
-			...(mappedFeed === undefined
-				? {}
-				: { linkedFromFeed: linked.some((row) => row.connectionAccountId === mappedFeed) })
+			...(await linkedInventory(ctx, transaction._id, mappedFeed))
 		});
 	}
 
@@ -247,4 +243,18 @@ function requireFileRow(input: FileRow, source: FileSource, cutoverDate: string)
 		...(sourceId === undefined ? {} : { sourceId }),
 		...(row.pick === undefined ? {} : { pick: row.pick })
 	};
+}
+
+async function linkedInventory(
+	ctx: QueryCtx,
+	transactionId: Id<'transactions'>,
+	mappedFeed: Id<'connectionAccounts'> | undefined
+) {
+	const linkedSources: BankSource[] = [];
+	let linkedFromFeed = false;
+	for await (const row of allBankRowsOf(ctx, transactionId)) {
+		linkedSources.push(row.source);
+		linkedFromFeed ||= row.connectionAccountId === mappedFeed;
+	}
+	return mappedFeed === undefined ? { linkedSources } : { linkedSources, linkedFromFeed };
 }

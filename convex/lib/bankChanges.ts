@@ -5,7 +5,6 @@ import { importedPayee, type ImportedPayees } from './payees';
 import { publicError } from './publicError';
 import {
 	allBankRowsOf,
-	bankRowsOf,
 	deleteTransaction,
 	payeeNameOf,
 	refreshSearchText,
@@ -35,7 +34,7 @@ async function changesQuietly(
 		transaction.split !== true &&
 		transaction.transferTransactionId === undefined &&
 		transaction.cleared !== 'reconciled' &&
-		(await bankRowsOf(ctx, transaction._id)).length === 1
+		(await allBankRowsOf(ctx, transaction._id).take(2)).length === 1
 	);
 }
 
@@ -195,7 +194,7 @@ async function requireNoOtherBacking(
 async function flagDisagreeingRows(ctx: MutationCtx, transactionId: Id<'transactions'>) {
 	const transaction = await ctx.db.get('transactions', transactionId);
 	if (transaction === null) return;
-	for (const bankRow of await bankRowsOf(ctx, transactionId)) {
+	for await (const bankRow of allBankRowsOf(ctx, transactionId)) {
 		const disagrees = bankRow.date !== transaction.date || bankRow.amount !== transaction.amount;
 		if (bankRow.state === 'linked' && disagrees) {
 			await ctx.db.patch('imports', bankRow._id, { state: 'changed' });
