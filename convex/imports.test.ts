@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import { assert, describe, expect, test } from 'vitest';
 
 import { decodeBankFile } from '../src/lib/domain/bankFiles';
+import { addDays } from '../src/lib/domain/dates';
 import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
 import checkingCsv from '../src/lib/domain/fixtures/synthetic/capital-one-checking.csv?raw';
 import checkingQfx from '../src/lib/domain/fixtures/synthetic/capital-one-checking.qfx?raw';
@@ -234,6 +235,47 @@ describe('importing a bank file', () => {
 			{ kind: 'new' }
 		]);
 		expect(picked[1]).toEqual({ kind: 'new' });
+	});
+
+	test('a row with more candidates than the picker lists still asks, offering the ten nearest, earlier first on a tie, plus any pick beyond them', async () => {
+		const { owner, checking } = await budgetWithChecking();
+		const entered = new Map<number, Id<'transactions'>>();
+		for (const offset of [6, -5, 5, 0, -4, 4, -3, 3, -2, 2, -1, 1]) {
+			entered.set(
+				offset,
+				await owner.mutation(api.transactions.create, {
+					accountId: checking,
+					date: addDays(coffee.date, offset),
+					amount: -450,
+					payee: `Sample Coffee Shop ${String(offset)}`,
+					memo: ''
+				})
+			);
+		}
+
+		const [row] = await owner.query(api.imports.preview, {
+			accountId: checking,
+			source: 'csv',
+			rows: [coffee]
+		});
+
+		assert(row?.kind === 'ask');
+		expect(row.candidates.map((candidate) => candidate._id)).toEqual(
+			[0, -1, 1, -2, 2, -3, 3, -4, 4, -5].map((offset) => entered.get(offset))
+		);
+
+		const unlisted = entered.get(5);
+		assert(unlisted !== undefined);
+		const [picked] = await owner.query(api.imports.preview, {
+			accountId: checking,
+			source: 'csv',
+			rows: [{ ...coffee, pick: unlisted }]
+		});
+		assert(picked?.kind === 'match');
+		expect(picked.transaction._id).toBe(unlisted);
+		expect(picked.candidates?.map((candidate) => candidate._id)).toEqual(
+			[0, -1, 1, -2, 2, -3, 3, -4, 4, 5].map((offset) => entered.get(offset))
+		);
 	});
 
 	test('Unmatch splits the Bank Row back into its own Transaction, restoring both', async () => {
