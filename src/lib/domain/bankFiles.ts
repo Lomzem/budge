@@ -155,16 +155,27 @@ const formatIssue = SchemaIssue.makeFormatterDefault();
 const decodeCsv = Effect.fnUntraced(function* (
 	text: string
 ): Effect.fn.Return<Omit<BankFile, 'rows'> & { rows: BankRow[] }, BankFileError> {
-	const [header = [], ...records] = parseCsv(text.replace(/^\uFEFF/, ''));
+	const [header = [], ...records] = yield* parseCsv(text.replace(/^\uFEFF/, ''));
 	const columns = header.map((name) => name.trim());
 	const profile = csvProfiles.find((candidate) =>
 		candidate.headers.every((name) => columns.includes(name))
 	);
 	if (profile === undefined) return yield* unknownLayout();
+	const repeated = columns.find((name, column) => columns.indexOf(name) !== column);
+	if (repeated !== undefined) {
+		return yield* new BankFileError({
+			message: `The header names the column “${repeated}” more than once, so its values are ambiguous.`
+		});
+	}
 
 	const rows: BankRow[] = [];
 	for (const [index, cells] of records.entries()) {
 		if (cells.every((cell) => cell.trim() === '')) continue;
+		if (cells.length > columns.length) {
+			return yield* new BankFileError({
+				message: `Row ${String(index + 2)} has ${String(cells.length)} cells but the header has ${String(columns.length)} columns. A comma may be missing its quotes.`
+			});
+		}
 		const record = Object.fromEntries(
 			columns.flatMap((name, column) => {
 				const cell = cells[column];
@@ -185,11 +196,12 @@ const decodeCsv = Effect.fnUntraced(function* (
 	return { format: profile.format, source: 'csv', rows };
 });
 
-function parseCsv(text: string): string[][] {
+function parseCsv(text: string): Effect.Effect<string[][], BankFileError> {
 	const rows: string[][] = [];
 	let row: string[] = [];
 	let field = '';
 	let quoted = false;
+	let quoteRow = 0;
 	for (let i = 0; i < text.length; i++) {
 		const char = text.charAt(i);
 		if (quoted) {
@@ -203,6 +215,7 @@ function parseCsv(text: string): string[][] {
 			}
 		} else if (char === '"') {
 			quoted = true;
+			quoteRow = rows.length + 1;
 		} else if (char === ',') {
 			row.push(field);
 			field = '';
@@ -216,11 +229,18 @@ function parseCsv(text: string): string[][] {
 			field += char;
 		}
 	}
+	if (quoted) {
+		return Effect.fail(
+			new BankFileError({
+				message: `Row ${String(quoteRow)} opens a quote that never closes, so the file may be cut off. Download it from your bank again.`
+			})
+		);
+	}
 	if (field !== '' || row.length > 0) {
 		row.push(field);
 		rows.push(row);
 	}
-	return rows;
+	return Effect.succeed(rows);
 }
 
 const QfxTransaction = Schema.Struct({
@@ -236,8 +256,15 @@ const decodeQfx = Effect.fnUntraced(function* (
 	text: string
 ): Effect.fn.Return<Omit<BankFile, 'rows'> & { rows: BankRow[] }, BankFileError> {
 	const rows: BankRow[] = [];
-	const postedBlocks = [...text.matchAll(/<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi)];
-	for (const [index, [, block = '']] of postedBlocks.entries()) {
+	const postedBlocks = [
+		...text.matchAll(/<STMTTRN>([\s\S]*?)(?:(<\/STMTTRN>)|(?=<STMTTRN>|<\/BANKTRANLIST>|$))/gi)
+	];
+	for (const [index, [, block = '', closingTag]] of postedBlocks.entries()) {
+		if (closingTag === undefined) {
+			return yield* new BankFileError({
+				message: `Transaction ${String(index + 1)} never closes, so the file may be cut off. Download it from your bank again.`
+			});
+		}
 		const tags: Record<string, string> = Object.fromEntries(
 			[...block.matchAll(/<([A-Z0-9.]+)>([^<\r\n]*)/gi)]
 				.map(([, name = '', value = '']): [string, string] => [
