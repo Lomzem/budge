@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
 import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
@@ -101,6 +101,49 @@ describe('renaming and reordering Accounts', () => {
 		expect(
 			await publicErrorCode(
 				owner.mutation(api.accounts.reorder, { accountIds: [checking, checking] })
+			)
+		).toBe('INVALID_INPUT');
+	});
+});
+
+describe("changing an Account's starting balance", () => {
+	async function checkingWithStartingBalance() {
+		const backend = await backendWithCutover();
+		const accountId = await backend.owner.mutation(api.accounts.create, {
+			name: 'Checking',
+			kind: 'cash',
+			startingBalance: 250_000
+		});
+		const startingBalances = async () =>
+			(
+				await backend.owner.query(api.transactions.list, {
+					accountId,
+					paginationOpts: { numItems: 10, cursor: null }
+				})
+			).page.filter((row) => row.payeeName === 'Starting Balance');
+		return { ...backend, accountId, startingBalances };
+	}
+
+	test('after the cutover date moves earlier, replaces the one starting balance on the new date', async () => {
+		const { owner, accountId, startingBalances } = await checkingWithStartingBalance();
+		await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-07-01' });
+
+		await owner.mutation(api.accounts.setStartingBalance, { accountId, startingBalance: 180_000 });
+
+		expect(await startingBalances()).toMatchObject([{ date: '2026-07-01', amount: 180_000 }]);
+		expect((await owner.query(api.accounts.list, {}))[0]?.balance).toBe(180_000);
+	});
+
+	test('the Starting Balance Payee keeps its name', async () => {
+		const { owner } = await checkingWithStartingBalance();
+		const payees = await owner.query(api.payees.list, {});
+		const named = (name: string) => payees.find((payee) => payee.name === name)?._id;
+		const startingBalance = named('Starting Balance');
+		assert(startingBalance !== undefined, 'expected the Payee');
+
+		expect(
+			await publicErrorCode(
+				owner.mutation(api.payees.rename, { payeeId: startingBalance, name: 'Opening' })
 			)
 		).toBe('INVALID_INPUT');
 	});

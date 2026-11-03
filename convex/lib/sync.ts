@@ -159,6 +159,7 @@ interface SyncStoreShape {
 	readonly recordConsent: (args: {
 		connectionId: Id<'bankConnections'>;
 		consentExpiresAt: number | null;
+		checkedByLease: number;
 	}) => Effect.Effect<void>;
 	readonly save: (args: {
 		name: string;
@@ -283,7 +284,11 @@ export const syncConnection = Effect.fnUntraced(function* (
 		}
 		const item = yield* Effect.option(plaid.itemGet(accessToken));
 		if (Option.isSome(item)) {
-			yield* store.recordConsent({ connectionId, consentExpiresAt: item.value.consentExpiresAt });
+			yield* store.recordConsent({
+				connectionId,
+				consentExpiresAt: item.value.consentExpiresAt,
+				checkedByLease: taken.lease
+			});
 		}
 		if (taken.accountsCheckRequestedAt !== null || totals.held > 0) {
 			yield* Effect.ignore(

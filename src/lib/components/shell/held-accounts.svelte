@@ -31,6 +31,7 @@
 	let suggesting = $state(false);
 	let suggestion = $state('');
 	let balance = $state('');
+	let suggestRequest = 0;
 
 	function labelOf(account: HeldAccount) {
 		const name = account.name ?? 'An unnamed bank Account';
@@ -50,6 +51,8 @@
 		kind = 'cash';
 		error = '';
 		mapped = null;
+		suggestRequest++;
+		suggesting = false;
 	}
 
 	function close() {
@@ -63,11 +66,14 @@
 	async function suggest() {
 		if (mapped === null) return;
 		const { _id: accountId, kind: mappedKind } = mapped;
+		const request = ++suggestRequest;
+		const typedBefore = balance;
 		suggesting = true;
 		suggestion = '';
 		const asked = await attempt(() =>
 			client.action(api.heldAccounts.suggestStartingBalance, { accountId })
 		);
+		if (request !== suggestRequest) return;
 		suggesting = false;
 		if (!asked.ok) {
 			suggestion =
@@ -79,7 +85,7 @@
 		if (outcome.kind === 'suggested') {
 			const shown =
 				mappedKind === 'creditCard' ? -outcome.startingBalance : outcome.startingBalance;
-			balance = typed(shown);
+			if (balance === typedBefore) balance = typed(shown);
 			suggestion =
 				"Budge suggests this from the bank's current balance, less the Transactions imported since the cutover date.";
 		} else if (outcome.kind === 'importing') {

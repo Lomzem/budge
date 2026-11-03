@@ -23,7 +23,7 @@
 	let result = $state('');
 
 	const exactTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-	const day = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+	const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
 	function freshness(connection: BankConnection) {
 		if (connection.overdue && connection.lastSyncedAt !== null) {

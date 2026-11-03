@@ -30,7 +30,7 @@ import { bankRowsOf } from './lib/transactions';
 
 export const HELD_BATCH = 200;
 const MAX_COUNTED = 1_000;
-const MAX_CONNECTIONS = 20;
+const MAX_HELD_LISTED = 50;
 const MAX_CONNECTION_ACCOUNTS = 50;
 
 export const list = query({
@@ -48,23 +48,22 @@ export const list = query({
 	handler: async (ctx) => {
 		await requireOwner(ctx);
 		const held = [];
-		for (const connection of await ctx.db.query('bankConnections').take(MAX_CONNECTIONS)) {
-			const accounts = await ctx.db
-				.query('connectionAccounts')
-				.withIndex('by_connection_externalId', (q) => q.eq('connectionId', connection._id))
-				.take(MAX_CONNECTION_ACCOUNTS);
-			for (const account of accounts) {
-				if (account.state !== 'held') continue;
-				const rows = await heldRows(ctx, account._id, MAX_COUNTED + 1);
-				held.push({
-					_id: account._id,
-					connectionName: connection.name,
-					name: account.name ?? null,
-					mask: account.mask ?? null,
-					rows: Math.min(rows.length, MAX_COUNTED),
-					moreRows: rows.length > MAX_COUNTED
-				});
-			}
+		const accounts = await ctx.db
+			.query('connectionAccounts')
+			.withIndex('by_state', (q) => q.eq('state', 'held'))
+			.take(MAX_HELD_LISTED);
+		for (const account of accounts) {
+			const connection = await ctx.db.get('bankConnections', account.connectionId);
+			if (connection === null) continue;
+			const rows = await heldRows(ctx, account._id, MAX_COUNTED + 1);
+			held.push({
+				_id: account._id,
+				connectionName: connection.name,
+				name: account.name ?? null,
+				mask: account.mask ?? null,
+				rows: Math.min(rows.length, MAX_COUNTED),
+				moreRows: rows.length > MAX_COUNTED
+			});
 		}
 		return held;
 	}
@@ -194,14 +193,11 @@ export const startingBalanceBasis = internalQuery({
 	args: { accountId: v.id('accounts') },
 	returns: basis,
 	handler: async (ctx, { accountId }) => {
-		let mapped: Doc<'connectionAccounts'> | undefined;
-		const known = await ctx.db
+		const mapped = await ctx.db
 			.query('connectionAccounts')
-			.take(MAX_CONNECTIONS * MAX_CONNECTION_ACCOUNTS);
-		for (const account of known) {
-			if (account.state === 'mapped' && account.accountId === accountId) mapped = account;
-		}
-		if (mapped === undefined) return { kind: 'notSynced' as const };
+			.withIndex('by_accountId', (q) => q.eq('accountId', accountId))
+			.first();
+		if (mapped === null) return { kind: 'notSynced' as const };
 		const connection = await ctx.db.get('bankConnections', mapped.connectionId);
 		if (connection?.provider.kind !== 'plaid') return { kind: 'notSynced' as const };
 		if ((await heldRows(ctx, mapped._id, 1)).length > 0) return { kind: 'importing' as const };
@@ -212,8 +208,8 @@ export const startingBalanceBasis = internalQuery({
 			.query('transactions')
 			.withIndex('by_account_date', (q) => q.eq('accountId', accountId).gte('date', cutoverDate));
 		for await (const transaction of since) {
-			if (transaction.cleared === 'uncleared') continue;
-			if ((await bankRowsOf(ctx, transaction._id)).length > 0) imported += transaction.amount;
+			const bankRows = await bankRowsOf(ctx, transaction._id);
+			if (bankRows.some((row) => row.state !== 'removed')) imported += transaction.amount;
 		}
 		return {
 			kind: 'synced' as const,

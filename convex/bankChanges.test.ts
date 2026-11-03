@@ -92,7 +92,10 @@ async function syncedBudget() {
 	assert(connectionId !== null, 'setup failed');
 
 	const syncWith = (transactionsSync: NonNullable<FakePlaid['transactionsSync']>) =>
-		run({ transactionsSync }, syncConnection(connectionId, { refresh: false }));
+		run(
+			{ transactionsSync, itemGet: () => Effect.succeed({ consentExpiresAt: null }) },
+			syncConnection(connectionId, { refresh: false })
+		);
 	const sync = (page: ReturnType<typeof changes>) => syncWith(() => Effect.succeed(page));
 	const replay = async (page: ReturnType<typeof changes>, from: string | undefined) => {
 		assert(from !== undefined, 'Replay needs the cursor before the page.');
@@ -116,9 +119,9 @@ async function syncedBudget() {
 				paginationOpts: { numItems: 50, cursor: null }
 			})
 		).page.filter((row) => row.payeeName !== 'Starting Balance');
-	const row = async (payeeName: string) => {
+	const row = async (payeeName: string | null) => {
 		const found = (await rows()).find((r) => r.payeeName === payeeName);
-		assert(found !== undefined, `No ${payeeName} Transaction`);
+		assert(found !== undefined, `No ${payeeName ?? 'unnamed'} Transaction`);
 		return found;
 	};
 	const snapshot = () =>
@@ -174,6 +177,59 @@ async function syncedBudget() {
 }
 
 type Budget = Awaited<ReturnType<typeof syncedBudget>>;
+
+async function backWithStatementRow(
+	budget: Budget,
+	transactionId: Id<'transactions'>,
+	{ accountId, date, amount }: { accountId: Id<'accounts'>; date: string; amount: number }
+) {
+	await budget.t.run((ctx) =>
+		ctx.db.insert('imports', {
+			source: 'csv',
+			accountId,
+			date,
+			amount,
+			bankText: 'SAMPLE STATEMENT ROW',
+			transactionId,
+			matched: true,
+			state: 'linked'
+		})
+	);
+}
+
+async function grocerAsTransfer(budget: Budget) {
+	const savings = await budget.owner.mutation(api.accounts.create, {
+		name: 'Savings',
+		kind: 'cash',
+		startingBalance: 0
+	});
+	const grocerRow = await budget.row('SAMPLE GROCER 0193');
+	await budget.owner.mutation(api.transactions.update, {
+		transactionId: grocerRow._id,
+		accountId: grocerRow.accountId,
+		transferAccountId: savings,
+		date: grocerRow.date,
+		amount: grocerRow.amount,
+		payee: '',
+		memo: 'to savings'
+	});
+	const savingsSide = (
+		await budget.owner.query(api.transactions.list, {
+			accountId: savings,
+			paginationOpts: { numItems: 50, cursor: null }
+		})
+	).page.find((row) => row.amount === 4_250);
+	assert(savingsSide !== undefined, 'No Savings side');
+	return { savings, savingsSide };
+}
+
+async function reconcileChecking(budget: Budget) {
+	await budget.owner.mutation(api.reconciliation.reconcile, {
+		accountId: budget.checking,
+		balance: 100_000 + 231_042 - 4_250,
+		date: '2026-08-31'
+	});
+}
 
 async function syncTwice(budget: Budget, page: ReturnType<typeof changes>) {
 	const before = await budget.cursor();
@@ -237,8 +293,9 @@ describe('a bank removal of an Unapproved, unedited Transaction', () => {
 		const budget = await syncedBudget();
 		const before = await budget.snapshot();
 
-		await budget.sync(changes({ removed: ['txn-synthetic-pending'] }));
+		const outcome = await budget.sync(changes({ removed: ['txn-synthetic-pending'] }));
 
+		expect(outcome).toMatchObject({ kind: 'synced' });
 		expect(await budget.snapshot()).toEqual(before);
 	});
 });
@@ -419,6 +476,46 @@ describe('resolving a bank change', () => {
 			bankRows: [{ state: 'changed' }]
 		});
 	});
+	test("the bank's version on a Transfer flags the other side's statement row that no longer agrees", async () => {
+		const budget = await syncedBudget();
+		const { savings, savingsSide } = await grocerAsTransfer(budget);
+		await backWithStatementRow(budget, savingsSide._id, {
+			accountId: savings,
+			date: '2026-08-14',
+			amount: 4_250
+		});
+		await budget.sync(changes({ modified: [grocerChanged] }));
+		const importId = (await budget.row(null)).bankRows[0]?._id;
+		assert(importId !== undefined, 'No Bank Row');
+
+		await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' });
+
+		const otherSide = (
+			await budget.owner.query(api.transactions.list, {
+				accountId: savings,
+				paginationOpts: { numItems: 50, cursor: null }
+			})
+		).page.find((row) => row._id === savingsSide._id);
+		expect(otherSide).toMatchObject({
+			amount: 4_550,
+			bankRows: [{ state: 'changed', amount: 4_250 }]
+		});
+	});
+
+	test("the bank's version is refused on a reconciled Transaction", async () => {
+		const { budget, importId } = await flaggedChange();
+		await reconcileChecking(budget);
+
+		expect(
+			await publicErrorMessage(
+				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
+			)
+		).toMatch(/reconciled/i);
+		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({
+			amount: -4_250,
+			bankRows: [{ state: 'changed' }]
+		});
+	});
 });
 
 describe('resolving a bank removal', () => {
@@ -461,6 +558,55 @@ describe('resolving a bank removal', () => {
 		await replay();
 		expect(await budget.snapshot()).toEqual(resolved);
 		await budget.expectTotalsRebuild();
+	});
+
+	test("the bank's version is refused while another statement row still backs the Transaction", async () => {
+		const { budget, importId } = await flaggedRemoval();
+		const grocerRow = await budget.row('SAMPLE GROCER 0193');
+		await backWithStatementRow(budget, grocerRow._id, {
+			accountId: budget.checking,
+			date: grocerRow.date,
+			amount: grocerRow.amount
+		});
+
+		expect(
+			await publicErrorMessage(
+				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
+			)
+		).toMatch(/still/);
+		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({ amount: -4_250 });
+	});
+
+	test("the bank's version on a Transfer is refused while the other side has its own statement row", async () => {
+		const budget = await syncedBudget();
+		const { savings, savingsSide } = await grocerAsTransfer(budget);
+		await backWithStatementRow(budget, savingsSide._id, {
+			accountId: savings,
+			date: '2026-08-14',
+			amount: 4_250
+		});
+		await budget.sync(changes({ removed: [grocer.transaction_id] }));
+		const importId = (await budget.row(null)).bankRows[0]?._id;
+		assert(importId !== undefined, 'No Bank Row');
+
+		expect(
+			await publicErrorMessage(
+				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
+			)
+		).toMatch(/still/);
+		expect(await budget.row(null)).toMatchObject({ amount: -4_250 });
+	});
+
+	test("the bank's version is refused on a reconciled Transaction", async () => {
+		const { budget, importId } = await flaggedRemoval();
+		await reconcileChecking(budget);
+
+		expect(
+			await publicErrorMessage(
+				budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' })
+			)
+		).toMatch(/reconciled/i);
+		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({ amount: -4_250 });
 	});
 
 	test('a Bank Row with nothing to resolve is refused', async () => {

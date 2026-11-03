@@ -54,6 +54,7 @@
 	let error = $state('');
 	let saving = $state(false);
 	let confirmDelete = $state(false);
+	let confirmBankRemoval = $state<Id<'imports'> | null>(null);
 	let unlocked = $state(false);
 
 	const locked = $derived(transaction?.reconciled === true && !unlocked);
@@ -345,6 +346,7 @@
 		saving = true;
 		const resolved = await attempt(() => resolveBankChange({ importId, keep }));
 		saving = false;
+		confirmBankRemoval = null;
 		if (resolved.ok) open = false;
 		else error = resolved.error?.message ?? "Budge couldn't resolve the bank's change. Try again.";
 	}
@@ -661,7 +663,10 @@
 												size="sm"
 												variant="outline"
 												disabled={saving}
-												onclick={() => resolveBankRow(bankRow._id, 'bank')}
+												onclick={() => {
+													if (bankRow.state === 'changed') void resolveBankRow(bankRow._id, 'bank');
+													else confirmBankRemoval = bankRow._id;
+												}}
 											>
 												{bankRow.state === 'changed' ? "Use the bank's version" : 'Delete it'}
 											</Button>
@@ -728,6 +733,38 @@
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel>Keep it</AlertDialog.Cancel>
 			<AlertDialog.Action onclick={deleteTransaction} disabled={saving}>Delete</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root
+	open={confirmBankRemoval !== null}
+	onOpenChange={(next) => {
+		if (!next) confirmBankRemoval = null;
+	}}
+>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>
+				{transaction?.transfer ? 'Delete this Transfer too?' : 'Delete this Transaction too?'}
+			</AlertDialog.Title>
+			<AlertDialog.Description>
+				{#if transaction?.transfer}
+					The bank removed it. Both sides are deleted, here and in {transaction.transfer
+						.accountName}. This can't be undone.
+				{:else}
+					The bank removed it. Its amount comes out of the Account balance. This can't be undone.
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Keep it</AlertDialog.Cancel>
+			<AlertDialog.Action
+				disabled={saving}
+				onclick={() => {
+					if (confirmBankRemoval !== null) void resolveBankRow(confirmBankRemoval, 'bank');
+				}}>Delete</AlertDialog.Action
+			>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

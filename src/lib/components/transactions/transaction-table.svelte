@@ -96,12 +96,17 @@
 	const more = $derived(secondShown ? second : first);
 	let dialogOpen = $state(false);
 	let importOpen = $state(false);
-	let editing: Row | undefined = $state();
+	let editingSnapshot: Row | undefined = $state();
+	const editing = $derived(
+		editingSnapshot === undefined
+			? undefined
+			: (rows.find((row) => row._id === editingSnapshot?._id) ?? editingSnapshot)
+	);
 	let rowError = $state('');
 	let approvingAll = $state(false);
 
 	function add() {
-		editing = undefined;
+		editingSnapshot = undefined;
 		dialogOpen = true;
 	}
 
@@ -112,7 +117,7 @@
 	}
 
 	function edit(row: Row) {
-		editing = row;
+		editingSnapshot = row;
 		dialogOpen = true;
 	}
 

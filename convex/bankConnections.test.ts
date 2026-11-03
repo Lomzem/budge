@@ -793,6 +793,28 @@ describe('the Bank Connection status', () => {
 		expect(await statusAt(consentExpiresAt + day)).toBe(consentExpiresAt);
 	});
 
+	test("a slower sync's older consent answer doesn't replace a newer one", async () => {
+		const { owner, sync } = await connectedBudget();
+		const renewedUntil = Date.parse('2027-05-01T15:00:00Z');
+		const endingSoon = Date.parse('2026-11-20T15:00:00Z');
+		await sync({
+			...plaidPages(page),
+			itemGet: () =>
+				Effect.promise(async () => {
+					await sync({
+						...plaidPages(page),
+						itemGet: () => Effect.succeed({ consentExpiresAt: renewedUntil })
+					});
+					return { consentExpiresAt: endingSoon };
+				})
+		});
+
+		const now = renewedUntil - day;
+		expect((await owner.query(api.bankConnections.list, { now }))[0]?.consentEndsAt).toBe(
+			renewedUntil
+		);
+	});
+
 	test('warns after 48 hours without a successful sync', async () => {
 		const { owner, sync, connection } = await connectedBudget();
 		await sync(plaidPages(page));

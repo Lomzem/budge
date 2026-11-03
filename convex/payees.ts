@@ -1,6 +1,7 @@
 import { v } from 'convex/values';
 
 import { internalMutation, mutation, query } from './_generated/server';
+import { STARTING_BALANCE } from './lib/accounts';
 import { findPayeeNamed, lastCategoryOf } from './lib/payees';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
@@ -38,6 +39,9 @@ export const rename = mutation({
 		const trimmed = name.trim();
 		if (trimmed === '') throw publicError('INVALID_INPUT', 'A Payee needs a name.');
 		if (trimmed === payee.name) return null;
+		if (payee.name === STARTING_BALANCE) {
+			throw publicError('INVALID_INPUT', 'The Starting Balance Payee keeps its name.');
+		}
 		if ((await findPayeeNamed(ctx, trimmed)) !== null) {
 			throw publicError('INVALID_INPUT', 'Another Payee already has this name.');
 		}

@@ -422,12 +422,17 @@ export const credentials = internalQuery({
 export const recordConsent = internalMutation({
 	args: {
 		connectionId: v.id('bankConnections'),
-		consentExpiresAt: v.union(v.number(), v.null())
+		consentExpiresAt: v.union(v.number(), v.null()),
+		checkedByLease: v.number()
 	},
 	returns: v.null(),
-	handler: async (ctx, { connectionId, consentExpiresAt }) => {
+	handler: async (ctx, { connectionId, consentExpiresAt, checkedByLease }) => {
+		const connection = await ctx.db.get('bankConnections', connectionId);
+		if (connection === null) return null;
+		if (checkedByLease <= (connection.consentCheckedByLease ?? -Infinity)) return null;
 		await ctx.db.patch('bankConnections', connectionId, {
-			consentExpiresAt: consentExpiresAt ?? undefined
+			consentExpiresAt: consentExpiresAt ?? undefined,
+			consentCheckedByLease: checkedByLease
 		});
 		return null;
 	}

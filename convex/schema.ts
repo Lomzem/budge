@@ -136,6 +136,7 @@ export default defineSchema({
 		attentionNotices: v.optional(v.number()),
 		accountsCheckRequestedAt: v.optional(v.number()),
 		consentExpiresAt: v.optional(v.number()),
+		consentCheckedByLease: v.optional(v.number()),
 		provider: v.union(
 			v.object({
 				kind: v.literal('plaid'),
@@ -183,7 +184,10 @@ export default defineSchema({
 				state: v.union(v.literal('held'), v.literal('ignored'))
 			})
 		)
-	).index('by_connection_externalId', ['connectionId', 'externalId']),
+	)
+		.index('by_connection_externalId', ['connectionId', 'externalId'])
+		.index('by_state', ['state'])
+		.index('by_accountId', ['accountId']),
 
 	monthlyTotals: defineTable({
 		month: v.string(),

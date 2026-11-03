@@ -118,6 +118,7 @@ export async function resolveBankChange(
 	}
 	if (bankRow.state === 'removed') {
 		if (keep === 'bank') {
+			await requireNoOtherBacking(ctx, transaction, bankRow);
 			await deleteTransaction(ctx, transaction);
 		} else {
 			await ctx.db.patch('imports', bankRow._id, { transactionId: undefined, matched: false });
@@ -164,4 +165,35 @@ async function takeBankValues(
 		transferAccountId: counterpart?.accountId,
 		transferTransactionId: counterpart?._id
 	});
+	if (counterpart !== null) await flagDisagreeingRows(ctx, counterpart._id);
+}
+
+async function requireNoOtherBacking(
+	ctx: MutationCtx,
+	transaction: Doc<'transactions'>,
+	removed: Doc<'imports'>
+) {
+	const sides = [transaction._id];
+	if (transaction.transferTransactionId !== undefined)
+		sides.push(transaction.transferTransactionId);
+	for (const side of sides) {
+		for (const other of await bankRowsOf(ctx, side)) {
+			if (other._id === removed._id || other.state === 'removed') continue;
+			throw publicError(
+				'INVALID_INPUT',
+				'Another bank row still shows this Transaction, so keep your version instead.'
+			);
+		}
+	}
+}
+
+async function flagDisagreeingRows(ctx: MutationCtx, transactionId: Id<'transactions'>) {
+	const transaction = await ctx.db.get('transactions', transactionId);
+	if (transaction === null) return;
+	for (const bankRow of await bankRowsOf(ctx, transactionId)) {
+		const disagrees = bankRow.date !== transaction.date || bankRow.amount !== transaction.amount;
+		if (bankRow.state === 'linked' && disagrees) {
+			await ctx.db.patch('imports', bankRow._id, { state: 'changed' });
+		}
+	}
 }

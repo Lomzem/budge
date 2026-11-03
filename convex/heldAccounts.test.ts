@@ -273,6 +273,55 @@ describe('a bank Account Budge does not know', () => {
 		expect(startingBalance).toMatchObject({ date: cutoverDate, amount: 73_208 });
 	});
 
+	test('the suggestion counts an imported row the owner marked uncleared, but not one the bank removed', async () => {
+		const { owner, sync, heldId, transactions, suggest } = await connectedBudget();
+		await sync(rowsFor(savingsId));
+		const savings = await owner.mutation(api.heldAccounts.createAccount, {
+			connectionAccountId: await heldId(),
+			name: 'Savings',
+			kind: 'cash'
+		});
+		const imported = await transactions(savings);
+		const grocer = imported.find((row) => row.amount === -4_250);
+		const paycheck = imported.find((row) => row.amount === 231_042);
+		assert(grocer !== undefined && paycheck !== undefined, 'expected both imported rows');
+		await owner.mutation(api.transactions.setCleared, {
+			transactionId: grocer._id,
+			cleared: false
+		});
+		await owner.mutation(api.transactions.approve, { transactionId: paycheck._id });
+
+		await sync({
+			...page,
+			added: [],
+			removed: [{ transaction_id: `${savingsId}-txn-synthetic-2`, account_id: savingsId }]
+		});
+
+		expect(await suggest(savings)).toEqual({ kind: 'suggested', startingBalance: 300_000 + 4_250 });
+	});
+
+	test('among many other bank Accounts, is still listed and still gets a suggestion', async () => {
+		const { owner, t, connectionId, sync, heldId, suggest } = await connectedBudget();
+		await t.run(async (ctx) => {
+			for (let n = 0; n < 1_001; n++) {
+				await ctx.db.insert('connectionAccounts', {
+					connectionId,
+					externalId: `account-synthetic-a-${String(n).padStart(4, '0')}`,
+					state: 'ignored'
+				});
+			}
+		});
+		await sync(rowsFor(savingsId));
+
+		const savings = await owner.mutation(api.heldAccounts.createAccount, {
+			connectionAccountId: await heldId(),
+			name: 'Savings',
+			kind: 'cash'
+		});
+
+		expect(await suggest(savings)).toMatchObject({ kind: 'suggested' });
+	});
+
 	test('an Account with no Bank Connection gets no suggestion', async () => {
 		const { owner, suggest } = await connectedBudget();
 		const wallet = await owner.mutation(api.accounts.create, {

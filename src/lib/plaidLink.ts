@@ -1,4 +1,5 @@
 const SCRIPT_URL = 'https://cdn.plaid.com/link/v2/stable/link-initialize.js';
+const LOAD_TIMEOUT_MS = 15_000;
 
 interface LinkHandler {
 	open: () => void;
@@ -24,13 +25,21 @@ let loading: Promise<PlaidLink | null> | undefined;
 function loadLink(): Promise<PlaidLink | null> {
 	loading ??= new Promise<PlaidLink | null>((resolve) => {
 		const script = document.createElement('script');
+		const settle = (plaid: PlaidLink | null) => {
+			clearTimeout(timeout);
+			if (plaid === null) script.remove();
+			resolve(plaid);
+		};
+		const timeout = setTimeout(() => {
+			settle(null);
+		}, LOAD_TIMEOUT_MS);
 		script.src = SCRIPT_URL;
 		script.async = true;
 		script.onload = () => {
-			resolve(window.Plaid ?? null);
+			settle(window.Plaid ?? null);
 		};
 		script.onerror = () => {
-			resolve(null);
+			settle(null);
 		};
 		document.head.append(script);
 	}).then((plaid) => {
