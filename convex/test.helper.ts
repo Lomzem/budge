@@ -26,20 +26,20 @@ export function newBackend() {
 	return { t, owner: t.withIdentity({ subject: ownerSubject, issuer: clerkIssuer }) };
 }
 
-export async function publicErrorCode(call: Promise<unknown>) {
+export async function publicErrorOf(call: Promise<unknown>) {
 	const error: unknown = await call.then(
 		() => undefined,
 		(thrown: unknown) => thrown
 	);
-	return readPublicError(error)?.code;
+	return readPublicError(error);
+}
+
+export async function publicErrorCode(call: Promise<unknown>) {
+	return (await publicErrorOf(call))?.code;
 }
 
 export async function publicErrorMessage(call: Promise<unknown>) {
-	const error: unknown = await call.then(
-		() => undefined,
-		(thrown: unknown) => thrown
-	);
-	return readPublicError(error)?.message;
+	return (await publicErrorOf(call))?.message;
 }
 
 type Backend = ReturnType<typeof newBackend>['t'];

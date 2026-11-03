@@ -50,6 +50,52 @@ describe('TokenCipher', () => {
 		})
 	);
 
+	const flipFirstByte = (field: string) => {
+		const bytes = Uint8Array.from(atob(field), (char) => char.charCodeAt(0));
+		bytes[0] = (bytes[0] ?? 0) ^ 1;
+		return btoa(String.fromCharCode(...bytes));
+	};
+
+	it.effect.each([
+		{ corruption: 'an unknown version', corrupt: (iv: string, data: string) => `v2.${iv}.${data}` },
+		{ corruption: 'no version', corrupt: (iv: string, data: string) => `${iv}.${data}` },
+		{ corruption: 'no ciphertext', corrupt: (iv: string) => `v1.${iv}` },
+		{ corruption: 'nothing at all', corrupt: () => '' },
+		{
+			corruption: 'an IV that is not base64',
+			corrupt: (_: string, data: string) => `v1.%%.${data}`
+		},
+		{
+			corruption: 'ciphertext that is not base64',
+			corrupt: (iv: string, data: string) => `v1.${iv}.${data.slice(1)}!`
+		},
+		{
+			corruption: 'an altered IV',
+			corrupt: (iv: string, data: string) => `v1.${flipFirstByte(iv)}.${data}`
+		},
+		{
+			corruption: 'altered ciphertext',
+			corrupt: (iv: string, data: string) => `v1.${iv}.${flipFirstByte(data)}`
+		},
+		{
+			corruption: 'ciphertext cut short',
+			corrupt: (iv: string, data: string) => `v1.${iv}.${btoa(atob(data).slice(0, -1))}`
+		}
+	])('refuses a sealed token with $corruption, saying only that it cannot be read', ({ corrupt }) =>
+		Effect.gen(function* () {
+			const cipher = yield* TokenCipher;
+			const [, iv = '', data = ''] = (yield* cipher.encrypt(token, 'item-synthetic-1')).split('.');
+			const corrupted = corrupt(iv, data);
+
+			const error = yield* Effect.flip(cipher.decrypt(corrupted, 'item-synthetic-1'));
+
+			expect(error._tag).toBe('TokenCipherError');
+			const told = `${String(error)} ${JSON.stringify(error)}`;
+			expect(told).not.toContain(token);
+			if (corrupted !== '') expect(told).not.toContain(corrupted);
+		}).pipe(Effect.provide(TokenCipher.layerTest))
+	);
+
 	it.effect('fails without a 32-byte key, never encrypting with a weak one', () =>
 		Effect.gen(function* () {
 			for (const key of [undefined, '', btoa('too short')]) {

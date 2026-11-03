@@ -17,7 +17,12 @@ type Signer = Awaited<ReturnType<typeof webhookSigner>>;
 
 function fakePlaid(signer: Signer) {
 	const paths: string[] = [];
-	const state = { keyOutage: false, accountsOutage: false };
+	const state = {
+		keyOutage: false,
+		accountsOutage: false,
+		moreAccounts: 0,
+		heldAnswer: null as { reached: () => void; release: Promise<void> } | null
+	};
 	const fetch = (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = new URL(input instanceof Request ? input.url : input);
 		assert(url.host === 'sandbox.plaid.com', `Unexpected request to ${url.host}`);
@@ -41,11 +46,11 @@ function fakePlaid(signer: Signer) {
 				);
 			case '/transactions/sync':
 				return answer(syncPage);
-			case '/accounts/get':
+			case '/accounts/get': {
 				if (state.accountsOutage) {
 					return Promise.resolve(new Response('Service Unavailable', { status: 503 }));
 				}
-				return answer({
+				const accounts = answer({
 					accounts: [
 						{
 							account_id: externalId,
@@ -60,9 +65,21 @@ function fakePlaid(signer: Signer) {
 							mask: '1111',
 							type: 'depository',
 							balances: { current: 250 }
-						}
+						},
+						...Array.from({ length: state.moreAccounts }, (_, n) => ({
+							account_id: `account-synthetic-more-${String(n)}`,
+							name: `Sample Savings ${String(n)}`,
+							type: 'depository',
+							balances: { current: 0 }
+						}))
 					]
 				});
+				const held = state.heldAnswer;
+				if (held === null) return accounts;
+				state.heldAnswer = null;
+				held.reached();
+				return held.release.then(() => accounts);
+			}
 			case '/item/get':
 				return answer({
 					item: { item_id: itemId, consent_expiration_time: null, error: null },
@@ -498,6 +515,52 @@ describe('a bank Account the owner adds at the bank', () => {
 		await runScheduled(backend);
 
 		expect(await heldExternalIds(backend)).toEqual([newExternalId]);
+	});
+
+	test.each([
+		{ answered: 50, held: 49 },
+		{ answered: 51, held: 0 }
+	])(
+		'a bank answer of $answered Accounts is taken whole or not at all',
+		async ({ answered, held }) => {
+			const backend = await connectedBudget();
+			plaid.state.moreAccounts = answered - 2;
+
+			await postNewAccounts(backend);
+			await runScheduled(backend);
+
+			expect(plaid.paths).toContain('/accounts/get');
+			expect(await heldExternalIds(backend)).toHaveLength(held);
+		}
+	);
+
+	test('an answer Plaid gave before a newer request does not settle that request', async () => {
+		const backend = await connectedBudget();
+		const { t, connectionId } = backend;
+		let releaseOlderAnswer: () => void = () => undefined;
+		const release = new Promise<void>((resolve) => {
+			releaseOlderAnswer = resolve;
+		});
+		const reached = new Promise<void>((resolve) => {
+			plaid.state.heldAnswer = { reached: resolve, release };
+		});
+		const olderLook = t.action(internal.heldAccounts.discover, { connectionId });
+		await reached;
+
+		plaid.state.moreAccounts = 1;
+		plaid.state.accountsOutage = true;
+		await postNewAccounts(backend);
+		await runScheduled(backend);
+		plaid.state.accountsOutage = false;
+		releaseOlderAnswer();
+		await olderLook;
+		expect(await heldExternalIds(backend)).toEqual([newExternalId]);
+		plaid.paths.length = 0;
+
+		await t.action(internal.bankConnections.sync, { connectionId });
+
+		expect(plaid.paths).toContain('/accounts/get');
+		expect(await heldExternalIds(backend)).toEqual([newExternalId, 'account-synthetic-more-0']);
 	});
 
 	test('a failed look at the Accounts is tried again on the next sync', async () => {
