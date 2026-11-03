@@ -26,7 +26,8 @@
 		"test:e2e:local": "bun e2e/run-local.ts",
 		"codegen": "bun scripts/codegen.js",
 		"app": "bun --no-env-file scripts/app.ts",
-		"sync": "PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-kit sync"
+		"sync": "PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-kit sync",
+		"capacity": "bun --no-env-file scripts/capacity/run.js"
 	},
 	"dependencies": {
 		"convex": "1.48.0",
