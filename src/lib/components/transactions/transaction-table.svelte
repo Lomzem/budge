@@ -163,7 +163,7 @@
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>
-					<Table.Head width="fit">Date</Table.Head>
+					<Table.Head width="fit" showFrom="md">Date</Table.Head>
 					{#if allAccounts}
 						<Table.Head showFrom="2xl">Account</Table.Head>
 					{/if}
@@ -172,7 +172,7 @@
 					<Table.Head showFrom="xl">Memo</Table.Head>
 					<Table.Head width="fit" align="end">Amount</Table.Head>
 					<Table.Head width="fit" align="center">Cleared</Table.Head>
-					<Table.Head width="fit"><span class="sr-only">Approval</span></Table.Head>
+					<Table.Head width="fit" showFrom="md"><span class="sr-only">Approval</span></Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
@@ -183,11 +183,8 @@
 					{@const categoryClass =
 						row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
 					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
-						<Table.Cell numeric>
-							<time datetime={row.date}>
-								<span class="@md:hidden">{formatDate(row.date, 'short')}</span>
-								<span class="hidden @md:inline">{formatDate(row.date)}</span>
-							</time>
+						<Table.Cell numeric showFrom="md">
+							<time datetime={row.date}>{formatDate(row.date)}</time>
 						</Table.Cell>
 						{#if allAccounts}
 							<Table.Cell showFrom="2xl">{row.accountName}</Table.Cell>
@@ -213,6 +210,12 @@
 							{#if flag}
 								<span class="block truncate text-xs font-normal text-warning">{flag}</span>
 							{/if}
+							<time
+								datetime={row.date}
+								class="block truncate text-xs font-normal text-muted-foreground tabular-nums @md:hidden"
+							>
+								{formatDate(row.date, 'short')}
+							</time>
 							<span class="block truncate text-xs font-normal text-muted-foreground @lg:hidden">
 								<span class={categoryClass}>{category}</span>
 							</span>
@@ -247,7 +250,7 @@
 								/>
 							{/if}
 						</Table.Cell>
-						<Table.Cell>
+						<Table.Cell showFrom="md">
 							{#if !row.approved}
 								<Button
 									size="sm"

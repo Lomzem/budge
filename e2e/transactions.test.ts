@@ -138,3 +138,34 @@ test('a save that finishes after the dialog was closed leaves the next opening a
 		});
 	}
 });
+
+test.describe('with Unapproved Transactions', () => {
+	test.use({ fixture: 'bank-sync' });
+
+	test('on a 320 px phone, an Unapproved Transaction opens from its Payee and can be approved', async ({
+		page
+	}) => {
+		if (!ownerEmail) throw new Error('E2E_CLERK_USER_EMAIL is not set.');
+		await page.setViewportSize({ width: 320, height: 640 });
+		await page.goto('/sign-in');
+		await clerk.signIn({ page, emailAddress: ownerEmail });
+		await page.goto('/accounts');
+		await expect(page.getByRole('heading', { level: 1, name: 'All Accounts' })).toBeVisible();
+
+		const table = page.locator('[data-slot="table-container"]');
+		await expect(
+			table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193\s*, Unapproved/ })
+		).toBeVisible();
+		expect(
+			await table.evaluate((container) => container.scrollWidth <= container.clientWidth)
+		).toBe(true);
+
+		await table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193\s*, Unapproved/ }).click();
+		const editing = page.getByRole('dialog', { name: 'Edit Transaction' });
+		await editing.getByRole('button', { name: 'Approve', exact: true }).click();
+		await expect(editing).toBeHidden();
+		await expect(
+			table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193\s*, edit/ })
+		).toBeVisible();
+	});
+});
