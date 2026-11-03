@@ -36,6 +36,7 @@ const MAX_BANK_TEXT = 500;
 export interface IncomingRow extends BankRow {
 	merchantName?: string | undefined;
 	pick?: Id<'transactions'> | 'new' | undefined;
+	heldId?: Id<'imports'> | undefined;
 }
 
 export interface ImportPlan<R extends IncomingRow = FileRow> {
@@ -66,7 +67,8 @@ export async function planBankRows<R extends IncomingRow>(
 	ctx: QueryCtx,
 	accountId: Id<'accounts'>,
 	source: BankSource,
-	rows: R[]
+	rows: R[],
+	mappedFeed?: Id<'connectionAccounts'>
 ): Promise<ImportPlan<R>> {
 	if (rows.length === 0) return { rows, decisions: [], candidates: new Map() };
 
@@ -117,14 +119,18 @@ export async function planBankRows<R extends IncomingRow>(
 			date: transaction.date,
 			amount: transaction.amount,
 			cleared: transaction.cleared !== 'uncleared',
-			linkedSources: linked.map((row) => row.source)
+			linkedSources: linked.map((row) => row.source),
+			...(mappedFeed === undefined
+				? {}
+				: { linkedFromFeed: linked.some((row) => row.connectionAccountId === mappedFeed) })
 		});
 	}
 
 	const decisions = matchBankRows(source, rows, {
 		knownImportIds,
 		knownRowsWithoutId,
-		candidates: matchCandidates
+		candidates: matchCandidates,
+		...(mappedFeed === undefined ? {} : { matchImported: true })
 	});
 	return { rows, decisions, candidates };
 }
@@ -157,6 +163,20 @@ export async function applyBankRows(
 			bankText: row.bankText,
 			state: 'linked' as const
 		};
+		const writeBankRow = async (transactionId: Id<'transactions'>, matched: boolean) => {
+			if (row.heldId === undefined) {
+				await ctx.db.insert('imports', { ...bankRow, transactionId, matched });
+			} else {
+				await ctx.db.patch('imports', row.heldId, {
+					accountId,
+					transactionId,
+					matched,
+					state: 'linked',
+					merchantName: undefined
+				});
+			}
+			await refreshSearchText(ctx, transactionId);
+		};
 		if (decision.kind === 'match') {
 			const matchedStaysLockedIfReconciled =
 				candidates.get(decision.transactionId)?.cleared === 'reconciled';
@@ -164,19 +184,14 @@ export async function applyBankRows(
 				cleared: matchedStaysLockedIfReconciled ? 'reconciled' : 'cleared',
 				approved: false
 			});
-			await ctx.db.insert('imports', {
-				...bankRow,
-				transactionId: decision.transactionId,
-				matched: true
-			});
-			await refreshSearchText(ctx, decision.transactionId);
+			await writeBankRow(decision.transactionId, true);
 			counts.matched++;
 		} else if (decision.kind === 'skip') {
+			if (row.heldId !== undefined) await ctx.db.delete('imports', row.heldId);
 			counts.skipped++;
 		} else {
 			const transactionId = await insertImported(ctx, accountId, row, payees);
-			await ctx.db.insert('imports', { ...bankRow, transactionId, matched: false });
-			await refreshSearchText(ctx, transactionId);
+			await writeBankRow(transactionId, false);
 			counts.added++;
 		}
 	}

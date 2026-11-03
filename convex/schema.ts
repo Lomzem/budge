@@ -103,13 +103,12 @@ export default defineSchema({
 		source: v.union(v.literal('plaid'), v.literal('qfx'), v.literal('csv')),
 
 		sourceId: v.optional(v.string()),
-		accountId: v.id('accounts'),
-
+		accountId: v.optional(v.id('accounts')),
 		connectionAccountId: v.optional(v.id('connectionAccounts')),
 		date: v.string(),
 		amount: v.number(),
 		bankText: v.string(),
-
+		merchantName: v.optional(v.string()),
 		transactionId: v.optional(v.id('transactions')),
 
 		matched: v.boolean(),
@@ -122,7 +121,8 @@ export default defineSchema({
 	})
 		.index('by_account_source_sourceId_date', ['accountId', 'source', 'sourceId', 'date'])
 		.index('by_transactionId', ['transactionId'])
-		.index('by_connectionAccountId_state', ['connectionAccountId', 'state']),
+		.index('by_connectionAccountId_state', ['connectionAccountId', 'state'])
+		.index('by_connectionAccountId_sourceId', ['connectionAccountId', 'sourceId']),
 
 	bankConnections: defineTable({
 		name: v.string(),
@@ -168,12 +168,16 @@ export default defineSchema({
 			v.object({
 				connectionId: v.id('bankConnections'),
 				externalId: v.string(),
+				name: v.optional(v.string()),
+				mask: v.optional(v.string()),
 				state: v.literal('mapped'),
 				accountId: v.id('accounts')
 			}),
 			v.object({
 				connectionId: v.id('bankConnections'),
 				externalId: v.string(),
+				name: v.optional(v.string()),
+				mask: v.optional(v.string()),
 				state: v.union(v.literal('held'), v.literal('ignored'))
 			})
 		)

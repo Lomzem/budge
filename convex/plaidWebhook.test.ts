@@ -10,6 +10,7 @@ useOwnerEnv();
 const accessToken = 'access-token-synthetic-not-real';
 const itemId = 'item-synthetic-1';
 const externalId = 'account-synthetic-checking';
+const newExternalId = 'account-synthetic-new-savings';
 const cutoverDate = '2026-08-01';
 
 type Signer = Awaited<ReturnType<typeof webhookSigner>>;
@@ -40,6 +41,25 @@ function fakePlaid(signer: Signer) {
 				);
 			case '/transactions/sync':
 				return answer(syncPage);
+			case '/accounts/get':
+				return answer({
+					accounts: [
+						{
+							account_id: externalId,
+							name: 'Sample Checking',
+							mask: '0000',
+							type: 'depository',
+							balances: { current: 100 }
+						},
+						{
+							account_id: newExternalId,
+							name: 'Sample Savings',
+							mask: '1111',
+							type: 'depository',
+							balances: { current: 250 }
+						}
+					]
+				});
 			case '/item/get':
 				return answer({
 					item: { item_id: itemId, consent_expiration_time: null, error: null },
@@ -417,6 +437,42 @@ describe('the Plaid webhook', () => {
 
 		expect((await postWebhook(backend, 'not json', null)).status).toBe(400);
 		expect(plaid.paths).toEqual([]);
+	});
+});
+
+describe('a bank Account the owner adds at the bank', () => {
+	const heldExternalIds = async ({ t }: Backend) =>
+		(await t.run((ctx) => ctx.db.query('connectionAccounts').collect()))
+			.filter((account) => account.state === 'held')
+			.map((account) => account.externalId);
+
+	test('NEW_ACCOUNTS_AVAILABLE holds it for the owner to map', async () => {
+		const backend = await connectedBudget();
+		const body = JSON.stringify({
+			webhook_type: 'ITEM',
+			webhook_code: 'NEW_ACCOUNTS_AVAILABLE',
+			item_id: itemId,
+			error: null,
+			environment: 'sandbox'
+		});
+
+		const response = await postWebhook(backend, body, await signer.sign(body));
+		expect(response.status).toBe(200);
+		await runScheduled(backend);
+
+		expect(plaid.paths).toContain('/accounts/get');
+		expect(await heldExternalIds(backend)).toEqual([newExternalId]);
+	});
+
+	test('a sync after Reconnect holds it for the owner to map', async () => {
+		const backend = await connectedBudget();
+
+		await backend.owner.action(api.bankConnections.syncAfterReconnect, {
+			connectionId: backend.connectionId
+		});
+
+		expect(plaid.paths).toContain('/accounts/get');
+		expect(await heldExternalIds(backend)).toEqual([newExternalId]);
 	});
 });
 

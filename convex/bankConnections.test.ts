@@ -343,32 +343,6 @@ describe('syncing a Bank Connection', () => {
 		expect((await connection())?.provider).not.toHaveProperty('cursor');
 	});
 
-	test('holds rows from a bank Account not yet mapped', async () => {
-		const { t, sync, rows, connectionId } = await connectedBudget();
-		const otherAccount = {
-			...page,
-			added: page.added.map((row) => ({ ...row, account_id: 'account-synthetic-savings' }))
-		};
-
-		expect(synced(await sync(plaidPages(otherAccount)))).toEqual({
-			kind: 'synced',
-			added: 0,
-			matched: 0,
-			held: 2
-		});
-		expect(await rows()).toEqual([]);
-		expect(
-			await t.run((ctx) =>
-				ctx.db
-					.query('connectionAccounts')
-					.withIndex('by_connection_externalId', (q) =>
-						q.eq('connectionId', connectionId).eq('externalId', 'account-synthetic-savings')
-					)
-					.collect()
-			)
-		).toMatchObject([{ state: 'held' }]);
-	});
-
 	test('pages through a batch, applying at most a bounded number per sync', async () => {
 		const { sync, connection } = await connectedBudget();
 		const more = (n: number): SyncPage => ({

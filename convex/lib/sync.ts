@@ -4,6 +4,7 @@ import { Cause, Context, Effect, Layer, Option, Result } from 'effect';
 
 import {
 	syncRowsOf,
+	type BankAccount,
 	type SyncPage,
 	type SyncRemoval,
 	type SyncRow
@@ -88,6 +89,26 @@ export const failArgs = {
 	status: v.union(v.literal('needsAttention'), v.literal('shortLived'), v.literal('failed'))
 };
 
+export const recordAccountsArgs = {
+	connectionId: v.id('bankConnections'),
+	accounts: v.array(
+		v.object({ externalId: v.string(), name: v.string(), mask: v.optional(v.string()) })
+	)
+};
+
+export const startingBalanceBasis = v.union(
+	v.object({ kind: v.literal('notSynced') }),
+	v.object({ kind: v.literal('importing') }),
+	v.object({
+		kind: v.literal('synced'),
+		itemId: v.string(),
+		encryptedToken: v.string(),
+		externalId: v.string(),
+		imported: v.number()
+	})
+);
+export type StartingBalanceBasis = Infer<typeof startingBalanceBasis>;
+
 export const saveArgs = {
 	name: v.string(),
 	itemId: v.string(),
@@ -136,6 +157,11 @@ interface SyncStoreShape {
 		encryptedToken: string;
 		accounts: { externalId: string; accountId: Id<'accounts'> }[];
 	}) => Effect.Effect<Id<'bankConnections'>>;
+	readonly recordAccounts: (args: {
+		connectionId: Id<'bankConnections'>;
+		accounts: { externalId: string; name: string; mask?: string }[];
+	}) => Effect.Effect<void>;
+	readonly startingBalanceBasis: (accountId: Id<'accounts'>) => Effect.Effect<StartingBalanceBasis>;
 }
 
 export type MutationRunner = Pick<GenericActionCtx<DataModel>, 'runMutation' | 'runQuery'>;
@@ -153,7 +179,11 @@ export class SyncStore extends Context.Service<SyncStore, SyncStoreShape>()('bud
 				Effect.promise(() => runQuery(internal.bankConnections.credentials, { connectionId })),
 			recordConsent: (args) =>
 				Effect.promise(() => runMutation(internal.bankConnections.recordConsent, args)),
-			save: (args) => Effect.promise(() => runMutation(internal.bankConnections.save, args))
+			save: (args) => Effect.promise(() => runMutation(internal.bankConnections.save, args)),
+			recordAccounts: (args) =>
+				Effect.promise(() => runMutation(internal.heldAccounts.recordAccounts, args)),
+			startingBalanceBasis: (accountId) =>
+				Effect.promise(() => runQuery(internal.heldAccounts.startingBalanceBasis, { accountId }))
 		});
 	}
 }
@@ -169,7 +199,12 @@ export type SyncError = PlaidError | TokenCipherError;
 
 export const syncConnection = Effect.fnUntraced(function* (
 	connectionId: Id<'bankConnections'>,
-	{ refresh, resume = false, attempt = 0 }: { refresh: boolean; resume?: boolean; attempt?: number }
+	{
+		refresh,
+		resume = false,
+		attempt = 0,
+		discover = false
+	}: { refresh: boolean; resume?: boolean; attempt?: number; discover?: boolean }
 ): Effect.fn.Return<SyncOutcome, SyncError, PlaidClient | TokenCipher | SyncStore> {
 	const store = yield* SyncStore;
 	const plaid = yield* PlaidClient;
@@ -226,6 +261,17 @@ export const syncConnection = Effect.fnUntraced(function* (
 		if (Option.isSome(item)) {
 			yield* store.recordConsent({ connectionId, consentExpiresAt: item.value.consentExpiresAt });
 		}
+		if (discover || totals.held > 0) {
+			yield* Effect.ignore(
+				plaid
+					.accountsGet(accessToken)
+					.pipe(
+						Effect.flatMap((accounts) =>
+							store.recordAccounts({ connectionId, accounts: accounts.map(namesOf) })
+						)
+					)
+			);
+		}
 		if (refresh) yield* Effect.ignore(plaid.transactionsRefresh(accessToken));
 		return { kind: 'synced', ...totals } as const;
 	});
@@ -235,6 +281,30 @@ export const syncConnection = Effect.fnUntraced(function* (
 			return store.fail({ connectionId, lease, attempt, ...failure });
 		})
 	);
+});
+
+function namesOf({ externalId, name, mask }: BankAccount) {
+	return { externalId, name, ...(mask === undefined ? {} : { mask }) };
+}
+
+export type StartingBalanceSuggestion =
+	| { kind: 'suggested'; startingBalance: number }
+	| { kind: 'notSynced' }
+	| { kind: 'importing' }
+	| { kind: 'noBalance' };
+
+export const suggestStartingBalance = Effect.fnUntraced(function* (
+	accountId: Id<'accounts'>
+): Effect.fn.Return<StartingBalanceSuggestion, SyncError, PlaidClient | TokenCipher | SyncStore> {
+	const store = yield* SyncStore;
+	const plaid = yield* PlaidClient;
+	const cipher = yield* TokenCipher;
+	const basis = yield* store.startingBalanceBasis(accountId);
+	if (basis.kind !== 'synced') return basis;
+	const accessToken = yield* cipher.decrypt(basis.encryptedToken, basis.itemId);
+	const [account] = yield* plaid.accountsGet(accessToken, [basis.externalId]);
+	if (account === undefined || account.balance === null) return { kind: 'noBalance' } as const;
+	return { kind: 'suggested', startingBalance: account.balance - basis.imported } as const;
 });
 
 interface Batch {

@@ -17,6 +17,7 @@ export interface MatchCandidate<T> {
 	cleared: boolean;
 
 	linkedSources: readonly BankSource[];
+	linkedFromFeed?: boolean;
 }
 
 export interface MatchContext<T> {
@@ -25,6 +26,7 @@ export interface MatchContext<T> {
 	knownRowsWithoutId?: readonly Pick<BankRow, 'date' | 'amount' | 'bankText'>[];
 
 	candidates: readonly MatchCandidate<T>[];
+	matchImported?: boolean;
 }
 
 export type MatchDecision<T> =
@@ -44,6 +46,10 @@ export function matchBankRows<T>(
 	const repeats = [...(context.knownRowsWithoutId ?? [])];
 	const taken = new Set<T>();
 	const fromFile = source !== 'plaid';
+	const takesImported = ({ linkedSources }: MatchCandidate<T>) =>
+		context.matchImported === true
+			? linkedSources.length > 0
+			: fromFile && linkedSources.includes('plaid');
 
 	return rows.map((row) => {
 		if (row.sourceId !== undefined) {
@@ -66,8 +72,8 @@ export function matchBankRows<T>(
 					!taken.has(candidate.id) &&
 					candidate.amount === row.amount &&
 					withinWindow(candidate.date, row.date) &&
-					(!candidate.cleared || (fromFile && candidate.linkedSources.includes('plaid'))) &&
-					!candidate.linkedSources.includes(source)
+					(!candidate.cleared || takesImported(candidate)) &&
+					!(candidate.linkedFromFeed ?? candidate.linkedSources.includes(source))
 			)
 			.sort((a, b) => distance(a.date, row.date) - distance(b.date, row.date))
 			.map((candidate) => candidate.id);

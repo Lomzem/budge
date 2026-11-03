@@ -301,4 +301,42 @@ describe('PlaidClient', () => {
 			]);
 		}).pipe(Effect.provide(plaid.layer));
 	});
+
+	it.effect("reads the Item's Accounts, optionally only some", () => {
+		const plaid = fakePlaid(() =>
+			Promise.resolve(
+				json(200, {
+					accounts: [
+						{
+							account_id: 'account-synthetic-card',
+							balances: { available: null, current: 12.5, limit: 500 },
+							mask: '7310',
+							name: 'Sample Card',
+							official_name: null,
+							subtype: 'credit card',
+							type: 'credit'
+						}
+					],
+					item: { item_id: 'item-synthetic-1' },
+					request_id: 'request-synthetic-4'
+				})
+			)
+		);
+		return Effect.gen(function* () {
+			const client = yield* PlaidClient;
+			yield* client.accountsGet(accessToken);
+			const accounts = yield* client.accountsGet(accessToken, ['account-synthetic-card']);
+
+			expect(accounts).toEqual([
+				{ externalId: 'account-synthetic-card', name: 'Sample Card', mask: '7310', balance: -1_250 }
+			]);
+			expect(plaid.sent.map(({ url, body }) => [url, body])).toEqual([
+				['https://sandbox.plaid.com/accounts/get', { access_token: accessToken }],
+				[
+					'https://sandbox.plaid.com/accounts/get',
+					{ access_token: accessToken, options: { account_ids: ['account-synthetic-card'] } }
+				]
+			]);
+		}).pipe(Effect.provide(plaid.layer));
+	});
 });

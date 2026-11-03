@@ -1,7 +1,12 @@
 import { Context, Duration, Effect, Layer, Schedule, Schema } from 'effect';
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http';
 
-import { decodeSyncPage, type SyncPage } from '../../src/lib/domain/plaid';
+import {
+	decodeAccounts,
+	decodeSyncPage,
+	type BankAccount,
+	type SyncPage
+} from '../../src/lib/domain/plaid';
 
 export class PlaidTransport extends Schema.TaggedError<
 	PlaidTransport,
@@ -49,6 +54,10 @@ interface PlaidClientShape {
 	readonly webhookVerificationKey: (keyId: string) => Effect.Effect<WebhookKey, PlaidError>;
 	readonly linkTokenCreate: (request: UpdateLinkRequest) => Effect.Effect<string, PlaidError>;
 	readonly itemGet: (accessToken: string) => Effect.Effect<ItemState, PlaidError>;
+	readonly accountsGet: (
+		accessToken: string,
+		accountIds?: readonly string[]
+	) => Effect.Effect<BankAccount[], PlaidError>;
 }
 
 export interface UpdateLinkRequest {
@@ -110,7 +119,8 @@ export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>(
 			setWebhook: fake.setWebhook ?? unexpected('setWebhook'),
 			webhookVerificationKey: fake.webhookVerificationKey ?? unexpected('webhookVerificationKey'),
 			linkTokenCreate: fake.linkTokenCreate ?? unexpected('linkTokenCreate'),
-			itemGet: fake.itemGet ?? unexpected('itemGet')
+			itemGet: fake.itemGet ?? unexpected('itemGet'),
+			accountsGet: fake.accountsGet ?? unexpected('accountsGet')
 		});
 	}
 }
@@ -243,7 +253,16 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 				(body) =>
 					Schema.decodeUnknownEffect(LinkTokenBody)(body).pipe(Effect.map((b) => b.link_token))
 			),
-		itemGet: (accessToken) => post('/item/get', { access_token: accessToken }, decodeItem)
+		itemGet: (accessToken) => post('/item/get', { access_token: accessToken }, decodeItem),
+		accountsGet: (accessToken, accountIds) =>
+			post(
+				'/accounts/get',
+				{
+					access_token: accessToken,
+					...(accountIds === undefined ? {} : { options: { account_ids: accountIds } })
+				},
+				decodeAccounts
+			)
 	};
 }
 

@@ -29,7 +29,8 @@ import {
 	readWebhook,
 	verifyWebhook,
 	webhookKeyValidator,
-	WebhookKeys
+	WebhookKeys,
+	type Webhook
 } from './lib/plaidWebhook';
 import { publicError } from './lib/publicError';
 import { runEffect } from './lib/runEffect';
@@ -176,14 +177,24 @@ export const webhook = httpAction(async (ctx, request) => {
 	if (webhook.type === 'TRANSACTIONS' && webhook.code === 'SYNC_UPDATES_AVAILABLE') {
 		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
 	}
-	if (webhook.type === 'ITEM') {
-		await ctx.runMutation(internal.bankConnections.flagItem, {
-			itemId: webhook.itemId,
-			code: webhook.errorCode ?? webhook.code
-		});
-	}
+	if (webhook.type === 'ITEM') await actOnItemWebhook(ctx, connectionId, webhook);
 	return new Response(null, { status: 200 });
 });
+
+async function actOnItemWebhook(
+	ctx: Pick<ActionCtx, 'runMutation' | 'scheduler'>,
+	connectionId: Id<'bankConnections'>,
+	webhook: Webhook
+) {
+	if (webhook.code === 'NEW_ACCOUNTS_AVAILABLE') {
+		await ctx.scheduler.runAfter(0, internal.heldAccounts.discover, { connectionId });
+		return;
+	}
+	await ctx.runMutation(internal.bankConnections.flagItem, {
+		itemId: webhook.itemId,
+		code: webhook.errorCode ?? webhook.code
+	});
+}
 
 function keptWebhookKeys(
 	ctx: Pick<ActionCtx, 'runMutation'>,
@@ -292,17 +303,19 @@ export const syncAfterReconnect = action({
 	returns: ownerSyncResult,
 	handler: async (ctx, { connectionId }) => {
 		await requireOwner(ctx);
-		return await ownerSync(ctx, connectionId, { refresh: false });
+		return await ownerSync(ctx, connectionId, { refresh: false, discover: true });
 	}
 });
 
 async function ownerSync(
 	ctx: ActionCtx,
 	connectionId: Id<'bankConnections'>,
-	{ refresh }: { refresh: boolean }
+	{ refresh, discover = false }: { refresh: boolean; discover?: boolean }
 ): Promise<Infer<typeof ownerSyncResult>> {
 	const outcome = await runEffect(
-		syncConnection(connectionId, { refresh, resume: true }).pipe(Effect.provide(liveLayer(ctx))),
+		syncConnection(connectionId, { refresh, resume: true, discover }).pipe(
+			Effect.provide(liveLayer(ctx))
+		),
 		toPublicError
 	);
 	if (outcome.kind === 'missing') throw publicError('NOT_FOUND');
@@ -355,11 +368,11 @@ export const retrySync = internalAction({
 	}
 });
 
-function liveLayer(ctx: ActionCtx) {
+export function liveLayer(ctx: ActionCtx) {
 	return Layer.mergeAll(livePlaid(), TokenCipher.layer(env.BUDGE_TOKEN_KEY), SyncStore.layer(ctx));
 }
 
-function toPublicError(error: SyncError): PublicError {
+export function toPublicError(error: SyncError): PublicError {
 	if (failureOf(error).status === 'needsAttention') {
 		return { code: 'BANK_CONNECTION_NEEDS_LOGIN', message: 'The bank needs you to reconnect.' };
 	}
@@ -520,7 +533,7 @@ async function applyByBankAccount(
 	for (const [externalId, accountRows] of byExternalId) {
 		const target = await connectionAccountOf(ctx, connectionId, externalId);
 		if (target.state !== 'mapped') {
-			if (target.state === 'held') totals.held += accountRows.length;
+			if (target.state === 'held') totals.held += await holdRows(ctx, target._id, accountRows);
 			continue;
 		}
 		const plan = await planBankRows(ctx, target.accountId, 'plaid', accountRows);
@@ -642,13 +655,20 @@ export const save = internalMutation({
 			const known = await findConnectionAccount(ctx, connectionId, externalId);
 			const mapped = { connectionId, externalId, state: 'mapped' as const, accountId };
 			if (known === null) await ctx.db.insert('connectionAccounts', mapped);
-			else await ctx.db.replace('connectionAccounts', known._id, mapped);
+			else {
+				const { name, mask } = known;
+				await ctx.db.replace('connectionAccounts', known._id, {
+					...mapped,
+					...(name === undefined ? {} : { name }),
+					...(mask === undefined ? {} : { mask })
+				});
+			}
 		}
 		return connectionId;
 	}
 });
 
-async function findConnectionAccount(
+export async function findConnectionAccount(
 	ctx: MutationCtx,
 	connectionId: Id<'bankConnections'>,
 	externalId: string
@@ -659,6 +679,36 @@ async function findConnectionAccount(
 			q.eq('connectionId', connectionId).eq('externalId', externalId)
 		)
 		.unique();
+}
+
+async function holdRows(
+	ctx: MutationCtx,
+	connectionAccountId: Id<'connectionAccounts'>,
+	rows: IncomingRow[]
+) {
+	let held = 0;
+	for (const row of rows) {
+		const known = await ctx.db
+			.query('imports')
+			.withIndex('by_connectionAccountId_sourceId', (q) =>
+				q.eq('connectionAccountId', connectionAccountId).eq('sourceId', row.sourceId)
+			)
+			.first();
+		if (known !== null) continue;
+		await ctx.db.insert('imports', {
+			source: 'plaid',
+			...(row.sourceId === undefined ? {} : { sourceId: row.sourceId }),
+			connectionAccountId,
+			date: row.date,
+			amount: row.amount,
+			bankText: row.bankText,
+			...(row.merchantName === undefined ? {} : { merchantName: row.merchantName }),
+			matched: false,
+			state: 'held'
+		});
+		held++;
+	}
+	return held;
 }
 
 async function connectionAccountOf(

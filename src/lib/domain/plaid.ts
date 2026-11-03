@@ -116,6 +116,57 @@ function bankRowsOf(
 	});
 }
 
+const Cents = Schema.Finite.pipe(
+	Schema.decodeTo(Schema.Finite, {
+		decode: SchemaGetter.transformEffect((amount: number) => {
+			const cents = parseCents(String(amount));
+			return cents === undefined
+				? Effect.fail(new SchemaIssue.InvalidValue({ message: 'Expected dollars and cents' }))
+				: Effect.succeed(cents);
+		}),
+		encode: SchemaGetter.transform((cents: number) => cents / 100)
+	})
+);
+
+const PlaidAccount = Schema.Struct({
+	account_id: Schema.String,
+	name: Schema.String,
+	mask: Schema.optionalKey(Schema.NullOr(Schema.String)),
+	type: Schema.String,
+	balances: Schema.Struct({ current: Schema.NullOr(Cents) })
+});
+
+const AccountsResponse = Schema.Struct({ accounts: Schema.Array(PlaidAccount) });
+
+export interface BankAccount {
+	externalId: string;
+	name: string;
+	mask?: string;
+	balance: number | null;
+}
+
+const OWED_TYPES = new Set(['credit', 'loan']);
+
+function budgetSigned(type: string, current: number) {
+	return OWED_TYPES.has(type) && current !== 0 ? -current : current;
+}
+
+export const decodeAccounts = (body: unknown): Effect.Effect<BankAccount[], Schema.SchemaError> =>
+	Schema.decodeUnknownEffect(AccountsResponse)(body).pipe(
+		Effect.map((response) =>
+			response.accounts.map((account) => {
+				const current = account.balances.current;
+				const mask = clean(account.mask);
+				return {
+					externalId: account.account_id,
+					name: clean(account.name) ?? 'Bank account',
+					...(mask === undefined ? {} : { mask }),
+					balance: current === null ? null : budgetSigned(account.type, current)
+				};
+			})
+		)
+	);
+
 function clean(text: string | null | undefined) {
 	const trimmed = text?.replace(/\s+/g, ' ').trim();
 	return trimmed === '' ? undefined : trimmed;

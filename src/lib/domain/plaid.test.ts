@@ -3,10 +3,14 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from '@effect/vitest';
 import { Effect, Exit } from 'effect';
 
-import { decodeSyncPage, syncRowsOf } from './plaid';
+import { decodeAccounts, decodeSyncPage, syncRowsOf } from './plaid';
 
 const page: unknown = JSON.parse(
 	readFileSync(new URL('./fixtures/synthetic/plaid-sync-page.json', import.meta.url), 'utf8')
+);
+
+const accounts: unknown = JSON.parse(
+	readFileSync(new URL('./fixtures/synthetic/plaid-accounts.json', import.meta.url), 'utf8')
 );
 
 describe('decoding a Plaid sync page', () => {
@@ -82,6 +86,36 @@ describe('decoding a Plaid sync page', () => {
 				],
 				removed: [{ externalAccountId: 'account-synthetic-checking', sourceId: 'txn-synthetic-2' }]
 			});
+		})
+	);
+});
+
+describe("decoding Plaid's Accounts", () => {
+	it.effect('reads each Account and its current balance as a Budge balance in cents', () =>
+		Effect.gen(function* () {
+			expect(yield* decodeAccounts(accounts)).toEqual([
+				{
+					externalId: 'account-synthetic-checking',
+					name: 'Sample Checking',
+					mask: '0042',
+					balance: 120_417
+				},
+				{
+					externalId: 'account-synthetic-card',
+					name: 'Sample Card',
+					mask: '7310',
+					balance: -89_990
+				},
+				{ externalId: 'account-synthetic-savings', name: 'Sample Savings', balance: null }
+			]);
+		})
+	);
+
+	it.effect('fails on a response without its Accounts', () =>
+		Effect.gen(function* () {
+			const exit = yield* Effect.exit(decodeAccounts({ item: {} }));
+
+			expect(Exit.isFailure(exit)).toBe(true);
 		})
 	);
 });
