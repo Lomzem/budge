@@ -13,6 +13,7 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 	const queued: Frame[] = [];
 	let browser: WebSocketRoute | undefined;
 	let holding = false;
+	let released = false;
 	const { promise: held, resolve: markHeld } = Promise.withResolvers<undefined>();
 
 	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => {
@@ -31,7 +32,7 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 		server.onMessage((frame) => {
 			const message = parse(frame);
 			const response = message.type === 'MutationResponse' || message.type === 'ActionResponse';
-			if (response && requestIds.has(message.requestId)) {
+			if (response && !released && requestIds.has(message.requestId)) {
 				holding = true;
 				markHeld(undefined);
 			}
@@ -44,6 +45,7 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 		held,
 		release() {
 			holding = false;
+			released = true;
 			for (const frame of queued.splice(0)) browser?.send(frame);
 		}
 	};

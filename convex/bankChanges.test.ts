@@ -605,18 +605,18 @@ describe('resolving a bank change', () => {
 	});
 });
 
-describe('resolving a bank removal', () => {
-	async function flaggedRemoval() {
-		const budget = await syncedBudget();
-		await ownerVersions.edited(budget);
-		const page = changes({ removed: [grocer.transaction_id] });
-		const before = await budget.cursor();
-		await budget.sync(page);
-		const importId = (await budget.row('SAMPLE GROCER 0193')).bankRows[0]?._id;
-		assert(importId !== undefined, 'No Bank Row');
-		return { budget, importId, replay: () => budget.replay(page, before) };
-	}
+async function flaggedRemoval() {
+	const budget = await syncedBudget();
+	await ownerVersions.edited(budget);
+	const page = changes({ removed: [grocer.transaction_id] });
+	const before = await budget.cursor();
+	await budget.sync(page);
+	const importId = (await budget.row('SAMPLE GROCER 0193')).bankRows[0]?._id;
+	assert(importId !== undefined, 'No Bank Row');
+	return { budget, importId, replay: () => budget.replay(page, before) };
+}
 
+describe('resolving a bank removal', () => {
 	test("the bank's version deletes the Transaction", async () => {
 		const { budget, importId, replay } = await flaggedRemoval();
 
@@ -671,11 +671,6 @@ describe('resolving a bank removal', () => {
 		}
 		await grocerUnderReissuedAccountId(budget, 11);
 		expect(await budget.rows()).toHaveLength(2);
-		const shownBankRows = (await budget.row('SAMPLE GROCER 0193')).bankRows;
-		expect(shownBankRows.map((row) => row.state)).toEqual([
-			...Array<string>(11).fill('removed'),
-			'linked'
-		]);
 
 		await expectRefused(budget, { importId, keep: 'bank' }, /still/);
 	});
@@ -815,7 +810,7 @@ describe('Unmatching a flagged Bank Row', () => {
 });
 
 describe('a Transaction backed by more than ten Bank Rows', () => {
-	test('shows every flagged Bank Row, and says when linked ones are left out', async () => {
+	test('shows its changed Bank Row first among ten, and says when linked ones are left out', async () => {
 		const budget = await syncedBudget();
 		await ownerVersions.approved(budget);
 		let last;
@@ -829,10 +824,10 @@ describe('a Transaction backed by more than ten Bank Rows', () => {
 		);
 
 		const grocerRow = await budget.row('SAMPLE GROCER 0193');
-		expect(grocerRow.bankRows.filter((row) => row.state === 'changed')).toMatchObject([
-			{ amount: -4_550 }
-		]);
-		expect(grocerRow.bankRows.filter((row) => row.state === 'linked')).toHaveLength(10);
+		expect(grocerRow.bankRows[0]).toMatchObject({ state: 'changed', amount: -4_550 });
+		expect(grocerRow.bankRows.slice(1).map((row) => row.state)).toEqual(
+			Array<string>(9).fill('linked')
+		);
 		expect(grocerRow.moreBankRows).toBe(true);
 	});
 
@@ -846,6 +841,26 @@ describe('a Transaction backed by more than ten Bank Rows', () => {
 		const grocerRow = await budget.row('SAMPLE GROCER 0193');
 		expect(grocerRow.bankRows).toHaveLength(10);
 		expect(grocerRow.moreBankRows).toBe(false);
+	});
+
+	test('shows ten flagged Bank Rows when more are flagged, and the rest once those are resolved', async () => {
+		const { budget } = await flaggedRemoval();
+		for (let reissue = 1; reissue <= 10; reissue++) {
+			const { account, transactionId } = await grocerUnderReissuedAccountId(budget, reissue);
+			await budget.sync(changes({ removed: [transactionId] }, account), account);
+		}
+		await grocerUnderReissuedAccountId(budget, 11);
+
+		const crowded = await budget.row('SAMPLE GROCER 0193');
+		expect(crowded.bankRows.map((row) => row.state)).toEqual(Array<string>(10).fill('removed'));
+		expect(crowded.moreBankRows).toBe(true);
+
+		for (const { _id } of crowded.bankRows) {
+			await budget.owner.mutation(api.imports.resolveBankChange, { importId: _id, keep: 'mine' });
+		}
+		const resolved = await budget.row('SAMPLE GROCER 0193');
+		expect(resolved.bankRows.map((row) => row.state)).toEqual(['removed', 'linked']);
+		expect(resolved.moreBankRows).toBe(false);
 	});
 
 	test("search finds the eleventh Bank Row's Bank Text", async () => {

@@ -748,7 +748,8 @@
 					</ul>
 					{#if transaction.moreBankRows}
 						<p class="text-sm text-muted-foreground">
-							More Bank Rows are linked than shown here. Search still finds their Bank Text.
+							More Bank Rows back this Transaction than are shown here. Flagged ones come first, and
+							search still finds every Bank Text.
 						</p>
 					{/if}
 				</section>

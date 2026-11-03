@@ -7,7 +7,7 @@ Keep approved or edited Transactions safe when the bank changes history, while a
 - `bank-held`: hold rows until their external Account is resolved (driven in [Accounts](accounts.md#driving-it-with-playwright)).
 - `bank-quiet`: an untouched Unapproved row follows the bank's modification or removal without asking.
 - `bank-resolve`: an approved or edited row is flagged `Bank changed this` or `Bank removed this`; the owner takes the bank's version or keeps theirs.
-- `bank-many-rows`: a Transaction with more than ten Bank Rows always lists every flagged Bank Row first, lists at most ten linked ones, and says `More Bank Rows are linked than shown here. Search still finds their Bank Text.` when any are left out. Search covers every Bank Row's Bank Text.
+- `bank-many-rows`: a Transaction with more than ten Bank Rows lists ten, flagged ones first, and says `More Bank Rows back this Transaction than are shown here. Flagged ones come first, and search still finds every Bank Text.` when any are left out. Resolving the shown flagged rows brings the hidden ones into view. Search covers every Bank Row's Bank Text.
 
 ## How to get to it (user POV)
 

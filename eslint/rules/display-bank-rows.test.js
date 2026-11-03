@@ -9,17 +9,37 @@ const eslint = new ESLint({
 	}
 });
 
-const restrictedSyntax = async (caller) => {
-	const [result] = await eslint.lintText(
-		`import { bankRowsShown } from './lib/transactions';\nexport async function ${caller}(ctx, id) {\n\treturn await bankRowsShown(ctx, id);\n}\n`,
-		{ filePath: 'convex/lib/transactions.ts' }
-	);
-	return result.messages.filter((message) => message.ruleId === 'no-restricted-syntax');
+const restrictedSyntax = async (source) => {
+	const [result] = await eslint.lintText(source, { filePath: 'convex/lib/transactions.ts' });
+	return result.messages
+		.filter((message) => message.ruleId === 'no-restricted-syntax')
+		.map((message) => message.message);
 };
 
+const caller = (name, imported, call) =>
+	`${imported}\nexport async function ${name}(ctx, id) {\n\treturn await ${call}(ctx, id);\n}\n`;
+
+const named = "import { bankRowsShown } from './transactions';";
+const capped = expect.stringContaining('`bankRowsShown` caps Bank Rows for display');
+
 test('only the list row reads the display-capped Bank Rows', async () => {
-	expect(await restrictedSyntax('refreshSearchText')).toMatchObject([
-		{ message: expect.stringContaining('`bankRowsShown` caps linked Bank Rows for display') }
+	expect(await restrictedSyntax(caller('refreshSearchText', named, 'bankRowsShown'))).toEqual([
+		capped
 	]);
-	expect(await restrictedSyntax('toRow')).toEqual([]);
+	expect(await restrictedSyntax(caller('toRow', named, 'bankRowsShown'))).toEqual([]);
+});
+
+test('renaming or namespacing the import does not get around the list-row rule', async () => {
+	const namespaced = "import * as transactions from './transactions';";
+	expect(
+		await restrictedSyntax(
+			caller('refreshSearchText', "import { bankRowsShown as rows } from './transactions';", 'rows')
+		)
+	).toContainEqual(capped);
+	expect(
+		await restrictedSyntax(caller('refreshSearchText', namespaced, 'transactions.bankRowsShown'))
+	).toEqual([capped]);
+	expect(await restrictedSyntax(caller('toRow', namespaced, 'transactions.bankRowsShown'))).toEqual(
+		[]
+	);
 });

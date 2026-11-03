@@ -97,9 +97,14 @@ export default defineConfig(
 				},
 				{
 					selector:
-						'CallExpression[callee.name="bankRowsShown"]:not(FunctionDeclaration[id.name="toRow"] *)',
+						':matches(CallExpression[callee.name="bankRowsShown"], CallExpression[callee.property.name="bankRowsShown"]):not(FunctionDeclaration[id.name="toRow"] *)',
 					message:
-						'`bankRowsShown` caps linked Bank Rows for display; decisions and search read every Bank Row with `allBankRowsOf`.'
+						'`bankRowsShown` caps Bank Rows for display; decisions and search read every Bank Row with `allBankRowsOf`.'
+				},
+				{
+					selector: 'ImportSpecifier[imported.name="bankRowsShown"][local.name!="bankRowsShown"]',
+					message:
+						'`bankRowsShown` caps Bank Rows for display; import it under its own name so only the list row reads it.'
 				}
 			]
 		}

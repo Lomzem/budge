@@ -48,9 +48,16 @@ test.describe('with more than one Bank Connection', () => {
 		await connections.getByRole('button', { name: /^Sample Credit Union: / }).click();
 		const creditUnion = page.getByRole('dialog', { name: 'Sample Credit Union' });
 		await expect(creditUnion.getByRole('button', { name: 'Sync now' })).toBeEnabled();
+		await page.evaluate((leak) => {
+			new MutationObserver(() => {
+				if (document.body.textContent.includes(leak)) document.body.dataset.leaked = leak;
+			}).observe(document.body, { subtree: true, childList: true, characterData: true });
+		}, 'This Bank Connection has no bank login');
 		sync.release();
-		await expect(page.getByText('This Bank Connection has no bank login')).toHaveCount(0);
-		await expect(creditUnion.getByRole('status')).toHaveCount(0);
-		await expect(creditUnion.getByRole('button', { name: 'Sync now' })).toBeEnabled();
+		await creditUnion.getByRole('button', { name: 'Sync now' }).click();
+		await expect(creditUnion.getByRole('status')).toHaveText(
+			"Couldn't reach the bank; try again later."
+		);
+		await expect(page.locator('body')).not.toHaveAttribute('data-leaked');
 	});
 });

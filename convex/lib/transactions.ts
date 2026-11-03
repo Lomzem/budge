@@ -491,16 +491,18 @@ async function bankTextsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
 	return bankTexts;
 }
 
-const LINKED_BANK_ROWS_SHOWN = 10;
+const BANK_ROWS_SHOWN = 10;
 
 export async function bankRowsShown(ctx: QueryCtx, transactionId: Id<'transactions'>) {
-	const flagged: Doc<'imports'>[] = [];
-	for (const state of ['changed', 'removed'] as const) {
-		for await (const bankRow of bankRowsIn(ctx, transactionId, state)) flagged.push(bankRow);
+	const read: Doc<'imports'>[] = [];
+	for (const state of ['changed', 'removed', 'linked'] as const) {
+		if (read.length > BANK_ROWS_SHOWN) break;
+		read.push(
+			...(await bankRowsIn(ctx, transactionId, state).take(BANK_ROWS_SHOWN + 1 - read.length))
+		);
 	}
-	const linked = await bankRowsIn(ctx, transactionId, 'linked').take(LINKED_BANK_ROWS_SHOWN + 1);
 	return {
-		bankRows: [...flagged, ...linked.slice(0, LINKED_BANK_ROWS_SHOWN)],
-		moreBankRows: linked.length > LINKED_BANK_ROWS_SHOWN
+		bankRows: read.slice(0, BANK_ROWS_SHOWN),
+		moreBankRows: read.length > BANK_ROWS_SHOWN
 	};
 }
