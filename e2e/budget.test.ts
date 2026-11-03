@@ -1,5 +1,5 @@
 import { clerk } from '@clerk/testing/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 
 import { formatCents, parseCents } from '../src/lib/domain/money';
 
@@ -25,12 +25,6 @@ test('editing Assigned inline changes Ready to Assign', async ({ page }) => {
 	await assigned.press('Enter');
 	await expect.poll(readCents).toBe(before - 1_000);
 	await expect(assigned).toHaveValue(formatCents(was + 1_000).replace('$', ''));
-
-	await test.step('put it back, so the seeded budget stays as it was', async () => {
-		await assigned.fill(formatCents(was).replace('$', ''));
-		await assigned.press('Enter');
-		await expect.poll(readCents).toBe(before);
-	});
 });
 
 test("a card's Payment Category shows the card debt not yet covered", async ({ page }) => {

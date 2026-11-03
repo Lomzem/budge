@@ -1,5 +1,5 @@
 import { clerk } from '@clerk/testing/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 
 import { parseCents } from '../src/lib/domain/money';
 import { holdResponseTo } from './heldResponse';

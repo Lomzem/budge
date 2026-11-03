@@ -12,6 +12,6 @@ CI uses `@clerk/testing` to sign in the existing test user through a backend sig
 
 Run `bun run test:e2e:local` from the main checkout or any worktree with `node_modules` installed. Arguments go to Playwright. It never asks for secrets. Do not run `bun run test:e2e` directly: the root `.env.local` points at the owner's dev backend.
 
-The runner copies the checkout to a temp directory and starts a fresh anonymous Convex backend there. It sets the test user as owner, seeds it with `seed:run`, runs the suite serially, then stops the backend and deletes the copy. A failed run keeps the copy for its logs.
+The runner copies the checkout to a temp directory and starts a fresh anonymous Convex backend there. It sets the test user as owner and runs the suite serially. Every test imports `test` from `e2e/test.ts`, which empties the backend and loads a named `bun run app seed` fixture (`budget-with-accounts` unless the file sets `test.use({ fixture })`) before the test starts, so no test depends on another. The runner then stops the backend and deletes the copy. A failed run keeps the copy for its logs.
 
 It passes only `PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_JWT_ISSUER_DOMAIN`, `E2E_CLERK_USER_ID`, and `E2E_CLERK_USER_EMAIL`. Each comes from the environment, else from the main checkout's `.env.local`. It refuses non-development Clerk keys, an issuer from another Clerk instance, a backend that is not anonymous and local, and a busy port 4173. It redacts these values and Clerk session tokens from the output.

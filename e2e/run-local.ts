@@ -5,7 +5,6 @@ import { join } from 'node:path';
 
 import {
 	claimBackendPorts,
-	runConvex,
 	spawnAnonymousBackend,
 	waitForAnonymousBackend
 } from '../scripts/local/backend';
@@ -63,9 +62,6 @@ async function main() {
 			`e2e-local: target: local-anonymous (${deployment.name.split(':')[1] ?? ''}, ${deployment.url})`
 		);
 
-		if ((await runConvex(deployment, workdir, ['run', 'seed:run'])) !== 0)
-			throw new Error('seed:run failed');
-
 		const playwright = spawn(
 			process.execPath,
 			['x', 'playwright', 'test', ...process.argv.slice(2)],
@@ -74,6 +70,7 @@ async function main() {
 				env: {
 					...inheritedEnvWithoutDeploymentSettings(),
 					PUBLIC_CONVEX_URL: deployment.url,
+					E2E_OWN_PREVIEW: '1',
 					PUBLIC_CLERK_PUBLISHABLE_KEY: credentials.PUBLIC_CLERK_PUBLISHABLE_KEY,
 					CLERK_SECRET_KEY: credentials.CLERK_SECRET_KEY,
 					E2E_CLERK_USER_EMAIL: credentials.E2E_CLERK_USER_EMAIL

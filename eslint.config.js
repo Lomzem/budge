@@ -134,6 +134,23 @@ export default defineConfig(
 		rules: { 'max-nested-callbacks': 'off' }
 	},
 	{
+		files: ['e2e/**/*.test.ts'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: '@playwright/test',
+							message:
+								"Import `test` from './test', which reloads a seed fixture before every test."
+						}
+					]
+				}
+			]
+		}
+	},
+	{
 		files: ['src/lib/domain/**'],
 		rules: {
 			'no-restricted-imports': [
