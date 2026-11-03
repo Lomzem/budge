@@ -45,6 +45,7 @@ function sampleArgs(ids: {
 		'accounts:rename': { accountId, name: 'Wallet' },
 		'accounts:reorder': { accountIds: [accountId] },
 		'accounts:setStartingBalance': { accountId, startingBalance: 0 },
+		'accounts:startingBalance': { accountId },
 		'transactions:list': { paginationOpts: { numItems: 10, cursor: null } },
 		'transactions:create': entry,
 		'transactions:update': { transactionId, ...entry },

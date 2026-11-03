@@ -124,6 +124,21 @@ describe("changing an Account's starting balance", () => {
 		return { ...backend, accountId, startingBalances };
 	}
 
+	test('reads back as it now stands, and as none once deleted', async () => {
+		const { owner, accountId, startingBalances } = await checkingWithStartingBalance();
+		const current = () => owner.query(api.accounts.startingBalance, { accountId });
+
+		expect(await current()).toBe(250_000);
+
+		await owner.mutation(api.accounts.setStartingBalance, { accountId, startingBalance: 180_000 });
+		expect(await current()).toBe(180_000);
+
+		const [existing] = await startingBalances();
+		assert(existing !== undefined, 'expected the starting balance');
+		await owner.mutation(api.transactions.remove, { transactionId: existing._id });
+		expect(await current()).toBeNull();
+	});
+
 	test('after the cutover date moves earlier, replaces the one starting balance on the new date', async () => {
 		const { owner, accountId, startingBalances } = await checkingWithStartingBalance();
 		await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-07-01' });

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { useConvexClient } from 'convex-svelte';
+	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { onMount } from 'svelte';
 
 	import { api } from '$convex/_generated/api';
@@ -9,7 +9,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { parseCents } from '$lib/domain/money';
+	import { formatCents, parseCents } from '$lib/domain/money';
 
 	let {
 		account,
@@ -22,6 +22,7 @@
 	} = $props();
 
 	const client = useConvexClient();
+	const current = useQuery(api.accounts.startingBalance, () => ({ accountId: account._id }));
 	const owed = $derived(account.kind === 'creditCard');
 
 	let balance = $state('');
@@ -124,6 +125,11 @@
 			autocomplete="off"
 			required
 		/>
+		{#if current.data != null}
+			<p class="text-sm text-muted-foreground tabular-nums" data-testid="current-starting-balance">
+				Now {formatCents(shown(current.data))}{owed ? ' owed' : ''}
+			</p>
+		{/if}
 	</div>
 	<p role="status" class="text-sm text-muted-foreground">{suggestion}</p>
 	{#if error}

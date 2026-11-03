@@ -1,5 +1,5 @@
 import type { Id } from '../_generated/dataModel';
-import type { MutationCtx } from '../_generated/server';
+import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { createPaymentCategory, ensureReadyToAssign, readPaymentCategory } from './categories';
 import { requireCents, requireName } from './input';
 import { findPayeeNamed, STARTING_BALANCE } from './payees';
@@ -75,7 +75,7 @@ export async function saveStartingBalance(
 	await insertTransaction(ctx, { ...fields, cleared: 'cleared', approved: true });
 }
 
-async function startingBalanceOf(ctx: MutationCtx, accountId: Id<'accounts'>) {
+export async function startingBalanceOf(ctx: QueryCtx, accountId: Id<'accounts'>) {
 	const payee = await findPayeeNamed(ctx, STARTING_BALANCE);
 	if (payee === null) return null;
 	const named = ctx.db
