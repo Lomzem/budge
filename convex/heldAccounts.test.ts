@@ -17,6 +17,7 @@ const cutoverDate = '2026-08-01';
 const accessToken = 'access-token-synthetic-not-real';
 const checkingId = 'account-synthetic-checking';
 const savingsId = 'account-synthetic-savings';
+const movedCheckingId = 'account-synthetic-checking-new';
 const tokenKey = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
 
 const page = Effect.runSync(decodeSyncPage(syncPage));
@@ -110,6 +111,19 @@ async function connectedBudget() {
 	};
 	const syncWith = (plaid: FakePlaid) =>
 		inAction(plaid, syncConnection(connectionId, { refresh: false }));
+	const connectNewBank = async () => {
+		const newConnection = await inAction(
+			{ setWebhook: () => Effect.void },
+			setupConnection({
+				name: 'Sample New Bank',
+				itemId: 'item-synthetic-2',
+				accessToken,
+				webhook: 'https://budge.example.test/plaid/webhook',
+				accounts: [{ externalId: movedCheckingId, accountId: checking }]
+			})
+		);
+		return (plaid: FakePlaid) => inAction(plaid, syncConnection(newConnection, { refresh: false }));
+	};
 	const suggest = (accountId: Id<'accounts'>, reported = bankAccounts) =>
 		inAction(
 			{
@@ -141,6 +155,7 @@ async function connectedBudget() {
 		connectionId,
 		sync,
 		syncWith,
+		connectNewBank,
 		suggest,
 		held,
 		heldId,
@@ -541,6 +556,51 @@ describe('a suggested starting balance', () => {
 		});
 	});
 
+	const movedReporting = (balance: number): BankAccount[] => [
+		{ externalId: movedCheckingId, name: 'Sample Checking', mask: '0042', balance }
+	];
+
+	test('after the Account is mapped to a newer bank Account, comes from the newer one', async () => {
+		const { owner, sync, heldId, suggest, checking } = await connectedBudget();
+		await sync(page);
+		await sync(rowsFor(movedCheckingId));
+		await owner.mutation(api.heldAccounts.map, {
+			connectionAccountId: await heldId(),
+			accountId: checking
+		});
+
+		expect(await suggest(checking, movedReporting(150_000))).toEqual({
+			kind: 'suggested',
+			startingBalance: 150_000 - 231_042 + 4_250
+		});
+	});
+
+	test('waits for rows still coming in from any bank Account mapped to the Account', async () => {
+		vi.useFakeTimers();
+		const { t, owner, sync, heldId, connectNewBank, suggest, checking } = await connectedBudget();
+		const many = Array.from({ length: HELD_BATCH + 20 }, (_, n) => ({
+			...payroll,
+			account_id: savingsId,
+			transaction_id: `txn-synthetic-many-${String(n)}`,
+			amount: 1 + n
+		}));
+		await sync({ ...page, added: many });
+		await connectNewBank();
+		await owner.mutation(api.heldAccounts.map, {
+			connectionAccountId: await heldId(),
+			accountId: checking
+		});
+
+		expect(await suggest(checking, movedReporting(150_000))).toEqual({ kind: 'importing' });
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+		const imported = many.reduce((sum, row) => sum + row.amount, 0);
+		expect(await suggest(checking, movedReporting(150_000))).toEqual({
+			kind: 'suggested',
+			startingBalance: 150_000 - imported
+		});
+	});
+
 	describe('asked while a sync is unfinished', () => {
 		const imported = 231_042 - 4_250;
 
@@ -597,6 +657,30 @@ describe('a suggested starting balance', () => {
 				kind: 'suggested',
 				startingBalance: 120_000 - imported
 			});
+		});
+
+		test("while a newer Bank Connection's sync for the Account is running, says the rows are still coming in", async () => {
+			const { owner, checking, connectNewBank } = await connectedBudget();
+			const suggestion = () =>
+				owner.action(api.heldAccounts.suggestStartingBalance, { accountId: checking });
+			const syncNewBank = await connectNewBank();
+			const bank = gate();
+			const syncAsked = gate();
+			const running = syncNewBank({
+				transactionsSync: () =>
+					Effect.promise(async () => {
+						syncAsked.open();
+						await bank.opened;
+						return rowsFor(movedCheckingId);
+					})
+			});
+			await syncAsked.opened;
+
+			expect(await suggestion()).toEqual({ kind: 'importing' });
+
+			bank.open();
+			await running;
+			expect(await suggestion()).toMatchObject({ kind: 'suggested' });
 		});
 
 		test("after a sync stopped before the bank's last page, says the rows are still coming in", async () => {

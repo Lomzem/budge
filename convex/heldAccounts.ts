@@ -10,7 +10,8 @@ import {
 	internalQuery,
 	mutation,
 	query,
-	type MutationCtx
+	type MutationCtx,
+	type QueryCtx
 } from './_generated/server';
 import { findConnectionAccount, liveLayer, toPublicError } from './bankConnections';
 import { insertAccount } from './lib/accounts';
@@ -139,15 +140,13 @@ export const syncUnfinished = internalQuery({
 	args: { accountId: v.id('accounts'), now: v.number() },
 	returns: v.boolean(),
 	handler: async (ctx, { accountId, now }) => {
-		const mapped = await ctx.db
-			.query('connectionAccounts')
-			.withIndex('by_accountId', (q) => q.eq('accountId', accountId))
-			.first();
-		if (mapped === null) return false;
-		const connection = await ctx.db.get('bankConnections', mapped.connectionId);
-		if (connection?.provider.kind !== 'plaid') return false;
-		const leased = (connection.syncLeaseUntil ?? 0) > now;
-		return leased || connection.provider.updateStart !== undefined;
+		for await (const mapped of bankAccountsOf(ctx, accountId)) {
+			const connection = await ctx.db.get('bankConnections', mapped.connectionId);
+			if (connection?.provider.kind !== 'plaid') continue;
+			const leased = (connection.syncLeaseUntil ?? 0) > now;
+			if (leased || connection.provider.updateStart !== undefined) return true;
+		}
+		return false;
 	}
 });
 
@@ -214,14 +213,13 @@ export const startingBalanceBasis = internalQuery({
 	args: { accountId: v.id('accounts') },
 	returns: basis,
 	handler: async (ctx, { accountId }) => {
-		const mapped = await ctx.db
-			.query('connectionAccounts')
-			.withIndex('by_accountId', (q) => q.eq('accountId', accountId))
-			.first();
-		if (mapped === null) return { kind: 'notSynced' as const };
-		const connection = await ctx.db.get('bankConnections', mapped.connectionId);
+		const newest = await bankAccountsOf(ctx, accountId).order('desc').first();
+		if (newest === null) return { kind: 'notSynced' as const };
+		const connection = await ctx.db.get('bankConnections', newest.connectionId);
 		if (connection?.provider.kind !== 'plaid') return { kind: 'notSynced' as const };
-		if ((await heldRows(ctx, mapped._id, 1)).length > 0) return { kind: 'importing' as const };
+		for await (const mapped of bankAccountsOf(ctx, accountId)) {
+			if ((await heldRows(ctx, mapped._id, 1)).length > 0) return { kind: 'importing' as const };
+		}
 
 		const cutoverDate = await requireCutoverDate(ctx);
 		let imported = 0;
@@ -239,7 +237,7 @@ export const startingBalanceBasis = internalQuery({
 			kind: 'synced' as const,
 			itemId: connection.provider.itemId,
 			encryptedToken: connection.provider.encryptedToken,
-			externalId: mapped.externalId,
+			externalId: newest.externalId,
 			imported
 		};
 	}
@@ -265,6 +263,12 @@ async function mapTo(ctx: MutationCtx, held: Doc<'connectionAccounts'>, accountI
 		accountId
 	});
 	await settleHeld(ctx, held._id);
+}
+
+function bankAccountsOf(ctx: QueryCtx, accountId: Id<'accounts'>) {
+	return ctx.db
+		.query('connectionAccounts')
+		.withIndex('by_accountId', (q) => q.eq('accountId', accountId));
 }
 
 async function heldRows(
