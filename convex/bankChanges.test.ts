@@ -218,6 +218,26 @@ async function backWithStatementRow(
 	);
 }
 
+async function grocerUnderReissuedAccountId(
+	budget: Budget,
+	reissue: number,
+	bankText = grocer.name
+) {
+	const account = `account-synthetic-reissued-${String(reissue)}`;
+	const transactionId = `txn-synthetic-grocer-reissued-${String(reissue)}`;
+	const row = { ...grocer, name: bankText, transaction_id: transactionId, account_id: account };
+	expect(await budget.sync(changes({ added: [row] }, account), account)).toMatchObject({
+		held: 1
+	});
+	const [held] = await budget.owner.query(api.heldAccounts.list, {});
+	assert(held !== undefined, 'No held Account');
+	await budget.owner.mutation(api.heldAccounts.map, {
+		connectionAccountId: held._id,
+		accountId: budget.checking
+	});
+	return { account, transactionId, row };
+}
+
 async function grocerAsTransfer(budget: Budget) {
 	const savings = await budget.owner.mutation(api.accounts.create, {
 		name: 'Savings',
@@ -645,29 +665,17 @@ describe('resolving a bank removal', () => {
 
 	test("the bank's version is refused while a bank row behind many removed ones still backs the Transaction", async () => {
 		const { budget, importId } = await flaggedRemoval();
-		const underReissuedAccountId = async (reissue: number) => {
-			const account = `account-synthetic-reissued-${String(reissue)}`;
-			const transactionId = `txn-synthetic-grocer-reissued-${String(reissue)}`;
-			const row = { ...grocer, transaction_id: transactionId, account_id: account };
-			expect(await budget.sync(changes({ added: [row] }, account), account)).toMatchObject({
-				held: 1
-			});
-			const [held] = await budget.owner.query(api.heldAccounts.list, {});
-			assert(held !== undefined, 'No held Account');
-			await budget.owner.mutation(api.heldAccounts.map, {
-				connectionAccountId: held._id,
-				accountId: budget.checking
-			});
-			return { account, transactionId };
-		};
 		for (let reissue = 1; reissue <= 10; reissue++) {
-			const { account, transactionId } = await underReissuedAccountId(reissue);
+			const { account, transactionId } = await grocerUnderReissuedAccountId(budget, reissue);
 			await budget.sync(changes({ removed: [transactionId] }, account), account);
 		}
-		await underReissuedAccountId(11);
+		await grocerUnderReissuedAccountId(budget, 11);
 		expect(await budget.rows()).toHaveLength(2);
 		const shownBankRows = (await budget.row('SAMPLE GROCER 0193')).bankRows;
-		expect(shownBankRows.map((row) => row.state)).toEqual(Array<string>(10).fill('removed'));
+		expect(shownBankRows.map((row) => row.state)).toEqual([
+			...Array<string>(11).fill('removed'),
+			'linked'
+		]);
 
 		await expectRefused(budget, { importId, keep: 'bank' }, /still/);
 	});
@@ -803,5 +811,54 @@ describe('Unmatching a flagged Bank Row', () => {
 				budget.owner.mutation(api.imports.unmatch, { importId: await importId() })
 			)
 		).toMatch(/removed/);
+	});
+});
+
+describe('a Transaction backed by more than ten Bank Rows', () => {
+	test('shows every flagged Bank Row, and says when linked ones are left out', async () => {
+		const budget = await syncedBudget();
+		await ownerVersions.approved(budget);
+		let last;
+		for (let reissue = 1; reissue <= 11; reissue++) {
+			last = await grocerUnderReissuedAccountId(budget, reissue);
+		}
+		assert(last !== undefined, 'No reissued Account');
+		await budget.sync(
+			changes({ modified: [{ ...last.row, amount: 45.5 }] }, last.account),
+			last.account
+		);
+
+		const grocerRow = await budget.row('SAMPLE GROCER 0193');
+		expect(grocerRow.bankRows.filter((row) => row.state === 'changed')).toMatchObject([
+			{ amount: -4_550 }
+		]);
+		expect(grocerRow.bankRows.filter((row) => row.state === 'linked')).toHaveLength(10);
+		expect(grocerRow.moreBankRows).toBe(true);
+	});
+
+	test('says nothing is left out when every Bank Row is shown', async () => {
+		const budget = await syncedBudget();
+		await ownerVersions.approved(budget);
+		for (let reissue = 1; reissue <= 9; reissue++) {
+			await grocerUnderReissuedAccountId(budget, reissue);
+		}
+
+		const grocerRow = await budget.row('SAMPLE GROCER 0193');
+		expect(grocerRow.bankRows).toHaveLength(10);
+		expect(grocerRow.moreBankRows).toBe(false);
+	});
+
+	test("search finds the eleventh Bank Row's Bank Text", async () => {
+		const budget = await syncedBudget();
+		for (let reissue = 1; reissue <= 10; reissue++) {
+			await grocerUnderReissuedAccountId(
+				budget,
+				reissue,
+				reissue === 10 ? 'SAMPLE CORNER MARKET 44' : grocer.name
+			);
+		}
+		const grocerRow = await budget.row('SAMPLE GROCER 0193');
+
+		expect(await budget.search('corner market')).toEqual([grocerRow._id]);
 	});
 });

@@ -746,6 +746,11 @@
 							</li>
 						{/each}
 					</ul>
+					{#if transaction.moreBankRows}
+						<p class="text-sm text-muted-foreground">
+							More Bank Rows are linked than shown here. Search still finds their Bank Text.
+						</p>
+					{/if}
 				</section>
 			{/if}
 			{#if error}

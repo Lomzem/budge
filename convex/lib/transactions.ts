@@ -398,7 +398,7 @@ export async function refreshSearchText(ctx: MutationCtx, transactionId: Id<'tra
 		await payeeNameOf(ctx, transaction),
 		transaction.memo,
 		...lines.map((line) => line.memo),
-		...(await bankRowsShown(ctx, transactionId)).map((bankRow) => bankRow.bankText)
+		...(await bankTextsOf(ctx, transactionId))
 	]
 		.filter((part) => part !== undefined && part !== null && part !== '')
 		.join(' ');
@@ -466,13 +466,41 @@ async function deleteOne(ctx: MutationCtx, existing: Doc<'transactions'>) {
 export function allBankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
 	return ctx.db
 		.query('imports')
-		.withIndex('by_transactionId', (q) => q.eq('transactionId', transactionId));
+		.withIndex('by_transactionId_state', (q) => q.eq('transactionId', transactionId));
+}
+
+function bankRowsIn(
+	ctx: QueryCtx,
+	transactionId: Id<'transactions'>,
+	state: Doc<'imports'>['state']
+) {
+	return ctx.db
+		.query('imports')
+		.withIndex('by_transactionId_state', (q) =>
+			q.eq('transactionId', transactionId).eq('state', state)
+		);
 }
 
 export async function hasBankRow(ctx: QueryCtx, transactionId: Id<'transactions'>) {
 	return (await allBankRowsOf(ctx, transactionId).first()) !== null;
 }
 
+async function bankTextsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	const bankTexts: string[] = [];
+	for await (const bankRow of allBankRowsOf(ctx, transactionId)) bankTexts.push(bankRow.bankText);
+	return bankTexts;
+}
+
+const LINKED_BANK_ROWS_SHOWN = 10;
+
 export async function bankRowsShown(ctx: QueryCtx, transactionId: Id<'transactions'>) {
-	return await allBankRowsOf(ctx, transactionId).take(10);
+	const flagged: Doc<'imports'>[] = [];
+	for (const state of ['changed', 'removed'] as const) {
+		for await (const bankRow of bankRowsIn(ctx, transactionId, state)) flagged.push(bankRow);
+	}
+	const linked = await bankRowsIn(ctx, transactionId, 'linked').take(LINKED_BANK_ROWS_SHOWN + 1);
+	return {
+		bankRows: [...flagged, ...linked.slice(0, LINKED_BANK_ROWS_SHOWN)],
+		moreBankRows: linked.length > LINKED_BANK_ROWS_SHOWN
+	};
 }

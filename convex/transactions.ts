@@ -49,6 +49,7 @@ const transactionRow = v.object({
 			amount: v.number()
 		})
 	),
+	moreBankRows: v.boolean(),
 	transfer: v.union(v.object({ accountId: v.id('accounts'), accountName: v.string() }), v.null()),
 
 	splits: v.union(
@@ -419,6 +420,7 @@ async function requireTransaction(ctx: MutationCtx, transactionId: Id<'transacti
 }
 
 async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
+	const { bankRows, moreBankRows } = await bankRowsShown(ctx, transaction._id);
 	const account = await ctx.db.get('accounts', transaction.accountId);
 	const category =
 		transaction.categoryId === undefined
@@ -438,7 +440,7 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		cleared: transaction.cleared !== 'uncleared',
 		reconciled: transaction.cleared === 'reconciled',
 		approved: transaction.approved !== false,
-		bankRows: (await bankRowsShown(ctx, transaction._id)).map((bankRow) => ({
+		bankRows: bankRows.map((bankRow) => ({
 			_id: bankRow._id,
 			bankText: bankRow.bankText,
 			matched: bankRow.matched,
@@ -446,6 +448,7 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 			date: bankRow.date,
 			amount: bankRow.amount
 		})),
+		moreBankRows,
 		transfer: await transferOf(ctx, transaction),
 		splits: await splitsOf(ctx, transaction)
 	};
