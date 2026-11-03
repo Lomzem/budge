@@ -301,14 +301,27 @@ describe('a bank Account Budge does not know', () => {
 	});
 
 	test('among many other bank Accounts, is still listed and still gets a suggestion', async () => {
-		const { owner, t, connectionId, sync, heldId, suggest } = await connectedBudget();
+		const { owner, t, sync, heldId, suggest } = await connectedBudget();
+		const otherConnections = 21;
+		const accountsEach = 48;
 		await t.run(async (ctx) => {
-			for (let n = 0; n < 1_001; n++) {
-				await ctx.db.insert('connectionAccounts', {
-					connectionId,
-					externalId: `account-synthetic-a-${String(n).padStart(4, '0')}`,
-					state: 'ignored'
+			for (let bank = 0; bank < otherConnections; bank++) {
+				const otherConnection = await ctx.db.insert('bankConnections', {
+					name: `Other Sample Bank ${String(bank)}`,
+					status: 'ok',
+					provider: {
+						kind: 'plaid',
+						itemId: `item-synthetic-other-${String(bank)}`,
+						encryptedToken: `token-synthetic-other-${String(bank)}`
+					}
 				});
+				for (let n = 0; n < accountsEach; n++) {
+					await ctx.db.insert('connectionAccounts', {
+						connectionId: otherConnection,
+						externalId: `account-synthetic-other-${String(bank)}-${String(n)}`,
+						state: 'ignored'
+					});
+				}
 			}
 		});
 		await sync(rowsFor(savingsId));
