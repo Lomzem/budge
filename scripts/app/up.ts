@@ -14,14 +14,7 @@ import { inheritedEnvWithoutDeploymentSettings } from '../local/env-file';
 import { spawnLogged } from '../local/logged';
 import { exitCode, freePort, reachable, waitFor } from '../local/processes';
 import { redact } from '../local/redaction';
-import {
-	liveApp,
-	readRunningApp,
-	startOwned,
-	stopOnInterrupt,
-	stopRecordedApp,
-	type AppUrls
-} from './owned';
+import { startOwned, withAppStartup, type AppUrls } from './owned';
 import { stateDir } from './state';
 import type { Verb } from './verb';
 
@@ -136,24 +129,16 @@ export const up: Verb = {
 	run: async () => {
 		const { checkout, mainCheckout } = findCheckout();
 		requireInstalled(checkout);
-		const live = liveApp(checkout);
-		if (live !== undefined) {
-			console.log(`app: already up at ${live.appUrl} (backend ${live.backendUrl}).`);
-			return;
-		}
-		if (readRunningApp(checkout) !== undefined) await stopRecordedApp(checkout);
-		const start = await planStart(checkout, mainCheckout);
-		const uninstall = stopOnInterrupt(checkout);
-		try {
-			await startApp(start);
-		} catch (error) {
-			await stopRecordedApp(checkout);
-			for (const tail of logTails(start)) console.error(tail);
-			throw error;
-		} finally {
-			uninstall();
-		}
-		console.log(`app: up at ${start.urls.appUrl} (backend ${start.urls.backendUrl}).`);
-		console.log('app: next, `bun run app login` and `bun run app seed <fixture>`.');
+		await withAppStartup(checkout, async () => {
+			const start = await planStart(checkout, mainCheckout);
+			try {
+				await startApp(start);
+			} catch (error) {
+				for (const tail of logTails(start)) console.error(tail);
+				throw error;
+			}
+			console.log('app: next, `bun run app login` and `bun run app seed <fixture>`.');
+			return start.urls;
+		});
 	}
 };

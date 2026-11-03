@@ -1,9 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { execFileSync, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { processGroupAlive, sleep, stopProcessGroup } from '../local/processes';
 import { redact } from '../local/redaction';
+import { withLifecycleLock } from './lock';
 import { stateDir } from './state';
 
 export type Role = 'backend' | 'vite';
@@ -110,8 +112,13 @@ export function readRunningApp(checkout: string): RunningApp | undefined {
 function writeRunningApp(checkout: string, app: RunningApp) {
 	const path = runningAppPath(checkout);
 	stateDir(checkout);
-	writeFileSync(`${path}.tmp`, `${JSON.stringify(app, null, '\t')}\n`, { mode: 0o600 });
-	renameSync(`${path}.tmp`, path);
+	const temporary = `${path}.${randomUUID()}.tmp`;
+	try {
+		writeFileSync(temporary, `${JSON.stringify(app, null, '\t')}\n`, { mode: 0o600, flag: 'wx' });
+		renameSync(temporary, path);
+	} finally {
+		rmSync(temporary, { force: true });
+	}
 }
 
 export function liveApp(checkout: string): RunningApp | undefined {
@@ -220,4 +227,25 @@ export function stopOnInterrupt(checkout: string) {
 		for (const [signal, handler] of handlers) process.off(signal, handler);
 		launched.clear();
 	};
+}
+
+export async function withAppStartup(checkout: string, start: () => Promise<AppUrls>) {
+	await withLifecycleLock(checkout, async () => {
+		const live = liveApp(checkout);
+		if (live !== undefined) {
+			console.log(`app: already up at ${live.appUrl} (backend ${live.backendUrl}).`);
+			return;
+		}
+		if (readRunningApp(checkout) !== undefined) await stopRecordedApp(checkout);
+		const uninstall = stopOnInterrupt(checkout);
+		try {
+			const urls = await start();
+			console.log(`app: up at ${urls.appUrl} (backend ${urls.backendUrl}).`);
+		} catch (error) {
+			await stopRecordedApp(checkout);
+			throw error;
+		} finally {
+			uninstall();
+		}
+	});
 }
