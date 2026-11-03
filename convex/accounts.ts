@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 
 import { mutation, query } from './_generated/server';
-import { insertAccount, saveStartingBalance } from './lib/accounts';
+import { insertAccount, saveStartingBalance, startingBalanceOf } from './lib/accounts';
 import { requireName } from './lib/input';
 import { readPaymentCategory } from './lib/categories';
 import { accountBalances } from './lib/monthlyTotals';
@@ -54,6 +54,15 @@ export const setStartingBalance = mutation({
 		await requireOwner(ctx);
 		await saveStartingBalance(ctx, accountId, startingBalance);
 		return null;
+	}
+});
+
+export const startingBalance = query({
+	args: { accountId: v.id('accounts') },
+	returns: v.union(v.number(), v.null()),
+	handler: async (ctx, { accountId }) => {
+		await requireOwner(ctx);
+		return (await startingBalanceOf(ctx, accountId))?.amount ?? null;
 	}
 });
 

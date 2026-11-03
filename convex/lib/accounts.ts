@@ -1,5 +1,5 @@
 import type { Id } from '../_generated/dataModel';
-import type { MutationCtx } from '../_generated/server';
+import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { createPaymentCategory, ensureReadyToAssign, readPaymentCategory } from './categories';
 import { requireCents, requireName } from './input';
 import { publicError } from './publicError';
@@ -34,12 +34,7 @@ export async function saveStartingBalance(
 	if (account === null) throw publicError('NOT_FOUND');
 	const amount = requireCents(startingBalance);
 	const cutoverDate = await requireCutoverDate(ctx);
-	const existing = await ctx.db
-		.query('transactions')
-		.withIndex('by_accountId_and_kind', (q) =>
-			q.eq('accountId', accountId).eq('kind', 'startingBalance')
-		)
-		.unique();
+	const existing = await startingBalanceOf(ctx, accountId);
 	if (existing !== null) {
 		requireUnlocked(existing, 'to change the starting balance');
 		await replaceTransaction(
@@ -76,4 +71,13 @@ export async function saveStartingBalance(
 		cleared: 'cleared',
 		approved: true
 	});
+}
+
+export function startingBalanceOf(ctx: QueryCtx, accountId: Id<'accounts'>) {
+	return ctx.db
+		.query('transactions')
+		.withIndex('by_accountId_and_kind', (q) =>
+			q.eq('accountId', accountId).eq('kind', 'startingBalance')
+		)
+		.unique();
 }

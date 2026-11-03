@@ -16,6 +16,7 @@
 	import { formatDate, isIsoDate, localIsoDate } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
 	import { SPLIT_LINE_LIMIT } from '$lib/domain/splits';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
 
@@ -178,7 +179,7 @@
 		linkChoice = value;
 	};
 
-	let session = 0;
+	const opening = new DialogSession<object>();
 
 	$effect(() => {
 		if (open) untrack(fill);
@@ -218,7 +219,7 @@
 	}
 
 	function fill() {
-		session += 1;
+		opening.open({});
 		error = '';
 		unlocked = false;
 		linkChoice = undefined;
@@ -322,11 +323,11 @@
 			open = false;
 		}
 	) {
-		const started = session;
+		const started = opening.current;
 		saving = true;
 		const result = await attempt(work);
 		saving = false;
-		if (started !== session) return;
+		if (started !== opening.current) return;
 		confirmDelete = false;
 		confirmBankRemoval = null;
 		if (result.ok) succeeded();

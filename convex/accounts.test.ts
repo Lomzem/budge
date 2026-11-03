@@ -189,6 +189,20 @@ describe("changing an Account's starting balance", () => {
 		};
 	}
 
+	test('reads back as it now stands, and as none once deleted', async () => {
+		const { owner, accountId, startingBalance } = await checkingWithStartingBalance();
+		const current = () => owner.query(api.accounts.startingBalance, { accountId });
+
+		expect(await current()).toBe(250_000);
+
+		await owner.mutation(api.accounts.setStartingBalance, { accountId, startingBalance: 180_000 });
+		expect(await current()).toBe(180_000);
+
+		const existing = await startingBalance();
+		await owner.mutation(api.transactions.remove, { transactionId: existing._id });
+		expect(await current()).toBeNull();
+	});
+
 	test('takes edits to its amount, date, Category, memo, cleared and approved, and stays the starting balance', async () => {
 		const { owner, accountId, groceries, startingBalance, balance } =
 			await checkingWithStartingBalance();
