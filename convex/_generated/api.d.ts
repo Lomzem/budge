@@ -47,6 +47,7 @@ import type * as owner from "../owner.js";
 import type * as payees from "../payees.js";
 import type * as reconciliation from "../reconciliation.js";
 import type * as seed from "../seed.js";
+import type * as seedBankSync from "../seedBankSync.js";
 import type * as settings from "../settings.js";
 import type * as transactions from "../transactions.js";
 
@@ -93,6 +94,7 @@ declare const fullApi: ApiFromModules<{
   payees: typeof payees;
   reconciliation: typeof reconciliation;
   seed: typeof seed;
+  seedBankSync: typeof seedBankSync;
   settings: typeof settings;
   transactions: typeof transactions;
 }>;

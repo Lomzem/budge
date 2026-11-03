@@ -48,7 +48,7 @@ export async function runConvex(
 	try {
 		const child = spawn(
 			process.execPath,
-			['--no-env-file', convexCli, ...args, '--env-file', envFile],
+			[...noAutomaticEnvFile(), convexCli, ...args, '--env-file', envFile],
 			{
 				cwd: dir,
 				env: inheritedEnvWithoutDeploymentSettings(),
@@ -62,6 +62,10 @@ export async function runConvex(
 	} finally {
 		rmSync(binding, { recursive: true, force: true });
 	}
+}
+
+function noAutomaticEnvFile() {
+	return process.versions.bun === undefined ? [] : ['--no-env-file'];
 }
 
 function backendStillRunning(dir: string) {
