@@ -53,8 +53,11 @@ function sampleArgs(ids: {
 		'imports:commit': { accountId, source: 'csv', rows: [] },
 		'imports:unmatch': { importId },
 		'imports:resolveBankChange': { importId, keep: 'mine' },
-		'bankConnections:list': {},
+		'bankConnections:list': { now: 0 },
+
 		'bankConnections:syncNow': { connectionId },
+		'bankConnections:reconnect': { connectionId },
+		'bankConnections:syncAfterReconnect': { connectionId },
 		'payees:lastCategory': { name: 'Corner Grocer' },
 		'payees:list': {},
 		'payees:rename': { payeeId, name: 'Corner Market' },

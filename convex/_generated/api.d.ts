@@ -35,6 +35,7 @@ import type * as lib_runEffect from "../lib/runEffect.js";
 import type * as lib_search from "../lib/search.js";
 import type * as lib_settings from "../lib/settings.js";
 import type * as lib_sync from "../lib/sync.js";
+import type * as lib_syncFailure from "../lib/syncFailure.js";
 import type * as lib_targets from "../lib/targets.js";
 import type * as lib_tokenCipher from "../lib/tokenCipher.js";
 import type * as lib_transactions from "../lib/transactions.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   "lib/search": typeof lib_search;
   "lib/settings": typeof lib_settings;
   "lib/sync": typeof lib_sync;
+  "lib/syncFailure": typeof lib_syncFailure;
   "lib/targets": typeof lib_targets;
   "lib/tokenCipher": typeof lib_tokenCipher;
   "lib/transactions": typeof lib_transactions;

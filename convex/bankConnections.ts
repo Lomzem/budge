@@ -1,6 +1,7 @@
 import { v, type Infer } from 'convex/values';
 import { Effect, Layer, Option } from 'effect';
 
+import { isSyncOverdue, renewalDue } from '../src/lib/domain/freshness';
 import type { PublicError } from '../src/lib/domain/publicError';
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
@@ -40,6 +41,8 @@ import {
 	leaseResult,
 	LEASE_MS,
 	MAX_SYNC_ROWS,
+	reconnectLinkToken,
+	RETRY_DELAYS_MS,
 	saveArgs,
 	setupConnection,
 	SyncStore,
@@ -48,22 +51,25 @@ import {
 	type syncRow,
 	type SyncError
 } from './lib/sync';
+import { failureOf, failureOfPlaidCode } from './lib/syncFailure';
 import { TokenCipher } from './lib/tokenCipher';
 
 const MAX_CONNECTIONS = 20;
 
 export const list = query({
-	args: {},
+	args: { now: v.number() },
 	returns: v.array(
 		v.object({
 			_id: v.id('bankConnections'),
 			name: v.string(),
 			status: v.union(v.literal('ok'), v.literal('needsAttention')),
 			lastSyncedAt: v.union(v.number(), v.null()),
+			overdue: v.boolean(),
+			consentEndsAt: v.union(v.number(), v.null()),
 			lastError: v.union(v.object({ at: v.number(), message: v.string() }), v.null())
 		})
 	),
-	handler: async (ctx) => {
+	handler: async (ctx, { now }) => {
 		await requireOwner(ctx);
 		const connections = await ctx.db.query('bankConnections').take(MAX_CONNECTIONS);
 		return connections.map((connection) => ({
@@ -71,27 +77,25 @@ export const list = query({
 			name: connection.name,
 			status: connection.status,
 			lastSyncedAt: connection.lastSyncedAt ?? null,
+			overdue: isSyncOverdue(connection.lastSyncedAt ?? null, now),
+			consentEndsAt: renewalDue(connection.consentExpiresAt ?? null, now),
 			lastError: connection.lastError ?? null
 		}));
 	}
 });
 
+const ownerSyncResult = v.union(
+	v.object({ kind: v.literal('synced'), added: v.number(), matched: v.number() }),
+	v.object({ kind: v.literal('busy') }),
+	v.object({ kind: v.literal('noToken') })
+);
+
 export const syncNow = action({
 	args: { connectionId: v.id('bankConnections') },
-	returns: v.union(
-		v.object({ kind: v.literal('synced'), added: v.number(), matched: v.number() }),
-		v.object({ kind: v.literal('busy') }),
-		v.object({ kind: v.literal('noToken') })
-	),
+	returns: ownerSyncResult,
 	handler: async (ctx, { connectionId }) => {
 		await requireOwner(ctx);
-		const outcome = await runEffect(
-			syncConnection(connectionId, { refresh: true }).pipe(Effect.provide(liveLayer(ctx))),
-			toPublicError
-		);
-		if (outcome.kind === 'missing') throw publicError('NOT_FOUND');
-		if (outcome.kind !== 'synced') return outcome;
-		return { kind: 'synced' as const, added: outcome.added, matched: outcome.matched };
+		return await ownerSync(ctx, connectionId, { refresh: true });
 	}
 });
 
@@ -171,6 +175,12 @@ export const webhook = httpAction(async (ctx, request) => {
 	if (!verified) return new Response(null, { status: 401 });
 	if (webhook.type === 'TRANSACTIONS' && webhook.code === 'SYNC_UPDATES_AVAILABLE') {
 		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
+	}
+	if (webhook.type === 'ITEM') {
+		await ctx.runMutation(internal.bankConnections.flagItem, {
+			itemId: webhook.itemId,
+			code: webhook.errorCode ?? webhook.code
+		});
 	}
 	return new Response(null, { status: 200 });
 });
@@ -260,6 +270,47 @@ export const saveWebhookKey = internalMutation({
 	}
 });
 
+export const reconnect = action({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.object({ linkToken: v.string() }),
+	handler: async (ctx, { connectionId }) => {
+		await requireOwner(ctx);
+		const result = await runEffect(
+			reconnectLinkToken(connectionId).pipe(Effect.provide(liveLayer(ctx))),
+			toPublicError
+		);
+		if (result.kind === 'missing') throw publicError('NOT_FOUND');
+		if (result.kind === 'noToken') {
+			throw publicError('INVALID_INPUT', 'This Bank Connection has no bank login to reconnect.');
+		}
+		return { linkToken: result.linkToken };
+	}
+});
+
+export const syncAfterReconnect = action({
+	args: { connectionId: v.id('bankConnections') },
+	returns: ownerSyncResult,
+	handler: async (ctx, { connectionId }) => {
+		await requireOwner(ctx);
+		return await ownerSync(ctx, connectionId, { refresh: false });
+	}
+});
+
+async function ownerSync(
+	ctx: ActionCtx,
+	connectionId: Id<'bankConnections'>,
+	{ refresh }: { refresh: boolean }
+): Promise<Infer<typeof ownerSyncResult>> {
+	const outcome = await runEffect(
+		syncConnection(connectionId, { refresh, resume: true }).pipe(Effect.provide(liveLayer(ctx))),
+		toPublicError
+	);
+	if (outcome.kind === 'missing') throw publicError('NOT_FOUND');
+	if (outcome.kind === 'paused') throw publicError('BANK_CONNECTION_NEEDS_LOGIN');
+	if (outcome.kind !== 'synced') return outcome;
+	return { kind: 'synced', added: outcome.added, matched: outcome.matched };
+}
+
 export const setup = internalAction({
 	args: {
 		name: v.string(),
@@ -290,21 +341,84 @@ function livePlaid() {
 	});
 }
 
+export const retrySync = internalAction({
+	args: { connectionId: v.id('bankConnections'), attempt: v.number() },
+	returns: v.null(),
+	handler: async (ctx, { connectionId, attempt }) => {
+		await Effect.runPromise(
+			syncConnection(connectionId, { refresh: false, attempt }).pipe(
+				Effect.ignore,
+				Effect.provide(liveLayer(ctx))
+			)
+		);
+		return null;
+	}
+});
+
 function liveLayer(ctx: ActionCtx) {
 	return Layer.mergeAll(livePlaid(), TokenCipher.layer(env.BUDGE_TOKEN_KEY), SyncStore.layer(ctx));
 }
 
 function toPublicError(error: SyncError): PublicError {
-	if (error._tag === 'PlaidApi' && error.error_code === 'ITEM_LOGIN_REQUIRED') {
-		return { code: 'BANK_CONNECTION_NEEDS_LOGIN', message: 'The bank needs you to sign in again.' };
+	if (failureOf(error).status === 'needsAttention') {
+		return { code: 'BANK_CONNECTION_NEEDS_LOGIN', message: 'The bank needs you to reconnect.' };
 	}
-	return { code: 'BANK_UNAVAILABLE', message: "Couldn't sync with the bank; try again later." };
+	return { code: 'BANK_UNAVAILABLE', message: "Couldn't reach the bank; try again later." };
 }
 
-export const takeLease = internalMutation({
+export const flagItem = internalMutation({
+	args: { itemId: v.string(), code: v.string() },
+	returns: v.null(),
+	handler: async (ctx, { itemId, code }) => {
+		const failure = failureOfPlaidCode(code);
+		if (failure.status !== 'needsAttention') return null;
+		const connection = await ctx.db
+			.query('bankConnections')
+			.withIndex('by_itemId', (q) => q.eq('provider.itemId', itemId))
+			.first();
+		if (connection === null) return null;
+		await ctx.db.patch('bankConnections', connection._id, {
+			status: 'needsAttention',
+			lastError: { at: Date.now(), message: failure.message }
+		});
+		return null;
+	}
+});
+
+export const credentials = internalQuery({
 	args: { connectionId: v.id('bankConnections') },
-	returns: leaseResult,
+	returns: v.union(
+		v.literal('missing'),
+		v.literal('noToken'),
+		v.object({ itemId: v.string(), encryptedToken: v.string() })
+	),
 	handler: async (ctx, { connectionId }) => {
+		const connection = await ctx.db.get('bankConnections', connectionId);
+		if (connection === null) return 'missing' as const;
+		const { provider } = connection;
+		if (provider.kind !== 'plaid') return 'noToken' as const;
+		return { itemId: provider.itemId, encryptedToken: provider.encryptedToken };
+	}
+});
+
+export const recordConsent = internalMutation({
+	args: {
+		connectionId: v.id('bankConnections'),
+		consentExpiresAt: v.union(v.number(), v.null())
+	},
+	returns: v.null(),
+	handler: async (ctx, { connectionId, consentExpiresAt }) => {
+		await ctx.db.patch('bankConnections', connectionId, {
+			consentExpiresAt: consentExpiresAt ?? undefined
+		});
+		return null;
+	}
+});
+
+export const takeLease = internalMutation({
+	args: { connectionId: v.id('bankConnections'), resume: v.boolean() },
+	returns: leaseResult,
+	handler: async (ctx, { connectionId, resume }) => {
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (connection === null) return { kind: 'missing' as const };
 		const now = Date.now();
@@ -314,6 +428,7 @@ export const takeLease = internalMutation({
 		}
 		const { provider } = connection;
 		if (provider.kind !== 'plaid') return { kind: 'noToken' as const };
+		if (connection.status === 'needsAttention' && !resume) return { kind: 'paused' as const };
 		const cutoverDate = await requireCutoverDate(ctx);
 		const lease = now + LEASE_MS;
 		await ctx.db.patch('bankConnections', connectionId, {
@@ -469,13 +584,22 @@ export const renewLease = internalMutation({
 export const fail = internalMutation({
 	args: failArgs,
 	returns: v.null(),
-	handler: async (ctx, { connectionId, lease, message, needsLogin }) => {
+	handler: async (ctx, { connectionId, lease, attempt, message, status }) => {
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (connection?.syncLeaseUntil !== lease) return null;
+		const delay = status === 'shortLived' ? RETRY_DELAYS_MS[attempt] : undefined;
+		if (delay !== undefined) {
+			await ctx.scheduler.runAfter(delay, internal.bankConnections.retrySync, {
+				connectionId,
+				attempt: attempt + 1
+			});
+			await ctx.db.patch('bankConnections', connectionId, { syncLeaseUntil: undefined });
+			return null;
+		}
 		await ctx.db.patch('bankConnections', connectionId, {
 			syncLeaseUntil: undefined,
 			lastError: { at: Date.now(), message },
-			...(needsLogin ? { status: 'needsAttention' as const } : {})
+			...(status === 'needsAttention' ? { status } : {})
 		});
 		await syncAgainIfRequested(ctx, connection);
 		return null;

@@ -11,6 +11,7 @@ import {
 import { internal } from '../_generated/api';
 import type { DataModel, Id } from '../_generated/dataModel';
 import { PlaidClient, type PlaidError } from './plaidClient';
+import { failureOf, type SyncFailure } from './syncFailure';
 import { TokenCipher, TokenCipherError } from './tokenCipher';
 
 export const LEASE_MS = 2 * 60_000;
@@ -20,7 +21,7 @@ export const PAGES_PER_BATCH = 3;
 export const MAX_SYNC_ROWS = PAGE_SIZE * PAGES_PER_BATCH;
 
 export const MAX_BATCHES = 4;
-
+export const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 25 * 60_000] as const;
 const MUTATION_DURING_PAGINATION = 'TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION';
 const PAGINATION_RESTARTS = 2;
 
@@ -39,6 +40,7 @@ export const leaseResult = v.union(
 	v.object({ kind: v.literal('missing') }),
 	v.object({ kind: v.literal('busy') }),
 	v.object({ kind: v.literal('noToken') }),
+	v.object({ kind: v.literal('paused') }),
 	v.object({
 		kind: v.literal('taken'),
 		lease: v.number(),
@@ -81,8 +83,9 @@ export type ApplyResult = Infer<typeof applyResult>;
 export const failArgs = {
 	connectionId: v.id('bankConnections'),
 	lease: v.number(),
+	attempt: v.number(),
 	message: v.string(),
-	needsLogin: v.boolean()
+	status: v.union(v.literal('needsAttention'), v.literal('shortLived'), v.literal('failed'))
 };
 
 export const saveArgs = {
@@ -93,7 +96,10 @@ export const saveArgs = {
 };
 
 interface SyncStoreShape {
-	readonly takeLease: (connectionId: Id<'bankConnections'>) => Effect.Effect<LeaseResult>;
+	readonly takeLease: (args: {
+		connectionId: Id<'bankConnections'>;
+		resume: boolean;
+	}) => Effect.Effect<LeaseResult>;
 	readonly apply: (args: {
 		connectionId: Id<'bankConnections'>;
 		lease: number;
@@ -110,11 +116,19 @@ interface SyncStoreShape {
 		connectionId: Id<'bankConnections'>;
 		lease: number;
 	}) => Effect.Effect<number | null>;
-	readonly fail: (args: {
+	readonly fail: (
+		args: {
+			connectionId: Id<'bankConnections'>;
+			lease: number;
+			attempt: number;
+		} & SyncFailure
+	) => Effect.Effect<void>;
+	readonly credentials: (
+		connectionId: Id<'bankConnections'>
+	) => Effect.Effect<{ itemId: string; encryptedToken: string } | 'missing' | 'noToken'>;
+	readonly recordConsent: (args: {
 		connectionId: Id<'bankConnections'>;
-		lease: number;
-		message: string;
-		needsLogin: boolean;
+		consentExpiresAt: number | null;
 	}) => Effect.Effect<void>;
 	readonly save: (args: {
 		name: string;
@@ -124,17 +138,21 @@ interface SyncStoreShape {
 	}) => Effect.Effect<Id<'bankConnections'>>;
 }
 
-export type MutationRunner = Pick<GenericActionCtx<DataModel>, 'runMutation'>;
+export type MutationRunner = Pick<GenericActionCtx<DataModel>, 'runMutation' | 'runQuery'>;
 
 export class SyncStore extends Context.Service<SyncStore, SyncStoreShape>()('budge/SyncStore') {
-	static layer({ runMutation }: MutationRunner): Layer.Layer<SyncStore> {
+	static layer({ runMutation, runQuery }: MutationRunner): Layer.Layer<SyncStore> {
 		return Layer.succeed(SyncStore, {
-			takeLease: (connectionId) =>
-				Effect.promise(() => runMutation(internal.bankConnections.takeLease, { connectionId })),
+			takeLease: (args) =>
+				Effect.promise(() => runMutation(internal.bankConnections.takeLease, args)),
 			apply: (args) => Effect.promise(() => runMutation(internal.bankConnections.apply, args)),
 			renewLease: (args) =>
 				Effect.promise(() => runMutation(internal.bankConnections.renewLease, args)),
 			fail: (args) => Effect.promise(() => runMutation(internal.bankConnections.fail, args)),
+			credentials: (connectionId) =>
+				Effect.promise(() => runQuery(internal.bankConnections.credentials, { connectionId })),
+			recordConsent: (args) =>
+				Effect.promise(() => runMutation(internal.bankConnections.recordConsent, args)),
 			save: (args) => Effect.promise(() => runMutation(internal.bankConnections.save, args))
 		});
 	}
@@ -144,18 +162,19 @@ export type SyncOutcome =
 	| { kind: 'synced'; added: number; matched: number; held: number }
 	| { kind: 'busy' }
 	| { kind: 'noToken' }
+	| { kind: 'paused' }
 	| { kind: 'missing' };
 
 export type SyncError = PlaidError | TokenCipherError;
 
 export const syncConnection = Effect.fnUntraced(function* (
 	connectionId: Id<'bankConnections'>,
-	{ refresh }: { refresh: boolean }
+	{ refresh, resume = false, attempt = 0 }: { refresh: boolean; resume?: boolean; attempt?: number }
 ): Effect.fn.Return<SyncOutcome, SyncError, PlaidClient | TokenCipher | SyncStore> {
 	const store = yield* SyncStore;
 	const plaid = yield* PlaidClient;
 	const cipher = yield* TokenCipher;
-	const taken = yield* store.takeLease(connectionId);
+	const taken = yield* store.takeLease({ connectionId, resume });
 	if (taken.kind !== 'taken') return taken;
 
 	let lease = taken.lease;
@@ -203,13 +222,17 @@ export const syncConnection = Effect.fnUntraced(function* (
 			if (applied.lease === null) break;
 			lease = applied.lease;
 		}
+		const item = yield* Effect.option(plaid.itemGet(accessToken));
+		if (Option.isSome(item)) {
+			yield* store.recordConsent({ connectionId, consentExpiresAt: item.value.consentExpiresAt });
+		}
 		if (refresh) yield* Effect.ignore(plaid.transactionsRefresh(accessToken));
 		return { kind: 'synced', ...totals } as const;
 	});
 	return yield* run.pipe(
 		Effect.tapCause((cause) => {
 			const failure = describeFailure(cause);
-			return store.fail({ connectionId, lease, ...failure });
+			return store.fail({ connectionId, lease, attempt, ...failure });
 		})
 	);
 });
@@ -252,24 +275,10 @@ function fetchBatch(
 	});
 }
 
-function describeFailure(cause: Cause.Cause<SyncError>): { message: string; needsLogin: boolean } {
+function describeFailure(cause: Cause.Cause<SyncError>): SyncFailure {
 	const error = Cause.findErrorOption(cause);
-	if (Option.isNone(error)) return { message: 'The sync stopped unexpectedly.', needsLogin: false };
-	const failure = error.value;
-	switch (failure._tag) {
-		case 'PlaidApi':
-			return failure.error_code === 'ITEM_LOGIN_REQUIRED'
-				? { message: 'The bank needs you to sign in again.', needsLogin: true }
-				: { message: `Plaid refused the sync (${failure.error_code}).`, needsLogin: false };
-		case 'PlaidTransport':
-			return { message: "Couldn't reach Plaid.", needsLogin: false };
-		case 'PlaidTimeout':
-			return { message: "Plaid didn't answer in time.", needsLogin: false };
-		case 'PlaidDecode':
-			return { message: "Plaid sent a response Budge couldn't read.", needsLogin: false };
-		case 'TokenCipherError':
-			return { message: "Budge couldn't open the stored bank login.", needsLogin: false };
-	}
+	if (Option.isNone(error)) return { status: 'failed', message: 'The sync stopped unexpectedly.' };
+	return failureOf(error.value);
 }
 
 export const setupConnection = Effect.fnUntraced(function* (input: {
@@ -290,4 +299,21 @@ export const setupConnection = Effect.fnUntraced(function* (input: {
 		encryptedToken,
 		accounts: input.accounts
 	});
+});
+
+export const reconnectLinkToken = Effect.fnUntraced(function* (
+	connectionId: Id<'bankConnections'>
+): Effect.fn.Return<
+	{ kind: 'linkToken'; linkToken: string } | { kind: 'missing' } | { kind: 'noToken' },
+	SyncError,
+	PlaidClient | TokenCipher | SyncStore
+> {
+	const store = yield* SyncStore;
+	const plaid = yield* PlaidClient;
+	const cipher = yield* TokenCipher;
+	const credentials = yield* store.credentials(connectionId);
+	if (credentials === 'missing' || credentials === 'noToken') return { kind: credentials };
+	const accessToken = yield* cipher.decrypt(credentials.encryptedToken, credentials.itemId);
+	const linkToken = yield* plaid.linkTokenCreate({ accessToken, clientUserId: connectionId });
+	return { kind: 'linkToken', linkToken };
 });

@@ -15,6 +15,8 @@ import {
 	PAGE_SIZE,
 	MAX_BATCHES,
 	PAGES_PER_BATCH,
+	reconnectLinkToken,
+	RETRY_DELAYS_MS,
 	setupConnection,
 	SyncStore,
 	syncConnection
@@ -38,7 +40,7 @@ type Backend = ReturnType<typeof newBackend>;
 type FakePlaid = Parameters<typeof PlaidClient.layerTest>[0];
 
 function runInAction<A, E>(
-	{ t }: Backend,
+	{ t }: Pick<Backend, 't'>,
 	plaid: FakePlaid,
 	program: Effect.Effect<A, E, PlaidClient | TokenCipher | SyncStore>
 ) {
@@ -47,7 +49,10 @@ function runInAction<A, E>(
 			program.pipe(
 				Effect.provide(
 					Layer.mergeAll(
-						PlaidClient.layerTest(plaid),
+						PlaidClient.layerTest({
+							itemGet: () => Effect.succeed({ consentExpiresAt: null }),
+							...plaid
+						}),
 						TokenCipher.layer(tokenKey),
 						SyncStore.layer(ctx)
 					)
@@ -109,6 +114,12 @@ async function connectedBudget() {
 		).page.filter((row) => row.payeeName !== 'Starting Balance');
 	return { ...backend, checking, connectionId, webhooks, sync, connection, rows };
 }
+
+const needsLogin = new PlaidApi({
+	error_code: 'ITEM_LOGIN_REQUIRED',
+	status: 400,
+	request_id: 'request-synthetic-3'
+});
 
 const synced = (result: { ok: true; value: unknown } | { ok: false }) =>
 	result.ok ? result.value : result;
@@ -290,8 +301,12 @@ describe('syncing a Bank Connection', () => {
 
 	test('a batch whose lease or cursor is no longer current writes nothing', async () => {
 		const { t, connectionId, connection, rows } = await connectedBudget();
-		const taken = await t.mutation(internal.bankConnections.takeLease, { connectionId });
+		const taken = await t.mutation(internal.bankConnections.takeLease, {
+			connectionId,
+			resume: false
+		});
 		assert(taken.kind === 'taken', 'expected the lease');
+
 		const batch = {
 			connectionId,
 			nextCursor: 'cursor-synthetic-2',
@@ -496,9 +511,89 @@ describe('syncing a Bank Connection', () => {
 		const saved = await connection();
 		expect(saved).toMatchObject({
 			status: 'needsAttention',
-			lastError: { message: 'The bank needs you to sign in again.' }
+			lastError: { message: 'The bank needs you to reconnect (ITEM_LOGIN_REQUIRED).' }
 		});
 		expect(saved?.syncLeaseUntil).toBeUndefined();
+	});
+
+	test('a needed login pauses sync until the owner reconnects, and the status says so', async () => {
+		const { owner, sync, connectionId } = await connectedBudget();
+		await sync({ transactionsSync: () => Effect.fail(needsLogin) });
+
+		expect(synced(await sync({}))).toEqual({ kind: 'paused' });
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toMatchObject([
+			{
+				_id: connectionId,
+				status: 'needsAttention',
+				lastError: { message: 'The bank needs you to reconnect (ITEM_LOGIN_REQUIRED).' }
+			}
+		]);
+	});
+
+	const bankDown = new PlaidApi({
+		error_code: 'INSTITUTION_NOT_RESPONDING',
+		status: 400,
+		request_id: 'request-synthetic-4'
+	});
+	const retries = (t: Backend['t']) =>
+		t.run((ctx) => ctx.db.system.query('_scheduled_functions').collect());
+
+	test('a short-lived error retries quietly with backoff, leaving the status OK', async () => {
+		const { t, sync, connection, connectionId } = await connectedBudget();
+		const before = Date.now();
+
+		await sync({ transactionsSync: () => Effect.fail(bankDown) });
+
+		const saved = await connection();
+		expect(saved).toMatchObject({ status: 'ok' });
+		expect(saved?.lastError).toBeUndefined();
+		expect(saved?.syncLeaseUntil).toBeUndefined();
+		const [retry, ...others] = await retries(t);
+		expect(others).toEqual([]);
+		expect(retry).toMatchObject({
+			name: 'bankConnections:retrySync',
+			args: [{ connectionId, attempt: 1 }]
+		});
+		expect(retry?.scheduledTime).toBeGreaterThanOrEqual(before + 60_000);
+	});
+
+	test('each retry waits longer than the one before', async () => {
+		const { t, connectionId } = await connectedBudget();
+		const before = Date.now();
+
+		await runInAction(
+			{ t },
+			{ transactionsSync: () => Effect.fail(bankDown) },
+			syncConnection(connectionId, { refresh: false, attempt: 1 })
+		);
+
+		const [retry] = await retries(t);
+		expect(retry).toMatchObject({ args: [{ connectionId, attempt: 2 }] });
+		expect(retry?.scheduledTime).toBeGreaterThanOrEqual(before + 5 * 60_000);
+	});
+
+	test('once its retries run out, a short-lived error is recorded for the owner', async () => {
+		const { t, connection, connectionId } = await connectedBudget();
+
+		await runInAction(
+			{ t },
+			{ transactionsSync: () => Effect.fail(bankDown) },
+			syncConnection(connectionId, { refresh: false, attempt: RETRY_DELAYS_MS.length })
+		);
+
+		expect(await connection()).toMatchObject({
+			status: 'ok',
+			lastError: { message: 'The bank is unavailable for now (INSTITUTION_NOT_RESPONDING).' }
+		});
+		expect(await retries(t)).toEqual([]);
+	});
+
+	test('a needed login is not retried', async () => {
+		const { t, sync } = await connectedBudget();
+
+		await sync({ transactionsSync: () => Effect.fail(needsLogin) });
+
+		expect(await retries(t)).toEqual([]);
 	});
 
 	test('Sync now asks Plaid to refresh after syncing', async () => {
@@ -535,22 +630,122 @@ describe('syncing a Bank Connection', () => {
 	});
 });
 
+describe("Plaid's notice that a Bank Connection needs the owner", () => {
+	test('an announced disconnect pauses sync and shows as needing attention', async () => {
+		const { t, owner, sync } = await connectedBudget();
+
+		await t.mutation(internal.bankConnections.flagItem, { itemId, code: 'PENDING_DISCONNECT' });
+
+		expect(synced(await sync({}))).toEqual({ kind: 'paused' });
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toMatchObject([
+			{
+				status: 'needsAttention',
+				lastError: { message: 'The bank needs you to reconnect (PENDING_DISCONNECT).' }
+			}
+		]);
+	});
+
+	test('a code that needs no owner, or an unknown Item, changes nothing', async () => {
+		const { t, connection } = await connectedBudget();
+		const before = await connection();
+
+		await t.mutation(internal.bankConnections.flagItem, { itemId, code: 'INSTITUTION_DOWN' });
+		await t.mutation(internal.bankConnections.flagItem, {
+			itemId: 'item-synthetic-unknown',
+			code: 'ITEM_LOGIN_REQUIRED'
+		});
+
+		expect(await connection()).toEqual(before);
+	});
+});
+
+describe('reconnecting a Bank Connection', () => {
+	test('gets an update-mode link token for the existing Item, never a new Item', async () => {
+		const { sync, connectionId, t } = await connectedBudget();
+		await sync({ transactionsSync: () => Effect.fail(needsLogin) });
+		const requests: unknown[] = [];
+
+		const result = await runInAction(
+			{ t },
+			{
+				linkTokenCreate: (request) => {
+					requests.push(request);
+					return Effect.succeed('link-token-synthetic-1');
+				}
+			},
+			reconnectLinkToken(connectionId)
+		);
+
+		expect(synced(result)).toEqual({ kind: 'linkToken', linkToken: 'link-token-synthetic-1' });
+		expect(requests).toEqual([{ accessToken, clientUserId: connectionId }]);
+	});
+
+	test('a successful sync after Reconnect clears the needed login', async () => {
+		const { t, owner, sync, connectionId } = await connectedBudget();
+		await sync({ transactionsSync: () => Effect.fail(needsLogin) });
+
+		await runInAction(
+			{ t },
+			plaidPages(page),
+			syncConnection(connectionId, { refresh: false, resume: true })
+		);
+
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toMatchObject([
+			{ status: 'ok', lastError: null }
+		]);
+		expect(synced(await sync(plaidPages(page)))).toMatchObject({ kind: 'synced' });
+	});
+});
+
 describe('the Bank Connection status', () => {
 	test('never returns the provider', async () => {
 		const { owner, sync, connectionId } = await connectedBudget();
 		await sync(plaidPages(page));
 
-		const [status] = await owner.query(api.bankConnections.list, {});
+		const [status] = await owner.query(api.bankConnections.list, { now: Date.now() });
 
 		expect(Object.keys(status ?? {}).sort()).toEqual([
 			'_id',
+			'consentEndsAt',
 			'lastError',
 			'lastSyncedAt',
 			'name',
+			'overdue',
 			'status'
 		]);
 		expect(status).toMatchObject({ _id: connectionId, name: 'Sample Bank', lastError: null });
 		expect(JSON.stringify(status)).not.toMatch(/item-synthetic|cursor-synthetic|v1\./);
+	});
+
+	const day = 24 * 60 * 60_000;
+
+	test('the renewal line shows from 14 days before consent ends', async () => {
+		const { owner, sync } = await connectedBudget();
+		const consentExpiresAt = Date.parse('2026-11-20T15:00:00Z');
+		await sync({
+			...plaidPages(page),
+			itemGet: (token) => {
+				expect(token).toBe(accessToken);
+				return Effect.succeed({ consentExpiresAt });
+			}
+		});
+		const statusAt = async (now: number) =>
+			(await owner.query(api.bankConnections.list, { now }))[0]?.consentEndsAt;
+
+		expect(await statusAt(consentExpiresAt - 14 * day - 1)).toBeNull();
+		expect(await statusAt(consentExpiresAt - 14 * day)).toBe(consentExpiresAt);
+		expect(await statusAt(consentExpiresAt + day)).toBe(consentExpiresAt);
+	});
+
+	test('warns after 48 hours without a successful sync', async () => {
+		const { owner, sync, connection } = await connectedBudget();
+		await sync(plaidPages(page));
+		const lastSyncedAt = (await connection())?.lastSyncedAt ?? 0;
+		const overdueAt = async (now: number) =>
+			(await owner.query(api.bankConnections.list, { now }))[0]?.overdue;
+
+		expect(await overdueAt(lastSyncedAt + 48 * 60 * 60_000)).toBe(false);
+		expect(await overdueAt(lastSyncedAt + 48 * 60 * 60_000 + 1)).toBe(true);
 	});
 });
 

@@ -40,6 +40,11 @@ function fakePlaid(signer: Signer) {
 				);
 			case '/transactions/sync':
 				return answer(syncPage);
+			case '/item/get':
+				return answer({
+					item: { item_id: itemId, consent_expiration_time: null, error: null },
+					status: null
+				});
 			default:
 				return assert.fail(`Unexpected Plaid call ${url.pathname}`);
 		}
@@ -175,7 +180,44 @@ describe('the Plaid webhook', () => {
 		await runScheduled(backend);
 
 		expect(await backend.rows()).toHaveLength(2);
-		expect(plaid.paths).toEqual(['/webhook_verification_key/get', '/transactions/sync']);
+		expect(plaid.paths).toEqual([
+			'/webhook_verification_key/get',
+			'/transactions/sync',
+			'/item/get'
+		]);
+	});
+
+	const itemBody = (code: string, errorCode?: string) =>
+		JSON.stringify({
+			webhook_type: 'ITEM',
+			webhook_code: code,
+			item_id: itemId,
+			error: errorCode === undefined ? null : { error_code: errorCode },
+			environment: 'sandbox'
+		});
+
+	const statusAfter = async (body: string) => {
+		const backend = await connectedBudget();
+		const response = await postWebhook(backend, body, await signer.sign(body));
+		expect(response.status).toBe(200);
+		const connection = await backend.t.run((ctx) =>
+			ctx.db.get('bankConnections', backend.connectionId)
+		);
+		return connection?.status;
+	};
+
+	test.each([
+		['PENDING_DISCONNECT', undefined],
+		['PENDING_EXPIRATION', undefined],
+		['USER_PERMISSION_REVOKED', undefined],
+		['ERROR', 'ITEM_LOGIN_REQUIRED']
+	])('ITEM %s %s pauses the Bank Connection until Reconnect', async (code, errorCode) => {
+		expect(await statusAfter(itemBody(code, errorCode))).toBe('needsAttention');
+	});
+
+	test('an ITEM webhook nothing needs the owner for leaves the Bank Connection as it was', async () => {
+		expect(await statusAfter(itemBody('WEBHOOK_UPDATE_ACKNOWLEDGED'))).toBe('ok');
+		expect(await statusAfter(itemBody('ERROR', 'INSTITUTION_DOWN'))).toBe('ok');
 	});
 
 	test('an unverified webhook changes nothing', async () => {
@@ -342,8 +384,9 @@ describe('the Plaid webhook', () => {
 		await backend.t.mutation(internal.bankConnections.fail, {
 			connectionId: backend.connectionId,
 			lease: backend.lease,
-			message: "Couldn't reach Plaid.",
-			needsLogin: false
+			message: 'Plaid refused the sync (INVALID_FIELD).',
+			status: 'failed',
+			attempt: 0
 		});
 		await runScheduled(backend);
 
