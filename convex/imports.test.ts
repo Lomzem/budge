@@ -63,25 +63,29 @@ describe('importing a bank file', () => {
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(2);
 	});
 
-	test("a row whose Bank Text is Starting Balance gets no Payee, so the Account's starting balance stays its own", async () => {
-		const { owner, checking, balance } = await budgetWithChecking();
+	test('a row whose Bank Text is Starting Balance gets an ordinary Payee of that name, which renames like any other', async () => {
+		const { owner, checking } = await budgetWithChecking();
 		await owner.mutation(api.imports.commit, {
 			accountId: checking,
 			source: 'csv',
 			rows: [{ ...coffee, bankText: 'Starting Balance' }]
 		});
+		const imported = async () =>
+			(
+				await owner.query(api.transactions.list, {
+					accountId: checking,
+					paginationOpts: { numItems: 50, cursor: null }
+				})
+			).page.find((row) => row.amount === -450);
+		expect(await imported()).toMatchObject({ payeeName: 'Starting Balance' });
+		const payee = (await owner.query(api.payees.list, {})).find(
+			(candidate) => candidate.name === 'Starting Balance'
+		);
+		assert(payee !== undefined, 'expected the imported Payee');
 
-		await owner.mutation(api.accounts.setStartingBalance, {
-			accountId: checking,
-			startingBalance: 90_000
-		});
+		await owner.mutation(api.payees.rename, { payeeId: payee._id, name: 'Sample Opening Deposit' });
 
-		expect(await balance()).toBe(90_000 - 450);
-		const listed = await owner.query(api.transactions.list, {
-			accountId: checking,
-			paginationOpts: { numItems: 50, cursor: null }
-		});
-		expect(listed.page.find((row) => row.amount === -450)).toMatchObject({ payeeName: null });
+		expect(await imported()).toMatchObject({ payeeName: 'Sample Opening Deposit' });
 	});
 
 	test('the same QFX file twice adds nothing the second time', async () => {

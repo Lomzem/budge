@@ -5,7 +5,7 @@ import { MATCH_WINDOW_DAYS } from '../../src/lib/domain/matcher';
 import { SPLIT_LINE_LIMIT } from '../../src/lib/domain/splits';
 import { requireCents } from './input';
 import { countTransaction, lineCounted } from './monthlyTotals';
-import { payeeNamed, rememberCategory, rememberRename, STARTING_BALANCE } from './payees';
+import { payeeNamed, rememberCategory, rememberRename } from './payees';
 import { requireCutoverDate, requireIsoDate } from './settings';
 import { publicError } from './publicError';
 
@@ -135,29 +135,6 @@ function requireLockKept(
 	}
 }
 
-async function requireStartingBalanceKept(
-	ctx: QueryCtx,
-	existing: Doc<'transactions'> | null,
-	input: Pick<TransactionInput, 'accountId' | 'payee'>
-) {
-	const payee =
-		existing?.payeeId === undefined ? null : await ctx.db.get('payees', existing.payeeId);
-	const wasStartingBalance = payee?.name === STARTING_BALANCE;
-	const isStartingBalance = input.payee.trim() === STARTING_BALANCE;
-	if (isStartingBalance && !wasStartingBalance) {
-		throw publicError(
-			'INVALID_INPUT',
-			'Budge keeps the Starting Balance Payee for starting balances. Pick another Payee.'
-		);
-	}
-	if (wasStartingBalance && (!isStartingBalance || input.accountId !== existing?.accountId)) {
-		throw publicError(
-			'INVALID_INPUT',
-			'A starting balance keeps its Payee and Account. Change its amount instead.'
-		);
-	}
-}
-
 const STARTING_BALANCE_LABEL = 'Starting Balance';
 
 export async function payeeNameOf(
@@ -202,8 +179,9 @@ export async function saveTransaction(
 	{ transferAccountId, transferTransactionId, ...given }: TransactionInput
 ): Promise<Id<'transactions'>> {
 	const startingBalance = existing?.kind === 'startingBalance' ? existing : null;
-	if (startingBalance === null) await requireStartingBalanceKept(ctx, existing, given);
-	else requireStartingBalanceEditable(startingBalance, { ...given, transferAccountId });
+	if (startingBalance !== null) {
+		requireStartingBalanceEditable(startingBalance, { ...given, transferAccountId });
+	}
 	const input = startingBalance === null ? given : { ...given, payee: '' };
 	const lines = await splitLines(ctx, input);
 	const fields: TransactionFields = {

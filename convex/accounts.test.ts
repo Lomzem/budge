@@ -438,19 +438,40 @@ describe("changing an Account's starting balance", () => {
 		expect(await balance()).toBe(185_000);
 	});
 
-	test('no other Transaction can take the Starting Balance Payee', async () => {
-		const { owner, accountId } = await checkingWithStartingBalance();
+	test('a Transaction entered with the Payee Starting Balance is an ordinary one', async () => {
+		const { owner, accountId, groceries, startingBalance, balance } =
+			await checkingWithStartingBalance();
+		const genuine = await startingBalance();
+		const entered = {
+			accountId,
+			date: '2026-08-02',
+			amount: -1_000,
+			payee: 'Starting Balance',
+			memo: ''
+		};
+		const transactionId = await owner.mutation(api.transactions.create, entered);
 
+		await owner.mutation(api.transactions.update, {
+			transactionId,
+			...entered,
+			splits: [
+				{ categoryId: groceries, amount: -600, memo: '' },
+				{ categoryId: groceries, amount: -400, memo: '' }
+			]
+		});
+		await owner.mutation(api.accounts.setStartingBalance, { accountId, startingBalance: 180_000 });
+
+		expect(await balance()).toBe(179_000);
 		expect(
-			await publicErrorCode(
-				owner.mutation(api.transactions.create, {
+			(
+				await owner.query(api.transactions.list, {
 					accountId,
-					date: '2026-08-02',
-					amount: -1_000,
-					payee: 'Starting Balance',
-					memo: ''
+					paginationOpts: { numItems: 10, cursor: null }
 				})
-			)
-		).toBe('INVALID_INPUT');
+			).page.map(({ _id, amount }) => ({ _id, amount }))
+		).toEqual([
+			{ _id: transactionId, amount: -1_000 },
+			{ _id: genuine._id, amount: 180_000 }
+		]);
 	});
 });

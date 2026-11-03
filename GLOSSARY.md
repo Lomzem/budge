@@ -24,6 +24,10 @@ _Avoid_: Entry, charge, record
 A Transaction pair that moves money between two Accounts without changing the total budgeted.
 _Avoid_: Move, internal payment
 
+**Starting Balance**:
+The one Transaction per Account that records its balance on the cutover date. It is a kind of Transaction, not a Payee: it has no Payee and reads "Starting Balance" wherever it is shown. Its amount, date, Category, memo, Cleared and approval can change; it cannot be split, become a Transfer, move to another Account, or take a Payee. A Payee that happens to be named "Starting Balance" is an ordinary Payee.
+_Avoid_: Opening balance, initial balance, Starting Balance Payee
+
 **Cleared**:
 A Transaction the bank has confirmed. Cleared Transactions make up the balance the bank would show.
 _Avoid_: Posted, settled
