@@ -1,32 +1,40 @@
 # Plaid connection, Sync now, reconnect and automatic updates
 
-Inspect bank freshness, request sync, and track the expected connection/reconnect workflows without claiming tokenless seeds contact a bank.
+Inspect bank freshness, request sync, and see when a Bank Connection needs a reconnect or a consent renewal, without claiming a seed contacts a bank.
 
 ## Sub-features
 
 - `plaid-status`, `plaid-sync`: freshness, exact time, errors, repeat/busy outcomes.
-- `plaid-connect`, `plaid-reconnect`: connect existing Item and update-mode renewal.
+- `plaid-attention`: needs-attention notice on the Budget and in the connection dialog; what Reconnect and Sync now do from there.
+- `plaid-consent`: `Consent ends …, renew` line and its dialog text.
+- `plaid-connect`, `plaid-reconnect`: connect a new Item; update-mode Plaid Link and the sync after it.
 - `plaid-auto`: verified webhook and daily backup sync.
 
 ## How to get to it (user POV)
 
-- Desktop sidebar Bank Connections → Sample Bank (Sandbox) → Sync now.
-- Connect, Reconnect/update mode and consent-renewal controls are not present in this checkout.
+- Desktop sidebar `Bank Connections` list → `<name>: Synced …` button → dialog `<name>` → `Sync now` (and `Reconnect` when the connection needs attention or its consent is ending).
+- Budget page → `<name> needs you to reconnect` line → `Reconnect`.
+- Sidebar under a connection → `Consent ends <date>, renew` → `renew`.
 - Webhook/cron have no direct UI entry; their user-visible result is automatic arrival/freshness.
 
 ## Driving it with Playwright
 
 Preconditions:
 
-- Authenticated baseline from the index; reseed before independent mutations.
+- Authenticated baseline from the index. `budget-with-accounts` has Sample Bank (Sandbox), with no login. `bun run app seed bank-sync` adds Sample Credit Union (consent ends in 5 days) and Sample Savings Bank (needs attention after `ITEM_LOGIN_REQUIRED`). Both have a login token that never decrypts, so Budge reaches no bank.
+- Readiness for `bank-sync`: on `/`, require text `Sample Savings Bank needs you to reconnect`.
 
-- **Seed status:** `getByRole("list", { name: "Bank Connections" }).getByRole("button", { name: /Sample Bank \(Sandbox\): Synced/ }).click()`; require dialog `Sample Bank (Sandbox)` and Last synced exact time. Click Sync now, require status `This Bank Connection has no bank login, so it never syncs.` Require no new Transactions or changed balances. Capture sidebar, action and status.
-- **Live Sandbox (blocked):** requires separately authorized Sandbox Item, encrypted token configuration and mapped Accounts. Use UI Sync now, require new/Cleared/Unapproved Transactions, Matches, cursor idempotence on repeat, freshness and busy/error handling; inspect actual network side effects including refresh instead of inferring from a test label. Never provision a token, deploy, or call Plaid to bypass this task’s local scope.
-- **Connect/update (blocked):** require visible connect entry or existing-item Reconnect notice, open real Link in connect/update mode as appropriate. For reconnect require same Item, post-success sync, cleared attention state; check 48-hour freshness and 14-day consent notice, without new/deleted Item. Record missing controls as failure/block.
-- **Automatic updates (blocked):** after an authorized signed Sandbox webhook or daily scheduled sync, require imported rows/freshness once; repeated/out-of-order events must not duplicate, invalid signature must not change data, and tokenless seed must make no Plaid calls. Browser observation alone cannot prove signature validation or no network calls: pair it with the boundary tests in `convex/plaidWebhook.test.ts`, `convex/lib/plaidWebhook.test.ts` and `convex/bankConnections.test.ts`.
+- **Seed status (`budget-with-accounts`):** `getByRole("list", { name: "Bank Connections" }).getByRole("button", { name: /Sample Bank \(Sandbox\): Synced/ }).click()`; require dialog `Sample Bank (Sandbox)` and Last synced exact time. Click Sync now, require status `This Bank Connection has no bank login, so it never syncs.` Require no new Transactions or changed balances.
+- **Needs attention (`bank-sync`):** on the Budget, require the notice `Sample Savings Bank needs you to reconnect` and no notice for Sample Credit Union. Click its `Reconnect`; require status `Couldn't reach the bank; try again later.` and the notice still shown. Open the sidebar button `/Sample Savings Bank: /` (it carries the `Needs a look` icon); require dialog text `Sample Savings Bank needs you to reconnect.` and alert `/failed: The bank needs you to reconnect \(ITEM_LOGIN_REQUIRED\)\.$/`. Sync now here also fails with `Couldn't reach the bank; try again later.`, because the fixture's token never decrypts. It does not prove how a real needs-attention connection refuses a sync; that stays with `convex/bankConnections.test.ts`.
+- **Consent (`bank-sync`):** require sidebar text `/^Consent ends .+, renew$/` under Sample Credit Union. Click `renew`; require the dialog `Sample Credit Union` to open with status `Couldn't reach the bank; try again later.` and text `/^Your consent at the bank ends .+ Reconnect to renew it\.$/`.
+- **At 320 px:** the Budget notice and its `Reconnect` still show. The `Bank Connections` list (status, Sync now, the consent line) renders only in the desktop sidebar, and neither the View menu nor the app menu offers it, so record those recipes at desktop width.
+- **Live Sandbox (blocked):** requires a separately authorized Sandbox Item, encrypted token configuration and mapped Accounts. Use UI Sync now, require new/Cleared/Unapproved Transactions, Matches, cursor idempotence on repeat, freshness and busy/error handling; inspect actual network side effects including refresh instead of inferring from a test label. Never provision a token, deploy, or call Plaid to bypass this task's local scope.
+- **Successful reconnect (blocked):** needs real Plaid Link in update mode. Require the same Item, the sync after success (`Reconnected. Added …`), and the notice and `Needs a look` icon cleared. A seed cannot reach this; record it as blocked.
+- **Automatic updates (blocked):** after an authorized signed Sandbox webhook or daily scheduled sync, require imported rows/freshness once; repeated/out-of-order events must not duplicate, invalid signature must not change data, and tokenless seed must make no Plaid calls. Pair browser observation with the boundary tests in `convex/plaidWebhook.test.ts`, `convex/lib/plaidWebhook.test.ts` and `convex/bankConnections.test.ts`.
 
 ## Gotchas
 
-- Seed connection has no token; it proves only status and no-login outcome. Sandbox credentials/Item and token key are not supplied by this fixture.
-- Ticket 17’s manual cloud Sandbox check is still open. The ticket 18 webhook (`/plaid/webhook` in `convex/http.ts`) and daily sync (`convex/crons.ts`) exist but need a live Sandbox Item and signed webhook to drive, so they stay blocked here. Ticket 20 reconnect/health/consent UI is unimplemented. `bankConnections.setup` is internal provisioning, not a public Connect UI.
-- Sources: tickets 17, 18, 20, 23; `e2e/bank-connections.test.ts`; public `bankConnections.list/syncNow`.
+- `e2e/bank-connections.test.ts` covers seed status; `e2e/bank-reconnect.test.ts` covers needs-attention and consent. Neither proves Plaid Link or a real sync.
+- The `bank-sync` fixture is built by `convex/seedBankSync.ts` through the production sync mutations; it refuses to run on a production deployment.
+- `bankConnections.setup` is internal provisioning, not a public Connect UI. Ticket 17's manual cloud Sandbox check is still open.
+- Sources: tickets 17, 18, 20, 23; public `bankConnections.list/syncNow/reconnect/syncAfterReconnect`.
