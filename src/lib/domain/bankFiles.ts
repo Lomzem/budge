@@ -161,7 +161,7 @@ const decodeCsv = Effect.fnUntraced(function* (
 		candidate.headers.every((name) => columns.includes(name))
 	);
 	if (profile === undefined) return yield* unknownLayout();
-	const repeated = columns.find((name, column) => columns.indexOf(name) !== column);
+	const repeated = columns.find((name, column) => name !== '' && columns.indexOf(name) !== column);
 	if (repeated !== undefined) {
 		return yield* new BankFileError({
 			message: `The header names the column “${repeated}” more than once, so its values are ambiguous.`
@@ -196,26 +196,43 @@ const decodeCsv = Effect.fnUntraced(function* (
 	return { format: profile.format, source: 'csv', rows };
 });
 
+function startsField(text: string, index: number) {
+	return index === 0 || ',\n\r'.includes(text.charAt(index - 1));
+}
+
+function readQuoted(text: string, start: number): { value: string; end: number } | undefined {
+	let value = '';
+	for (let i = start; i < text.length; i++) {
+		const char = text.charAt(i);
+		if (char !== '"') {
+			value += char;
+		} else if (text[i + 1] === '"') {
+			value += '"';
+			i++;
+		} else {
+			return { value, end: i };
+		}
+	}
+	return undefined;
+}
+
 function parseCsv(text: string): Effect.Effect<string[][], BankFileError> {
 	const rows: string[][] = [];
 	let row: string[] = [];
 	let field = '';
-	let quoted = false;
-	let quoteRow = 0;
 	for (let i = 0; i < text.length; i++) {
 		const char = text.charAt(i);
-		if (quoted) {
-			if (char === '"' && text[i + 1] === '"') {
-				field += '"';
-				i++;
-			} else if (char === '"') {
-				quoted = false;
-			} else {
-				field += char;
+		if (char === '"' && startsField(text, i)) {
+			const quoted = readQuoted(text, i + 1);
+			if (quoted === undefined) {
+				return Effect.fail(
+					new BankFileError({
+						message: `Row ${String(rows.length + 1)} opens a quote that never closes, so the file may be cut off. Download it from your bank again.`
+					})
+				);
 			}
-		} else if (char === '"') {
-			quoted = true;
-			quoteRow = rows.length + 1;
+			field += quoted.value;
+			i = quoted.end;
 		} else if (char === ',') {
 			row.push(field);
 			field = '';
@@ -228,13 +245,6 @@ function parseCsv(text: string): Effect.Effect<string[][], BankFileError> {
 		} else {
 			field += char;
 		}
-	}
-	if (quoted) {
-		return Effect.fail(
-			new BankFileError({
-				message: `Row ${String(quoteRow)} opens a quote that never closes, so the file may be cut off. Download it from your bank again.`
-			})
-		);
 	}
 	if (field !== '' || row.length > 0) {
 		row.push(field);

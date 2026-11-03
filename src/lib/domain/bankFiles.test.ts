@@ -107,6 +107,10 @@ describe('decoding a bank file', () => {
 		[
 			'trailing blank lines',
 			'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,Restaurants\n\n,,,,\n\n'
+		],
+		[
+			'blank columns after the last header',
+			'Trans. Date,Post Date,Description,Amount,Category,,\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,Restaurants,,\n'
 		]
 	] as const)('reads a Discover CSV with %s', ([, text]) =>
 		Effect.gen(function* () {
@@ -114,6 +118,20 @@ describe('decoding a bank file', () => {
 
 			expect(file.rows).toEqual([
 				{ date: '2026-08-14', amount: -1_825, bankText: 'SAMPLE TACO STAND' }
+			]);
+		})
+	);
+
+	it.effect('reads a quote inside an unquoted Description as part of the text', () =>
+		Effect.gen(function* () {
+			const file = yield* decodeBankFile(
+				'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,SAMPLE 12" PIZZA,18.25,Restaurants\n08/16/2026,08/16/2026,SAMPLE BAKERY,4.50,Restaurants\n',
+				cutoverDate
+			);
+
+			expect(file.rows).toEqual([
+				{ date: '2026-08-14', amount: -1_825, bankText: 'SAMPLE 12" PIZZA' },
+				{ date: '2026-08-16', amount: -450, bankText: 'SAMPLE BAKERY' }
 			]);
 		})
 	);
