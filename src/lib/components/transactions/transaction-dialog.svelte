@@ -177,6 +177,8 @@
 		linkChoice = value;
 	};
 
+	let session = 0;
+
 	$effect(() => {
 		if (open) untrack(fill);
 	});
@@ -215,6 +217,7 @@
 	}
 
 	function fill() {
+		session += 1;
 		error = '';
 		unlocked = false;
 		linkChoice = undefined;
@@ -254,7 +257,7 @@
 	}
 
 	function startSplit(previous: string) {
-		if (lines.length > 0) return;
+		lines = [];
 		const total = parseCents(amount);
 		const sizeAloneSinceTheDirectionIsSetApart =
 			total === undefined ? amount : formatCents(Math.abs(total)).replace('$', '');
@@ -262,6 +265,15 @@
 		addLine();
 		const first = lines[0];
 		if (first && previous !== '' && !previous.startsWith(TRANSFER)) first.categoryId = previous;
+	}
+
+	function savedCategoryOf(line: { categoryId: string }) {
+		const savedLine = transaction?.splits?.find((s) => s.categoryId === line.categoryId);
+		if (savedLine) return { id: savedLine.categoryId, name: savedLine.categoryName };
+		const seededFromTheParent = transaction?.categoryId === line.categoryId;
+		if (seededFromTheParent)
+			return { id: line.categoryId, name: transaction.categoryName ?? undefined };
+		return undefined;
 	}
 
 	function findCategory(id: string): Id<'categories'> | undefined {
@@ -300,6 +312,24 @@
 			transferAccountId: other._id,
 			...(linked === undefined ? {} : { transferTransactionId: linked._id })
 		};
+	}
+
+	async function write(
+		work: () => PromiseLike<unknown>,
+		failure: string,
+		succeeded = () => {
+			open = false;
+		}
+	) {
+		const started = session;
+		saving = true;
+		const result = await attempt(work);
+		saving = false;
+		if (started !== session) return;
+		confirmDelete = false;
+		confirmBankRemoval = null;
+		if (result.ok) succeeded();
+		else error = result.error?.message ?? failure;
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -342,66 +372,53 @@
 			const noPayeeOrCategory = { payee: '' };
 			fields = { ...shared, ...noPayeeOrCategory, ...transfer };
 		}
-		saving = true;
 		const transactionId = transaction?._id;
-		const saved = await attempt(() =>
-			transactionId === undefined ? create(fields) : update({ transactionId, ...fields })
+		await write(
+			() => (transactionId === undefined ? create(fields) : update({ transactionId, ...fields })),
+			"Budge couldn't save the Transaction. Try again."
 		);
-		saving = false;
-		if (saved.ok) open = false;
-		else error = saved.error?.message ?? "Budge couldn't save the Transaction. Try again.";
 	}
 
 	async function approveTransaction() {
 		if (!transaction) return;
 		const transactionId = transaction._id;
-		saving = true;
-		const approved = await attempt(() => approve({ transactionId }));
-		saving = false;
-		if (approved.ok) open = false;
-		else error = approved.error?.message ?? "Budge couldn't approve the Transaction. Try again.";
+		await write(
+			() => approve({ transactionId }),
+			"Budge couldn't approve the Transaction. Try again."
+		);
 	}
 
 	async function unmatchRow(importId: Id<'imports'>) {
-		saving = true;
-		const unmatched = await attempt(() => unmatch({ importId }));
-		saving = false;
-		if (unmatched.ok) open = false;
-		else error = unmatched.error?.message ?? "Budge couldn't Unmatch the row. Try again.";
+		await write(() => unmatch({ importId }), "Budge couldn't Unmatch the row. Try again.");
 	}
 
 	async function resolveBankRow(importId: Id<'imports'>, keep: 'bank' | 'mine') {
-		saving = true;
-		const resolved = await attempt(() => resolveBankChange({ importId, keep }));
-		saving = false;
-		confirmBankRemoval = null;
-		if (resolved.ok) open = false;
-		else error = resolved.error?.message ?? "Budge couldn't resolve the bank's change. Try again.";
+		await write(
+			() => resolveBankChange({ importId, keep }),
+			"Budge couldn't resolve the bank's change. Try again."
+		);
 	}
 
 	async function unlockTransaction() {
 		if (!transaction) return;
 		const transactionId = transaction._id;
-		saving = true;
-		const unlockedNow = await attempt(() => unlock({ transactionId }));
-		saving = false;
-		if (!unlockedNow.ok) {
-			error = unlockedNow.error?.message ?? "Budge couldn't unlock the Transaction. Try again.";
-			return;
-		}
-		unlocked = true;
-		error = '';
+		await write(
+			() => unlock({ transactionId }),
+			"Budge couldn't unlock the Transaction. Try again.",
+			() => {
+				unlocked = true;
+				error = '';
+			}
+		);
 	}
 
 	async function deleteTransaction() {
 		if (!transaction) return;
 		const transactionId = transaction._id;
-		saving = true;
-		const removed = await attempt(() => remove({ transactionId }));
-		saving = false;
-		confirmDelete = false;
-		if (removed.ok) open = false;
-		else error = removed.error?.message ?? "Budge couldn't delete the Transaction. Try again.";
+		await write(
+			() => remove({ transactionId }),
+			"Budge couldn't delete the Transaction. Try again."
+		);
 	}
 </script>
 
@@ -430,7 +447,7 @@
 		<legend class="px-1 text-sm font-medium">Split lines</legend>
 		<ol class="flex flex-col gap-3">
 			{#each lines as line, index (line.key)}
-				{@const saved = transaction?.splits?.find((s) => s.categoryId === line.categoryId)}
+				{@const saved = savedCategoryOf(line)}
 				{@const number = index + 1}
 				<li class="flex flex-col gap-2">
 					<div class="flex items-end gap-2">
@@ -443,7 +460,7 @@
 								class="h-8 min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
 							>
 								<option value="" disabled>Pick a Category</option>
-								{@render categoryOptions(saved?.categoryId, saved?.categoryName)}
+								{@render categoryOptions(saved?.id, saved?.name)}
 							</select>
 						</div>
 						<div class="flex w-28 flex-col gap-1">

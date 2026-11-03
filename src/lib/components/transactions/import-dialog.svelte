@@ -40,6 +40,7 @@
 	let reading = $state(false);
 
 	let reads = 0;
+	let session = 0;
 	let saving = $state(false);
 	let error = $state('');
 
@@ -74,6 +75,7 @@
 	});
 
 	function reset() {
+		session += 1;
 		reads += 1;
 		reading = false;
 		accountId = defaultAccountId ?? accounts.all[0]?._id ?? '';
@@ -114,11 +116,13 @@
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
 		if (!account || !file || !ready) return;
+		const started = session;
 		saving = true;
 		error = '';
 		const args = { accountId: account._id, source: file.source, rows: rowsWithPicks(file) };
 		const committed = await attempt(() => commit(args));
 		saving = false;
+		if (started !== session) return;
 		if (committed.ok) open = false;
 		else error = committed.error?.message ?? "Budge couldn't save the import. Try again.";
 	}
