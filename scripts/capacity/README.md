@@ -71,3 +71,23 @@ same deployment and reset its tables. Use a separate checkout and `app up` for
 independent measurements. After an interrupted run, repeat the command to reseed
 and reconcile the temporary deployment; normal completion restores source modules
 and the checkout's original `.env.local`.
+
+## Failing contract check
+
+Run `bun run app up`, then `bun run capacity:check` (or `bun run check` for all
+local gates), then `bun run app down`. The check resets this checkout's anonymous
+backend. It measures the exported `MAX_FILE_ROWS` in preview and commit for CSV
+and QFX: three fresh runs each, at one dense date and across 60 months, with
+distinct Payees and Category memory. All five transaction counters and the return
+size must stay below the full limits; errors also fail. The exploratory command's
+50% headroom search remains separate from this admission contract.
+
+An over-capacity check exits 1 with
+`Import capacity contract failed; reduce MAX_FILE_ROWS or reduce measured preview/commit work.`
+Setup, skipped-work, and restoration failures also exit nonzero. Evidence includes
+uncached completion receipts, counts, metrics, host load, and a timed summary.
+The first complete 250-row check took 78.38 seconds locally (12 workflows, 24
+measured calls, including temporary deployment and seed work, excluding final
+restoration). This fits the roughly three-minute budget, so CI runs it against its
+existing anonymous E2E backend before Playwright. CI runtime remains to be measured.
+`capacity:check` requires that backend; it never silently skips missing setup.

@@ -27,7 +27,9 @@
 		"codegen": "bun scripts/codegen.js",
 		"app": "bun --no-env-file scripts/app.ts",
 		"sync": "PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-kit sync",
-		"capacity": "bun --no-env-file scripts/capacity/run.js"
+		"capacity": "bun --no-env-file scripts/capacity/run.js",
+		"capacity:check": "bun run capacity --check",
+		"check": "bun run format:check && bun run lint && bun run lint:ui && bun run typecheck && bun run test && bun run capacity:check"
 	},
 	"dependencies": {
 		"convex": "1.48.0",

@@ -18,6 +18,10 @@ import { emptyEveryTable } from '../app/reset.ts';
 import { runConvex } from '../local/backend.ts';
 import { writeReport } from './report.js';
 import { loadavg, cpus, freemem } from 'node:os';
+import { MAX_FILE_ROWS } from '../../convex/lib/imports.ts';
+
+const checkMode = process.argv[2] === '--check';
+const started = performance.now();
 
 const { checkout, mainCheckout } = findCheckout();
 const deployment = requireLocalAnonymousDeployment(checkout, 'measure capacity');
@@ -80,8 +84,8 @@ async function deployHarness() {
 	if (code !== 0) throw new Error(`harness deploy exit ${code}`);
 }
 
-async function seed(count, history) {
-	await emptyEveryTable('measure capacity');
+async function seed(count, history, diverse = false) {
+	await emptyEveryTable(checkout, deployment);
 	const ids = await call('initialize');
 	const size = history ? count : 1000;
 	for (let start = 0; start < size; start += 100) {
@@ -91,6 +95,7 @@ async function seed(count, history) {
 			start,
 			count: batch,
 			history,
+			diverse,
 			perMonth: count / 60
 		});
 		appendFileSync(
@@ -146,24 +151,37 @@ function belowHalf(record) {
 	);
 }
 
-async function importTrial(source, count, run, phase) {
-	const ids = await seed(count, false);
+async function importTrial(source, count, run, phase, diverse = false) {
+	const ids = await seed(count, false, diverse);
 	const rows = Array.from({ length: count }, (_, i) => ({
-		date: '2024-06-15',
+		date: diverse ? diverseDate(i) : '2024-06-15',
 		amount: -100,
 		bankText: `Invented Capacity ${String(i).padStart(6, '0')} `.padEnd(500, 'x'),
 		pick: 'new',
 		...(source === 'qfx' ? { sourceId: `invented-${i}` } : {})
 	}));
 	const input = { accountId: ids.accountId, source, rows };
-	const preview = await measured('preview', { input }, source, count, run, true);
+	const preview = await measured(
+		'preview',
+		{ input },
+		diverse ? `${source}-diverse` : source,
+		count,
+		run,
+		true
+	);
 	if (
 		!preview.error &&
 		(preview.result.result.length !== count ||
 			preview.result.result.some((row) => row.kind !== 'new'))
 	)
 		throw new Error('preview skipped work');
-	const commit = await measured('commit', { input }, source, count, run);
+	const commit = await measured(
+		'commit',
+		{ input },
+		diverse ? `${source}-diverse` : source,
+		count,
+		run
+	);
 	if (
 		!commit.error &&
 		JSON.stringify(commit.result.result) !==
@@ -217,7 +235,36 @@ async function searchImport(source, phase) {
 	return low;
 }
 
-const [scenario, countText] = process.argv.slice(2);
+function diverseDate(i) {
+	return `${2020 + Math.floor((i % 60) / 12)}-${String((i % 12) + 1).padStart(2, '0')}-15`;
+}
+
+function withinLimits(record) {
+	return (
+		!record.error &&
+		Object.entries(limits).every(([key, limit]) => record.result.metrics[key].used < limit) &&
+		record.completion.returnBytes < 16777216
+	);
+}
+
+async function checkCapacity() {
+	for (const source of ['qfx', 'csv']) {
+		for (const diverse of [false, true]) {
+			for (let run = 1; run <= 3; run++)
+				await importTrial(source, MAX_FILE_ROWS, run, 'workflow', diverse);
+		}
+	}
+	const passed = records.every(withinLimits);
+	if (!passed) {
+		console.error(
+			'Import capacity contract failed; reduce MAX_FILE_ROWS or reduce measured preview/commit work.'
+		);
+		process.exitCode = 1;
+	}
+	return { passed, maxFileRows: MAX_FILE_ROWS, seconds: (performance.now() - started) / 1000 };
+}
+
+const [scenario, countText] = checkMode ? [] : process.argv.slice(2);
 const count = Number(countText);
 if (
 	scenario !== undefined &&
@@ -231,13 +278,16 @@ if (
 save('manifest.json', {
 	limits,
 	sourceHead: git(checkout, 'rev-parse', 'HEAD').trim(),
-	decision: 'Every measured transaction resource strictly below 50%, three fresh runs',
+	decision: checkMode
+		? 'Admitted MAX_FILE_ROWS preview and commit below full limits, three fresh runs at dense and diverse dates'
+		: 'Every measured transaction resource strictly below 50%, three fresh runs',
 	backendVersion: await (await fetch(`${deployment.url}/version`)).text()
 });
 try {
 	await deployHarness();
 	const summary = {};
-	if (scenario !== undefined) summary[scenario] = await trials(scenario, count);
+	if (checkMode) summary.check = await checkCapacity();
+	else if (scenario !== undefined) summary[scenario] = await trials(scenario, count);
 	else {
 		for (const source of ['qfx', 'csv'])
 			summary[source] = {
@@ -247,6 +297,7 @@ try {
 		summary.history9000 = await trials('history', 9000);
 	}
 	save('summary.json', summary);
+	console.log(JSON.stringify(summary));
 } finally {
 	const code = await runConvex(deployment, checkout, [
 		'dev',
