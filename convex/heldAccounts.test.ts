@@ -1,5 +1,5 @@
 import { Effect, Exit, Layer } from 'effect';
-import { afterEach, assert, describe, expect, test, vi } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { decodeSyncPage, type BankAccount, type SyncPage } from '../src/lib/domain/plaid';
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
@@ -38,6 +38,19 @@ const bankAccounts: BankAccount[] = [
 	{ externalId: checkingId, name: 'Sample Checking', mask: '0042', balance: 120_000 },
 	{ externalId: savingsId, name: 'Sample Savings', mask: '4321', balance: 300_000 }
 ];
+
+function gate() {
+	let open!: () => void;
+	const opened = new Promise<void>((resolve) => {
+		open = resolve;
+	});
+	return {
+		open: () => {
+			open();
+		},
+		opened
+	};
+}
 
 type FakePlaid = Parameters<typeof PlaidClient.layerTest>[0];
 
@@ -95,12 +108,14 @@ async function connectedBudget() {
 			syncConnection(connectionId, { refresh: false })
 		);
 	};
-	const suggest = (accountId: Id<'accounts'>) =>
+	const syncWith = (plaid: FakePlaid) =>
+		inAction(plaid, syncConnection(connectionId, { refresh: false }));
+	const suggest = (accountId: Id<'accounts'>, reported = bankAccounts) =>
 		inAction(
 			{
 				accountsGet: (token, ids) => {
 					expect(token).toBe(accessToken);
-					return Effect.succeed(bankAccounts.filter((a) => ids?.includes(a.externalId)));
+					return Effect.succeed(reported.filter((a) => ids?.includes(a.externalId)));
 				}
 			},
 			suggestStartingBalance(accountId)
@@ -125,6 +140,7 @@ async function connectedBudget() {
 		checking,
 		connectionId,
 		sync,
+		syncWith,
 		suggest,
 		held,
 		heldId,
@@ -430,6 +446,123 @@ describe('the bank changes a row it holds for an unknown Account', () => {
 		expect(amounts).toHaveLength(HELD_BATCH + 2);
 		expect(amounts).toContain(-999);
 		expect(amounts).not.toContain(-(HELD_BATCH + 2));
+	});
+});
+
+describe('a suggested starting balance', () => {
+	const checkingReporting = (balance: number | null): BankAccount[] => [
+		{ externalId: checkingId, name: 'Sample Checking', mask: '0042', balance }
+	];
+
+	test("is the bank's balance, even zero, and is withheld when the bank has no balance or no such Account", async () => {
+		const { checking, suggest } = await connectedBudget();
+
+		expect(await suggest(checking, checkingReporting(0))).toEqual({
+			kind: 'suggested',
+			startingBalance: 0
+		});
+		expect(await suggest(checking, checkingReporting(null))).toEqual({ kind: 'noBalance' });
+		expect(await suggest(checking, [])).toEqual({ kind: 'noBalance' });
+	});
+
+	test('waits until every held row is brought in', async () => {
+		vi.useFakeTimers();
+		const { t, owner, sync, heldId, suggest } = await connectedBudget();
+		const many = Array.from({ length: HELD_BATCH + 20 }, (_, n) => ({
+			...payroll,
+			account_id: savingsId,
+			transaction_id: `txn-synthetic-many-${String(n)}`,
+			amount: 1 + n
+		}));
+		await sync({ ...page, added: many });
+		const savings = await owner.mutation(api.heldAccounts.createAccount, {
+			connectionAccountId: await heldId(),
+			name: 'Savings',
+			kind: 'cash'
+		});
+
+		expect(await suggest(savings)).toEqual({ kind: 'importing' });
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+		const imported = many.reduce((sum, row) => sum + row.amount, 0);
+		expect(await suggest(savings)).toEqual({
+			kind: 'suggested',
+			startingBalance: 300_000 - imported
+		});
+	});
+
+	describe('asked while a sync is unfinished', () => {
+		const imported = 231_042 - 4_250;
+
+		beforeEach(() => {
+			vi.stubEnv('PLAID_CLIENT_ID', 'client-id-synthetic');
+			vi.stubEnv('PLAID_SECRET', 'secret-synthetic-not-real');
+			vi.stubEnv('BUDGE_TOKEN_KEY', tokenKey);
+			vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+				const url = new URL(input instanceof Request ? input.url : input);
+				assert(url.pathname === '/accounts/get', `Unexpected Plaid call ${url.pathname}`);
+				const accounts = [
+					{
+						account_id: checkingId,
+						name: 'Sample Checking',
+						mask: '0042',
+						type: 'depository',
+						balances: { current: 1_200 }
+					}
+				];
+				return Promise.resolve(
+					new Response(JSON.stringify({ accounts, request_id: 'request-synthetic' }), {
+						status: 200,
+						headers: { 'content-type': 'application/json' }
+					})
+				);
+			});
+		});
+
+		afterEach(() => {
+			vi.unstubAllGlobals();
+		});
+
+		test('while the sync is running, says the rows are still coming in', async () => {
+			const { owner, checking, syncWith } = await connectedBudget();
+			const suggestion = () =>
+				owner.action(api.heldAccounts.suggestStartingBalance, { accountId: checking });
+			const bank = gate();
+			const syncAsked = gate();
+			const running = syncWith({
+				transactionsSync: () =>
+					Effect.promise(async () => {
+						syncAsked.open();
+						await bank.opened;
+						return page;
+					})
+			});
+			await syncAsked.opened;
+
+			expect(await suggestion()).toEqual({ kind: 'importing' });
+
+			bank.open();
+			await running;
+			expect(await suggestion()).toEqual({
+				kind: 'suggested',
+				startingBalance: 120_000 - imported
+			});
+		});
+
+		test("after a sync stopped before the bank's last page, says the rows are still coming in", async () => {
+			const { owner, checking, sync } = await connectedBudget();
+			const suggestion = () =>
+				owner.action(api.heldAccounts.suggestStartingBalance, { accountId: checking });
+			await sync({ ...page, nextCursor: 'cursor-synthetic-more', hasMore: true });
+
+			expect(await suggestion()).toEqual({ kind: 'importing' });
+
+			await sync(page);
+			expect(await suggestion()).toEqual({
+				kind: 'suggested',
+				startingBalance: 120_000 - imported
+			});
+		});
 	});
 });
 

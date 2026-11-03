@@ -126,7 +126,28 @@ export const suggestStartingBalance = action({
 	),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
+		const unfinished: boolean = await ctx.runQuery(internal.heldAccounts.syncUnfinished, {
+			accountId,
+			now: Date.now()
+		});
+		if (unfinished) return { kind: 'importing' as const };
 		return await runEffect(suggest(accountId).pipe(Effect.provide(liveLayer(ctx))), toPublicError);
+	}
+});
+
+export const syncUnfinished = internalQuery({
+	args: { accountId: v.id('accounts'), now: v.number() },
+	returns: v.boolean(),
+	handler: async (ctx, { accountId, now }) => {
+		const mapped = await ctx.db
+			.query('connectionAccounts')
+			.withIndex('by_accountId', (q) => q.eq('accountId', accountId))
+			.first();
+		if (mapped === null) return false;
+		const connection = await ctx.db.get('bankConnections', mapped.connectionId);
+		if (connection?.provider.kind !== 'plaid') return false;
+		const leased = (connection.syncLeaseUntil ?? 0) > now;
+		return leased || connection.provider.updateStart !== undefined;
 	}
 });
 
