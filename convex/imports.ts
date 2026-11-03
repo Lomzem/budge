@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
+import { resolveBankChange as resolve } from './lib/bankChanges';
 import { applyBankRows, fileRow, fileSource, insertImported, planImport } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
@@ -96,10 +97,13 @@ export const unmatch = mutation({
 		if (!bankRow.matched || matchedId === undefined) {
 			throw publicError('INVALID_INPUT', 'This bank row is not Matched.');
 		}
+		if (bankRow.state === 'removed') {
+			throw publicError('INVALID_INPUT', 'The bank removed this row. Resolve that instead.');
+		}
 		const matchedTransaction = await ctx.db.get('transactions', matchedId);
 		if (matchedTransaction !== null) requireUnlocked(matchedTransaction, 'to unmatch it');
 		const transactionId = await insertImported(ctx, bankRow.accountId, bankRow);
-		await ctx.db.patch('imports', importId, { transactionId, matched: false });
+		await ctx.db.patch('imports', importId, { transactionId, matched: false, state: 'linked' });
 		await refreshSearchText(ctx, transactionId);
 		await refreshSearchText(ctx, matchedId);
 		const stillLinked = await bankRowsOf(ctx, matchedId);
@@ -107,6 +111,16 @@ export const unmatch = mutation({
 			await ctx.db.patch('transactions', matchedId, { cleared: 'uncleared', approved: true });
 		}
 		return transactionId;
+	}
+});
+
+export const resolveBankChange = mutation({
+	args: { importId: v.id('imports'), keep: v.union(v.literal('bank'), v.literal('mine')) },
+	returns: v.null(),
+	handler: async (ctx, { importId, keep }) => {
+		await requireOwner(ctx);
+		await resolve(ctx, importId, keep);
+		return null;
 	}
 });
 

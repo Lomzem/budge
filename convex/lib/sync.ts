@@ -2,7 +2,12 @@ import type { GenericActionCtx } from 'convex/server';
 import { v, type Infer } from 'convex/values';
 import { Cause, Context, Effect, Layer, Option, Result } from 'effect';
 
-import { syncRowsOf, type SyncRow } from '../../src/lib/domain/plaid';
+import {
+	syncRowsOf,
+	type SyncPage,
+	type SyncRemoval,
+	type SyncRow
+} from '../../src/lib/domain/plaid';
 import { internal } from '../_generated/api';
 import type { DataModel, Id } from '../_generated/dataModel';
 import { PlaidClient, type PlaidError } from './plaidClient';
@@ -27,6 +32,8 @@ export const syncRow = v.object({
 	bankText: v.string(),
 	merchantName: v.optional(v.string())
 });
+
+export const syncRemoval = v.object({ externalAccountId: v.string(), sourceId: v.string() });
 
 export const leaseResult = v.union(
 	v.object({ kind: v.literal('missing') }),
@@ -54,7 +61,8 @@ export const applyArgs = {
 
 	hasMore: v.boolean(),
 	rows: v.array(syncRow),
-
+	modified: v.array(syncRow),
+	removed: v.array(syncRemoval),
 	release: v.boolean()
 };
 
@@ -93,6 +101,8 @@ interface SyncStoreShape {
 		nextCursor: string;
 		hasMore: boolean;
 		rows: SyncRow[];
+		modified: SyncRow[];
+		removed: SyncRemoval[];
 		release: boolean;
 	}) => Effect.Effect<ApplyResult>;
 
@@ -181,6 +191,8 @@ export const syncConnection = Effect.fnUntraced(function* (
 				nextCursor: fetched.nextCursor,
 				hasMore: fetched.hasMore,
 				rows: fetched.rows,
+				modified: fetched.modified,
+				removed: fetched.removed,
 				release
 			});
 			if (applied.kind === 'stale') return { kind: 'busy' } as const;
@@ -204,6 +216,8 @@ export const syncConnection = Effect.fnUntraced(function* (
 
 interface Batch {
 	rows: SyncRow[];
+	modified: SyncRow[];
+	removed: SyncRemoval[];
 	nextCursor: string;
 	hasMore: boolean;
 }
@@ -216,17 +230,25 @@ function fetchBatch(
 ): Effect.Effect<Batch, PlaidError> {
 	return Effect.gen(function* () {
 		const rows: SyncRow[] = [];
+		const modified: SyncRow[] = [];
+		const removed: SyncRemoval[] = [];
+		const collect = (page: SyncPage) => {
+			const changes = syncRowsOf(page, cutoverDate);
+			rows.push(...changes.added);
+			modified.push(...changes.modified);
+			removed.push(...changes.removed);
+		};
 		let page = yield* plaid.transactionsSync({ accessToken, cursor, count: PAGE_SIZE });
-		rows.push(...syncRowsOf(page, cutoverDate));
+		collect(page);
 		for (let pages = 1; pages < PAGES_PER_BATCH && page.hasMore; pages++) {
 			page = yield* plaid.transactionsSync({
 				accessToken,
 				cursor: page.nextCursor,
 				count: PAGE_SIZE
 			});
-			rows.push(...syncRowsOf(page, cutoverDate));
+			collect(page);
 		}
-		return { rows, nextCursor: page.nextCursor, hasMore: page.hasMore };
+		return { rows, modified, removed, nextCursor: page.nextCursor, hasMore: page.hasMore };
 	});
 }
 

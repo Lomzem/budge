@@ -52,6 +52,7 @@ function sampleArgs(ids: {
 		'imports:preview': { accountId, source: 'csv', rows: [] },
 		'imports:commit': { accountId, source: 'csv', rows: [] },
 		'imports:unmatch': { importId },
+		'imports:resolveBankChange': { importId, keep: 'mine' },
 		'bankConnections:list': {},
 		'bankConnections:syncNow': { connectionId },
 		'payees:lastCategory': { name: 'Corner Grocer' },

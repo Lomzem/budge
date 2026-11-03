@@ -86,7 +86,13 @@ describe('PlaidClient', () => {
 			return Effect.gen(function* () {
 				const page = yield* sync;
 
-				expect(page).toEqual({ added: [], nextCursor: 'cursor-synthetic-1', hasMore: false });
+				expect(page).toEqual({
+					added: [],
+					modified: [],
+					removed: [],
+					nextCursor: 'cursor-synthetic-1',
+					hasMore: false
+				});
 				expect(plaid.sent).toHaveLength(1);
 				const [request] = plaid.sent;
 				expect(request?.url).toBe('https://sandbox.plaid.com/transactions/sync');

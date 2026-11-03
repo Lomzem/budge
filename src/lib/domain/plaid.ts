@@ -30,14 +30,23 @@ const SyncTransaction = Schema.Struct({
 	pending: Schema.Boolean
 });
 
+const RemovedTransaction = Schema.Struct({
+	transaction_id: Schema.String,
+	account_id: Schema.String
+});
+
 const SyncResponse = Schema.Struct({
 	added: Schema.Array(SyncTransaction),
+	modified: Schema.Array(SyncTransaction),
+	removed: Schema.Array(RemovedTransaction),
 	next_cursor: Schema.String,
 	has_more: Schema.Boolean
 });
 
 export interface SyncPage {
 	added: readonly (typeof SyncTransaction.Type)[];
+	modified: readonly (typeof SyncTransaction.Type)[];
+	removed: readonly (typeof RemovedTransaction.Type)[];
 	nextCursor: string;
 	hasMore: boolean;
 }
@@ -52,17 +61,44 @@ export interface SyncRow {
 	merchantName?: string;
 }
 
+export interface SyncRemoval {
+	externalAccountId: string;
+	sourceId: string;
+}
+
+export interface SyncChanges {
+	added: SyncRow[];
+	modified: SyncRow[];
+	removed: SyncRemoval[];
+}
+
 export const decodeSyncPage = (body: unknown): Effect.Effect<SyncPage, Schema.SchemaError> =>
 	Schema.decodeUnknownEffect(SyncResponse)(body).pipe(
 		Effect.map((response) => ({
 			added: response.added,
+			modified: response.modified,
+			removed: response.removed,
 			nextCursor: response.next_cursor,
 			hasMore: response.has_more
 		}))
 	);
 
-export function syncRowsOf(page: SyncPage, cutoverDate: string): SyncRow[] {
-	return page.added.flatMap((transaction) => {
+export function syncRowsOf(page: SyncPage, cutoverDate: string): SyncChanges {
+	return {
+		added: bankRowsOf(page.added, cutoverDate),
+		modified: bankRowsOf(page.modified, cutoverDate),
+		removed: page.removed.map((removal) => ({
+			externalAccountId: removal.account_id,
+			sourceId: removal.transaction_id
+		}))
+	};
+}
+
+function bankRowsOf(
+	transactions: readonly (typeof SyncTransaction.Type)[],
+	cutoverDate: string
+): SyncRow[] {
+	return transactions.flatMap((transaction) => {
 		if (transaction.pending || transaction.date < cutoverDate) return [];
 		const bankText = clean(transaction.original_description) ?? clean(transaction.name);
 		if (bankText === undefined) return [];

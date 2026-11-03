@@ -327,6 +327,8 @@ describe('the Plaid webhook', () => {
 			nextCursor: 'cursor-synthetic-held',
 			hasMore: false,
 			rows: [],
+			modified: [],
+			removed: [],
 			release: true
 		});
 		await runScheduled(backend);

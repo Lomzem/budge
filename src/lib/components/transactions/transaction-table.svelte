@@ -23,6 +23,13 @@
 	let { accountId }: { accountId?: Id<'accounts'> | undefined } = $props();
 
 	const PAGE_SIZE = 50;
+
+	function bankFlag(row: Row) {
+		if (row.bankRows.some((bankRow) => bankRow.state === 'removed')) return 'Bank removed this';
+		if (row.bankRows.some((bankRow) => bankRow.state === 'changed')) return 'Bank changed this';
+		return undefined;
+	}
+
 	const SEARCH_PAUSE_MS = 300;
 	let filterValues = $state({ ...noFilters });
 
@@ -167,6 +174,7 @@
 				{#each rows as row (row._id)}
 					{@const payee = row.payeeName ?? (row.transfer ? 'Transfer' : 'No Payee')}
 					{@const category = categoryOf(row)}
+					{@const flag = bankFlag(row)}
 					{@const categoryClass =
 						row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
 					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
@@ -197,6 +205,9 @@
 									, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(row.date)}
 								</span>
 							</button>
+							{#if flag}
+								<span class="block truncate text-xs font-normal text-warning">{flag}</span>
+							{/if}
 							<span class="block truncate text-xs font-normal text-muted-foreground @lg:hidden">
 								<span class={categoryClass}>{category}</span>
 							</span>

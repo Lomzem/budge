@@ -21,6 +21,7 @@ import type * as crons from "../crons.js";
 import type * as export_ from "../export.js";
 import type * as http from "../http.js";
 import type * as imports from "../imports.js";
+import type * as lib_bankChanges from "../lib/bankChanges.js";
 import type * as lib_categories from "../lib/categories.js";
 import type * as lib_imports from "../lib/imports.js";
 import type * as lib_input from "../lib/input.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   export: typeof export_;
   http: typeof http;
   imports: typeof imports;
+  "lib/bankChanges": typeof lib_bankChanges;
   "lib/categories": typeof lib_categories;
   "lib/imports": typeof lib_imports;
   "lib/input": typeof lib_input;

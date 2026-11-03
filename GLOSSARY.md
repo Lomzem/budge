@@ -115,3 +115,7 @@ _Avoid_: Merge, reconcile, dedupe
 **Bank Text**:
 The raw description on a Bank Row, kept read-only and shown alongside the Transaction's Payee.
 _Avoid_: Memo, raw payee, statement name
+
+**Bank Change**:
+The bank changing or removing a Transaction it already reported. An Unapproved Transaction you have not edited follows the bank: it takes the new date, amount, and Bank Text, or is deleted. Any other Transaction keeps your version and is flagged "bank changed this" or "bank removed this" until you resolve it by keeping the bank's version or your own; either way it is then approved. Applying the same Bank Change again changes nothing.
+_Avoid_: Bank edit, modification, correction
