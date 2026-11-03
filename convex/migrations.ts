@@ -12,6 +12,7 @@ export const backfillPaymentCategories = internalMutation({
 	returns: v.object({ repaired: v.number(), unmatched: v.array(v.id('accounts')) }),
 	handler: async (ctx) => {
 		const cutoverDate = await requireCutoverDate(ctx);
+		const legacy = await legacyStartingBalances(ctx);
 		let repaired = 0;
 		const unmatched: Id<'accounts'>[] = [];
 		for await (const account of ctx.db.query('accounts')) {
@@ -19,12 +20,9 @@ export const backfillPaymentCategories = internalMutation({
 				continue;
 			}
 			const categoryId = await createPaymentCategory(ctx, account);
-			const startingBalance = await ctx.db
-				.query('transactions')
-				.withIndex('by_accountId_and_kind', (q) =>
-					q.eq('accountId', account._id).eq('kind', 'startingBalance')
-				)
-				.unique();
+			const startingBalance =
+				(await startingBalanceOf(ctx, account._id)) ??
+				genuineLegacyRow(account, legacy.get(account._id));
 			if (
 				startingBalance?.date === cutoverDate &&
 				startingBalance.categoryId === undefined &&
@@ -70,18 +68,18 @@ export const backfillStartingBalanceKind = internalMutation({
 	handler: async (ctx) => {
 		let converted = 0;
 		const unresolved: Id<'accounts'>[] = [];
-		for (const [accountId, [only, ...others]] of await legacyStartingBalances(ctx)) {
-			if (
-				only === undefined ||
-				others.length > 0 ||
-				only.split === true ||
-				(await hasStartingBalance(ctx, accountId))
-			) {
+		for (const [accountId, rows] of await legacyStartingBalances(ctx)) {
+			const account = await ctx.db.get('accounts', accountId);
+			const genuine = account === null ? null : genuineLegacyRow(account, rows);
+			if (genuine === null || (await startingBalanceOf(ctx, accountId)) !== null) {
 				unresolved.push(accountId);
 				continue;
 			}
-			await ctx.db.patch('transactions', only._id, { kind: 'startingBalance', payeeId: undefined });
-			await refreshSearchText(ctx, only._id);
+			await ctx.db.patch('transactions', genuine._id, {
+				kind: 'startingBalance',
+				payeeId: undefined
+			});
+			await refreshSearchText(ctx, genuine._id);
 			converted++;
 		}
 		return { converted, unresolved };
@@ -116,12 +114,20 @@ async function hasUnmatchedBankRow(ctx: MutationCtx, transactionId: Id<'transact
 	return false;
 }
 
-async function hasStartingBalance(ctx: MutationCtx, accountId: Id<'accounts'>) {
-	const found = await ctx.db
+async function startingBalanceOf(ctx: MutationCtx, accountId: Id<'accounts'>) {
+	return await ctx.db
 		.query('transactions')
 		.withIndex('by_accountId_and_kind', (q) =>
 			q.eq('accountId', accountId).eq('kind', 'startingBalance')
 		)
 		.first();
-	return found !== null;
+}
+
+const MUTATION_TIME_LIMIT_MS = 1_000;
+
+function genuineLegacyRow(account: Doc<'accounts'>, rows: readonly Doc<'transactions'>[] = []) {
+	const [only, ...others] = rows;
+	if (only === undefined || others.length > 0 || only.split === true) return null;
+	const madeWithItsAccount = only._creationTime - account._creationTime < MUTATION_TIME_LIMIT_MS;
+	return madeWithItsAccount ? only : null;
 }
