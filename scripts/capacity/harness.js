@@ -33,14 +33,17 @@ export const prepare = mutation({
 		start: v.number(),
 		count: v.number(),
 		history: v.boolean(),
+		diverse: v.optional(v.boolean()),
 		perMonth: v.number()
 	},
 	handler: async (ctx, args) => {
 		for (let i = args.start; i < args.start + args.count; i++) {
 			const month = Math.floor(i / args.perMonth);
-			const date = args.history
-				? `${2020 + Math.floor(month / 12)}-${String((month % 12) + 1).padStart(2, '0')}-15`
-				: '2024-06-15';
+			let date = '2024-06-15';
+			if (args.history)
+				date = `${2020 + Math.floor(month / 12)}-${String((month % 12) + 1).padStart(2, '0')}-15`;
+			else if (args.diverse)
+				date = `${2020 + Math.floor((i % 60) / 12)}-${String((i % 12) + 1).padStart(2, '0')}-15`;
 			const bankText = `Invented Capacity ${String(i).padStart(6, '0')} `.padEnd(500, 'x');
 			const payeeId = await ctx.db.insert('payees', {
 				name: bankText,
