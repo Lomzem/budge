@@ -1,11 +1,11 @@
 import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
-import type { Id } from './_generated/dataModel';
-import { internalMutation } from './_generated/server';
+import type { Doc, Id } from './_generated/dataModel';
+import { internalMutation, type MutationCtx } from './_generated/server';
 import { createPaymentCategory, readPaymentCategory } from './lib/categories';
 import { requireCutoverDate } from './lib/settings';
-import { refreshSearchText, replaceTransaction } from './lib/transactions';
+import { allBankRowsOf, refreshSearchText, replaceTransaction } from './lib/transactions';
 
 export const backfillPaymentCategories = internalMutation({
 	args: {},
@@ -63,3 +63,65 @@ export const backfillSearchText = internalMutation({
 		return null;
 	}
 });
+
+export const backfillStartingBalanceKind = internalMutation({
+	args: {},
+	returns: v.object({ converted: v.number(), unresolved: v.array(v.id('accounts')) }),
+	handler: async (ctx) => {
+		let converted = 0;
+		const unresolved: Id<'accounts'>[] = [];
+		for (const [accountId, [only, ...others]] of await legacyStartingBalances(ctx)) {
+			if (
+				only === undefined ||
+				others.length > 0 ||
+				only.split === true ||
+				(await hasStartingBalance(ctx, accountId))
+			) {
+				unresolved.push(accountId);
+				continue;
+			}
+			await ctx.db.patch('transactions', only._id, { kind: 'startingBalance', payeeId: undefined });
+			await refreshSearchText(ctx, only._id);
+			converted++;
+		}
+		return { converted, unresolved };
+	}
+});
+
+async function legacyStartingBalances(ctx: MutationCtx) {
+	const byAccount = new Map<Id<'accounts'>, Doc<'transactions'>[]>();
+	const payee = await ctx.db
+		.query('payees')
+		.withIndex('by_name', (q) => q.eq('name', 'Starting Balance'))
+		.unique();
+	if (payee === null) return byAccount;
+	const named = ctx.db
+		.query('transactions')
+		.withIndex('by_payee_date', (q) => q.eq('payeeId', payee._id));
+	for await (const transaction of named) {
+		if (transaction.transferTransactionId !== undefined) continue;
+		if (await hasUnmatchedBankRow(ctx, transaction._id)) continue;
+		byAccount.set(transaction.accountId, [
+			...(byAccount.get(transaction.accountId) ?? []),
+			transaction
+		]);
+	}
+	return byAccount;
+}
+
+async function hasUnmatchedBankRow(ctx: MutationCtx, transactionId: Id<'transactions'>) {
+	for await (const bankRow of allBankRowsOf(ctx, transactionId)) {
+		if (!bankRow.matched) return true;
+	}
+	return false;
+}
+
+async function hasStartingBalance(ctx: MutationCtx, accountId: Id<'accounts'>) {
+	const found = await ctx.db
+		.query('transactions')
+		.withIndex('by_accountId_and_kind', (q) =>
+			q.eq('accountId', accountId).eq('kind', 'startingBalance')
+		)
+		.first();
+	return found !== null;
+}
