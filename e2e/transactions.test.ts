@@ -2,6 +2,7 @@ import { clerk } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 
 import { parseCents } from '../src/lib/domain/money';
+import { holdResponseTo } from './heldResponse';
 
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 
@@ -80,4 +81,60 @@ test("a Payee's last Category fills in, and picking another Category keeps it", 
 		await page.keyboard.press('Escape');
 		await expect(dialog).toBeHidden();
 	});
+});
+
+test('a save that finishes after the dialog was closed leaves the next opening alone', async ({
+	page
+}) => {
+	if (!ownerEmail) throw new Error('E2E_CLERK_USER_EMAIL is not set.');
+
+	const create = await holdResponseTo(page, 'transactions:create');
+	await page.goto('/sign-in');
+	await clerk.signIn({ page, emailAddress: ownerEmail });
+	await page.goto('/');
+	await page
+		.getByRole('navigation', { name: 'Budget and Accounts' })
+		.getByRole('link', { name: /^Checking/ })
+		.click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Checking' })).toBeVisible();
+
+	const slowPayee = 'Smoke Test Slow Bakery';
+	const slowRow = page.getByRole('button', { name: new RegExp(`^${slowPayee}`) });
+	const adding = page.getByRole('dialog', { name: 'Add Transaction' });
+	const editing = page.getByRole('dialog', { name: 'Edit Transaction' });
+
+	try {
+		await page.getByRole('button', { name: 'Add Transaction' }).click();
+		await adding.getByLabel('Payee').fill(slowPayee);
+		await adding.getByLabel('Amount').fill('7.00');
+		await adding.getByRole('button', { name: 'Save' }).click();
+		await create.held;
+		await page.keyboard.press('Escape');
+		await expect(adding).toBeHidden();
+
+		await page
+			.getByRole('button', { name: /^Sample Landlord/ })
+			.first()
+			.click();
+		await expect(editing.getByLabel('Payee')).toHaveValue('Sample Landlord');
+		create.release();
+
+		await expect(slowRow.first()).toBeVisible();
+		await expect(editing.getByRole('button', { name: 'Save' })).toBeEnabled();
+		await expect(editing).toHaveAttribute('data-state', 'open');
+		await expect(editing.getByLabel('Payee')).toHaveValue('Sample Landlord');
+		await expect(editing.getByRole('alert')).toHaveCount(0);
+	} finally {
+		await test.step('delete the slow save, even if a step above failed', async () => {
+			create.release();
+			if (await page.getByRole('dialog').isVisible()) await page.keyboard.press('Escape');
+			while ((await slowRow.count()) > 0) {
+				await slowRow.first().click();
+				await editing.getByRole('button', { name: 'Delete' }).click();
+				await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+				await expect(page.getByRole('alertdialog')).toBeHidden();
+				await expect(editing).toBeHidden();
+			}
+		});
+	}
 });

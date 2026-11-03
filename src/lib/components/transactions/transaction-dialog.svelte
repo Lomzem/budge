@@ -177,6 +177,8 @@
 		linkChoice = value;
 	};
 
+	let session = 0;
+
 	$effect(() => {
 		if (open) untrack(fill);
 	});
@@ -215,6 +217,7 @@
 	}
 
 	function fill() {
+		session += 1;
 		error = '';
 		unlocked = false;
 		linkChoice = undefined;
@@ -311,6 +314,24 @@
 		};
 	}
 
+	async function write(
+		work: () => PromiseLike<unknown>,
+		failure: string,
+		succeeded = () => {
+			open = false;
+		}
+	) {
+		const started = session;
+		saving = true;
+		const result = await attempt(work);
+		saving = false;
+		if (started !== session) return;
+		confirmDelete = false;
+		confirmBankRemoval = null;
+		if (result.ok) succeeded();
+		else error = result.error?.message ?? failure;
+	}
+
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (categoryId === UNRESOLVED) return;
@@ -351,66 +372,53 @@
 			const noPayeeOrCategory = { payee: '' };
 			fields = { ...shared, ...noPayeeOrCategory, ...transfer };
 		}
-		saving = true;
 		const transactionId = transaction?._id;
-		const saved = await attempt(() =>
-			transactionId === undefined ? create(fields) : update({ transactionId, ...fields })
+		await write(
+			() => (transactionId === undefined ? create(fields) : update({ transactionId, ...fields })),
+			"Budge couldn't save the Transaction. Try again."
 		);
-		saving = false;
-		if (saved.ok) open = false;
-		else error = saved.error?.message ?? "Budge couldn't save the Transaction. Try again.";
 	}
 
 	async function approveTransaction() {
 		if (!transaction) return;
 		const transactionId = transaction._id;
-		saving = true;
-		const approved = await attempt(() => approve({ transactionId }));
-		saving = false;
-		if (approved.ok) open = false;
-		else error = approved.error?.message ?? "Budge couldn't approve the Transaction. Try again.";
+		await write(
+			() => approve({ transactionId }),
+			"Budge couldn't approve the Transaction. Try again."
+		);
 	}
 
 	async function unmatchRow(importId: Id<'imports'>) {
-		saving = true;
-		const unmatched = await attempt(() => unmatch({ importId }));
-		saving = false;
-		if (unmatched.ok) open = false;
-		else error = unmatched.error?.message ?? "Budge couldn't Unmatch the row. Try again.";
+		await write(() => unmatch({ importId }), "Budge couldn't Unmatch the row. Try again.");
 	}
 
 	async function resolveBankRow(importId: Id<'imports'>, keep: 'bank' | 'mine') {
-		saving = true;
-		const resolved = await attempt(() => resolveBankChange({ importId, keep }));
-		saving = false;
-		confirmBankRemoval = null;
-		if (resolved.ok) open = false;
-		else error = resolved.error?.message ?? "Budge couldn't resolve the bank's change. Try again.";
+		await write(
+			() => resolveBankChange({ importId, keep }),
+			"Budge couldn't resolve the bank's change. Try again."
+		);
 	}
 
 	async function unlockTransaction() {
 		if (!transaction) return;
 		const transactionId = transaction._id;
-		saving = true;
-		const unlockedNow = await attempt(() => unlock({ transactionId }));
-		saving = false;
-		if (!unlockedNow.ok) {
-			error = unlockedNow.error?.message ?? "Budge couldn't unlock the Transaction. Try again.";
-			return;
-		}
-		unlocked = true;
-		error = '';
+		await write(
+			() => unlock({ transactionId }),
+			"Budge couldn't unlock the Transaction. Try again.",
+			() => {
+				unlocked = true;
+				error = '';
+			}
+		);
 	}
 
 	async function deleteTransaction() {
 		if (!transaction) return;
 		const transactionId = transaction._id;
-		saving = true;
-		const removed = await attempt(() => remove({ transactionId }));
-		saving = false;
-		confirmDelete = false;
-		if (removed.ok) open = false;
-		else error = removed.error?.message ?? "Budge couldn't delete the Transaction. Try again.";
+		await write(
+			() => remove({ transactionId }),
+			"Budge couldn't delete the Transaction. Try again."
+		);
 	}
 </script>
 
