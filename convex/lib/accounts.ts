@@ -6,6 +6,7 @@ import { findPayeeNamed, STARTING_BALANCE } from './payees';
 import { publicError } from './publicError';
 import { requireCutoverDate } from './settings';
 import {
+	bankRowsOf,
 	insertTransaction,
 	replaceTransaction,
 	requireUnlocked,
@@ -81,9 +82,12 @@ async function startingBalanceOf(ctx: MutationCtx, accountId: Id<'accounts'>) {
 		.query('transactions')
 		.withIndex('by_payee_date', (q) => q.eq('payeeId', payee._id));
 	for await (const transaction of named) {
-		if (transaction.accountId === accountId && transaction.transferTransactionId === undefined) {
-			return transaction;
+		if (transaction.accountId !== accountId || transaction.transferTransactionId !== undefined) {
+			continue;
 		}
+		const bankRows = await bankRowsOf(ctx, transaction._id);
+		const importedFromABankRow = bankRows.some((bankRow) => !bankRow.matched);
+		if (!importedFromABankRow) return transaction;
 	}
 	return null;
 }

@@ -156,6 +156,39 @@ describe("changing an Account's starting balance", () => {
 		expect(await startingBalances()).toMatchObject([{ _id: existing._id, amount: 180_000 }]);
 	});
 
+	test('a row imported with the Starting Balance Payee before the guard is never taken for the starting balance', async () => {
+		const { t, owner, accountId, startingBalances } = await checkingWithStartingBalance();
+		const [genuine] = await startingBalances();
+		assert(genuine !== undefined, 'expected the starting balance');
+		await owner.mutation(api.imports.commit, {
+			accountId,
+			source: 'csv',
+			rows: [{ date: '2026-08-02', amount: 5_000, bankText: 'Starting Balance' }]
+		});
+		const imported = (
+			await owner.query(api.transactions.list, {
+				accountId,
+				paginationOpts: { numItems: 10, cursor: null }
+			})
+		).page.find((row) => row.amount === 5_000);
+		await t.run(async (ctx) => {
+			const payee = await ctx.db
+				.query('payees')
+				.withIndex('by_name', (q) => q.eq('name', 'Starting Balance'))
+				.unique();
+			assert(imported !== undefined && payee !== null, 'expected the imported row and the Payee');
+			await ctx.db.patch('transactions', imported._id, { payeeId: payee._id });
+		});
+		await owner.mutation(api.transactions.remove, { transactionId: genuine._id });
+
+		await owner.mutation(api.accounts.setStartingBalance, { accountId, startingBalance: 180_000 });
+
+		expect(await startingBalances()).toMatchObject([
+			{ amount: 5_000, date: '2026-08-02' },
+			{ amount: 180_000, date: '2026-08-01' }
+		]);
+	});
+
 	test('no other Transaction can take the Starting Balance Payee', async () => {
 		const { owner, accountId } = await checkingWithStartingBalance();
 
