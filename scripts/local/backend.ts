@@ -91,13 +91,13 @@ function moveLocalConfig(dir: string, ports: BackendPorts) {
 	writeFileSync(path, `${JSON.stringify({ ...config, ports }, null, 2)}\n`);
 }
 
-export async function claimBackendPorts(dir: string): Promise<BackendPorts> {
+export async function claimBackendPorts(dir: string, preferred?: number): Promise<BackendPorts> {
 	if (backendStillRunning(dir)) {
 		throw new Error(
 			"a backend for this checkout's .convex/local is still running outside `bun run app up`; stop it first."
 		);
 	}
-	const cloud = await freePort(readLocalConfig(dir)?.cloudPort ?? 3210);
+	const cloud = await freePort(preferred ?? readLocalConfig(dir)?.cloudPort ?? 3210);
 	const site = await freePort(cloud + 1, [cloud]);
 	moveLocalConfig(dir, { cloud, site });
 	return { cloud, site };
