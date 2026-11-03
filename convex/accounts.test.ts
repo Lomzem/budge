@@ -1,6 +1,6 @@
 import { assert, describe, expect, test } from 'vitest';
 
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
@@ -123,6 +123,66 @@ describe("changing an Account's starting balance", () => {
 			).page.filter((row) => row.payeeName === 'Starting Balance');
 		return { ...backend, accountId, startingBalances };
 	}
+
+	test('setting a split starting balance keeps its lines, its balance, and its monthly totals', async () => {
+		const { t, owner, accountId, startingBalances } = await checkingWithStartingBalance();
+		const everyday = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
+		const groceries = await owner.mutation(api.categories.create, {
+			groupId: everyday,
+			name: 'Groceries'
+		});
+		const [existing] = await startingBalances();
+		assert(existing?.categoryId != null, 'expected the starting balance in Ready to Assign');
+		await owner.mutation(api.transactions.update, {
+			transactionId: existing._id,
+			accountId,
+			date: existing.date,
+			amount: existing.amount,
+			payee: 'Starting Balance',
+			memo: '',
+			splits: [
+				{ categoryId: existing.categoryId, amount: 200_000, memo: '' },
+				{ categoryId: groceries, amount: 50_000, memo: 'Pantry' }
+			]
+		});
+		const totals = () =>
+			t.run(async (ctx) =>
+				(await ctx.db.query('monthlyTotals').collect())
+					.map(({ month, accountId, bucket, amount, count }) => ({
+						month,
+						accountId,
+						bucket,
+						amount,
+						count
+					}))
+					.sort((a, b) =>
+						`${a.month}${a.accountId}${a.bucket}`.localeCompare(
+							`${b.month}${b.accountId}${b.bucket}`
+						)
+					)
+			);
+
+		expect(
+			await publicErrorCode(
+				owner.mutation(api.accounts.setStartingBalance, { accountId, startingBalance: 180_000 })
+			)
+		).toBe('INVALID_INPUT');
+
+		expect(await startingBalances()).toMatchObject([
+			{
+				_id: existing._id,
+				amount: 250_000,
+				splits: [
+					{ categoryId: existing.categoryId, amount: 200_000 },
+					{ categoryId: groceries, amount: 50_000 }
+				]
+			}
+		]);
+		expect((await owner.query(api.accounts.list, {}))[0]?.balance).toBe(250_000);
+		const kept = await totals();
+		await t.mutation(internal.monthlyTotals.rebuild, {});
+		expect(await totals()).toEqual(kept);
+	});
 
 	test('after the cutover date moves earlier, replaces the one starting balance on the new date', async () => {
 		const { owner, accountId, startingBalances } = await checkingWithStartingBalance();

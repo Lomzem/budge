@@ -351,7 +351,7 @@ export async function replaceTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'>,
 	fields: TransactionFields,
-	lines: readonly SplitLine[] = []
+	lines: readonly SplitLine[]
 ) {
 	await takeOut(ctx, existing);
 	await ctx.db.replace('transactions', existing._id, fields);

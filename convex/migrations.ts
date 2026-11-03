@@ -38,11 +38,12 @@ export const backfillPaymentCategories = internalMutation({
 				) {
 					continue;
 				}
-				await replaceTransaction(ctx, transaction, {
-					...transaction,
-					categoryId,
-					approved: transaction.approved !== false
-				});
+				await replaceTransaction(
+					ctx,
+					transaction,
+					{ ...transaction, categoryId, approved: transaction.approved !== false },
+					[]
+				);
 				matched = true;
 				break;
 			}

@@ -81,14 +81,19 @@ async function followBank(
 				...(payeeId === undefined ? {} : { payeeId }),
 				...(categoryId === undefined ? {} : { categoryId })
 			};
-	await replaceTransaction(ctx, transaction, {
-		accountId: transaction.accountId,
-		...named,
-		cleared: transaction.cleared,
-		date: row.date,
-		amount: row.amount,
-		approved: false
-	});
+	await replaceTransaction(
+		ctx,
+		transaction,
+		{
+			accountId: transaction.accountId,
+			...named,
+			cleared: transaction.cleared,
+			date: row.date,
+			amount: row.amount,
+			approved: false
+		},
+		[]
+	);
 }
 
 async function linkedTransaction(ctx: MutationCtx, bankRow: Doc<'imports'>) {

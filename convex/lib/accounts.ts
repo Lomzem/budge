@@ -52,12 +52,18 @@ export async function saveStartingBalance(
 	const existing = await startingBalanceOf(ctx, accountId);
 	if (existing !== null) {
 		requireUnlocked(existing, 'to change the starting balance');
-		await replaceTransaction(ctx, existing, {
-			...existing,
-			date: cutoverDate,
-			amount,
-			approved: existing.approved !== false
-		});
+		if (existing.split === true) {
+			throw publicError(
+				'INVALID_INPUT',
+				'This starting balance is split. Change its amount in the register instead.'
+			);
+		}
+		await replaceTransaction(
+			ctx,
+			existing,
+			{ ...existing, date: cutoverDate, amount, approved: existing.approved !== false },
+			[]
+		);
 		return;
 	}
 	const fields = await transactionFields(ctx, {
