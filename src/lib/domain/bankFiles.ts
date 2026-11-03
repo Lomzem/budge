@@ -256,8 +256,15 @@ const decodeQfx = Effect.fnUntraced(function* (
 	text: string
 ): Effect.fn.Return<Omit<BankFile, 'rows'> & { rows: BankRow[] }, BankFileError> {
 	const rows: BankRow[] = [];
-	const postedBlocks = [...text.matchAll(/<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi)];
-	for (const [index, [, block = '']] of postedBlocks.entries()) {
+	const postedBlocks = [
+		...text.matchAll(/<STMTTRN>([\s\S]*?)(?:(<\/STMTTRN>)|(?=<STMTTRN>|<\/BANKTRANLIST>|$))/gi)
+	];
+	for (const [index, [, block = '', closingTag]] of postedBlocks.entries()) {
+		if (closingTag === undefined) {
+			return yield* new BankFileError({
+				message: `Transaction ${String(index + 1)} never closes, so the file may be cut off. Download it from your bank again.`
+			});
+		}
 		const tags: Record<string, string> = Object.fromEntries(
 			[...block.matchAll(/<([A-Z0-9.]+)>([^<\r\n]*)/gi)]
 				.map(([, name = '', value = '']): [string, string] => [

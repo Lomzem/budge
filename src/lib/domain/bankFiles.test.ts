@@ -145,6 +145,21 @@ describe('decoding a bank file', () => {
 			'a row with more cells than the header has columns',
 			'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,Gas, Auto\n',
 			'Row 2 has 6 cells'
+		],
+		[
+			'a QFX cut off inside a Transaction',
+			fixture('capital-one-checking.qfx').split('<FITID>DEMO-0002')[0] ?? '',
+			'Transaction 2 never closes'
+		],
+		[
+			'a QFX Transaction left open at the end of its list',
+			fixture('capital-one-card.qfx').replace('</STMTTRN>', ''),
+			'Transaction 1 never closes'
+		],
+		[
+			'a QFX Transaction left open before the next one',
+			fixture('capital-one-checking.qfx').replace('&amp; CO\r\n</STMTTRN>', '&amp; CO\r\n'),
+			'Transaction 2 never closes'
 		]
 	] as const)('refuses %s', ([, text, message]) =>
 		Effect.gen(function* () {
