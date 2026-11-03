@@ -1,13 +1,16 @@
 import { v, type Infer } from 'convex/values';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Option } from 'effect';
 
 import type { PublicError } from '../src/lib/domain/publicError';
-import type { Id } from './_generated/dataModel';
+import { internal } from './_generated/api';
+import type { Doc, Id } from './_generated/dataModel';
 import {
 	action,
 	env,
+	httpAction,
 	internalAction,
 	internalMutation,
+	internalQuery,
 	query,
 	type ActionCtx,
 	type MutationCtx
@@ -15,7 +18,17 @@ import {
 import { applyBankRows, planBankRows, requireBankRow, type IncomingRow } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { ImportedPayees } from './lib/payees';
-import { PlaidClient } from './lib/plaidClient';
+import { PlaidClient, type WebhookKey } from './lib/plaidClient';
+import {
+	KEY_LOOKUP_INTERVAL_MS,
+	KeyLookupDeferred,
+	lookUpKey,
+	KEY_TTL_MS,
+	readWebhook,
+	verifyWebhook,
+	webhookKeyValidator,
+	WebhookKeys
+} from './lib/plaidWebhook';
 import { publicError } from './lib/publicError';
 import { runEffect } from './lib/runEffect';
 import { requireCutoverDate } from './lib/settings';
@@ -80,6 +93,171 @@ export const syncNow = action({
 	}
 });
 
+export const sync = internalAction({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.null(),
+	handler: async (ctx, { connectionId }) => {
+		await Effect.runPromise(
+			syncConnection(connectionId, { refresh: false }).pipe(
+				Effect.ignore,
+				Effect.provide(liveLayer(ctx))
+			)
+		);
+		return null;
+	}
+});
+
+const CONNECTIONS_SCHEDULED_PER_MUTATION = 20;
+
+export const syncAll = internalMutation({
+	args: { cursor: v.optional(v.union(v.string(), v.null())) },
+	returns: v.null(),
+	handler: async (ctx, { cursor }) => {
+		const { page, isDone, continueCursor } = await ctx.db
+			.query('bankConnections')
+			.paginate({ numItems: CONNECTIONS_SCHEDULED_PER_MUTATION, cursor: cursor ?? null });
+		for (const connection of page) {
+			if (connection.provider.kind !== 'plaid') continue;
+			await ctx.scheduler.runAfter(0, internal.bankConnections.sync, {
+				connectionId: connection._id
+			});
+		}
+		if (!isDone) {
+			await ctx.scheduler.runAfter(0, internal.bankConnections.syncAll, {
+				cursor: continueCursor
+			});
+		}
+		return null;
+	}
+});
+
+export const webhookTarget = internalQuery({
+	args: { itemId: v.string() },
+	returns: v.union(v.id('bankConnections'), v.null()),
+	handler: async (ctx, { itemId }) => {
+		const connection = await ctx.db
+			.query('bankConnections')
+			.withIndex('by_itemId', (q) => q.eq('provider.itemId', itemId))
+			.first();
+		return connection?.provider.kind === 'plaid' ? connection._id : null;
+	}
+});
+
+export const webhook = httpAction(async (ctx, request) => {
+	const body = new Uint8Array(await request.arrayBuffer());
+	const webhook = readWebhook(body);
+	if (webhook === null) return new Response(null, { status: 400 });
+	const connectionId: Id<'bankConnections'> | null = await ctx.runQuery(
+		internal.bankConnections.webhookTarget,
+		{ itemId: webhook.itemId }
+	);
+	if (connectionId === null) return new Response(null, { status: 200 });
+	const verified = await Effect.runPromise(
+		verifyWebhook({
+			body,
+			token: request.headers.get('plaid-verification'),
+			now: Date.now()
+		}).pipe(
+			Effect.catchTag('KeyLookupDeferred', () => Effect.succeed('deferred' as const)),
+			Effect.provide(keptWebhookKeys(ctx, webhook.itemId))
+		)
+	);
+	if (verified === 'deferred') {
+		const retryAfter = String(KEY_LOOKUP_INTERVAL_MS / 1000);
+		return new Response(null, { status: 429, headers: { 'retry-after': retryAfter } });
+	}
+	if (!verified) return new Response(null, { status: 401 });
+	if (webhook.type === 'TRANSACTIONS' && webhook.code === 'SYNC_UPDATES_AVAILABLE') {
+		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
+	}
+	return new Response(null, { status: 200 });
+});
+
+function keptWebhookKeys(
+	ctx: Pick<ActionCtx, 'runMutation'>,
+	itemId: string
+): Layer.Layer<WebhookKeys> {
+	return Layer.effect(
+		WebhookKeys,
+		Effect.map(PlaidClient, (plaid) => ({
+			find: (kid: string) =>
+				Effect.gen(function* () {
+					const claim: WebhookKeyClaim = yield* Effect.promise(() =>
+						ctx.runMutation(internal.bankConnections.claimWebhookKey, { kid, itemId })
+					);
+					if (claim.kind === 'kept') return Option.some(claim.key);
+					if (claim.kind === 'limited') return yield* new KeyLookupDeferred();
+					const key = yield* lookUpKey(plaid, kid);
+					if (Option.isSome(key)) {
+						yield* Effect.promise(() =>
+							ctx.runMutation(internal.bankConnections.saveWebhookKey, { kid, key: key.value })
+						);
+					}
+					return key;
+				})
+		}))
+	).pipe(Layer.provide(livePlaid()));
+}
+
+type WebhookKeyClaim = { kind: 'kept'; key: WebhookKey } | { kind: 'lookup' | 'limited' };
+
+const EXPIRED_ROWS_CLEARED_PER_LOOKUP = 10;
+
+export const claimWebhookKey = internalMutation({
+	args: { kid: v.string(), itemId: v.string() },
+	returns: v.union(
+		v.object({ kind: v.literal('kept'), key: webhookKeyValidator }),
+		v.object({ kind: v.union(v.literal('lookup'), v.literal('limited')) })
+	),
+	handler: async (ctx, { kid, itemId }): Promise<WebhookKeyClaim> => {
+		const now = Date.now();
+		const kept = await ctx.db
+			.query('webhookKeys')
+			.withIndex('by_kid', (q) => q.eq('kid', kid))
+			.unique();
+		if (kept?.key && kept.checkedAt > now - KEY_TTL_MS)
+			return { kind: 'kept' as const, key: kept.key };
+		const lastLookup = await ctx.db
+			.query('webhookKeyLookups')
+			.withIndex('by_itemId', (q) => q.eq('itemId', itemId))
+			.unique();
+		if (lastLookup !== null && lastLookup.lookedUpAt > now - KEY_LOOKUP_INTERVAL_MS)
+			return { kind: 'limited' as const };
+		if (lastLookup === null) await ctx.db.insert('webhookKeyLookups', { itemId, lookedUpAt: now });
+		else await ctx.db.patch('webhookKeyLookups', lastLookup._id, { lookedUpAt: now });
+		if (kept === null) await ctx.db.insert('webhookKeys', { kid, key: null, checkedAt: now });
+		else await ctx.db.patch('webhookKeys', kept._id, { key: null, checkedAt: now });
+		await clearExpiredWebhookKeyRows(ctx, now);
+		return { kind: 'lookup' as const };
+	}
+});
+
+async function clearExpiredWebhookKeyRows(ctx: MutationCtx, now: number) {
+	const expiredKeys = await ctx.db
+		.query('webhookKeys')
+		.withIndex('by_checkedAt', (q) => q.lt('checkedAt', now - KEY_TTL_MS))
+		.take(EXPIRED_ROWS_CLEARED_PER_LOOKUP);
+	for (const row of expiredKeys) await ctx.db.delete('webhookKeys', row._id);
+	const expiredLookups = await ctx.db
+		.query('webhookKeyLookups')
+		.withIndex('by_lookedUpAt', (q) => q.lt('lookedUpAt', now - KEY_LOOKUP_INTERVAL_MS))
+		.take(EXPIRED_ROWS_CLEARED_PER_LOOKUP);
+	for (const row of expiredLookups) await ctx.db.delete('webhookKeyLookups', row._id);
+}
+
+export const saveWebhookKey = internalMutation({
+	args: { kid: v.string(), key: webhookKeyValidator },
+	returns: v.null(),
+	handler: async (ctx, { kid, key }) => {
+		const row = await ctx.db
+			.query('webhookKeys')
+			.withIndex('by_kid', (q) => q.eq('kid', kid))
+			.unique();
+		if (row !== null) await ctx.db.patch('webhookKeys', row._id, { key });
+		return null;
+	}
+});
+
 export const setup = internalAction({
 	args: {
 		name: v.string(),
@@ -88,27 +266,30 @@ export const setup = internalAction({
 		accounts: v.array(v.object({ externalId: v.string(), accountId: v.id('accounts') }))
 	},
 	returns: v.id('bankConnections'),
-	handler: async (ctx, { accessToken, ...input }) =>
-		await runEffect(
+	handler: async (ctx, { accessToken, ...input }) => {
+		const connectionId = await runEffect(
 			setupConnection({
 				...input,
 				accessToken,
 				webhook: `${env.CONVEX_SITE_URL}/plaid/webhook`
 			}).pipe(Effect.provide(liveLayer(ctx))),
 			toPublicError
-		)
+		);
+		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
+		return connectionId;
+	}
 });
 
+function livePlaid() {
+	return PlaidClient.layerLive({
+		clientId: env.PLAID_CLIENT_ID,
+		secret: env.PLAID_SECRET,
+		environment: env.BUDGE_PRODUCTION === undefined ? 'sandbox' : 'production'
+	});
+}
+
 function liveLayer(ctx: ActionCtx) {
-	return Layer.mergeAll(
-		PlaidClient.layerLive({
-			clientId: env.PLAID_CLIENT_ID,
-			secret: env.PLAID_SECRET,
-			environment: env.BUDGE_PRODUCTION === undefined ? 'sandbox' : 'production'
-		}),
-		TokenCipher.layer(env.BUDGE_TOKEN_KEY),
-		SyncStore.layer(ctx)
-	);
+	return Layer.mergeAll(livePlaid(), TokenCipher.layer(env.BUDGE_TOKEN_KEY), SyncStore.layer(ctx));
 }
 
 function toPublicError(error: SyncError): PublicError {
@@ -125,12 +306,18 @@ export const takeLease = internalMutation({
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (connection === null) return { kind: 'missing' as const };
 		const now = Date.now();
-		if ((connection.syncLeaseUntil ?? 0) > now) return { kind: 'busy' as const };
+		if ((connection.syncLeaseUntil ?? 0) > now) {
+			await ctx.db.patch('bankConnections', connectionId, { syncRequestedDuringLease: true });
+			return { kind: 'busy' as const };
+		}
 		const { provider } = connection;
 		if (provider.kind !== 'plaid') return { kind: 'noToken' as const };
 		const cutoverDate = await requireCutoverDate(ctx);
 		const lease = now + LEASE_MS;
-		await ctx.db.patch('bankConnections', connectionId, { syncLeaseUntil: lease });
+		await ctx.db.patch('bankConnections', connectionId, {
+			syncLeaseUntil: lease,
+			syncRequestedDuringLease: undefined
+		});
 		return {
 			kind: 'taken' as const,
 			lease,
@@ -180,6 +367,7 @@ export const apply = internalMutation({
 			syncLeaseUntil: nextLease,
 			...(release ? { lastSyncedAt: now, lastError: undefined, status: 'ok' as const } : {})
 		});
+		if (release) await syncAgainIfRequested(ctx, connection);
 		return { kind: 'applied' as const, lease: nextLease ?? null, ...totals };
 	}
 });
@@ -240,9 +428,16 @@ export const fail = internalMutation({
 			lastError: { at: Date.now(), message },
 			...(needsLogin ? { status: 'needsAttention' as const } : {})
 		});
+		await syncAgainIfRequested(ctx, connection);
 		return null;
 	}
 });
+
+async function syncAgainIfRequested(ctx: MutationCtx, connection: Doc<'bankConnections'>) {
+	if (connection.syncRequestedDuringLease !== true) return;
+	await ctx.db.patch('bankConnections', connection._id, { syncRequestedDuringLease: undefined });
+	await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId: connection._id });
+}
 
 export const save = internalMutation({
 	args: saveArgs,

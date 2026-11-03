@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schedule, Schema } from 'effect';
+import { Context, Duration, Effect, Layer, Schedule, Schema } from 'effect';
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http';
 
 import { decodeSyncPage, type SyncPage } from '../../src/lib/domain/plaid';
@@ -46,6 +46,15 @@ interface PlaidClientShape {
 	readonly transactionsRefresh: (accessToken: string) => Effect.Effect<void, PlaidError>;
 
 	readonly setWebhook: (accessToken: string, webhook: string) => Effect.Effect<void, PlaidError>;
+	readonly webhookVerificationKey: (keyId: string) => Effect.Effect<WebhookKey, PlaidError>;
+}
+
+export interface WebhookKey {
+	kty: string;
+	crv: string;
+	x: string;
+	y: string;
+	expiredAt: number | null;
 }
 
 export interface PlaidConfig {
@@ -58,6 +67,13 @@ export interface PlaidConfig {
 export const ATTEMPTS = 3;
 const ATTEMPT_TIMEOUT = '10 seconds';
 const CALL_TIMEOUT = '35 seconds';
+
+interface CallLimits {
+	attempts: number;
+	attemptTimeout: Duration.Input;
+}
+const EVERY_CALL: CallLimits = { attempts: ATTEMPTS, attemptTimeout: ATTEMPT_TIMEOUT };
+const WITHIN_PLAIDS_WEBHOOK_DEADLINE: CallLimits = { attempts: 1, attemptTimeout: '5 seconds' };
 const BACKOFF = Schedule.exponential('2 seconds');
 
 export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>()(
@@ -80,10 +96,21 @@ export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>(
 		return Layer.succeed(PlaidClient, {
 			transactionsSync: fake.transactionsSync ?? unexpected('transactionsSync'),
 			transactionsRefresh: fake.transactionsRefresh ?? unexpected('transactionsRefresh'),
-			setWebhook: fake.setWebhook ?? unexpected('setWebhook')
+			setWebhook: fake.setWebhook ?? unexpected('setWebhook'),
+			webhookVerificationKey: fake.webhookVerificationKey ?? unexpected('webhookVerificationKey')
 		});
 	}
 }
+
+const WebhookKeyBody = Schema.Struct({
+	key: Schema.Struct({
+		kty: Schema.String,
+		crv: Schema.String,
+		x: Schema.String,
+		y: Schema.String,
+		expired_at: Schema.NullOr(Schema.Finite)
+	})
+});
 
 const PlaidErrorBody = Schema.Struct({ error_code: Schema.String, request_id: Schema.String });
 
@@ -93,7 +120,8 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 	const post = <A>(
 		path: string,
 		body: Record<string, unknown>,
-		decode: (body: unknown) => Effect.Effect<A, unknown>
+		decode: (body: unknown) => Effect.Effect<A, unknown>,
+		limits: CallLimits = EVERY_CALL
 	): Effect.Effect<A, PlaidError> => {
 		const { clientId, secret } = config;
 		if (clientId === undefined || secret === undefined) {
@@ -125,10 +153,10 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 		});
 		return attempt.pipe(
 			Effect.timeoutOrElse({
-				duration: ATTEMPT_TIMEOUT,
+				duration: limits.attemptTimeout,
 				orElse: () => Effect.fail(new PlaidTimeout())
 			}),
-			Effect.retry({ times: ATTEMPTS - 1, schedule: BACKOFF, while: isRetryable }),
+			Effect.retry({ times: limits.attempts - 1, schedule: BACKOFF, while: isRetryable }),
 			Effect.timeoutOrElse({
 				duration: CALL_TIMEOUT,
 				orElse: () => Effect.fail(new PlaidTimeout())
@@ -153,11 +181,27 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 		transactionsRefresh: (accessToken) =>
 			post('/transactions/refresh', { access_token: accessToken }, ignoreBody),
 		setWebhook: (accessToken, webhook) =>
-			post('/item/webhook/update', { access_token: accessToken, webhook }, ignoreBody)
+			post('/item/webhook/update', { access_token: accessToken, webhook }, ignoreBody),
+		webhookVerificationKey: (keyId) =>
+			post(
+				'/webhook_verification_key/get',
+				{ key_id: keyId },
+				(body) =>
+					Schema.decodeUnknownEffect(WebhookKeyBody)(body).pipe(
+						Effect.map(({ key }) => ({
+							kty: key.kty,
+							crv: key.crv,
+							x: key.x,
+							y: key.y,
+							expiredAt: key.expired_at
+						}))
+					),
+				WITHIN_PLAIDS_WEBHOOK_DEADLINE
+			)
 	};
 }
 
-function isRetryable(error: PlaidError): boolean {
+export function isRetryable(error: PlaidError): boolean {
 	switch (error._tag) {
 		case 'PlaidTransport':
 		case 'PlaidTimeout':

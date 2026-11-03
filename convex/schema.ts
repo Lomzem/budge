@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
+import { webhookKeyValidator } from './lib/plaidWebhook';
 import { targetValidator } from './lib/targets';
 
 export default defineSchema({
@@ -131,6 +132,7 @@ export default defineSchema({
 		lastError: v.optional(v.object({ at: v.number(), message: v.string() })),
 
 		syncLeaseUntil: v.optional(v.number()),
+		syncRequestedDuringLease: v.optional(v.boolean()),
 		consentExpiresAt: v.optional(v.number()),
 		provider: v.union(
 			v.object({
@@ -145,6 +147,21 @@ export default defineSchema({
 			v.object({ kind: v.literal('sandbox') })
 		)
 	}).index('by_itemId', ['provider.itemId']),
+
+	webhookKeys: defineTable({
+		kid: v.string(),
+		key: v.union(webhookKeyValidator, v.null()),
+		checkedAt: v.number()
+	})
+		.index('by_kid', ['kid'])
+		.index('by_checkedAt', ['checkedAt']),
+
+	webhookKeyLookups: defineTable({
+		itemId: v.string(),
+		lookedUpAt: v.number()
+	})
+		.index('by_itemId', ['itemId'])
+		.index('by_lookedUpAt', ['lookedUpAt']),
 
 	connectionAccounts: defineTable(
 		v.union(

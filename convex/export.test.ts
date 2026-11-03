@@ -123,13 +123,15 @@ async function exportAll(owner: Owner, numItems = 2) {
 }
 
 describe('the export', () => {
-	test('covers every table but the monthly totals, which a backup rebuilds from split lines in their Categories', async () => {
+	test('covers every table but the monthly totals, which a backup rebuilds from split lines in their Categories, and the webhook keys, which Plaid serves again', async () => {
 		const { t, owner } = newBackend();
 		await t.run(seedEveryTable);
 
 		const exported = await exportAll(owner);
 
-		expect([...seededTables, 'monthlyTotals'].sort()).toEqual(Object.keys(schema.tables).sort());
+		expect([...seededTables, 'monthlyTotals', 'webhookKeys', 'webhookKeyLookups'].sort()).toEqual(
+			Object.keys(schema.tables).sort()
+		);
 		expect(Object.keys(exported).sort()).toEqual([...seededTables].sort());
 		for (const table of seededTables) {
 			expect(exported[table], table).toHaveLength(1);
