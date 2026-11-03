@@ -10,6 +10,6 @@ export default defineConfig({
 	webServer: {
 		command: 'bun run build && bun run preview',
 		port: 4173,
-		reuseExistingServer: !process.env.CI
+		reuseExistingServer: !process.env.CI && process.env.E2E_OWN_PREVIEW !== '1'
 	}
 });
