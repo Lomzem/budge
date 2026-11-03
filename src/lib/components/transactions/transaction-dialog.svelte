@@ -254,7 +254,7 @@
 	}
 
 	function startSplit(previous: string) {
-		if (lines.length > 0) return;
+		lines = [];
 		const total = parseCents(amount);
 		const sizeAloneSinceTheDirectionIsSetApart =
 			total === undefined ? amount : formatCents(Math.abs(total)).replace('$', '');
