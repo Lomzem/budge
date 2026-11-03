@@ -300,6 +300,43 @@ describe('a bank Account Budge does not know', () => {
 		expect(await suggest(savings)).toEqual({ kind: 'suggested', startingBalance: 300_000 + 4_250 });
 	});
 
+	test('the suggestion counts a row the bank removed once a statement row behind ten removed ones still backs it', async () => {
+		const { owner, t, sync, heldId, transactions, suggest } = await connectedBudget();
+		await sync(rowsFor(savingsId));
+		const savings = await owner.mutation(api.heldAccounts.createAccount, {
+			connectionAccountId: await heldId(),
+			name: 'Savings',
+			kind: 'cash'
+		});
+		const paycheck = (await transactions(savings)).find((row) => row.amount === 231_042);
+		assert(paycheck !== undefined, 'expected the imported paycheck');
+		await owner.mutation(api.transactions.approve, { transactionId: paycheck._id });
+		await sync({
+			...page,
+			added: [],
+			removed: [{ transaction_id: `${savingsId}-txn-synthetic-2`, account_id: savingsId }]
+		});
+		await t.run(async (ctx) => {
+			const statementRow = {
+				accountId: savings,
+				date: paycheck.date,
+				amount: paycheck.amount,
+				bankText: 'SAMPLE STATEMENT ROW',
+				transactionId: paycheck._id,
+				matched: true
+			};
+			for (let index = 0; index < 10; index++) {
+				await ctx.db.insert('imports', { ...statementRow, source: 'qfx', state: 'removed' });
+			}
+			await ctx.db.insert('imports', { ...statementRow, source: 'csv', state: 'linked' });
+		});
+
+		expect(await suggest(savings)).toEqual({
+			kind: 'suggested',
+			startingBalance: 300_000 - 231_042 + 4_250
+		});
+	});
+
 	test('among many other bank Accounts, is still listed and still gets a suggestion', async () => {
 		const { owner, t, connectionId, sync, heldId, suggest } = await connectedBudget();
 		await t.run(async (ctx) => {

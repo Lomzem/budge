@@ -26,7 +26,7 @@ import {
 	suggestStartingBalance as suggest,
 	syncConnection
 } from './lib/sync';
-import { bankRowsOf } from './lib/transactions';
+import { allBankRowsOf } from './lib/transactions';
 
 export const HELD_BATCH = 200;
 const MAX_COUNTED = 1_000;
@@ -208,8 +208,11 @@ export const startingBalanceBasis = internalQuery({
 			.query('transactions')
 			.withIndex('by_account_date', (q) => q.eq('accountId', accountId).gte('date', cutoverDate));
 		for await (const transaction of since) {
-			const bankRows = await bankRowsOf(ctx, transaction._id);
-			if (bankRows.some((row) => row.state !== 'removed')) imported += transaction.amount;
+			for await (const row of allBankRowsOf(ctx, transaction._id)) {
+				if (row.state === 'removed') continue;
+				imported += transaction.amount;
+				break;
+			}
 		}
 		return {
 			kind: 'synced' as const,
@@ -244,7 +247,7 @@ async function mapTo(ctx: MutationCtx, held: Doc<'connectionAccounts'>, accountI
 }
 
 async function heldRows(
-	ctx: MutationCtx | Parameters<typeof bankRowsOf>[0],
+	ctx: MutationCtx | Parameters<typeof allBankRowsOf>[0],
 	connectionAccountId: Id<'connectionAccounts'>,
 	limit: number
 ) {

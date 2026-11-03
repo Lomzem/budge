@@ -5,8 +5,8 @@ import { importedPayee, type ImportedPayees } from './payees';
 import { publicError } from './publicError';
 import {
 	allBankRowsOf,
-	bankRowsOf,
 	deleteTransaction,
+	payeeNameOf,
 	refreshSearchText,
 	replaceTransaction,
 	saveTransaction,
@@ -34,7 +34,7 @@ async function changesQuietly(
 		transaction.split !== true &&
 		transaction.transferTransactionId === undefined &&
 		transaction.cleared !== 'reconciled' &&
-		(await bankRowsOf(ctx, transaction._id)).length === 1
+		(await allBankRowsOf(ctx, transaction._id).take(2)).length === 1
 	);
 }
 
@@ -81,14 +81,19 @@ async function followBank(
 				...(payeeId === undefined ? {} : { payeeId }),
 				...(categoryId === undefined ? {} : { categoryId })
 			};
-	await replaceTransaction(ctx, transaction, {
-		accountId: transaction.accountId,
-		...named,
-		cleared: transaction.cleared,
-		date: row.date,
-		amount: row.amount,
-		approved: false
-	});
+	await replaceTransaction(
+		ctx,
+		transaction,
+		{
+			accountId: transaction.accountId,
+			...named,
+			cleared: transaction.cleared,
+			date: row.date,
+			amount: row.amount,
+			approved: false
+		},
+		[]
+	);
 }
 
 async function linkedTransaction(ctx: MutationCtx, bankRow: Doc<'imports'>) {
@@ -145,8 +150,6 @@ async function takeBankValues(
 			"This split's lines add up to your amount. Edit the split to the bank's amount, then keep your version."
 		);
 	}
-	const payee =
-		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
 	const counterpart =
 		transaction.transferTransactionId === undefined
 			? null
@@ -155,7 +158,7 @@ async function takeBankValues(
 		accountId: transaction.accountId,
 		date: bankRow.date,
 		amount: bankRow.amount,
-		payee: payee?.name ?? '',
+		payee: (await payeeNameOf(ctx, transaction)) ?? '',
 		categoryId: transaction.categoryId,
 		memo: transaction.memo ?? '',
 		splits: lines.map((line) => ({
@@ -191,7 +194,7 @@ async function requireNoOtherBacking(
 async function flagDisagreeingRows(ctx: MutationCtx, transactionId: Id<'transactions'>) {
 	const transaction = await ctx.db.get('transactions', transactionId);
 	if (transaction === null) return;
-	for (const bankRow of await bankRowsOf(ctx, transactionId)) {
+	for await (const bankRow of allBankRowsOf(ctx, transactionId)) {
 		const disagrees = bankRow.date !== transaction.date || bankRow.amount !== transaction.amount;
 		if (bankRow.state === 'linked' && disagrees) {
 			await ctx.db.patch('imports', bankRow._id, { state: 'changed' });

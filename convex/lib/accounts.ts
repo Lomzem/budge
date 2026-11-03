@@ -2,11 +2,9 @@ import type { Id } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
 import { createPaymentCategory, ensureReadyToAssign, readPaymentCategory } from './categories';
 import { requireCents, requireName } from './input';
-import { findPayeeNamed, STARTING_BALANCE } from './payees';
 import { publicError } from './publicError';
 import { requireCutoverDate } from './settings';
 import {
-	bankRowsOf,
 	insertTransaction,
 	replaceTransaction,
 	requireUnlocked,
@@ -18,25 +16,12 @@ export async function insertAccount(
 	args: { name: string; kind: 'cash' | 'creditCard'; startingBalance: number }
 ) {
 	const name = requireName(args.name);
-	const amount = requireCents(args.startingBalance);
-	const cutoverDate = await requireCutoverDate(ctx);
 	let position = 0;
 	for await (const account of ctx.db.query('accounts')) {
 		position = Math.max(position, account.position + 1);
 	}
 	const accountId = await ctx.db.insert('accounts', { name, kind: args.kind, position });
-	const fields = await transactionFields(ctx, {
-		accountId,
-		date: cutoverDate,
-		amount,
-		payee: STARTING_BALANCE,
-		categoryId:
-			args.kind === 'cash'
-				? await ensureReadyToAssign(ctx)
-				: await createPaymentCategory(ctx, { _id: accountId, name }),
-		memo: ''
-	});
-	await insertTransaction(ctx, { ...fields, cleared: 'cleared', approved: true });
+	await saveStartingBalance(ctx, accountId, args.startingBalance);
 	return accountId;
 }
 
@@ -49,22 +34,35 @@ export async function saveStartingBalance(
 	if (account === null) throw publicError('NOT_FOUND');
 	const amount = requireCents(startingBalance);
 	const cutoverDate = await requireCutoverDate(ctx);
-	const existing = await startingBalanceOf(ctx, accountId);
+	const existing = await ctx.db
+		.query('transactions')
+		.withIndex('by_accountId_and_kind', (q) =>
+			q.eq('accountId', accountId).eq('kind', 'startingBalance')
+		)
+		.unique();
 	if (existing !== null) {
 		requireUnlocked(existing, 'to change the starting balance');
-		await replaceTransaction(ctx, existing, {
-			...existing,
-			date: cutoverDate,
-			amount,
-			approved: existing.approved !== false
-		});
+		await replaceTransaction(
+			ctx,
+			existing,
+			{
+				accountId,
+				date: cutoverDate,
+				amount,
+				...(existing.categoryId === undefined ? {} : { categoryId: existing.categoryId }),
+				...(existing.memo === undefined ? {} : { memo: existing.memo }),
+				cleared: existing.cleared,
+				approved: existing.approved !== false
+			},
+			[]
+		);
 		return;
 	}
 	const fields = await transactionFields(ctx, {
 		accountId,
 		date: cutoverDate,
 		amount,
-		payee: STARTING_BALANCE,
+		payee: '',
 		categoryId:
 			account.kind === 'cash'
 				? await ensureReadyToAssign(ctx)
@@ -72,22 +70,10 @@ export async function saveStartingBalance(
 					(await createPaymentCategory(ctx, account))),
 		memo: ''
 	});
-	await insertTransaction(ctx, { ...fields, cleared: 'cleared', approved: true });
-}
-
-async function startingBalanceOf(ctx: MutationCtx, accountId: Id<'accounts'>) {
-	const payee = await findPayeeNamed(ctx, STARTING_BALANCE);
-	if (payee === null) return null;
-	const named = ctx.db
-		.query('transactions')
-		.withIndex('by_payee_date', (q) => q.eq('payeeId', payee._id));
-	for await (const transaction of named) {
-		if (transaction.accountId !== accountId || transaction.transferTransactionId !== undefined) {
-			continue;
-		}
-		const bankRows = await bankRowsOf(ctx, transaction._id);
-		const importedFromABankRow = bankRows.some((bankRow) => !bankRow.matched);
-		if (!importedFromABankRow) return transaction;
-	}
-	return null;
+	await insertTransaction(ctx, {
+		...fields,
+		kind: 'startingBalance',
+		cleared: 'cleared',
+		approved: true
+	});
 }

@@ -14,8 +14,9 @@ import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { requireIsoDate } from './lib/settings';
 import {
-	bankRowsOf,
+	bankRowsShown,
 	deleteTransaction,
+	payeeNameOf,
 	requireUnlocked,
 	saveTransaction,
 	splitLinesOf,
@@ -316,19 +317,13 @@ export const transferCandidates = query({
 		const distance = (other: string) => Math.abs(Date.parse(other) - Date.parse(date));
 		candidates.sort((a, b) => distance(a.date) - distance(b.date));
 		return await Promise.all(
-			candidates.map(async (transaction) => {
-				const payee =
-					transaction.payeeId === undefined
-						? null
-						: await ctx.db.get('payees', transaction.payeeId);
-				return {
-					_id: transaction._id,
-					date: transaction.date,
-					amount: transaction.amount,
-					payeeName: payee?.name ?? null,
-					memo: transaction.memo ?? null
-				};
-			})
+			candidates.map(async (transaction) => ({
+				_id: transaction._id,
+				date: transaction.date,
+				amount: transaction.amount,
+				payeeName: await payeeNameOf(ctx, transaction),
+				memo: transaction.memo ?? null
+			}))
 		);
 	}
 });
@@ -424,8 +419,6 @@ async function requireTransaction(ctx: MutationCtx, transactionId: Id<'transacti
 
 async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 	const account = await ctx.db.get('accounts', transaction.accountId);
-	const payee =
-		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
 	const category =
 		transaction.categoryId === undefined
 			? null
@@ -436,14 +429,14 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		accountName: account?.name ?? '',
 		date: transaction.date,
 		amount: transaction.amount,
-		payeeName: payee?.name ?? null,
+		payeeName: await payeeNameOf(ctx, transaction),
 		categoryId: transaction.categoryId ?? null,
 		categoryName: category?.name ?? null,
 		memo: transaction.memo ?? null,
 		cleared: transaction.cleared !== 'uncleared',
 		reconciled: transaction.cleared === 'reconciled',
 		approved: transaction.approved !== false,
-		bankRows: (await bankRowsOf(ctx, transaction._id)).map((bankRow) => ({
+		bankRows: (await bankRowsShown(ctx, transaction._id)).map((bankRow) => ({
 			_id: bankRow._id,
 			bankText: bankRow.bankText,
 			matched: bankRow.matched,

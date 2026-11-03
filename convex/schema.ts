@@ -72,9 +72,12 @@ export default defineSchema({
 
 		transferTransactionId: v.optional(v.id('transactions')),
 
+		kind: v.optional(v.literal('startingBalance')),
+
 		searchText: v.optional(v.string())
 	})
 		.index('by_account_date', ['accountId', 'date'])
+		.index('by_accountId_and_kind', ['accountId', 'kind'])
 
 		.index('by_account_cleared_date', ['accountId', 'cleared', 'date'])
 		.index('by_date', ['date'])

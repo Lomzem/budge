@@ -7,7 +7,7 @@ import type { Id } from './_generated/dataModel';
 import { PlaidApi, PlaidClient, type SyncRequest } from './lib/plaidClient';
 import { setupConnection, SyncStore, syncConnection } from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
-import { newBackend, publicErrorMessage, useOwnerEnv } from './test.helper';
+import { newBackend, publicErrorCode, publicErrorMessage, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -183,7 +183,7 @@ async function backWithStatementRow(
 	transactionId: Id<'transactions'>,
 	{ accountId, date, amount }: { accountId: Id<'accounts'>; date: string; amount: number }
 ) {
-	await budget.t.run((ctx) =>
+	return await budget.t.run((ctx) =>
 		ctx.db.insert('imports', {
 			source: 'csv',
 			accountId,
@@ -503,6 +503,34 @@ describe('resolving a bank change', () => {
 			});
 		}
 	);
+
+	test("the bank's version on a Transfer flags the other side's eleventh statement row that no longer agrees, behind ten that do", async () => {
+		const budget = await syncedBudget();
+		const { savings, savingsSide } = await grocerAsTransfer(budget);
+		for (let index = 0; index < 10; index++) {
+			await backWithStatementRow(budget, savingsSide._id, {
+				accountId: savings,
+				date: '2026-08-16',
+				amount: 4_550
+			});
+		}
+		const eleventh = await backWithStatementRow(budget, savingsSide._id, {
+			accountId: savings,
+			date: '2026-08-14',
+			amount: 4_250
+		});
+		await budget.sync(changes({ modified: [grocerChanged] }));
+		const importId = (await budget.row(null)).bankRows[0]?._id;
+		assert(importId !== undefined, 'No Bank Row');
+
+		await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' });
+
+		expect(
+			await publicErrorCode(
+				budget.owner.mutation(api.imports.resolveBankChange, { importId: eleventh, keep: 'mine' })
+			)
+		).toBeUndefined();
+	});
 
 	test("the bank's version is refused on a reconciled Transaction", async () => {
 		const { budget, importId } = await flaggedChange();
