@@ -1,4 +1,4 @@
-import { Effect, Exit, Layer } from 'effect';
+import { Cause, Effect, Exit, Layer } from 'effect';
 import { assert, describe, expect, test } from 'vitest';
 
 import { decodeSyncPage } from '../src/lib/domain/plaid';
@@ -80,7 +80,8 @@ async function syncedBudget() {
 					)
 				)
 			);
-			return Exit.isSuccess(exit) ? exit.value : null;
+			if (Exit.isFailure(exit)) assert.fail(`Bank operation failed: ${Cause.pretty(exit.cause)}`);
+			return exit.value;
 		});
 	const connectionId = await run(
 		{ setWebhook: () => Effect.void },
@@ -92,13 +93,12 @@ async function syncedBudget() {
 			accounts: [{ externalId, accountId: checking }]
 		})
 	);
-	assert(connectionId !== null, 'setup failed');
 
-	const syncWith = (
+	const syncWith = async (
 		transactionsSync: NonNullable<FakePlaid['transactionsSync']>,
 		account = externalId
-	) =>
-		run(
+	) => {
+		const outcome = await run(
 			{
 				transactionsSync,
 				itemGet: () => Effect.succeed({ consentExpiresAt: null }),
@@ -107,6 +107,9 @@ async function syncedBudget() {
 			},
 			syncConnection(connectionId, { refresh: false })
 		);
+		assert(outcome.kind === 'synced', `Expected a finished sync, got ${outcome.kind}`);
+		return outcome;
+	};
 	const sync = (page: ReturnType<typeof changes>, account = externalId) =>
 		syncWith(() => Effect.succeed(page), account);
 	const replay = async (page: ReturnType<typeof changes>, from: string | undefined) => {
