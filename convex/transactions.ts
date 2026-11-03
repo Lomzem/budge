@@ -30,6 +30,7 @@ const transactionRow = v.object({
 	date: v.string(),
 	amount: v.number(),
 	payeeName: v.union(v.string(), v.null()),
+	startingBalance: v.boolean(),
 	categoryId: v.union(v.id('categories'), v.null()),
 
 	categoryName: v.union(v.string(), v.null()),
@@ -430,6 +431,7 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		date: transaction.date,
 		amount: transaction.amount,
 		payeeName: await payeeNameOf(ctx, transaction),
+		startingBalance: transaction.kind === 'startingBalance',
 		categoryId: transaction.categoryId ?? null,
 		categoryName: category?.name ?? null,
 		memo: transaction.memo ?? null,

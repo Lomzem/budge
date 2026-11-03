@@ -58,6 +58,7 @@
 	let unlocked = $state(false);
 
 	const locked = $derived(transaction?.reconciled === true && !unlocked);
+	const startingBalance = $derived(transaction?.startingBalance === true);
 
 	let filledCategoryId = $state('');
 
@@ -554,9 +555,9 @@
 				<select
 					id="transaction-account"
 					bind:value={accountId}
-					disabled={locked}
+					disabled={locked || startingBalance}
 					required
-					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
 				>
 					{#each accounts.all as account (account._id)}
 						<option value={account._id}>{account.name}</option>
@@ -570,11 +571,23 @@
 			{#if !isTransfer}
 				<div class="flex flex-col gap-2">
 					<Label for="transaction-payee">Payee</Label>
-					<Input id="transaction-payee" bind:value={payee} autocomplete="off" />
+					<Input
+						id="transaction-payee"
+						bind:value={payee}
+						autocomplete="off"
+						disabled={startingBalance}
+					/>
 				</div>
 			{/if}
+			{#if startingBalance}
+				<p class="text-sm text-muted-foreground">
+					A starting balance stays in its Account, with no Payee and one Category.
+				</p>
+			{/if}
 			<div class="flex flex-col gap-2">
-				<Label for="transaction-category">Category or Transfer</Label>
+				<Label for="transaction-category"
+					>{startingBalance ? 'Category' : 'Category or Transfer'}</Label
+				>
 				<select
 					id="transaction-category"
 					bind:value={
@@ -596,12 +609,14 @@
 						</option>
 					{/if}
 					<option value="">Uncategorized</option>
-					<option value={SPLIT}>Split across Categories</option>
+					{#if !startingBalance}
+						<option value={SPLIT}>Split across Categories</option>
+					{/if}
 					{@render categoryOptions(
 						transaction?.categoryId ?? undefined,
 						transaction?.categoryName ?? undefined
 					)}
-					{#if transferAccounts.length > 0}
+					{#if transferAccounts.length > 0 && !startingBalance}
 						<optgroup label="Transfer to or from">
 							{#each transferAccounts as account (account._id)}
 								<option value={TRANSFER + account._id}>Transfer: {account.name}</option>
