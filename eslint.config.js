@@ -102,6 +102,11 @@ export default defineConfig(
 						'`bankRowsShown` caps Bank Rows for display; decisions and search read every Bank Row with `allBankRowsOf`.'
 				},
 				{
+					selector:
+						':matches(VariableDeclarator[init.name="bankRowsShown"], VariableDeclarator[init.property.name="bankRowsShown"])',
+					message: '`bankRowsShown` caps Bank Rows for display; do not alias display reads.'
+				},
+				{
 					selector: 'ImportSpecifier[imported.name="bankRowsShown"][local.name!="bankRowsShown"]',
 					message:
 						'`bankRowsShown` caps Bank Rows for display; import it under its own name so only the list row reads it.'
@@ -145,7 +150,7 @@ export default defineConfig(
 		rules: { 'max-nested-callbacks': 'off' }
 	},
 	{
-		files: ['e2e/**/*.test.ts'],
+		files: ['e2e/**/*.{test,spec}.ts'],
 		rules: {
 			'no-restricted-imports': [
 				'error',

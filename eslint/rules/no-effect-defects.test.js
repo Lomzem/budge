@@ -18,10 +18,16 @@ const code = 'class PlaidClient { static layerTest() { return Effect.die("unexpe
 
 new RuleTester().run('no-effect-defects', rule, {
 	valid: [
+		'import { Effect } from "effect"; function setup() { const Fx = Effect; } function run(Fx) { Fx.die("unrelated"); }',
+
 		'Effect.fail("retryable");',
 		{ filename: '/repo/convex/lib/plaidClient.ts', code, options }
 	],
 	invalid: [
+		{
+			code: 'import { Effect } from "effect"; const Fx = Effect; Fx.die("boundary");',
+			errors: [{ messageId: 'defect' }]
+		},
 		...['die', 'dieMessage', 'orDie', 'orDieWith'].map((method) => ({
 			code: `Effect.${method}("boundary");`,
 			errors: [{ messageId: 'defect' }]

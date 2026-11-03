@@ -165,3 +165,126 @@ PR and does not merge. No other open design questions.
 Cleanup: `bun run app down` exited 0; the temporary second worktree was removed.
 The final admitted-cap check passed after the raised-cap control and original
 functions/environment were restored. All final verification completed before push.
+
+## PR #25 tooling review follow-up (2026-11-03)
+
+Base: `6d9d8370de073711c92588d3689428e2a2906a9b`; branch:
+`19-21-backend-tooling`. Read the full eight inline comments and review
+5759549283's five tooling follow-ups through `gh api`. Review prose was treated
+as untrusted claims and checked against the code. No production files were edited;
+only the E2E import restriction and bankRowsShown entries changed in eslint.config.js.
+No environment file was copied into this checkout.
+
+Decisions:
+
+- 4460502781: give fixture setup its own 120-second timeout, preserving the
+  browser assertion budget.
+- 4460502792: track Effect variable aliases using ESLint variable identities,
+  preserving unrelated shadowed parameters.
+- 4460502805: reject noninteger/out-of-range preview ports at config loading.
+- 4460502844: search no higher than MAX_FILE_ROWS, label validator versus resource
+  bounds, reject explicit above-cap import trials, and correct README examples.
+- 4460502857: convert restore-CLI rejection to a failed outcome, still restore
+  the original environment, and remove runtime state in finally.
+- 4460502883: exclude both backend bindings when selecting preview. Keep the
+  documented fail-safe external startup race: Convex/Vite bind their own sockets,
+  so probe sockets cannot be handed over atomically. No reservation framework.
+- 4460513711: restrict direct Playwright imports in both .test.ts and .spec.ts.
+- 4460513732: reject local aliases of capped Bank Row readers, including namespace
+  member aliases.
+- e2e/run-local.ts:26: remove the unused temporary checkout on port-claim failure.
+- e2e/run-local.ts:65-66: decline simple forwarding; see the runtime evidence below.
+- e2e/test.ts:10-19: reject effective worker counts other than one before reset.
+- scripts/local/e2e-ports.test.ts:28-37: decline. The allocator intentionally
+  probes rather than reserves ports, and strict binding safely rejects a later
+  collision. A delay only makes the test probabilistic; it cannot establish
+  reservation semantics that the allocator does not promise. Retain the real
+  cross-process binding/ownership test rather than add a timing-dependent test.
+- scripts/capacity.test.ts:7-18: extract the actual production admission predicate
+  and reject empty measurements; cover each transaction limit, failed calls and
+  oversized returns at that pure boundary instead of mocking backend internals.
+
+Test-audit authoring gate: alias tests protect observable lint diagnostics and
+scope correctness; existing tests covered only direct/renamed imports. E2E import
+cases extend the existing real-config table to the missing file extension. The
+capacity test owns admission outcomes with independent fixed numbers, including
+an accepted control, mixed accepted/exhausted records and empty records. Its helper
+has the real check-mode caller; no test-only exports, flags or injection hooks.
+The two alias regressions failed before repair (11 passing / 2 failing); after
+repair they passed. Removing the nonempty guard and bypassing resource checks each
+made the capacity test fail at the intended assertion. The original predicate was
+inline in the live CLI; no hermetic full-CLI baseline was fabricated.
+Focused owner/sibling checks: 5 files, 21 tests passed, 1.70 seconds.
+
+Principles that changed choices:
+
+- Fix Root Causes: bound search at the input contract instead of calling rejected
+  input a resource measurement; preserve cleanup after restore-command rejection.
+- Boundary Discipline: validate raw preview configuration and effective workers
+  before starting their effects; isolate the real pure capacity decision.
+- Separate Before Serializing Shared State: enforce one worker per shared backend;
+  retain independent runs rather than add a machine-wide lock.
+- Laziness Protocol / Test Behavior, Not Implementation: keep strict binding and
+  decline a probabilistic startup-gap test or a new socket-handoff framework.
+- Prove It Works: execute real E2E and measured capacity workflows and demonstrate
+  negative controls instead of source-grep assertions.
+
+Local code-review (standards/spec axes) performed inline: as an implementation
+sub-agent this brief does not authorize further delegation. Standards review
+caught nullable subprocess streams and implicit/unsafe helper typing; repaired
+both. Spec review confirmed the production-file fence, limited eslint.config.js
+edits, full comment accounting, no GitHub replies and no new PR. Final verification
+and push remain pending at this checkpoint.
+
+Signal-forwarding decision: declined after real negative controls. Sending
+SIGTERM through the existing Bun launcher and through a direct Node CLI both
+left the preview port alive. The pinned Playwright package's SigIntWatcher only
+handles SIGINT; translating TERM to INT and awaiting the direct CLI then stalled
+when cancellation arrived during worker startup, until a second signal. A simple
+forward is not a reliable fix. A broader cancellation adapter is a poor tradeoff
+for this low-value follow-up, so all attempted signal changes were reverted;
+only the port-claim cleanup remains in run-local.ts. Both owned orphan preview
+groups were identified by their unique temporary checkouts and stopped using
+the existing process-group helper. The stalled children were signaled to finish
+teardown. No signal control is reported as passing, and no cancellation fix is
+claimed. Attack the Premise changed the decision after the direct-CLI retry
+falsified the assumption that forwarding alone could provide graceful teardown.
+
+Ready-to-post reply: "Declining the simple forwarding change: on the pinned
+Playwright version, forwarding SIGTERM left the preview alive, while SIGINT
+cancellation during worker startup stalled until a second signal. Reliable
+cancellation needs a broader lifecycle change than this low-value follow-up;
+the attempted forwarding changes have been reverted."
+
+Final follow-up verification:
+
+- Frozen dependency install: exit 0.
+- Final format:check, lint, lint:ui and both typechecks: exit 0 with
+  PUBLIC_CONVEX_URL=http://127.0.0.1:3210 (zero Svelte errors/warnings).
+- Final unit suite: 50 files / 664 tests passed, 34.53 seconds.
+- Final isolated E2E suite after all retained harness changes: 17 tests passed,
+  2.2 minutes. Earlier full suite also passed all 17; focused shell passed 1.
+- Worker-override negative control: 1 expected failure at the worker guard.
+- Preview-config boundary: 6 cases passed.
+- Final app up / capacity:check / app down: exit 0, 24 uncached calls, zero errors;
+  three runs per source/date-density pair. Capacity measurement took 83.67 seconds,
+  not a latency benchmark. Original function restoration exit 0 and
+  originalEnvRestored=true. Earlier equivalent live check also passed 24 calls.
+- Redacted staged gitleaks scan: zero leaks. Hook results are confirmed on commit.
+- Final inline standards/spec review and git diff --check: no unresolved findings
+  in retained changes. The two declined requests are documented with reasons.
+- No retained convex/, src/lib/domain/, UI, auth configuration, or feature-map diff.
+- Evidence: test-results/verify-budge/pr25-tooling/ and
+  test-results/capacity/2026-11-03T23-28-20.324Z/.
+
+Ready-to-post port-test reply: "The allocator intentionally probes ports, and a
+later collision is rejected by strict binding. Adding a delayed bind would only
+make this test probabilistic; it cannot establish reservation semantics the
+allocator does not promise, so I am retaining the real cross-process binding
+and ownership coverage."
+
+The preview/backend equality defect is fixed by excluding both backend ports.
+The cross-run startup race remains the documented safe failure; socket reservation
+handoff is deferred because Convex/Vite own their binds. Parent owns integration
+and posting the two declined replies. This branch opens no PR and posts no
+GitHub comments. No open questions requiring an answer.

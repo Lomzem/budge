@@ -32,15 +32,31 @@ export default {
 	},
 	create(context) {
 		const names = new Set(['Effect']);
+		const aliases = new Set();
+		const namespace = (node) => {
+			if (node.type !== 'Identifier') return false;
+			if (names.has(node.name)) return true;
+			let scope = context.sourceCode.getScope(node);
+			while (scope) {
+				const variable = scope.set.get(node.name);
+				if (variable) return aliases.has(variable);
+				scope = scope.upper;
+			}
+			return false;
+		};
 		const allow = context.options[0]?.allow ?? [];
 		return {
 			ImportSpecifier(node) {
 				if (node.parent.source.value === 'effect' && node.imported.name === 'Effect')
 					names.add(node.local.name);
 			},
+			VariableDeclarator(node) {
+				if (node.id.type === 'Identifier' && node.init && namespace(node.init))
+					aliases.add(context.sourceCode.getDeclaredVariables(node)[0]);
+			},
 			MemberExpression(node) {
 				const property = node.computed ? node.property.value : node.property.name;
-				if (!names.has(node.object.name) || !defects.has(property)) return;
+				if (!namespace(node.object) || !defects.has(property)) return;
 				const ancestors = context.sourceCode.getAncestors(node);
 				const method = ancestors.findLast((ancestor) => ancestor.type === 'MethodDefinition');
 				const owner = ancestors.findLast((ancestor) => ancestor.type === 'ClassDeclaration');
