@@ -133,6 +133,8 @@ export default defineSchema({
 
 		syncLeaseUntil: v.optional(v.number()),
 		syncRequestedDuringLease: v.optional(v.boolean()),
+		attentionNotices: v.optional(v.number()),
+		accountsCheckRequestedAt: v.optional(v.number()),
 		consentExpiresAt: v.optional(v.number()),
 		provider: v.union(
 			v.object({

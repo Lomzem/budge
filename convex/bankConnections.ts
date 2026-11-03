@@ -355,11 +355,15 @@ function livePlaid() {
 }
 
 export const retrySync = internalAction({
-	args: { connectionId: v.id('bankConnections'), attempt: v.number() },
+	args: {
+		connectionId: v.id('bankConnections'),
+		attempt: v.number(),
+		resumeFrom: v.optional(v.number())
+	},
 	returns: v.null(),
-	handler: async (ctx, { connectionId, attempt }) => {
+	handler: async (ctx, { connectionId, attempt, resumeFrom }) => {
 		await Effect.runPromise(
-			syncConnection(connectionId, { refresh: false, attempt }).pipe(
+			syncConnection(connectionId, { refresh: false, attempt, resumeFrom }).pipe(
 				Effect.ignore,
 				Effect.provide(liveLayer(ctx))
 			)
@@ -392,6 +396,7 @@ export const flagItem = internalMutation({
 		if (connection === null) return null;
 		await ctx.db.patch('bankConnections', connection._id, {
 			status: 'needsAttention',
+			attentionNotices: (connection.attentionNotices ?? 0) + 1,
 			lastError: { at: Date.now(), message: failure.message }
 		});
 		return null;
@@ -429,19 +434,30 @@ export const recordConsent = internalMutation({
 });
 
 export const takeLease = internalMutation({
-	args: { connectionId: v.id('bankConnections'), resume: v.boolean() },
+	args: {
+		connectionId: v.id('bankConnections'),
+		resume: v.boolean(),
+		resumeFrom: v.optional(v.number()),
+		discover: v.boolean()
+	},
 	returns: leaseResult,
-	handler: async (ctx, { connectionId, resume }) => {
+	handler: async (ctx, { connectionId, resume, resumeFrom, discover }) => {
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (connection === null) return { kind: 'missing' as const };
 		const now = Date.now();
+		const accountsCheckRequestedAt = discover ? now : (connection.accountsCheckRequestedAt ?? null);
+		if (discover) {
+			await ctx.db.patch('bankConnections', connectionId, { accountsCheckRequestedAt: now });
+		}
 		if ((connection.syncLeaseUntil ?? 0) > now) {
 			await ctx.db.patch('bankConnections', connectionId, { syncRequestedDuringLease: true });
 			return { kind: 'busy' as const };
 		}
 		const { provider } = connection;
 		if (provider.kind !== 'plaid') return { kind: 'noToken' as const };
-		if (connection.status === 'needsAttention' && !resume) return { kind: 'paused' as const };
+		const attentionNotices = connection.attentionNotices ?? 0;
+		const authorized = resume || resumeFrom === attentionNotices;
+		if (connection.status === 'needsAttention' && !authorized) return { kind: 'paused' as const };
 		const cutoverDate = await requireCutoverDate(ctx);
 		const lease = now + LEASE_MS;
 		await ctx.db.patch('bankConnections', connectionId, {
@@ -456,7 +472,9 @@ export const takeLease = internalMutation({
 			cursor: provider.cursor ?? null,
 			updateStart:
 				provider.updateStart === undefined ? (provider.cursor ?? null) : provider.updateStart,
-			cutoverDate
+			cutoverDate,
+			attentionNotices,
+			accountsCheckRequestedAt
 		};
 	}
 });
@@ -466,7 +484,18 @@ export const apply = internalMutation({
 	returns: applyResult,
 	handler: async (
 		ctx,
-		{ connectionId, lease, fromCursor, nextCursor, hasMore, rows, modified, removed, release }
+		{
+			connectionId,
+			lease,
+			fromCursor,
+			nextCursor,
+			hasMore,
+			rows,
+			modified,
+			removed,
+			release,
+			attentionNotices
+		}
 	) => {
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (
@@ -493,6 +522,7 @@ export const apply = internalMutation({
 		const changes = await applyBankChanges(ctx, connectionId, modified, cutoverDate, payees);
 		totals.added += changes.added;
 		totals.matched += changes.matched;
+		totals.held += changes.held;
 		await applyBankRemovals(ctx, connectionId, removed);
 
 		const now = Date.now();
@@ -504,12 +534,24 @@ export const apply = internalMutation({
 		await ctx.db.patch('bankConnections', connectionId, {
 			provider: { ...provider, cursor: nextCursor, ...updateStartUntilItsLastPage },
 			syncLeaseUntil: nextLease,
-			...(release ? { lastSyncedAt: now, lastError: undefined, status: 'ok' as const } : {})
+			...(release ? finishedSync(connection, now, attentionNotices) : {})
 		});
 		if (release) await syncAgainIfRequested(ctx, connection);
 		return { kind: 'applied' as const, lease: nextLease ?? null, ...totals };
 	}
 });
+
+function finishedSync(
+	connection: Doc<'bankConnections'>,
+	now: number,
+	attentionNoticesAtLease: number
+) {
+	const noNewNotice = (connection.attentionNotices ?? 0) === attentionNoticesAtLease;
+	return {
+		lastSyncedAt: now,
+		...(noNewNotice ? { lastError: undefined, status: 'ok' as const } : {})
+	};
+}
 
 function rowsByBankAccount(
 	rows: Infer<typeof syncRow>[],
@@ -551,11 +593,15 @@ async function applyBankChanges(
 	cutoverDate: string,
 	payees: ImportedPayees
 ) {
-	const totals = { added: 0, matched: 0 };
+	const totals = { added: 0, matched: 0, held: 0 };
 	for (const { externalAccountId, ...row } of modified) {
-		const target = await findConnectionAccount(ctx, connectionId, externalAccountId);
-		if (target?.state !== 'mapped') continue;
 		const checked = requireBankRow(row, cutoverDate);
+		const target = await connectionAccountOf(ctx, connectionId, externalAccountId);
+		if (await changeHeldRow(ctx, target._id, checked)) continue;
+		if (target.state !== 'mapped') {
+			if (target.state === 'held') totals.held += await holdRows(ctx, target._id, [checked]);
+			continue;
+		}
 		const bankRow = await syncedBankRow(ctx, target.accountId, checked.sourceId);
 		if (bankRow !== null) {
 			await applyBankChange(ctx, bankRow, checked, payees);
@@ -576,10 +622,46 @@ async function applyBankRemovals(
 ) {
 	for (const { externalAccountId, sourceId } of removed) {
 		const target = await findConnectionAccount(ctx, connectionId, externalAccountId);
-		if (target?.state !== 'mapped') continue;
+		if (target === null) continue;
+		const held = await importOf(ctx, target._id, sourceId);
+		if (held?.state === 'held') {
+			await ctx.db.patch('imports', held._id, { state: 'removed' });
+			continue;
+		}
+		if (target.state !== 'mapped') continue;
 		const bankRow = await syncedBankRow(ctx, target.accountId, sourceId);
 		if (bankRow !== null) await applyBankRemoval(ctx, bankRow);
 	}
+}
+
+async function changeHeldRow(
+	ctx: MutationCtx,
+	connectionAccountId: Id<'connectionAccounts'>,
+	row: IncomingRow
+) {
+	const held = await importOf(ctx, connectionAccountId, row.sourceId);
+	if (held === null || held.transactionId !== undefined) return false;
+	if (held.state !== 'held') return true;
+	await ctx.db.patch('imports', held._id, {
+		date: row.date,
+		amount: row.amount,
+		bankText: row.bankText,
+		merchantName: row.merchantName
+	});
+	return true;
+}
+
+async function importOf(
+	ctx: MutationCtx,
+	connectionAccountId: Id<'connectionAccounts'>,
+	sourceId: string | undefined
+) {
+	return await ctx.db
+		.query('imports')
+		.withIndex('by_connectionAccountId_sourceId', (q) =>
+			q.eq('connectionAccountId', connectionAccountId).eq('sourceId', sourceId)
+		)
+		.first();
 }
 
 export const renewLease = internalMutation({
@@ -597,14 +679,15 @@ export const renewLease = internalMutation({
 export const fail = internalMutation({
 	args: failArgs,
 	returns: v.null(),
-	handler: async (ctx, { connectionId, lease, attempt, message, status }) => {
+	handler: async (ctx, { connectionId, lease, attempt, resumeFrom, message, status }) => {
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (connection?.syncLeaseUntil !== lease) return null;
 		const delay = status === 'shortLived' ? RETRY_DELAYS_MS[attempt] : undefined;
 		if (delay !== undefined) {
 			await ctx.scheduler.runAfter(delay, internal.bankConnections.retrySync, {
 				connectionId,
-				attempt: attempt + 1
+				attempt: attempt + 1,
+				...(resumeFrom === undefined ? {} : { resumeFrom })
 			});
 			await ctx.db.patch('bankConnections', connectionId, { syncLeaseUntil: undefined });
 			return null;
@@ -612,7 +695,9 @@ export const fail = internalMutation({
 		await ctx.db.patch('bankConnections', connectionId, {
 			syncLeaseUntil: undefined,
 			lastError: { at: Date.now(), message },
-			...(status === 'needsAttention' ? { status } : {})
+			...(status === 'needsAttention'
+				? { status, attentionNotices: (connection.attentionNotices ?? 0) + 1 }
+				: {})
 		});
 		await syncAgainIfRequested(ctx, connection);
 		return null;
@@ -688,13 +773,7 @@ async function holdRows(
 ) {
 	let held = 0;
 	for (const row of rows) {
-		const known = await ctx.db
-			.query('imports')
-			.withIndex('by_connectionAccountId_sourceId', (q) =>
-				q.eq('connectionAccountId', connectionAccountId).eq('sourceId', row.sourceId)
-			)
-			.first();
-		if (known !== null) continue;
+		if ((await importOf(ctx, connectionAccountId, row.sourceId)) !== null) continue;
 		await ctx.db.insert('imports', {
 			source: 'plaid',
 			...(row.sourceId === undefined ? {} : { sourceId: row.sourceId }),

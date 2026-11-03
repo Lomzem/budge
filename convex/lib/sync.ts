@@ -50,7 +50,9 @@ export const leaseResult = v.union(
 		cursor: v.union(v.string(), v.null()),
 
 		updateStart: v.union(v.string(), v.null()),
-		cutoverDate: v.string()
+		cutoverDate: v.string(),
+		attentionNotices: v.number(),
+		accountsCheckRequestedAt: v.union(v.number(), v.null())
 	})
 );
 export type LeaseResult = Infer<typeof leaseResult>;
@@ -66,7 +68,8 @@ export const applyArgs = {
 	rows: v.array(syncRow),
 	modified: v.array(syncRow),
 	removed: v.array(syncRemoval),
-	release: v.boolean()
+	release: v.boolean(),
+	attentionNotices: v.number()
 };
 
 export const applyResult = v.union(
@@ -85,12 +88,14 @@ export const failArgs = {
 	connectionId: v.id('bankConnections'),
 	lease: v.number(),
 	attempt: v.number(),
+	resumeFrom: v.optional(v.number()),
 	message: v.string(),
 	status: v.union(v.literal('needsAttention'), v.literal('shortLived'), v.literal('failed'))
 };
 
 export const recordAccountsArgs = {
 	connectionId: v.id('bankConnections'),
+	answersRequestAt: v.optional(v.union(v.number(), v.null())),
 	accounts: v.array(
 		v.object({ externalId: v.string(), name: v.string(), mask: v.optional(v.string()) })
 	)
@@ -120,6 +125,8 @@ interface SyncStoreShape {
 	readonly takeLease: (args: {
 		connectionId: Id<'bankConnections'>;
 		resume: boolean;
+		resumeFrom?: number;
+		discover: boolean;
 	}) => Effect.Effect<LeaseResult>;
 	readonly apply: (args: {
 		connectionId: Id<'bankConnections'>;
@@ -131,6 +138,7 @@ interface SyncStoreShape {
 		modified: SyncRow[];
 		removed: SyncRemoval[];
 		release: boolean;
+		attentionNotices: number;
 	}) => Effect.Effect<ApplyResult>;
 
 	readonly renewLease: (args: {
@@ -142,6 +150,7 @@ interface SyncStoreShape {
 			connectionId: Id<'bankConnections'>;
 			lease: number;
 			attempt: number;
+			resumeFrom?: number;
 		} & SyncFailure
 	) => Effect.Effect<void>;
 	readonly credentials: (
@@ -159,6 +168,7 @@ interface SyncStoreShape {
 	}) => Effect.Effect<Id<'bankConnections'>>;
 	readonly recordAccounts: (args: {
 		connectionId: Id<'bankConnections'>;
+		answersRequestAt: number | null;
 		accounts: { externalId: string; name: string; mask?: string }[];
 	}) => Effect.Effect<void>;
 	readonly startingBalanceBasis: (accountId: Id<'accounts'>) => Effect.Effect<StartingBalanceBasis>;
@@ -202,15 +212,28 @@ export const syncConnection = Effect.fnUntraced(function* (
 	{
 		refresh,
 		resume = false,
+		resumeFrom,
 		attempt = 0,
 		discover = false
-	}: { refresh: boolean; resume?: boolean; attempt?: number; discover?: boolean }
+	}: {
+		refresh: boolean;
+		resume?: boolean;
+		resumeFrom?: number | undefined;
+		attempt?: number;
+		discover?: boolean;
+	}
 ): Effect.fn.Return<SyncOutcome, SyncError, PlaidClient | TokenCipher | SyncStore> {
 	const store = yield* SyncStore;
 	const plaid = yield* PlaidClient;
 	const cipher = yield* TokenCipher;
-	const taken = yield* store.takeLease({ connectionId, resume });
+	const taken = yield* store.takeLease({
+		connectionId,
+		resume,
+		discover,
+		...(resumeFrom === undefined ? {} : { resumeFrom })
+	});
 	if (taken.kind !== 'taken') return taken;
+	const authorized = resume || resumeFrom !== undefined;
 
 	let lease = taken.lease;
 	const run = Effect.gen(function* () {
@@ -247,7 +270,8 @@ export const syncConnection = Effect.fnUntraced(function* (
 				rows: fetched.rows,
 				modified: fetched.modified,
 				removed: fetched.removed,
-				release
+				release,
+				attentionNotices: taken.attentionNotices
 			});
 			if (applied.kind === 'stale') return { kind: 'busy' } as const;
 			totals.added += applied.added;
@@ -261,15 +285,17 @@ export const syncConnection = Effect.fnUntraced(function* (
 		if (Option.isSome(item)) {
 			yield* store.recordConsent({ connectionId, consentExpiresAt: item.value.consentExpiresAt });
 		}
-		if (discover || totals.held > 0) {
+		if (taken.accountsCheckRequestedAt !== null || totals.held > 0) {
 			yield* Effect.ignore(
-				plaid
-					.accountsGet(accessToken)
-					.pipe(
-						Effect.flatMap((accounts) =>
-							store.recordAccounts({ connectionId, accounts: accounts.map(namesOf) })
-						)
+				plaid.accountsGet(accessToken).pipe(
+					Effect.flatMap((accounts) =>
+						store.recordAccounts({
+							connectionId,
+							answersRequestAt: taken.accountsCheckRequestedAt,
+							accounts: accounts.map(namesOf)
+						})
 					)
+				)
 			);
 		}
 		if (refresh) yield* Effect.ignore(plaid.transactionsRefresh(accessToken));
@@ -278,7 +304,13 @@ export const syncConnection = Effect.fnUntraced(function* (
 	return yield* run.pipe(
 		Effect.tapCause((cause) => {
 			const failure = describeFailure(cause);
-			return store.fail({ connectionId, lease, attempt, ...failure });
+			return store.fail({
+				connectionId,
+				lease,
+				attempt,
+				...(authorized ? { resumeFrom: taken.attentionNotices } : {}),
+				...failure
+			});
 		})
 	);
 });

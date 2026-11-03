@@ -313,6 +313,77 @@ describe('a bank Account Budge does not know', () => {
 	});
 });
 
+describe('the bank changes a row it holds for an unknown Account', () => {
+	const grocerId = `${savingsId}-txn-synthetic-1`;
+	const changes = (part: Partial<SyncPage>): SyncPage => ({ ...page, added: [], ...part });
+	const grocerAt = (amount: number) => {
+		const [grocer] = rowsFor(savingsId).added;
+		assert(grocer !== undefined, 'the fixture has a grocer row');
+		return { ...grocer, amount };
+	};
+
+	test('mapping brings in what the bank last said, not what it first sent', async () => {
+		const { owner, sync, heldId, transactions, checking } = await connectedBudget();
+		await sync(rowsFor(savingsId));
+		await sync(changes({ modified: [grocerAt(-4_550)] }));
+
+		await owner.mutation(api.heldAccounts.map, {
+			connectionAccountId: await heldId(),
+			accountId: checking
+		});
+
+		expect((await transactions(checking)).map((row) => row.amount)).toEqual([231_042, -4_550]);
+	});
+
+	test('a removed row is never imported, even when an earlier page arrives again', async () => {
+		const { owner, sync, heldId, transactions, checking } = await connectedBudget();
+		await sync(rowsFor(savingsId));
+		await sync(changes({ removed: [{ transaction_id: grocerId, account_id: savingsId }] }));
+		await sync(rowsFor(savingsId));
+
+		await owner.mutation(api.heldAccounts.map, {
+			connectionAccountId: await heldId(),
+			accountId: checking
+		});
+
+		expect((await transactions(checking)).map((row) => row.amount)).toEqual([231_042]);
+	});
+
+	test('a change to an Account the bank never sent rows for holds that row', async () => {
+		const { sync, held } = await connectedBudget();
+
+		expect(await sync(changes({ modified: [grocerAt(-4_550)] }))).toMatchObject({ held: 1 });
+
+		expect(await held()).toMatchObject([{ name: 'Sample Savings', rows: 1 }]);
+	});
+
+	test('a change that arrives while mapping is still bringing rows in is kept', async () => {
+		vi.useFakeTimers();
+		const { t, owner, sync, heldId, transactions, checking } = await connectedBudget();
+		const many = Array.from({ length: HELD_BATCH + 2 }, (_, n) => ({
+			...payroll,
+			account_id: savingsId,
+			transaction_id: `txn-synthetic-many-${String(n)}`,
+			amount: -(1 + n)
+		}));
+		await sync({ ...page, added: many });
+		await owner.mutation(api.heldAccounts.map, {
+			connectionAccountId: await heldId(),
+			accountId: checking
+		});
+		const last = many.at(-1);
+		assert(last !== undefined, 'there are rows');
+
+		await sync(changes({ modified: [{ ...last, amount: -999 }], removed: [] }));
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		const amounts = (await transactions(checking)).map((row) => row.amount);
+		expect(amounts).toHaveLength(HELD_BATCH + 2);
+		expect(amounts).toContain(-999);
+		expect(amounts).not.toContain(-(HELD_BATCH + 2));
+	});
+});
+
 afterEach(() => {
 	vi.useRealTimers();
 });

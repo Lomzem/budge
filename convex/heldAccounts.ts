@@ -157,7 +157,7 @@ export const settle = internalMutation({
 export const recordAccounts = internalMutation({
 	args: recordAccountsArgs,
 	returns: v.null(),
-	handler: async (ctx, { connectionId, accounts }) => {
+	handler: async (ctx, { connectionId, answersRequestAt, accounts }) => {
 		if (accounts.length > MAX_CONNECTION_ACCOUNTS) {
 			throw publicError(
 				'INVALID_INPUT',
@@ -177,6 +177,14 @@ export const recordAccounts = internalMutation({
 			} else {
 				await ctx.db.patch('connectionAccounts', known._id, { name, mask });
 			}
+		}
+		const connection = await ctx.db.get('bankConnections', connectionId);
+		if (
+			connection !== null &&
+			answersRequestAt != null &&
+			connection.accountsCheckRequestedAt === answersRequestAt
+		) {
+			await ctx.db.patch('bankConnections', connectionId, { accountsCheckRequestedAt: undefined });
 		}
 		return null;
 	}

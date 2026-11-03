@@ -303,7 +303,8 @@ describe('syncing a Bank Connection', () => {
 		const { t, connectionId, connection, rows } = await connectedBudget();
 		const taken = await t.mutation(internal.bankConnections.takeLease, {
 			connectionId,
-			resume: false
+			resume: false,
+			discover: false
 		});
 		assert(taken.kind === 'taken', 'expected the lease');
 
@@ -322,7 +323,8 @@ describe('syncing a Bank Connection', () => {
 			],
 			modified: [],
 			removed: [],
-			release: true
+			release: true,
+			attentionNotices: 0
 		};
 
 		expect(
@@ -668,6 +670,86 @@ describe('reconnecting a Bank Connection', () => {
 			{ status: 'ok', lastError: null }
 		]);
 		expect(synced(await sync(plaidPages(page)))).toMatchObject({ kind: 'synced' });
+	});
+});
+
+describe('a needed login while syncing', () => {
+	const bankDown = new PlaidApi({
+		error_code: 'INSTITUTION_NOT_RESPONDING',
+		status: 400,
+		request_id: 'request-synthetic-6'
+	});
+	const scheduledRetry = async (t: Backend['t']) => {
+		const jobs = await t.run((ctx) => ctx.db.system.query('_scheduled_functions').collect());
+		const retry = jobs.find((job) => job.name === 'bankConnections:retrySync');
+		assert(retry !== undefined, 'expected a scheduled retry');
+		const [{ attempt, resumeFrom }] = retry.args as [{ attempt: number; resumeFrom?: number }];
+		return { attempt, resumeFrom };
+	};
+	const statusOf = async (owner: Backend['owner']) =>
+		(await owner.query(api.bankConnections.list, { now: Date.now() }))[0]?.status;
+
+	test('a short-lived failure in the sync after Reconnect still retries and recovers', async () => {
+		const { t, owner, sync, connectionId } = await connectedBudget();
+		await sync({ transactionsSync: () => Effect.fail(needsLogin) });
+		await runInAction(
+			{ t },
+			{ transactionsSync: () => Effect.fail(bankDown) },
+			syncConnection(connectionId, { refresh: false, resume: true })
+		);
+
+		const retried = await runInAction(
+			{ t },
+			plaidPages(page),
+			syncConnection(connectionId, { refresh: false, ...(await scheduledRetry(t)) })
+		);
+
+		expect(synced(retried)).toMatchObject({ kind: 'synced' });
+		expect(await statusOf(owner)).toBe('ok');
+	});
+
+	test('a new notice that the bank needs the owner stops that retry', async () => {
+		const { t, sync, connectionId } = await connectedBudget();
+		await sync({ transactionsSync: () => Effect.fail(needsLogin) });
+		await runInAction(
+			{ t },
+			{ transactionsSync: () => Effect.fail(bankDown) },
+			syncConnection(connectionId, { refresh: false, resume: true })
+		);
+		await t.mutation(internal.bankConnections.flagItem, { itemId, code: 'PENDING_DISCONNECT' });
+
+		const retried = await runInAction(
+			{ t },
+			plaidPages(page),
+			syncConnection(connectionId, { refresh: false, ...(await scheduledRetry(t)) })
+		);
+
+		expect(synced(retried)).toEqual({ kind: 'paused' });
+	});
+
+	test.each([
+		['an ordinary sync', false],
+		['the sync after Reconnect', true]
+	])('a notice that arrives during %s still shows once it finishes', async (_name, resume) => {
+		const { t, owner, sync, connectionId } = await connectedBudget();
+		if (resume) await sync({ transactionsSync: () => Effect.fail(needsLogin) });
+		const noticeMidSync = () =>
+			Effect.promise(() =>
+				t.mutation(internal.bankConnections.flagItem, { itemId, code: 'PENDING_EXPIRATION' })
+			).pipe(Effect.as(page));
+
+		await runInAction(
+			{ t },
+			{ transactionsSync: noticeMidSync },
+			syncConnection(connectionId, { refresh: false, resume })
+		);
+
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toMatchObject([
+			{
+				status: 'needsAttention',
+				lastError: { message: 'The bank needs you to reconnect (PENDING_EXPIRATION).' }
+			}
+		]);
 	});
 });
 
