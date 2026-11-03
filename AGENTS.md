@@ -53,6 +53,13 @@ Run these for each ticket, scoped to the ticket's diff. A ticket is not done unt
 2. Address every CodeRabbit comment with a fix or a reply. Batch the fixes, push, and request one incremental review.
 3. Merge only when CodeRabbit has approved the latest commit and CI is green.
 
+## Enforced rules
+
+| Rule                                                                                           | Enforced by                                                                                                           |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Serialize app startup, shutdown, and process-record writes within each checkout.               | `scripts/app/lock.ts`; `scripts/app/lifecycle.test.ts`                                                                |
+| Keep Effect failures in the error channel; defects require an allow-listed invariant boundary. | `local/no-effect-defects` and its reasoned allow-list in `eslint.config.js`; `eslint/rules/no-effect-defects.test.js` |
+
 <!-- convex-ai-start -->
 
 This project uses [Convex](https://convex.dev) as its backend.

@@ -8,6 +8,7 @@ import globals from 'globals';
 import ts from 'typescript-eslint';
 
 import noComments from './eslint/rules/no-comments.js';
+import noEffectDefects from './eslint/rules/no-effect-defects.js';
 import svelteConfig from './svelte.config.ts';
 
 const browserOnlyGlobals = new Set([
@@ -98,13 +99,34 @@ export default defineConfig(
 		}
 	},
 	{
-		plugins: { local: { rules: { 'no-comments': noComments } } },
+		plugins: {
+			local: { rules: { 'no-comments': noComments, 'no-effect-defects': noEffectDefects } }
+		},
 		rules: {
 			'local/no-comments': 'error',
 			'max-depth': ['error', 3],
 			complexity: ['error', 15],
 			'no-nested-ternary': 'error',
 			'max-nested-callbacks': ['error', 3]
+		}
+	},
+	{
+		files: ['convex/**', 'src/**'],
+		rules: {
+			'local/no-effect-defects': [
+				'error',
+				{
+					allow: [
+						{
+							file: 'convex/lib/plaidClient.ts',
+							className: 'PlaidClient',
+							method: 'layerTest',
+							reason:
+								'An unexpected call means the test fake violates its declared interaction contract.'
+						}
+					]
+				}
+			]
 		}
 	},
 	{
