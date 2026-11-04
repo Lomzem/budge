@@ -76,8 +76,8 @@ const FIRST_UNPRIVILEGED_PORT = 1024;
 const UNPRIVILEGED_PORTS = 65536 - FIRST_UNPRIVILEGED_PORT;
 
 export async function freePort(preferred: number, taken: number[] = []) {
-	if (!Number.isInteger(preferred) || preferred < FIRST_UNPRIVILEGED_PORT || preferred > 65535)
-		throw new Error(`preferred port ${String(preferred)} is not from 1024 to 65535`);
+	if (!Number.isInteger(preferred) || preferred < FIRST_UNPRIVILEGED_PORT)
+		throw new Error(`preferred port ${String(preferred)} is below 1024`);
 	for (let offset = 0; offset < 100; offset++) {
 		const port =
 			FIRST_UNPRIVILEGED_PORT +
