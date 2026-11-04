@@ -3,6 +3,7 @@
 
 	import { api } from '$convex/_generated/api';
 	import { Accounts, setAccounts } from '$lib/accounts.svelte';
+	import { BankConnections, setBankConnections } from '$lib/bankConnections.svelte';
 	import { BudgetMonth, setBudgetMonth } from '$lib/budget.svelte';
 	import AccountSidebar from '$lib/components/shell/account-sidebar.svelte';
 	import AppMenu from '$lib/components/shell/app-menu.svelte';
@@ -19,7 +20,9 @@
 	const auth = useAuth();
 
 	const whoami = useQuery(api.owner.whoami, () => (auth.isAuthenticated ? {} : 'skip'));
-	setAccounts(new Accounts(() => auth.isAuthenticated));
+	const accounts = new Accounts(() => auth.isAuthenticated);
+	setAccounts(accounts);
+	setBankConnections(new BankConnections(() => accounts.loaded));
 	const budget = new BudgetMonth(() => auth.isAuthenticated);
 	setBudgetMonth(budget);
 

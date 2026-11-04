@@ -1,4 +1,5 @@
 import { clerk } from '@clerk/testing/playwright';
+import { holdResponseTo } from './heldResponse';
 import { expect, test } from './test';
 
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
@@ -22,4 +23,41 @@ test('the sidebar shows when each Bank Connection last synced', async ({ page })
 	await expect(dialog.getByRole('status')).toHaveText(
 		'This Bank Connection has no bank login, so it never syncs.'
 	);
+});
+
+test.describe('with more than one Bank Connection', () => {
+	test.use({ fixture: 'bank-sync' });
+
+	test("a Sync now that finishes after its dialog closed leaves the next Bank Connection's dialog alone", async ({
+		page
+	}) => {
+		if (!ownerEmail) throw new Error('E2E_CLERK_USER_EMAIL is not set.');
+		const sync = await holdResponseTo(page, 'bankConnections:syncNow');
+		await page.goto('/sign-in');
+		await clerk.signIn({ page, emailAddress: ownerEmail });
+		await page.goto('/');
+		const connections = page.getByRole('list', { name: 'Bank Connections' });
+
+		await connections.getByRole('button', { name: /^Sample Bank \(Sandbox\): / }).click();
+		const sandbox = page.getByRole('dialog', { name: 'Sample Bank (Sandbox)' });
+		await sandbox.getByRole('button', { name: 'Sync now' }).click();
+		await sync.held;
+		await page.keyboard.press('Escape');
+		await expect(sandbox).toBeHidden();
+
+		await connections.getByRole('button', { name: /^Sample Credit Union: / }).click();
+		const creditUnion = page.getByRole('dialog', { name: 'Sample Credit Union' });
+		await expect(creditUnion.getByRole('button', { name: 'Sync now' })).toBeEnabled();
+		await page.evaluate((leak) => {
+			new MutationObserver(() => {
+				if (document.body.textContent.includes(leak)) document.body.dataset.leaked = leak;
+			}).observe(document.body, { subtree: true, childList: true, characterData: true });
+		}, 'This Bank Connection has no bank login');
+		sync.release();
+		await creditUnion.getByRole('button', { name: 'Sync now' }).click();
+		await expect(creditUnion.getByRole('status')).toHaveText(
+			"Couldn't reach the bank; try again later."
+		);
+		await expect(page.locator('body')).not.toHaveAttribute('data-leaked');
+	});
 });

@@ -6,6 +6,7 @@ export const tableColumnVariants = tv({
 		width: { auto: '', fit: 'w-0', fill: 'w-full max-w-0' },
 		showFrom: {
 			always: '',
+			md: 'hidden @md:table-cell',
 			lg: 'hidden @lg:table-cell',
 			xl: 'hidden @xl:table-cell',
 			'2xl': 'hidden @2xl:table-cell',

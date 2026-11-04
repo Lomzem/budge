@@ -23,7 +23,7 @@ Preconditions:
 - **Cancel:** open Add Transaction, fill a different invented Payee, press Escape; require no saved row or balance change.
 - **Edit/clear:** open the created row by `getByRole("button", { name: /^Sample Verification Bakery/ })`; change Amount, Date, Account, Category, memo, and Direction in separate checks. Save and verify the resulting balances and budget Activity; revisit both Account pages after moving an Account. Toggle `getByRole("checkbox", { name: /^Cleared: Sample Verification Bakery/ })`, reload, require checked.
 - **Delete:** open the row, click `Delete`, then confirm `getByRole("alertdialog").getByRole("button", { name: "Delete", exact: true })`. Require absence after reload and reversal of its current balance/budget effect.
-- **List:** use `Show more` when present; require new rows without duplicates. Capture list and dialog at 320 px, verify no horizontal overflow. Follow imports for approval, splits for line editing, and Reconciliation for locks.
+- **List:** use `Show more` when present; require new rows without duplicates. Capture list and dialog at 320 px, verify no horizontal overflow of the page or the table container. Below a 448 px table the Date and Approve columns hide: the short date sits under the Payee, and an Unapproved row (bold) is approved from its dialog's `Approve` or `Approve all`; on `bank-sync` require the `SAMPLE BOOKSHOP 0193` Payee button visible and clickable at 320 px (`e2e/transactions.test.ts` covers it). Follow imports for approval, splits for line editing, and Reconciliation for locks.
 
 ## Gotchas
 

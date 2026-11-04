@@ -13,6 +13,7 @@
 
 	import AppMenu from './app-menu.svelte';
 	import BankConnections from './bank-connections.svelte';
+	import HeldAccounts from './held-accounts.svelte';
 
 	const accounts = getAccounts();
 	const unapproved = useQuery(api.transactions.unapprovedCount, () =>
@@ -81,6 +82,7 @@
 </nav>
 <div class="flex flex-col gap-2 border-t border-sidebar-border p-3">
 	<BankConnections />
+	<HeldAccounts />
 	<AppMenu wide />
 </div>
 

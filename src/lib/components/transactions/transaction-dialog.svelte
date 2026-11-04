@@ -16,6 +16,7 @@
 	import { formatDate, isIsoDate, localIsoDate } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
 	import { SPLIT_LINE_LIMIT } from '$lib/domain/splits';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
 
@@ -36,6 +37,7 @@
 	const remove = useMutation(api.transactions.remove);
 	const approve = useMutation(api.transactions.approve);
 	const unmatch = useMutation(api.imports.unmatch);
+	const resolveBankChange = useMutation(api.imports.resolveBankChange);
 	const unlock = useMutation(api.transactions.unlock);
 	const categories = useQuery(api.categories.list, () => (open ? {} : 'skip'));
 
@@ -53,9 +55,11 @@
 	let error = $state('');
 	let saving = $state(false);
 	let confirmDelete = $state(false);
+	let confirmBankRemoval = $state<Id<'imports'> | null>(null);
 	let unlocked = $state(false);
 
 	const locked = $derived(transaction?.reconciled === true && !unlocked);
+	const startingBalance = $derived(transaction?.startingBalance === true);
 
 	let filledCategoryId = $state('');
 
@@ -175,9 +179,38 @@
 		linkChoice = value;
 	};
 
+	const opening = new DialogSession<object>();
+
 	$effect(() => {
 		if (open) untrack(fill);
 	});
+
+	let filledFromRow = { date: '', amount: 0 };
+
+	$effect(() => {
+		if (!open || transaction === undefined) return;
+		const live = { date: transaction.date, amount: transaction.amount };
+		untrack(() => {
+			refreshUntouched(live);
+		});
+	});
+
+	function shownAmount(cents: number) {
+		return formatCents(Math.abs(cents)).replace('$', '');
+	}
+
+	function refreshUntouched(live: { date: string; amount: number }) {
+		const before = filledFromRow;
+		filledFromRow = live;
+		if (date === before.date) date = live.date;
+		const amountUntouched =
+			amount === shownAmount(before.amount) &&
+			direction === (before.amount < 0 ? 'outflow' : 'inflow');
+		if (amountUntouched) {
+			amount = shownAmount(live.amount);
+			direction = live.amount < 0 ? 'outflow' : 'inflow';
+		}
+	}
 
 	function choiceOf(saved: Row) {
 		if (saved.transfer) return TRANSFER + saved.transfer.accountId;
@@ -186,6 +219,7 @@
 	}
 
 	function fill() {
+		opening.open({});
 		error = '';
 		unlocked = false;
 		linkChoice = undefined;
@@ -195,8 +229,9 @@
 			payee = transaction.payeeName ?? '';
 			chosenCategoryId = choiceOf(transaction);
 			direction = transaction.amount < 0 ? 'outflow' : 'inflow';
-			amount = formatCents(Math.abs(transaction.amount)).replace('$', '');
+			amount = shownAmount(transaction.amount);
 			memo = transaction.memo ?? '';
+			filledFromRow = { date: transaction.date, amount: transaction.amount };
 			const sign = transaction.amount < 0 ? -1 : 1;
 			lines = (transaction.splits ?? []).map((line) => ({
 				key: nextLineKey++,
@@ -224,7 +259,7 @@
 	}
 
 	function startSplit(previous: string) {
-		if (lines.length > 0) return;
+		lines = [];
 		const total = parseCents(amount);
 		const sizeAloneSinceTheDirectionIsSetApart =
 			total === undefined ? amount : formatCents(Math.abs(total)).replace('$', '');
@@ -232,6 +267,15 @@
 		addLine();
 		const first = lines[0];
 		if (first && previous !== '' && !previous.startsWith(TRANSFER)) first.categoryId = previous;
+	}
+
+	function savedCategoryOf(line: { categoryId: string }) {
+		const savedLine = transaction?.splits?.find((s) => s.categoryId === line.categoryId);
+		if (savedLine) return { id: savedLine.categoryId, name: savedLine.categoryName };
+		const seededFromTheParent = transaction?.categoryId === line.categoryId;
+		if (seededFromTheParent)
+			return { id: line.categoryId, name: transaction.categoryName ?? undefined };
+		return undefined;
 	}
 
 	function findCategory(id: string): Id<'categories'> | undefined {
@@ -270,6 +314,24 @@
 			transferAccountId: other._id,
 			...(linked === undefined ? {} : { transferTransactionId: linked._id })
 		};
+	}
+
+	async function write(
+		work: () => PromiseLike<unknown>,
+		failure: string,
+		succeeded = () => {
+			open = false;
+		}
+	) {
+		const started = opening.current;
+		saving = true;
+		const result = await attempt(work);
+		saving = false;
+		if (started !== opening.current) return;
+		confirmDelete = false;
+		confirmBankRemoval = null;
+		if (result.ok) succeeded();
+		else error = result.error?.message ?? failure;
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -312,57 +374,53 @@
 			const noPayeeOrCategory = { payee: '' };
 			fields = { ...shared, ...noPayeeOrCategory, ...transfer };
 		}
-		saving = true;
 		const transactionId = transaction?._id;
-		const saved = await attempt(() =>
-			transactionId === undefined ? create(fields) : update({ transactionId, ...fields })
+		await write(
+			() => (transactionId === undefined ? create(fields) : update({ transactionId, ...fields })),
+			"Budge couldn't save the Transaction. Try again."
 		);
-		saving = false;
-		if (saved.ok) open = false;
-		else error = saved.error?.message ?? "Budge couldn't save the Transaction. Try again.";
 	}
 
 	async function approveTransaction() {
 		if (!transaction) return;
 		const transactionId = transaction._id;
-		saving = true;
-		const approved = await attempt(() => approve({ transactionId }));
-		saving = false;
-		if (approved.ok) open = false;
-		else error = approved.error?.message ?? "Budge couldn't approve the Transaction. Try again.";
+		await write(
+			() => approve({ transactionId }),
+			"Budge couldn't approve the Transaction. Try again."
+		);
 	}
 
 	async function unmatchRow(importId: Id<'imports'>) {
-		saving = true;
-		const unmatched = await attempt(() => unmatch({ importId }));
-		saving = false;
-		if (unmatched.ok) open = false;
-		else error = unmatched.error?.message ?? "Budge couldn't Unmatch the row. Try again.";
+		await write(() => unmatch({ importId }), "Budge couldn't Unmatch the row. Try again.");
+	}
+
+	async function resolveBankRow(importId: Id<'imports'>, keep: 'bank' | 'mine') {
+		await write(
+			() => resolveBankChange({ importId, keep }),
+			"Budge couldn't resolve the bank's change. Try again."
+		);
 	}
 
 	async function unlockTransaction() {
 		if (!transaction) return;
 		const transactionId = transaction._id;
-		saving = true;
-		const unlockedNow = await attempt(() => unlock({ transactionId }));
-		saving = false;
-		if (!unlockedNow.ok) {
-			error = unlockedNow.error?.message ?? "Budge couldn't unlock the Transaction. Try again.";
-			return;
-		}
-		unlocked = true;
-		error = '';
+		await write(
+			() => unlock({ transactionId }),
+			"Budge couldn't unlock the Transaction. Try again.",
+			() => {
+				unlocked = true;
+				error = '';
+			}
+		);
 	}
 
 	async function deleteTransaction() {
 		if (!transaction) return;
 		const transactionId = transaction._id;
-		saving = true;
-		const removed = await attempt(() => remove({ transactionId }));
-		saving = false;
-		confirmDelete = false;
-		if (removed.ok) open = false;
-		else error = removed.error?.message ?? "Budge couldn't delete the Transaction. Try again.";
+		await write(
+			() => remove({ transactionId }),
+			"Budge couldn't delete the Transaction. Try again."
+		);
 	}
 </script>
 
@@ -391,7 +449,7 @@
 		<legend class="px-1 text-sm font-medium">Split lines</legend>
 		<ol class="flex flex-col gap-3">
 			{#each lines as line, index (line.key)}
-				{@const saved = transaction?.splits?.find((s) => s.categoryId === line.categoryId)}
+				{@const saved = savedCategoryOf(line)}
 				{@const number = index + 1}
 				<li class="flex flex-col gap-2">
 					<div class="flex items-end gap-2">
@@ -404,7 +462,7 @@
 								class="h-8 min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
 							>
 								<option value="" disabled>Pick a Category</option>
-								{@render categoryOptions(saved?.categoryId, saved?.categoryName)}
+								{@render categoryOptions(saved?.id, saved?.name)}
 							</select>
 						</div>
 						<div class="flex w-28 flex-col gap-1">
@@ -498,9 +556,9 @@
 				<select
 					id="transaction-account"
 					bind:value={accountId}
-					disabled={locked}
+					disabled={locked || startingBalance}
 					required
-					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
 				>
 					{#each accounts.all as account (account._id)}
 						<option value={account._id}>{account.name}</option>
@@ -514,11 +572,23 @@
 			{#if !isTransfer}
 				<div class="flex flex-col gap-2">
 					<Label for="transaction-payee">Payee</Label>
-					<Input id="transaction-payee" bind:value={payee} autocomplete="off" />
+					<Input
+						id="transaction-payee"
+						bind:value={payee}
+						autocomplete="off"
+						disabled={startingBalance}
+					/>
 				</div>
 			{/if}
+			{#if startingBalance}
+				<p class="text-sm text-muted-foreground">
+					A starting balance stays in its Account, with no Payee and one Category.
+				</p>
+			{/if}
 			<div class="flex flex-col gap-2">
-				<Label for="transaction-category">Category or Transfer</Label>
+				<Label for="transaction-category"
+					>{startingBalance ? 'Category' : 'Category or Transfer'}</Label
+				>
 				<select
 					id="transaction-category"
 					bind:value={
@@ -540,12 +610,14 @@
 						</option>
 					{/if}
 					<option value="">Uncategorized</option>
-					<option value={SPLIT}>Split across Categories</option>
+					{#if !startingBalance}
+						<option value={SPLIT}>Split across Categories</option>
+					{/if}
 					{@render categoryOptions(
 						transaction?.categoryId ?? undefined,
 						transaction?.categoryName ?? undefined
 					)}
-					{#if transferAccounts.length > 0}
+					{#if transferAccounts.length > 0 && !startingBalance}
 						<optgroup label="Transfer to or from">
 							{#each transferAccounts as account (account._id)}
 								<option value={TRANSFER + account._id}>Transfer: {account.name}</option>
@@ -624,7 +696,7 @@
 						{#each transaction.bankRows as bankRow (bankRow._id)}
 							<li class="flex flex-wrap items-center justify-between gap-2 text-sm">
 								<span class="min-w-0 break-words text-muted-foreground">{bankRow.bankText}</span>
-								{#if bankRow.matched}
+								{#if bankRow.matched && bankRow.state !== 'removed'}
 									<Button
 										type="button"
 										size="sm"
@@ -635,9 +707,51 @@
 										Unmatch
 									</Button>
 								{/if}
+								{#if bankRow.state !== 'linked'}
+									<div class="flex w-full flex-col gap-2 rounded-md border p-3">
+										<p class="text-warning">
+											{#if bankRow.state === 'changed'}
+												Bank changed this: {formatCents(bankRow.amount)} on {formatDate(
+													bankRow.date
+												)}.
+											{:else}
+												Bank removed this.
+											{/if}
+										</p>
+										<div class="flex flex-wrap gap-2">
+											<Button
+												type="button"
+												size="sm"
+												variant="outline"
+												disabled={saving}
+												onclick={() => {
+													if (bankRow.state === 'changed') void resolveBankRow(bankRow._id, 'bank');
+													else confirmBankRemoval = bankRow._id;
+												}}
+											>
+												{bankRow.state === 'changed' ? "Use the bank's version" : 'Delete it'}
+											</Button>
+											<Button
+												type="button"
+												size="sm"
+												variant="outline"
+												disabled={saving}
+												onclick={() => resolveBankRow(bankRow._id, 'mine')}
+											>
+												Keep mine
+											</Button>
+										</div>
+									</div>
+								{/if}
 							</li>
 						{/each}
 					</ul>
+					{#if transaction.moreBankRows}
+						<p class="text-sm text-muted-foreground">
+							More Bank Rows back this Transaction than are shown here. Flagged ones come first, and
+							search still finds every Bank Text.
+						</p>
+					{/if}
 				</section>
 			{/if}
 			{#if error}
@@ -686,6 +800,38 @@
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel>Keep it</AlertDialog.Cancel>
 			<AlertDialog.Action onclick={deleteTransaction} disabled={saving}>Delete</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root
+	open={confirmBankRemoval !== null}
+	onOpenChange={(next) => {
+		if (!next) confirmBankRemoval = null;
+	}}
+>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>
+				{transaction?.transfer ? 'Delete this Transfer too?' : 'Delete this Transaction too?'}
+			</AlertDialog.Title>
+			<AlertDialog.Description>
+				{#if transaction?.transfer}
+					The bank removed it. Both sides are deleted, here and in {transaction.transfer
+						.accountName}. This can't be undone.
+				{:else}
+					The bank removed it. Its amount comes out of the Account balance. This can't be undone.
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Keep it</AlertDialog.Cancel>
+			<AlertDialog.Action
+				disabled={saving}
+				onclick={() => {
+					if (confirmBankRemoval !== null) void resolveBankRow(confirmBankRemoval, 'bank');
+				}}>Delete</AlertDialog.Action
+			>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
