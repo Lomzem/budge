@@ -103,7 +103,7 @@ export default defineConfig(
 				},
 				{
 					selector:
-						':matches(VariableDeclarator[init.name="bankRowsShown"], VariableDeclarator[init.property.name="bankRowsShown"])',
+						':matches(VariableDeclarator[init.name="bankRowsShown"], VariableDeclarator[init.property.name="bankRowsShown"], AssignmentExpression[right.name="bankRowsShown"], AssignmentExpression[right.property.name="bankRowsShown"])',
 					message: '`bankRowsShown` caps Bank Rows for display; do not alias display reads.'
 				},
 				{

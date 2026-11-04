@@ -288,3 +288,73 @@ The cross-run startup race remains the documented safe failure; socket reservati
 handoff is deferred because Convex/Vite own their binds. Parent owns integration
 and posting the two declined replies. This branch opens no PR and posts no
 GitHub comments. No open questions requiring an answer.
+
+## CodeRabbit round 2 tooling follow-up
+
+Branch `19-21-backend-tooling-2`, based directly on `30d769b`. Parent owns
+integration and GitHub replies; this follow-up opens no PR or GitHub comments.
+
+- 4461949710: the existing alias restriction also matches assignment RHS identifiers
+  and member properties, with the same diagnostic.
+- 4461949714: assignment aliases record the left identifier's resolved variable.
+- 4461949723: namespace recognition resolves bindings first; import variables and
+  recorded aliases qualify, other bindings do not. Only unbound `Effect` retains
+  the existing global fallback. Flow-sensitive reassignment remains declined.
+- 4461949728: search results include `errors`, counting errored measurements
+  recorded during that search. Errors still fail trials and steer binary search;
+  all three runs continue. JSON summaries also appear in `table.md`. The
+  `checkCapacity` admission path is unchanged; no measurement-injection seam.
+- 4461949733: probe at most 100 candidates, wrapping within 1..65535 and keeping
+  `taken` exclusions. Checked every caller with `git grep`: app startup, backend
+  cloud/site allocation, and E2E preview allocation. Backend site allocation can
+  start at 65536 (`cloud + 1`), so starting values wrap as well.
+
+Test-audit authoring gate: lint diagnostics (including absence for unrelated
+shadowed bindings) and returned usable port ranges are observable contracts.
+Existing tests covered declarations, ordinary aliases, and ordinary ports, but
+missed assignments, import-name shadowing, and the upper boundary. Extend the
+existing test owners; use the real ESLint config/RuleTester and real socket
+probes. No new exports, mocks, flags, or test-only seams. Invented inputs only.
+Eight new cases failed against the original implementations: two missing alias
+diagnostics, one missing Effect diagnostic, three false shadowing diagnostics,
+and two RangeErrors at port 65536. The same 23 focused cases passed after repair
+(1.71 s; baseline 1.84 s). Negative evidence retained at
+`test-results/verify-budge/tooling-round-2/negative-controls.log`.
+
+Principles that changed choices: Fix Root Causes moved Effect recognition from
+name strings to resolved variables; Test Behavior, Not Implementation kept port
+proof at the existing real API without injection; Laziness Protocol reused the
+existing restriction and report instead of adding a second rule/report path;
+Prove It Works required the live capacity search in addition to CSV 250, since
+the single-point command's boolean summary does not exercise the search shape.
+Boundary Discipline kept port normalization at the shared allocator used by all
+callers. Explain the Number keeps errors explicit alongside the boundary label;
+no latency improvement is claimed.
+
+Local code-review: standards and spec axes reviewed inline against `30d769b`
+and this delegation brief. Further delegation is explicitly prohibited, so the
+code-review skill's parallel subagents are replaced with an inline review.
+No unresolved findings. No production/UI edits or copied `.env*` files. The app
+CLI generated its own anonymous local deployment configuration.
+
+Verification/push checkpoint: focused regressions and live CSV 250 passed;
+full gates and live default search running. Commit, hook results, cleanup and
+push remain to be recorded below.
+
+All required gates passed with `PUBLIC_CONVEX_URL=http://127.0.0.1:3210`:
+format:check, lint, lint:ui, typecheck (zero Svelte errors/warnings), and test
+(50 files, 682 tests, 38.94 s). Live `capacity csv 250` passed three fresh
+preview/commit workflows, six uncached measurements, zero errors; restoration
+exit 0 and originalEnvRestored=true. Evidence:
+`test-results/capacity/2026-11-04T00-08-38.653Z/`.
+
+The additional live default search also passed: CSV/QFX workflow and commit
+results each contain `{rows: 250, bound: "validator", errors: 0}` in both
+`summary.json` and `table.md`; 15 uncached measurements including three history
+rebuilds, zero errors. Evidence:
+`test-results/capacity/2026-11-04T00-09-13.604Z/`. Original functions restored,
+restore exit 0 and originalEnvRestored=true. The real runs did not exercise a
+nonzero error count; no injected runner test was added per the parent's decision.
+`bun run app down` cleaned up this run. Evidence remains nonempty after cleanup.
+Redacted staged gitleaks and `git diff --no-ext-diff --check` passed. No open
+questions. Parent still owns integration, GitHub replies and PR follow-through.

@@ -73,7 +73,8 @@ export function reachable(url: string) {
 }
 
 export async function freePort(preferred: number, taken: number[] = []) {
-	for (let port = preferred; port < preferred + 100; port++) {
+	for (let offset = 0; offset < 100; offset++) {
+		const port = ((preferred - 1 + offset) % 65535) + 1;
 		if (!taken.includes(port) && !(await portInUse(port))) return port;
 	}
 	throw new Error(`no free port from ${String(preferred)}`);

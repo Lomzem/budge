@@ -52,3 +52,10 @@ test('local aliases cannot hide display-capped reads', async () => {
 		)
 	).toEqual([capped]);
 });
+
+test.each([
+	`${named} let read; read = bankRowsShown;`,
+	"import * as transactions from './transactions'; let read; read = transactions.bankRowsShown;"
+])('assignments cannot hide display-capped reads: %s', async (source) => {
+	expect(await restrictedSyntax(source)).toEqual([capped]);
+});
