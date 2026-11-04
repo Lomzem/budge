@@ -198,15 +198,18 @@ async function rebuildTrial(count, run) {
 	return belowHalf(record);
 }
 
-async function trials(scenario, count, phase = 'workflow') {
-	const existing = records.filter(
-		(row) =>
-			row.scenario === scenario &&
-			row.count === count &&
-			(phase !== 'commit' || row.function === 'commit')
-	);
+async function trials(scenario, count, phase = 'workflow', evaluated = []) {
+	const judged = (row) =>
+		row.scenario === scenario &&
+		row.count === count &&
+		(phase !== 'commit' || row.function === 'commit');
+	const existing = records.filter(judged);
 	const needed = phase === 'commit' || scenario === 'history' ? 3 : 6;
-	if (existing.length === needed) return existing.every(belowHalf);
+	if (existing.length === needed) {
+		evaluated.push(...existing);
+		return existing.every(belowHalf);
+	}
+	const firstMeasurement = records.length;
 	const results = [];
 	for (let run = 1; run <= 3; run++)
 		results.push(
@@ -214,22 +217,24 @@ async function trials(scenario, count, phase = 'workflow') {
 				? rebuildTrial(count, run)
 				: importTrial(scenario, count, run, phase))
 		);
+	evaluated.push(...records.slice(firstMeasurement).filter(judged));
 	return results.every(Boolean);
 }
 
 async function searchImport(source, phase) {
-	const firstMeasurement = records.length;
+	const evaluated = [];
 	const result = (rows, bound) => ({
 		rows,
 		bound,
-		errors: records.slice(firstMeasurement).filter((record) => record.error).length
+		errors: evaluated.filter((record) => record.error).length
 	});
-	if (await trials(source, MAX_FILE_ROWS, phase)) return result(MAX_FILE_ROWS, 'validator');
+	if (await trials(source, MAX_FILE_ROWS, phase, evaluated))
+		return result(MAX_FILE_ROWS, 'validator');
 	let low = 0;
 	let high = MAX_FILE_ROWS;
 	while (high - low > 1) {
 		const mid = Math.floor((high + low) / 2);
-		if (await trials(source, mid, phase)) low = mid;
+		if (await trials(source, mid, phase, evaluated)) low = mid;
 		else high = mid;
 	}
 	return result(low, 'resource-headroom');

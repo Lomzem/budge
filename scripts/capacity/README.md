@@ -60,8 +60,8 @@ when the measured scenario exceeds capacity. Read `summary.json` for the decisio
 The default search stays within `MAX_FILE_ROWS` and reports commit-only and
 complete-workflow boundaries separately. A passing ceiling is labeled `validator`;
 a lower boundary is labeled `resource-headroom`. Each search result contains
-`rows`, `bound`, and `errors` (the number of errored measurements recorded during
-that search), in both `summary.json` and the summary section of `table.md`.
+`rows`, `bound`, and `errors` (the number of errored measurements the search
+judged, including measurements the commit search reuses from the workflow search), in both `summary.json` and the summary section of `table.md`.
 Errors count as failed trials and lower the search ceiling; the search continues
 so a timeout above the boundary can still locate a passing row count. A
 `resource-headroom` label with nonzero `errors` includes execution failures, not
