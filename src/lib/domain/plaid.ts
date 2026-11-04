@@ -87,10 +87,18 @@ export function syncRowsOf(page: SyncPage, cutoverDate: string): SyncChanges {
 	return {
 		added: bankRowsOf(page.added, cutoverDate),
 		modified: bankRowsOf(page.modified, cutoverDate),
-		removed: page.removed.map((removal) => ({
-			externalAccountId: removal.account_id,
-			sourceId: removal.transaction_id
-		}))
+		removed: [
+			...page.removed.map((removal) => ({
+				externalAccountId: removal.account_id,
+				sourceId: removal.transaction_id
+			})),
+			...page.modified
+				.filter((transaction) => transaction.date < cutoverDate)
+				.map((transaction) => ({
+					externalAccountId: transaction.account_id,
+					sourceId: transaction.transaction_id
+				}))
+		]
 	};
 }
 

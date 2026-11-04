@@ -17,6 +17,7 @@ import { loadCredentials } from '../local/credentials.ts';
 import { emptyEveryTable } from '../app/reset.ts';
 import { runConvex } from '../local/backend.ts';
 import { writeReport } from './report.js';
+import { capacityPassed, limits } from './limits.ts';
 import { loadavg, cpus, freemem } from 'node:os';
 import { MAX_FILE_ROWS } from '../../convex/lib/imports.ts';
 
@@ -35,13 +36,6 @@ client.setAdminAuth(deployment.adminKey, {
 	subject: credentials.E2E_CLERK_USER_ID,
 	issuer: credentials.CLERK_JWT_ISSUER_DOMAIN
 });
-const limits = {
-	bytesRead: 16777216,
-	bytesWritten: 16777216,
-	documentsRead: 32000,
-	documentsWritten: 16000,
-	databaseQueries: 4096
-};
 const records = [];
 let cursor = 0;
 
@@ -224,27 +218,25 @@ async function trials(scenario, count, phase = 'workflow') {
 }
 
 async function searchImport(source, phase) {
-	if (await trials(source, 1000, phase)) return 1000;
+	const firstMeasurement = records.length;
+	const result = (rows, bound) => ({
+		rows,
+		bound,
+		errors: records.slice(firstMeasurement).filter((record) => record.error).length
+	});
+	if (await trials(source, MAX_FILE_ROWS, phase)) return result(MAX_FILE_ROWS, 'validator');
 	let low = 0;
-	let high = 1000;
+	let high = MAX_FILE_ROWS;
 	while (high - low > 1) {
 		const mid = Math.floor((high + low) / 2);
 		if (await trials(source, mid, phase)) low = mid;
 		else high = mid;
 	}
-	return low;
+	return result(low, 'resource-headroom');
 }
 
 function diverseDate(i) {
 	return `${2020 + Math.floor((i % 60) / 12)}-${String((i % 12) + 1).padStart(2, '0')}-15`;
-}
-
-function withinLimits(record) {
-	return (
-		!record.error &&
-		Object.entries(limits).every(([key, limit]) => record.result.metrics[key].used < limit) &&
-		record.completion.returnBytes < 16777216
-	);
 }
 
 async function checkCapacity() {
@@ -254,7 +246,7 @@ async function checkCapacity() {
 				await importTrial(source, MAX_FILE_ROWS, run, 'workflow', diverse);
 		}
 	}
-	const passed = records.every(withinLimits);
+	const passed = capacityPassed(records);
 	if (!passed) {
 		console.error(
 			'Import capacity contract failed; reduce MAX_FILE_ROWS or reduce measured preview/commit work.'
@@ -272,9 +264,11 @@ if (
 		!Number.isSafeInteger(count) ||
 		count < 1 ||
 		(scenario === 'history' && count % 60 !== 0) ||
-		(scenario !== 'history' && count > 1000))
+		(scenario !== 'history' && count > MAX_FILE_ROWS))
 )
-	throw new Error('usage: bun run capacity [qfx|csv|history COUNT]');
+	throw new Error(
+		`usage: bun run capacity [qfx|csv|history COUNT]; imports admit at most ${MAX_FILE_ROWS} rows`
+	);
 save('manifest.json', {
 	limits,
 	sourceHead: git(checkout, 'rev-parse', 'HEAD').trim(),
@@ -297,24 +291,37 @@ try {
 		summary.history9000 = await trials('history', 9000);
 	}
 	save('summary.json', summary);
+	appendFileSync(
+		join(out, 'table.md'),
+		`\n## Summary\n\n\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\`\n`
+	);
 	console.log(JSON.stringify(summary));
 } finally {
-	const code = await runConvex(deployment, checkout, [
-		'dev',
-		'--once',
-		'--typecheck',
-		'disable',
-		'--codegen',
-		'disable'
-	]);
-	writeFileSync(join(checkout, '.env.local'), originalEnv, { mode: 0o600 });
-	save('restore.json', {
-		exitCode: code,
-		originalEnvRestored: readFileSync(join(checkout, '.env.local')).equals(originalEnv)
-	});
-	if (code !== 0) {
-		console.error(`restoring original functions exit ${code}`);
-		process.exitCode = 1;
+	try {
+		const code = await runConvex(deployment, checkout, [
+			'dev',
+			'--once',
+			'--typecheck',
+			'disable',
+			'--codegen',
+			'disable'
+		]).catch((cause) => {
+			console.error(`restoring original functions failed: ${cause}`);
+			return 1;
+		});
+		if (code !== 0) {
+			console.error(`restoring original functions exit ${code}`);
+			process.exitCode = 1;
+		}
+		try {
+			writeFileSync(join(checkout, '.env.local'), originalEnv, { mode: 0o600 });
+		} finally {
+			save('restore.json', {
+				exitCode: code,
+				originalEnvRestored: readFileSync(join(checkout, '.env.local')).equals(originalEnv)
+			});
+		}
+	} finally {
+		if (existsSync(runtime)) rmSync(runtime, { recursive: true, force: true });
 	}
-	if (existsSync(runtime)) rmSync(runtime, { recursive: true, force: true });
 }

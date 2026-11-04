@@ -22,23 +22,29 @@ describe('decoding a Plaid sync page', () => {
 
 				expect(decoded.nextCursor).toBe('cursor-synthetic-2');
 				expect(decoded.hasMore).toBe(false);
-				expect(syncRowsOf(decoded, '2026-08-01').added).toEqual([
-					{
-						externalAccountId: 'account-synthetic-checking',
-						sourceId: 'txn-synthetic-1',
-						date: '2026-08-14',
-						amount: -4_250,
-						bankText: 'DEBIT CARD PURCHASE SAMPLE GROCER 0193',
-						merchantName: 'Sample Grocer'
-					},
-					{
-						externalAccountId: 'account-synthetic-checking',
-						sourceId: 'txn-synthetic-2',
-						date: '2026-08-15',
-						amount: 231_042,
-						bankText: 'SAMPLE PAYROLL'
-					}
-				]);
+				expect(syncRowsOf(decoded, '2026-08-01')).toEqual({
+					added: [
+						{
+							externalAccountId: 'account-synthetic-checking',
+							sourceId: 'txn-synthetic-1',
+							date: '2026-08-14',
+							amount: -4_250,
+							bankText: 'DEBIT CARD PURCHASE SAMPLE GROCER 0193',
+							merchantName: 'Sample Grocer'
+						},
+						{
+							externalAccountId: 'account-synthetic-checking',
+							sourceId: 'txn-synthetic-2',
+							date: '2026-08-15',
+							amount: 231_042,
+							bankText: 'SAMPLE PAYROLL'
+						}
+					],
+					modified: [],
+					removed: [
+						{ externalAccountId: 'account-synthetic-checking', sourceId: 'txn-synthetic-0' }
+					]
+				});
 			})
 	);
 
@@ -54,39 +60,52 @@ describe('decoding a Plaid sync page', () => {
 		Effect.gen(function* () {
 			const row = { ...(page as { added: object[] }).added[0], amount: 1.005 };
 			const exit = yield* Effect.exit(
-				decodeSyncPage({ added: [row], next_cursor: 'c', has_more: false })
+				decodeSyncPage({
+					added: [row],
+					modified: [],
+					removed: [],
+					next_cursor: 'c',
+					has_more: false
+				})
 			);
 
 			expect(Exit.isFailure(exit)).toBe(true);
 		})
 	);
 
-	it.effect('keeps modified rows as Bank Rows, and every removed ID with its Account', () =>
-		Effect.gen(function* () {
-			const base = (page as { added: object[] }).added;
-			const decoded = yield* decodeSyncPage({
-				added: [],
-				modified: [{ ...base[0], amount: 45.5 }, base[2], base[3]],
-				removed: [{ transaction_id: 'txn-synthetic-2', account_id: 'account-synthetic-checking' }],
-				next_cursor: 'c',
-				has_more: false
-			});
+	it.effect(
+		'keeps modified rows as Bank Rows, and removes every removed ID and every row the bank moved before the cutover date, with its Account',
+		() =>
+			Effect.gen(function* () {
+				const base = (page as { added: object[] }).added;
+				const decoded = yield* decodeSyncPage({
+					added: [],
+					modified: [{ ...base[0], amount: 45.5 }, base[2], base[3]],
+					removed: [
+						{ transaction_id: 'txn-synthetic-2', account_id: 'account-synthetic-checking' }
+					],
+					next_cursor: 'c',
+					has_more: false
+				});
 
-			expect(syncRowsOf(decoded, '2026-08-01')).toEqual({
-				added: [],
-				modified: [
-					{
-						externalAccountId: 'account-synthetic-checking',
-						sourceId: 'txn-synthetic-1',
-						date: '2026-08-14',
-						amount: -4_550,
-						bankText: 'DEBIT CARD PURCHASE SAMPLE GROCER 0193',
-						merchantName: 'Sample Grocer'
-					}
-				],
-				removed: [{ externalAccountId: 'account-synthetic-checking', sourceId: 'txn-synthetic-2' }]
-			});
-		})
+				expect(syncRowsOf(decoded, '2026-08-01')).toEqual({
+					added: [],
+					modified: [
+						{
+							externalAccountId: 'account-synthetic-checking',
+							sourceId: 'txn-synthetic-1',
+							date: '2026-08-14',
+							amount: -4_550,
+							bankText: 'DEBIT CARD PURCHASE SAMPLE GROCER 0193',
+							merchantName: 'Sample Grocer'
+						}
+					],
+					removed: [
+						{ externalAccountId: 'account-synthetic-checking', sourceId: 'txn-synthetic-2' },
+						{ externalAccountId: 'account-synthetic-checking', sourceId: 'txn-synthetic-4' }
+					]
+				});
+			})
 	);
 });
 
@@ -108,6 +127,22 @@ describe("decoding Plaid's Accounts", () => {
 				},
 				{ externalId: 'account-synthetic-savings', name: 'Sample Savings', balance: null }
 			]);
+		})
+	);
+
+	it.effect('fails on a balance finer than a cent', () =>
+		Effect.gen(function* () {
+			const {
+				accounts: [first, ...rest]
+			} = accounts as { accounts: { balances: object }[] };
+			const exit = yield* Effect.exit(
+				decodeAccounts({
+					...(accounts as object),
+					accounts: [{ ...first, balances: { ...first?.balances, current: 1.005 } }, ...rest]
+				})
+			);
+
+			expect(Exit.isFailure(exit)).toBe(true);
 		})
 	);
 

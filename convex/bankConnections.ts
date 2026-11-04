@@ -303,17 +303,21 @@ export const syncAfterReconnect = action({
 	returns: ownerSyncResult,
 	handler: async (ctx, { connectionId }) => {
 		await requireOwner(ctx);
-		return await ownerSync(ctx, connectionId, { refresh: false, discover: true });
+		return await ownerSync(ctx, connectionId, { refresh: false, resume: true, discover: true });
 	}
 });
 
 async function ownerSync(
 	ctx: ActionCtx,
 	connectionId: Id<'bankConnections'>,
-	{ refresh, discover = false }: { refresh: boolean; discover?: boolean }
+	{
+		refresh,
+		resume = false,
+		discover = false
+	}: { refresh: boolean; resume?: boolean; discover?: boolean }
 ): Promise<Infer<typeof ownerSyncResult>> {
 	const outcome = await runEffect(
-		syncConnection(connectionId, { refresh, resume: true, discover }).pipe(
+		syncConnection(connectionId, { refresh, resume, discover }).pipe(
 			Effect.provide(liveLayer(ctx))
 		),
 		toPublicError
@@ -450,10 +454,9 @@ export const takeLease = internalMutation({
 		const connection = await ctx.db.get('bankConnections', connectionId);
 		if (connection === null) return { kind: 'missing' as const };
 		const now = Date.now();
-		const accountsCheckRequestedAt = discover ? now : (connection.accountsCheckRequestedAt ?? null);
-		if (discover) {
-			await ctx.db.patch('bankConnections', connectionId, { accountsCheckRequestedAt: now });
-		}
+		const accountsCheckRequestedAt = discover
+			? await requestAccountsCheck(ctx, connection)
+			: (connection.accountsCheckRequestedAt ?? null);
 		if ((connection.syncLeaseUntil ?? 0) > now) {
 			await ctx.db.patch('bankConnections', connectionId, { syncRequestedDuringLease: true });
 			return { kind: 'busy' as const };
@@ -542,7 +545,14 @@ export const apply = internalMutation({
 			...(release ? finishedSync(connection, now, attentionNotices) : {})
 		});
 		if (release) await syncAgainIfRequested(ctx, connection);
-		return { kind: 'applied' as const, lease: nextLease ?? null, ...totals };
+		const accountsCheckRequestedAt =
+			(await ctx.db.get('bankConnections', connectionId))?.accountsCheckRequestedAt ?? null;
+		return {
+			kind: 'applied' as const,
+			lease: nextLease ?? null,
+			...totals,
+			accountsCheckRequestedAt
+		};
 	}
 });
 
@@ -810,5 +820,15 @@ async function connectionAccountOf(
 	const known = await findConnectionAccount(ctx, connectionId, externalId);
 	if (known !== null) return known;
 	const held = { connectionId, externalId, state: 'held' as const };
-	return { _id: await ctx.db.insert('connectionAccounts', held), ...held };
+	const heldId = await ctx.db.insert('connectionAccounts', held);
+	const connection = await ctx.db.get('bankConnections', connectionId);
+	if (connection !== null) await requestAccountsCheck(ctx, connection);
+	return { _id: heldId, ...held };
+}
+
+async function requestAccountsCheck(ctx: MutationCtx, connection: Doc<'bankConnections'>) {
+	const pending = connection.accountsCheckRequestedAt;
+	const newer = pending === undefined ? Date.now() : Math.max(Date.now(), pending + 1);
+	await ctx.db.patch('bankConnections', connection._id, { accountsCheckRequestedAt: newer });
+	return newer;
 }

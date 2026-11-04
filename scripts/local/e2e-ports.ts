@@ -1,6 +1,7 @@
 import { createServer } from 'node:net';
 
 import { claimBackendPorts } from './backend';
+import { freePort } from './processes';
 
 async function ephemeralPort() {
 	const server = createServer();
@@ -22,6 +23,6 @@ async function ephemeralPort() {
 
 export async function claimE2EPorts(dir: string) {
 	const backend = await claimBackendPorts(dir, await ephemeralPort());
-	const preview = await ephemeralPort();
+	const preview = await freePort(await ephemeralPort(), [backend.cloud, backend.site]);
 	return { ...backend, preview };
 }

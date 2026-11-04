@@ -6,6 +6,7 @@ import { publicError } from './publicError';
 import {
 	allBankRowsOf,
 	deleteTransaction,
+	hasBankRow,
 	payeeNameOf,
 	refreshSearchText,
 	replaceTransaction,
@@ -124,7 +125,7 @@ export async function resolveBankChange(
 	}
 	if (bankRow.state === 'removed') {
 		if (keep === 'bank') {
-			await requireNoOtherBacking(ctx, transaction, bankRow);
+			await requireNoOtherBacking(ctx, transaction);
 			await deleteTransaction(ctx, transaction);
 		} else {
 			await ctx.db.patch('imports', bankRow._id, { transactionId: undefined, matched: false });
@@ -172,17 +173,12 @@ async function takeBankValues(
 	if (counterpart !== null) await flagDisagreeingRows(ctx, counterpart._id);
 }
 
-async function requireNoOtherBacking(
-	ctx: MutationCtx,
-	transaction: Doc<'transactions'>,
-	removed: Doc<'imports'>
-) {
+async function requireNoOtherBacking(ctx: MutationCtx, transaction: Doc<'transactions'>) {
 	const sides = [transaction._id];
 	if (transaction.transferTransactionId !== undefined)
 		sides.push(transaction.transferTransactionId);
 	for (const side of sides) {
-		for await (const other of allBankRowsOf(ctx, side)) {
-			if (other._id === removed._id || other.state === 'removed') continue;
+		if (await hasBankRow(ctx, side)) {
 			throw publicError(
 				'INVALID_INPUT',
 				'Another bank row still shows this Transaction, so keep your version instead.'

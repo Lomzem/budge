@@ -343,6 +343,21 @@ describe('a bank removal of an Unapproved, unedited Transaction', () => {
 		await budget.expectTotalsRebuild();
 	});
 
+	test('a change that moves it before the Cutover Date removes it the same way', async () => {
+		const budget = await syncedBudget();
+
+		await syncTwice(budget, changes({ modified: [{ ...grocer, date: '2026-07-30' }] }));
+
+		expect((await budget.rows()).map((row) => row.payeeName)).toEqual(['SAMPLE PAYROLL']);
+		expect(
+			(await budget.snapshot()).imports
+				.filter((bankRow) => bankRow.sourceId === grocer.transaction_id)
+				.map((bankRow) => bankRow.state)
+		).toEqual(['removed']);
+		expect(await budget.balance()).toBe(100_000 + 231_042);
+		await budget.expectTotalsRebuild();
+	});
+
 	test('the removed row is never imported again', async () => {
 		const budget = await syncedBudget();
 		await budget.sync(changes({ removed: [grocer.transaction_id] }));
@@ -806,6 +821,23 @@ describe('Unmatching a flagged Bank Row', () => {
 				budget.owner.mutation(api.imports.unmatch, { importId: await importId() })
 			)
 		).toMatch(/removed/);
+	});
+
+	test('the Transaction it leaves is no longer Cleared when the bank removed its only other row', async () => {
+		const { budget, importId } = await flaggedRemoval();
+		const grocerRow = await budget.row('SAMPLE GROCER 0193');
+		const statementRowId = await backWithStatementRow(budget, grocerRow._id, {
+			accountId: budget.checking,
+			date: grocerRow.date,
+			amount: grocerRow.amount
+		});
+
+		await budget.owner.mutation(api.imports.unmatch, { importId: statementRowId });
+
+		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({
+			cleared: false,
+			bankRows: [{ _id: importId, state: 'removed' }]
+		});
 	});
 });
 

@@ -23,7 +23,10 @@ async function main() {
 	copyCheckout(checkout, workdir);
 
 	const logPath = join(workdir, 'convex.log');
-	const ports = await claimE2EPorts(workdir);
+	const ports = await claimE2EPorts(workdir).catch((error: unknown) => {
+		rmSync(workdir, { recursive: true, force: true });
+		throw error;
+	});
 	console.log(`e2e-local: bindings: ${JSON.stringify(ports)}`);
 	const backend = spawnAnonymousBackend(workdir, logPath, ports);
 

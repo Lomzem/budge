@@ -31,16 +31,40 @@ export default {
 		}
 	},
 	create(context) {
-		const names = new Set(['Effect']);
+		const aliases = new Set();
+		const variableOf = (node) => {
+			let scope = context.sourceCode.getScope(node);
+			while (scope) {
+				const variable = scope.set.get(node.name);
+				if (variable) return variable;
+				scope = scope.upper;
+			}
+			return undefined;
+		};
+		const namespace = (node) => {
+			if (node.type !== 'Identifier') return false;
+			const variable = variableOf(node);
+			return variable ? aliases.has(variable) : node.name === 'Effect';
+		};
 		const allow = context.options[0]?.allow ?? [];
 		return {
 			ImportSpecifier(node) {
 				if (node.parent.source.value === 'effect' && node.imported.name === 'Effect')
-					names.add(node.local.name);
+					aliases.add(context.sourceCode.getDeclaredVariables(node)[0]);
+			},
+			VariableDeclarator(node) {
+				if (node.id.type === 'Identifier' && node.init && namespace(node.init))
+					aliases.add(context.sourceCode.getDeclaredVariables(node)[0]);
+			},
+			AssignmentExpression(node) {
+				if (node.operator === '=' && node.left.type === 'Identifier' && namespace(node.right)) {
+					const variable = variableOf(node.left);
+					if (variable) aliases.add(variable);
+				}
 			},
 			MemberExpression(node) {
 				const property = node.computed ? node.property.value : node.property.name;
-				if (!names.has(node.object.name) || !defects.has(property)) return;
+				if (!namespace(node.object) || !defects.has(property)) return;
 				const ancestors = context.sourceCode.getAncestors(node);
 				const method = ancestors.findLast((ancestor) => ancestor.type === 'MethodDefinition');
 				const owner = ancestors.findLast((ancestor) => ancestor.type === 'ClassDeclaration');

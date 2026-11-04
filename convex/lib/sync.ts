@@ -79,7 +79,8 @@ export const applyResult = v.union(
 		lease: v.union(v.number(), v.null()),
 		added: v.number(),
 		matched: v.number(),
-		held: v.number()
+		held: v.number(),
+		accountsCheckRequestedAt: v.union(v.number(), v.null())
 	})
 );
 export type ApplyResult = Infer<typeof applyResult>;
@@ -240,6 +241,7 @@ export const syncConnection = Effect.fnUntraced(function* (
 	const run = Effect.gen(function* () {
 		const accessToken = yield* cipher.decrypt(taken.encryptedToken, taken.itemId);
 		let committed = taken.cursor;
+		let accountsCheckRequestedAt = taken.accountsCheckRequestedAt;
 		const totals = { added: 0, matched: 0, held: 0 };
 		for (let batch = 1; ; batch++) {
 			let from = committed;
@@ -278,6 +280,7 @@ export const syncConnection = Effect.fnUntraced(function* (
 			totals.added += applied.added;
 			totals.matched += applied.matched;
 			totals.held += applied.held;
+			accountsCheckRequestedAt = applied.accountsCheckRequestedAt;
 			committed = fetched.nextCursor;
 			if (applied.lease === null) break;
 			lease = applied.lease;
@@ -290,13 +293,13 @@ export const syncConnection = Effect.fnUntraced(function* (
 				checkedByLease: taken.lease
 			});
 		}
-		if (taken.accountsCheckRequestedAt !== null || totals.held > 0) {
+		if (accountsCheckRequestedAt !== null || totals.held > 0) {
 			yield* Effect.ignore(
 				plaid.accountsGet(accessToken).pipe(
 					Effect.flatMap((accounts) =>
 						store.recordAccounts({
 							connectionId,
-							answersRequestAt: taken.accountsCheckRequestedAt,
+							answersRequestAt: accountsCheckRequestedAt,
 							accounts: accounts.map(namesOf)
 						})
 					)
