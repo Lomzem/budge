@@ -218,8 +218,13 @@ async function trials(scenario, count, phase = 'workflow') {
 }
 
 async function searchImport(source, phase) {
-	if (await trials(source, MAX_FILE_ROWS, phase))
-		return { rows: MAX_FILE_ROWS, bound: 'validator' };
+	const firstMeasurement = records.length;
+	const result = (rows, bound) => ({
+		rows,
+		bound,
+		errors: records.slice(firstMeasurement).filter((record) => record.error).length
+	});
+	if (await trials(source, MAX_FILE_ROWS, phase)) return result(MAX_FILE_ROWS, 'validator');
 	let low = 0;
 	let high = MAX_FILE_ROWS;
 	while (high - low > 1) {
@@ -227,7 +232,7 @@ async function searchImport(source, phase) {
 		if (await trials(source, mid, phase)) low = mid;
 		else high = mid;
 	}
-	return { rows: low, bound: 'resource-headroom' };
+	return result(low, 'resource-headroom');
 }
 
 function diverseDate(i) {
@@ -286,6 +291,10 @@ try {
 		summary.history9000 = await trials('history', 9000);
 	}
 	save('summary.json', summary);
+	appendFileSync(
+		join(out, 'table.md'),
+		`\n## Summary\n\n\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\`\n`
+	);
 	console.log(JSON.stringify(summary));
 } finally {
 	try {

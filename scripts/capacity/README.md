@@ -59,7 +59,13 @@ and a `table.md`; it exits zero when measurement and verification complete even
 when the measured scenario exceeds capacity. Read `summary.json` for the decision.
 The default search stays within `MAX_FILE_ROWS` and reports commit-only and
 complete-workflow boundaries separately. A passing ceiling is labeled `validator`;
-a lower boundary is labeled `resource-headroom`. Use `history 18000` as a doubling
+a lower boundary is labeled `resource-headroom`. Each search result contains
+`rows`, `bound`, and `errors` (the number of errored measurements recorded during
+that search), in both `summary.json` and the summary section of `table.md`.
+Errors count as failed trials and lower the search ceiling; the search continues
+so a timeout above the boundary can still locate a passing row count. A
+`resource-headroom` label with nonzero `errors` includes execution failures, not
+only completed measurements exceeding the headroom threshold. Use `history 18000` as a doubling
 control for the rebuild.
 Resource decisions use transaction counters, not billed I/O statistics. Durations
 are observations, not a claim about production latency or CPU headroom.
