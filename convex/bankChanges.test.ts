@@ -349,6 +349,11 @@ describe('a bank removal of an Unapproved, unedited Transaction', () => {
 		await syncTwice(budget, changes({ modified: [{ ...grocer, date: '2026-07-30' }] }));
 
 		expect((await budget.rows()).map((row) => row.payeeName)).toEqual(['SAMPLE PAYROLL']);
+		expect(
+			(await budget.snapshot()).imports
+				.filter((bankRow) => bankRow.sourceId === grocer.transaction_id)
+				.map((bankRow) => bankRow.state)
+		).toEqual(['removed']);
 		expect(await budget.balance()).toBe(100_000 + 231_042);
 		await budget.expectTotalsRebuild();
 	});
