@@ -77,6 +77,31 @@ describe('the matcher', () => {
 		expect(decide([coffee], { candidates: [synced] }, 'plaid')).toEqual([{ kind: 'new' }]);
 	});
 
+	test("a newly mapped bank Account's held rows Match what the Account already imported", () => {
+		const fromOldFeed = handEntered('a', {
+			cleared: true,
+			linkedSources: ['plaid'],
+			linkedFromFeed: false
+		});
+		const fromFile = handEntered('b', { cleared: true, linkedSources: ['csv'] });
+		const context = { matchImported: true, candidates: [fromOldFeed] };
+
+		expect(decide([coffee], context, 'plaid')).toEqual([{ kind: 'match', transactionId: 'a' }]);
+		expect(decide([coffee], { ...context, candidates: [fromFile] }, 'plaid')).toEqual([
+			{ kind: 'match', transactionId: 'b' }
+		]);
+		expect(
+			decide(
+				[coffee],
+				{ ...context, candidates: [{ ...fromOldFeed, linkedFromFeed: true }] },
+				'plaid'
+			)
+		).toEqual([{ kind: 'new' }]);
+		expect(
+			decide([coffee], { ...context, candidates: [handEntered('c', { cleared: true })] }, 'plaid')
+		).toEqual([{ kind: 'new' }]);
+	});
+
 	test('each Transaction takes at most one row, so two identical coffees stay two', () => {
 		expect(decide([coffee, coffee], { candidates: [handEntered('a')] })).toEqual([
 			{ kind: 'match', transactionId: 'a' },

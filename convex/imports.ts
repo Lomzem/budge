@@ -1,12 +1,13 @@
 import { v } from 'convex/values';
 
 import type { Doc, Id } from './_generated/dataModel';
-import { mutation, query, type QueryCtx } from './_generated/server';
+import { mutation, query } from './_generated/server';
+import { resolveBankChange as resolve } from './lib/bankChanges';
 import { applyBankRows, fileRow, fileSource, insertImported, planImport } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { ImportedPayees } from './lib/payees';
-import { bankRowsOf, refreshSearchText, requireUnlocked } from './lib/transactions';
+import { hasBankRow, payeeNameOf, refreshSearchText, requireUnlocked } from './lib/transactions';
 
 const candidate = v.object({
 	_id: v.id('transactions'),
@@ -35,10 +36,24 @@ export const preview = query({
 	handler: async (ctx, { accountId, source, rows }) => {
 		await requireOwner(ctx);
 		const plan = await planImport(ctx, accountId, source, rows);
+		const payees = new Map<Id<'payees'>, Promise<Doc<'payees'> | null>>();
+		const payeeOf = (payeeId: Id<'payees'>) => {
+			const known = payees.get(payeeId);
+			if (known !== undefined) return known;
+			const loading = ctx.db.get('payees', payeeId);
+			payees.set(payeeId, loading);
+			return loading;
+		};
 		const describe = async (transactionId: Id<'transactions'>) => {
 			const transaction = plan.candidates.get(transactionId);
 			if (transaction === undefined) throw publicError('NOT_FOUND');
-			return await describeCandidate(ctx, transaction);
+			return {
+				_id: transaction._id,
+				date: transaction.date,
+				amount: transaction.amount,
+				payeeName: await payeeNameOf(ctx, transaction, payeeOf),
+				memo: transaction.memo ?? null
+			};
 		};
 		const describeAll = async (candidates: Id<'transactions'>[] | undefined) =>
 			candidates === undefined ? {} : { candidates: await Promise.all(candidates.map(describe)) };
@@ -93,31 +108,31 @@ export const unmatch = mutation({
 		const bankRow = await ctx.db.get('imports', importId);
 		if (bankRow === null) throw publicError('NOT_FOUND');
 		const matchedId = bankRow.transactionId;
-		if (!bankRow.matched || matchedId === undefined) {
+		if (!bankRow.matched || matchedId === undefined || bankRow.accountId === undefined) {
 			throw publicError('INVALID_INPUT', 'This bank row is not Matched.');
+		}
+		if (bankRow.state === 'removed') {
+			throw publicError('INVALID_INPUT', 'The bank removed this row. Resolve that instead.');
 		}
 		const matchedTransaction = await ctx.db.get('transactions', matchedId);
 		if (matchedTransaction !== null) requireUnlocked(matchedTransaction, 'to unmatch it');
 		const transactionId = await insertImported(ctx, bankRow.accountId, bankRow);
-		await ctx.db.patch('imports', importId, { transactionId, matched: false });
+		await ctx.db.patch('imports', importId, { transactionId, matched: false, state: 'linked' });
 		await refreshSearchText(ctx, transactionId);
 		await refreshSearchText(ctx, matchedId);
-		const stillLinked = await bankRowsOf(ctx, matchedId);
-		if (stillLinked.length === 0) {
+		if (!(await hasBankRow(ctx, matchedId))) {
 			await ctx.db.patch('transactions', matchedId, { cleared: 'uncleared', approved: true });
 		}
 		return transactionId;
 	}
 });
 
-async function describeCandidate(ctx: QueryCtx, transaction: Doc<'transactions'>) {
-	const payee =
-		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
-	return {
-		_id: transaction._id,
-		date: transaction.date,
-		amount: transaction.amount,
-		payeeName: payee?.name ?? null,
-		memo: transaction.memo ?? null
-	};
-}
+export const resolveBankChange = mutation({
+	args: { importId: v.id('imports'), keep: v.union(v.literal('bank'), v.literal('mine')) },
+	returns: v.null(),
+	handler: async (ctx, { importId, keep }) => {
+		await requireOwner(ctx);
+		await resolve(ctx, importId, keep);
+		return null;
+	}
+});

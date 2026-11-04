@@ -91,9 +91,14 @@ jobs:
           done
           cat convex.log
           exit 1
-      # Synthetic Accounts and Transactions for the smoke tests; never real data.
-      - name: Seed the local backend
-        run: bunx convex run seed:run
+      - name: Import capacity contract
+        env:
+          PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEV_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_DEV_SECRET_KEY }}
+          CLERK_JWT_ISSUER_DOMAIN: ${{ secrets.CLERK_DEV_JWT_ISSUER_DOMAIN }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
+        run: bun run capacity:check
       - name: Playwright
         # The Clerk development instance and its one hand-made test user. Never production.
         env:

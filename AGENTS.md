@@ -53,6 +53,21 @@ Run these for each ticket, scoped to the ticket's diff. A ticket is not done unt
 2. Address every CodeRabbit comment with a fix or a reply. Batch the fixes, push, and request one incremental review.
 3. Merge only when CodeRabbit has approved the latest commit and CI is green.
 
+## Enforced rules
+
+| Rule                                                                                                 | Enforced by                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Serialize app startup, shutdown, and process-record writes within each checkout.                     | `scripts/app/lock.ts`; `scripts/app/lifecycle.test.ts`                                                                                                                                                              |
+| Keep Effect failures in the error channel; defects require an allow-listed invariant boundary.       | `local/no-effect-defects` and its reasoned allow-list in `eslint.config.js`; `eslint/rules/no-effect-defects.test.js`                                                                                               |
+| A Starting Balance is identified by its Transaction `kind`, never by its Payee name or date.         | `kind` in `convex/schema.ts` with index `by_accountId_and_kind`; `saveStartingBalance` in `convex/lib/accounts.ts` is its writer, apart from the `backfillStartingBalanceKind` migration; `convex/accounts.test.ts` |
+| Replacing a Transaction states its split lines.                                                      | the required `lines` parameter of `replaceTransaction` in `convex/lib/transactions.ts`                                                                                                                              |
+| An async result in a dialog lands only in the opening that started it.                               | `DialogSession` in `src/lib/dialogSession.svelte.ts`; delayed-response E2E through `e2e/heldResponse.ts`                                                                                                            |
+| A malformed bank file fails before preview.                                                          | the one parser `src/lib/domain/bankFiles.ts`; the malformed and preserved-format tables in `src/lib/domain/bankFiles.test.ts`                                                                                       |
+| Every E2E test starts from its own fixture.                                                          | `e2e/test.ts`; `no-restricted-imports` in `eslint.config.js`; `eslint/rules/e2e-imports.test.js`                                                                                                                    |
+| Each E2E run owns its frontend and backend ports.                                                    | `scripts/local/e2e-ports.ts`, `scripts/local/preview.ts`, `playwright.config.ts`; `scripts/local/e2e-ports.test.ts`                                                                                                 |
+| The admitted import file cap fits the measured preview and commit transaction limits.                | `bun run capacity:check`, in `bun run check` and CI's Import capacity contract step                                                                                                                                 |
+| Search and Bank Row decisions read every Bank Row; only the list row reads the capped display slice. | `allBankRowsOf` in `convex/lib/transactions.ts`; the `bankRowsShown` selector in `no-restricted-syntax`; `eslint/rules/display-bank-rows.test.js`                                                                   |
+
 <!-- convex-ai-start -->
 
 This project uses [Convex](https://convex.dev) as its backend.

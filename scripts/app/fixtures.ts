@@ -15,6 +15,12 @@ export const FIXTURES: readonly Fixture[] = [
 		summary:
 			'Checking, Savings and Card with about three months of invented Transactions (seed:run).',
 		convexFunctionsToRun: ['seed:run']
+	},
+	{
+		name: 'bank-sync',
+		summary:
+			'budget-with-accounts plus two Bank Connections built through the sync mutations, no Plaid: Sample Credit Union with three held bank Accounts, a changed and a removed Bank Row and consent ending in 5 days; Sample Savings Bank needing a reconnect.',
+		convexFunctionsToRun: ['seed:run', 'seedBankSync:run']
 	}
 ];
 

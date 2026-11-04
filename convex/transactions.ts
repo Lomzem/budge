@@ -14,8 +14,9 @@ import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { requireIsoDate } from './lib/settings';
 import {
-	bankRowsOf,
+	bankRowsShown,
 	deleteTransaction,
+	payeeNameOf,
 	requireUnlocked,
 	saveTransaction,
 	splitLinesOf,
@@ -29,6 +30,7 @@ const transactionRow = v.object({
 	date: v.string(),
 	amount: v.number(),
 	payeeName: v.union(v.string(), v.null()),
+	startingBalance: v.boolean(),
 	categoryId: v.union(v.id('categories'), v.null()),
 
 	categoryName: v.union(v.string(), v.null()),
@@ -37,9 +39,17 @@ const transactionRow = v.object({
 	cleared: v.boolean(),
 	reconciled: v.boolean(),
 	approved: v.boolean(),
-
-	bankRows: v.array(v.object({ _id: v.id('imports'), bankText: v.string(), matched: v.boolean() })),
-
+	bankRows: v.array(
+		v.object({
+			_id: v.id('imports'),
+			bankText: v.string(),
+			matched: v.boolean(),
+			state: v.union(v.literal('linked'), v.literal('changed'), v.literal('removed')),
+			date: v.string(),
+			amount: v.number()
+		})
+	),
+	moreBankRows: v.boolean(),
 	transfer: v.union(v.object({ accountId: v.id('accounts'), accountName: v.string() }), v.null()),
 
 	splits: v.union(
@@ -309,19 +319,13 @@ export const transferCandidates = query({
 		const distance = (other: string) => Math.abs(Date.parse(other) - Date.parse(date));
 		candidates.sort((a, b) => distance(a.date) - distance(b.date));
 		return await Promise.all(
-			candidates.map(async (transaction) => {
-				const payee =
-					transaction.payeeId === undefined
-						? null
-						: await ctx.db.get('payees', transaction.payeeId);
-				return {
-					_id: transaction._id,
-					date: transaction.date,
-					amount: transaction.amount,
-					payeeName: payee?.name ?? null,
-					memo: transaction.memo ?? null
-				};
-			})
+			candidates.map(async (transaction) => ({
+				_id: transaction._id,
+				date: transaction.date,
+				amount: transaction.amount,
+				payeeName: await payeeNameOf(ctx, transaction),
+				memo: transaction.memo ?? null
+			}))
 		);
 	}
 });
@@ -416,9 +420,8 @@ async function requireTransaction(ctx: MutationCtx, transactionId: Id<'transacti
 }
 
 async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
+	const { bankRows, moreBankRows } = await bankRowsShown(ctx, transaction._id);
 	const account = await ctx.db.get('accounts', transaction.accountId);
-	const payee =
-		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
 	const category =
 		transaction.categoryId === undefined
 			? null
@@ -429,18 +432,23 @@ async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		accountName: account?.name ?? '',
 		date: transaction.date,
 		amount: transaction.amount,
-		payeeName: payee?.name ?? null,
+		payeeName: await payeeNameOf(ctx, transaction),
+		startingBalance: transaction.kind === 'startingBalance',
 		categoryId: transaction.categoryId ?? null,
 		categoryName: category?.name ?? null,
 		memo: transaction.memo ?? null,
 		cleared: transaction.cleared !== 'uncleared',
 		reconciled: transaction.cleared === 'reconciled',
 		approved: transaction.approved !== false,
-		bankRows: (await bankRowsOf(ctx, transaction._id)).map((bankRow) => ({
+		bankRows: bankRows.map((bankRow) => ({
 			_id: bankRow._id,
 			bankText: bankRow.bankText,
-			matched: bankRow.matched
+			matched: bankRow.matched,
+			state: bankRow.state === 'held' ? ('linked' as const) : bankRow.state,
+			date: bankRow.date,
+			amount: bankRow.amount
 		})),
+		moreBankRows,
 		transfer: await transferOf(ctx, transaction),
 		splits: await splitsOf(ctx, transaction)
 	};

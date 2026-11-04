@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { clerk } from '@clerk/testing/playwright';
-import { expect, test, type Download } from '@playwright/test';
+import { expect, test, type Download } from './test';
 
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
 

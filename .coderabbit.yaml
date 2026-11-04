@@ -34,7 +34,8 @@ reviews:
         taglines; cards only for items compared side by side; theme color tokens; WCAG 2.2 AA in
         dark and light themes; a visible label and keyboard path for every control; responsive
         from 320 px. Shared UI state lives in context-provided classes in .svelte.ts modules, never
-        in module-level $state, and no Effect runs in components.
+        in module-level $state. Components must not execute Effects from the `effect` package
+        with `Effect.run*` APIs. This rule does not ban Svelte's `$effect` rune.
     - path: '.scratch/**'
       instructions: |
         These are planning documents: the spec, tickets, and decisions. Review them lightly as

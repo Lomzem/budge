@@ -1,0 +1,43 @@
+{
+	"accounts": [
+		{
+			"account_id": "account-synthetic-checking",
+			"balances": {
+				"available": 1180.5,
+				"current": 1204.17,
+				"limit": null,
+				"iso_currency_code": "USD"
+			},
+			"mask": "0042",
+			"name": "Sample Checking",
+			"official_name": "Sample Everyday Checking",
+			"subtype": "checking",
+			"type": "depository"
+		},
+		{
+			"account_id": "account-synthetic-card",
+			"balances": {
+				"available": 4100,
+				"current": 899.9,
+				"limit": 5000,
+				"iso_currency_code": "USD"
+			},
+			"mask": "7310",
+			"name": "Sample Card",
+			"official_name": null,
+			"subtype": "credit card",
+			"type": "credit"
+		},
+		{
+			"account_id": "account-synthetic-savings",
+			"balances": { "available": null, "current": null, "limit": null, "iso_currency_code": "USD" },
+			"mask": null,
+			"name": "Sample Savings",
+			"official_name": null,
+			"subtype": "savings",
+			"type": "depository"
+		}
+	],
+	"item": { "item_id": "item-synthetic-1" },
+	"request_id": "request-synthetic-accounts"
+}

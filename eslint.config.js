@@ -8,6 +8,7 @@ import globals from 'globals';
 import ts from 'typescript-eslint';
 
 import noComments from './eslint/rules/no-comments.js';
+import noEffectDefects from './eslint/rules/no-effect-defects.js';
 import svelteConfig from './svelte.config.ts';
 
 const browserOnlyGlobals = new Set([
@@ -93,12 +94,30 @@ export default defineConfig(
 					selector: 'ThrowStatement:not([argument.callee.name="publicError"])',
 					message:
 						'Throw only `publicError(...)` from a Convex function; return failures otherwise.'
+				},
+				{
+					selector:
+						':matches(CallExpression[callee.name="bankRowsShown"], CallExpression[callee.property.name="bankRowsShown"]):not(FunctionDeclaration[id.name="toRow"] *)',
+					message:
+						'`bankRowsShown` caps Bank Rows for display; decisions and search read every Bank Row with `allBankRowsOf`.'
+				},
+				{
+					selector:
+						':matches(VariableDeclarator[init.name="bankRowsShown"], VariableDeclarator[init.property.name="bankRowsShown"], AssignmentExpression[right.name="bankRowsShown"], AssignmentExpression[right.property.name="bankRowsShown"])',
+					message: '`bankRowsShown` caps Bank Rows for display; do not alias display reads.'
+				},
+				{
+					selector: 'ImportSpecifier[imported.name="bankRowsShown"][local.name!="bankRowsShown"]',
+					message:
+						'`bankRowsShown` caps Bank Rows for display; import it under its own name so only the list row reads it.'
 				}
 			]
 		}
 	},
 	{
-		plugins: { local: { rules: { 'no-comments': noComments } } },
+		plugins: {
+			local: { rules: { 'no-comments': noComments, 'no-effect-defects': noEffectDefects } }
+		},
 		rules: {
 			'local/no-comments': 'error',
 			'max-depth': ['error', 3],
@@ -108,8 +127,44 @@ export default defineConfig(
 		}
 	},
 	{
+		files: ['convex/**', 'src/**'],
+		rules: {
+			'local/no-effect-defects': [
+				'error',
+				{
+					allow: [
+						{
+							file: 'convex/lib/plaidClient.ts',
+							className: 'PlaidClient',
+							method: 'layerTest',
+							reason:
+								'An unexpected call means the test fake violates its declared interaction contract.'
+						}
+					]
+				}
+			]
+		}
+	},
+	{
 		files: ['**/*.test.ts'],
 		rules: { 'max-nested-callbacks': 'off' }
+	},
+	{
+		files: ['e2e/**/*.{test,spec}.ts'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: '@playwright/test',
+							message:
+								"Import `test` from './test', which reloads a seed fixture before every test."
+						}
+					]
+				}
+			]
+		}
 	},
 	{
 		files: ['src/lib/domain/**'],

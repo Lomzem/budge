@@ -30,3 +30,10 @@ test('freePort skips a port another server holds, and ports already handed out',
 	expect(port).toBeGreaterThan(held + 1);
 	expect(port).toBeLessThan(held + 100);
 });
+
+test('freePort wraps past 65535 to the first unprivileged port and respects taken ports', async () => {
+	const port = await freePort(65535, [65535, 1024]);
+
+	expect(port).toBeGreaterThan(1024);
+	expect(port).toBeLessThan(1024 + 100);
+});

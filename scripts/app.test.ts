@@ -64,7 +64,7 @@ describe('seed --list', () => {
 			.trim()
 			.split('\n')
 			.map((line) => line.split(/\s+/)[0]);
-		expect(names).toEqual(['empty-budget', 'budget-with-accounts']);
+		expect(names).toEqual(['empty-budget', 'budget-with-accounts', 'bank-sync']);
 	});
 });
 

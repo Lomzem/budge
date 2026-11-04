@@ -10,13 +10,19 @@ useOwnerEnv();
 const accessToken = 'access-token-synthetic-not-real';
 const itemId = 'item-synthetic-1';
 const externalId = 'account-synthetic-checking';
+const newExternalId = 'account-synthetic-new-savings';
 const cutoverDate = '2026-08-01';
 
 type Signer = Awaited<ReturnType<typeof webhookSigner>>;
 
 function fakePlaid(signer: Signer) {
 	const paths: string[] = [];
-	const state = { keyOutage: false };
+	const state = {
+		keyOutage: false,
+		accountsOutage: false,
+		moreAccounts: 0,
+		heldAnswer: null as { reached: () => void; release: Promise<void> } | null
+	};
 	const fetch = (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = new URL(input instanceof Request ? input.url : input);
 		assert(url.host === 'sandbox.plaid.com', `Unexpected request to ${url.host}`);
@@ -40,6 +46,45 @@ function fakePlaid(signer: Signer) {
 				);
 			case '/transactions/sync':
 				return answer(syncPage);
+			case '/accounts/get': {
+				if (state.accountsOutage) {
+					return Promise.resolve(new Response('Service Unavailable', { status: 503 }));
+				}
+				const accounts = answer({
+					accounts: [
+						{
+							account_id: externalId,
+							name: 'Sample Checking',
+							mask: '0000',
+							type: 'depository',
+							balances: { current: 100 }
+						},
+						{
+							account_id: newExternalId,
+							name: 'Sample Savings',
+							mask: '1111',
+							type: 'depository',
+							balances: { current: 250 }
+						},
+						...Array.from({ length: state.moreAccounts }, (_, n) => ({
+							account_id: `account-synthetic-more-${String(n)}`,
+							name: `Sample Savings ${String(n)}`,
+							type: 'depository',
+							balances: { current: 0 }
+						}))
+					]
+				});
+				const held = state.heldAnswer;
+				if (held === null) return accounts;
+				state.heldAnswer = null;
+				held.reached();
+				return held.release.then(() => accounts);
+			}
+			case '/item/get':
+				return answer({
+					item: { item_id: itemId, consent_expiration_time: null, error: null },
+					status: null
+				});
 			default:
 				return assert.fail(`Unexpected Plaid call ${url.pathname}`);
 		}
@@ -175,7 +220,44 @@ describe('the Plaid webhook', () => {
 		await runScheduled(backend);
 
 		expect(await backend.rows()).toHaveLength(2);
-		expect(plaid.paths).toEqual(['/webhook_verification_key/get', '/transactions/sync']);
+		expect(plaid.paths).toEqual([
+			'/webhook_verification_key/get',
+			'/transactions/sync',
+			'/item/get'
+		]);
+	});
+
+	const itemBody = (code: string, errorCode?: string) =>
+		JSON.stringify({
+			webhook_type: 'ITEM',
+			webhook_code: code,
+			item_id: itemId,
+			error: errorCode === undefined ? null : { error_code: errorCode },
+			environment: 'sandbox'
+		});
+
+	const statusAfter = async (body: string) => {
+		const backend = await connectedBudget();
+		const response = await postWebhook(backend, body, await signer.sign(body));
+		expect(response.status).toBe(200);
+		const connection = await backend.t.run((ctx) =>
+			ctx.db.get('bankConnections', backend.connectionId)
+		);
+		return connection?.status;
+	};
+
+	test.each([
+		['PENDING_DISCONNECT', undefined],
+		['PENDING_EXPIRATION', undefined],
+		['USER_PERMISSION_REVOKED', undefined],
+		['ERROR', 'ITEM_LOGIN_REQUIRED']
+	])('ITEM %s %s pauses the Bank Connection until Reconnect', async (code, errorCode) => {
+		expect(await statusAfter(itemBody(code, errorCode))).toBe('needsAttention');
+	});
+
+	test('an ITEM webhook nothing needs the owner for leaves the Bank Connection as it was', async () => {
+		expect(await statusAfter(itemBody('WEBHOOK_UPDATE_ACKNOWLEDGED'))).toBe('ok');
+		expect(await statusAfter(itemBody('ERROR', 'INSTITUTION_DOWN'))).toBe('ok');
 	});
 
 	test('an unverified webhook changes nothing', async () => {
@@ -327,7 +409,10 @@ describe('the Plaid webhook', () => {
 			nextCursor: 'cursor-synthetic-held',
 			hasMore: false,
 			rows: [],
-			release: true
+			modified: [],
+			removed: [],
+			release: true,
+			attentionNotices: 0
 		});
 		await runScheduled(backend);
 
@@ -340,8 +425,9 @@ describe('the Plaid webhook', () => {
 		await backend.t.mutation(internal.bankConnections.fail, {
 			connectionId: backend.connectionId,
 			lease: backend.lease,
-			message: "Couldn't reach Plaid.",
-			needsLogin: false
+			message: 'Plaid refused the sync (INVALID_FIELD).',
+			status: 'failed',
+			attempt: 0
 		});
 		await runScheduled(backend);
 
@@ -372,6 +458,144 @@ describe('the Plaid webhook', () => {
 
 		expect((await postWebhook(backend, 'not json', null)).status).toBe(400);
 		expect(plaid.paths).toEqual([]);
+	});
+});
+
+describe('a bank Account the owner adds at the bank', () => {
+	const heldExternalIds = async ({ t }: Backend) =>
+		(await t.run((ctx) => ctx.db.query('connectionAccounts').collect()))
+			.filter((account) => account.state === 'held')
+			.map((account) => account.externalId);
+
+	const newAccountsBody = JSON.stringify({
+		webhook_type: 'ITEM',
+		webhook_code: 'NEW_ACCOUNTS_AVAILABLE',
+		item_id: itemId,
+		error: null,
+		environment: 'sandbox'
+	});
+	const postNewAccounts = async (backend: Backend) => {
+		const body = newAccountsBody;
+		return await postWebhook(backend, body, await signer.sign(body));
+	};
+
+	test('NEW_ACCOUNTS_AVAILABLE holds it for the owner to map', async () => {
+		const backend = await connectedBudget();
+
+		const response = await postNewAccounts(backend);
+		expect(response.status).toBe(200);
+		await runScheduled(backend);
+
+		expect(plaid.paths).toContain('/accounts/get');
+		expect(await heldExternalIds(backend)).toEqual([newExternalId]);
+	});
+
+	test('NEW_ACCOUNTS_AVAILABLE while another sync holds the lease is looked into once it finishes', async () => {
+		const backend = await connectedBudget();
+		const lease = Date.now() + 60_000;
+		await backend.t.run((ctx) =>
+			ctx.db.patch('bankConnections', backend.connectionId, { syncLeaseUntil: lease })
+		);
+		expect((await postNewAccounts(backend)).status).toBe(200);
+		await runScheduled(backend);
+		expect(plaid.paths).not.toContain('/accounts/get');
+
+		await backend.t.mutation(internal.bankConnections.apply, {
+			connectionId: backend.connectionId,
+			lease,
+			fromCursor: null,
+			nextCursor: 'cursor-synthetic-held',
+			hasMore: false,
+			rows: [],
+			modified: [],
+			removed: [],
+			release: true,
+			attentionNotices: 0
+		});
+		await runScheduled(backend);
+
+		expect(await heldExternalIds(backend)).toEqual([newExternalId]);
+	});
+
+	test.each([
+		{ answered: 50, held: 49 },
+		{ answered: 51, held: 0 }
+	])(
+		'a bank answer of $answered Accounts is taken whole or not at all',
+		async ({ answered, held }) => {
+			const backend = await connectedBudget();
+			plaid.state.moreAccounts = answered - 2;
+
+			await postNewAccounts(backend);
+			await runScheduled(backend);
+
+			expect(plaid.paths).toContain('/accounts/get');
+			expect(await heldExternalIds(backend)).toHaveLength(held);
+		}
+	);
+
+	test('an answer Plaid gave before a newer request does not settle that request', async () => {
+		const backend = await connectedBudget();
+		const { t, connectionId } = backend;
+		let releaseOlderAnswer: () => void = () => undefined;
+		const release = new Promise<void>((resolve) => {
+			releaseOlderAnswer = resolve;
+		});
+		const reached = new Promise<void>((resolve) => {
+			plaid.state.heldAnswer = { reached: resolve, release };
+		});
+		const olderLook = t.action(internal.heldAccounts.discover, { connectionId });
+		await reached;
+
+		plaid.state.moreAccounts = 1;
+		plaid.state.accountsOutage = true;
+		await postNewAccounts(backend);
+		await runScheduled(backend);
+		plaid.state.accountsOutage = false;
+		releaseOlderAnswer();
+		await olderLook;
+		expect(await heldExternalIds(backend)).toEqual([newExternalId]);
+		plaid.paths.length = 0;
+
+		await t.action(internal.bankConnections.sync, { connectionId });
+
+		expect(plaid.paths).toContain('/accounts/get');
+		expect(await heldExternalIds(backend)).toEqual([newExternalId, 'account-synthetic-more-0']);
+	});
+
+	test('a failed look at the Accounts is tried again on the next sync', async () => {
+		const backend = await connectedBudget();
+		plaid.state.accountsOutage = true;
+		await postNewAccounts(backend);
+		await runScheduled(backend);
+		expect(await heldExternalIds(backend)).toEqual([]);
+		plaid.state.accountsOutage = false;
+
+		await backend.t.action(internal.bankConnections.sync, { connectionId: backend.connectionId });
+
+		expect(await heldExternalIds(backend)).toEqual([newExternalId]);
+	});
+
+	test('once the Accounts are looked at, later syncs do not ask again', async () => {
+		const backend = await connectedBudget();
+		await postNewAccounts(backend);
+		await runScheduled(backend);
+		plaid.paths.length = 0;
+
+		await backend.t.action(internal.bankConnections.sync, { connectionId: backend.connectionId });
+
+		expect(plaid.paths).not.toContain('/accounts/get');
+	});
+
+	test('a sync after Reconnect holds it for the owner to map', async () => {
+		const backend = await connectedBudget();
+
+		await backend.owner.action(api.bankConnections.syncAfterReconnect, {
+			connectionId: backend.connectionId
+		});
+
+		expect(plaid.paths).toContain('/accounts/get');
+		expect(await heldExternalIds(backend)).toEqual([newExternalId]);
 	});
 });
 

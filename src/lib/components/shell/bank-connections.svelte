@@ -17,7 +17,10 @@
 	const client = useConvexClient();
 	const accounts = getAccounts();
 
-	const connections = useQuery(api.bankConnections.list, () => (accounts.loaded ? {} : 'skip'));
+	const listedAt = Date.now();
+	const connections = useQuery(api.bankConnections.list, () =>
+		accounts.loaded ? { now: listedAt } : 'skip'
+	);
 
 	let now = $state(Date.now());
 	$effect(() => {

@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import { assert, describe, expect, test } from 'vitest';
 
 import { decodeBankFile } from '../src/lib/domain/bankFiles';
+import { addDays } from '../src/lib/domain/dates';
 import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
 import checkingCsv from '../src/lib/domain/fixtures/synthetic/capital-one-checking.csv?raw';
 import checkingQfx from '../src/lib/domain/fixtures/synthetic/capital-one-checking.qfx?raw';
@@ -61,6 +62,66 @@ describe('importing a bank file', () => {
 			{ date: '2026-08-14', amount: -4_250, cleared: true, approved: false }
 		]);
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(2);
+	});
+
+	test('a row never Matches a Transaction whose eleventh Bank Row already came from the same kind of file', async () => {
+		const { owner, t, checking, rows } = await budgetWithChecking();
+		const handEntered = await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			date: coffee.date,
+			amount: coffee.amount,
+			payee: 'Sample Coffee',
+			memo: ''
+		});
+		await t.run(async (ctx) => {
+			const statementRow = {
+				accountId: checking,
+				date: coffee.date,
+				amount: coffee.amount,
+				bankText: 'SAMPLE STATEMENT ROW',
+				transactionId: handEntered,
+				matched: true,
+				state: 'linked' as const
+			};
+			for (let index = 0; index < 10; index++) {
+				await ctx.db.insert('imports', { ...statementRow, source: 'qfx' });
+			}
+			await ctx.db.insert('imports', { ...statementRow, source: 'csv' });
+		});
+
+		expect(
+			await owner.mutation(api.imports.commit, {
+				accountId: checking,
+				source: 'csv',
+				rows: [coffee]
+			})
+		).toEqual({ added: 1, matched: 0, skipped: 0 });
+		expect((await rows()).filter((row) => row.amount === coffee.amount)).toHaveLength(2);
+	});
+
+	test('a row whose Bank Text is Starting Balance gets an ordinary Payee of that name, which renames like any other', async () => {
+		const { owner, checking } = await budgetWithChecking();
+		await owner.mutation(api.imports.commit, {
+			accountId: checking,
+			source: 'csv',
+			rows: [{ ...coffee, bankText: 'Starting Balance' }]
+		});
+		const imported = async () =>
+			(
+				await owner.query(api.transactions.list, {
+					accountId: checking,
+					paginationOpts: { numItems: 50, cursor: null }
+				})
+			).page.find((row) => row.amount === -450);
+		expect(await imported()).toMatchObject({ payeeName: 'Starting Balance' });
+		const payee = (await owner.query(api.payees.list, {})).find(
+			(candidate) => candidate.name === 'Starting Balance'
+		);
+		assert(payee !== undefined, 'expected the imported Payee');
+
+		await owner.mutation(api.payees.rename, { payeeId: payee._id, name: 'Sample Opening Deposit' });
+
+		expect(await imported()).toMatchObject({ payeeName: 'Sample Opening Deposit' });
 	});
 
 	test('the same QFX file twice adds nothing the second time', async () => {
@@ -128,6 +189,30 @@ describe('importing a bank file', () => {
 				approved: false,
 				bankRows: [{ bankText: 'SAMPLE COFFEE 0042', matched: true }]
 			}
+		]);
+	});
+
+	test('a row that would Match the starting balance shows it under the Starting Balance label', async () => {
+		const { owner, checking } = await budgetWithChecking();
+		const listed = await owner.query(api.transactions.list, {
+			accountId: checking,
+			paginationOpts: { numItems: 50, cursor: null }
+		});
+		const opening = listed.page.find((row) => row.startingBalance);
+		assert(opening !== undefined, 'expected the starting balance');
+		await owner.mutation(api.transactions.setCleared, {
+			transactionId: opening._id,
+			cleared: false
+		});
+
+		expect(
+			await owner.query(api.imports.preview, {
+				accountId: checking,
+				source: 'csv',
+				rows: [{ date: cutoverDate, amount: 100_000, bankText: 'OPENING DEPOSIT' }]
+			})
+		).toMatchObject([
+			{ kind: 'match', transaction: { _id: opening._id, payeeName: 'Starting Balance' } }
 		]);
 	});
 
@@ -215,6 +300,47 @@ describe('importing a bank file', () => {
 		expect(picked[1]).toEqual({ kind: 'new' });
 	});
 
+	test('a row with more candidates than the picker lists still asks, offering the ten nearest, earlier first on a tie, plus any pick beyond them', async () => {
+		const { owner, checking } = await budgetWithChecking();
+		const entered = new Map<number, Id<'transactions'>>();
+		for (const offset of [6, -5, 5, 0, -4, 4, -3, 3, -2, 2, -1, 1]) {
+			entered.set(
+				offset,
+				await owner.mutation(api.transactions.create, {
+					accountId: checking,
+					date: addDays(coffee.date, offset),
+					amount: -450,
+					payee: `Sample Coffee Shop ${String(offset)}`,
+					memo: ''
+				})
+			);
+		}
+
+		const [row] = await owner.query(api.imports.preview, {
+			accountId: checking,
+			source: 'csv',
+			rows: [coffee]
+		});
+
+		assert(row?.kind === 'ask');
+		expect(row.candidates.map((candidate) => candidate._id)).toEqual(
+			[0, -1, 1, -2, 2, -3, 3, -4, 4, -5].map((offset) => entered.get(offset))
+		);
+
+		const unlisted = entered.get(5);
+		assert(unlisted !== undefined);
+		const [picked] = await owner.query(api.imports.preview, {
+			accountId: checking,
+			source: 'csv',
+			rows: [{ ...coffee, pick: unlisted }]
+		});
+		assert(picked?.kind === 'match');
+		expect(picked.transaction._id).toBe(unlisted);
+		expect(picked.candidates?.map((candidate) => candidate._id)).toEqual(
+			[0, -1, 1, -2, 2, -3, 3, -4, 4, 5].map((offset) => entered.get(offset))
+		);
+	});
+
 	test('Unmatch splits the Bank Row back into its own Transaction, restoring both', async () => {
 		const { owner, checking, rows, balance } = await budgetWithChecking();
 		const entered = await owner.mutation(api.transactions.create, {
@@ -251,6 +377,23 @@ describe('importing a bank file', () => {
 			approved: false,
 			bankRows: [{ _id: bankRowId, matched: false }]
 		});
+	});
+
+	test('a file of 250 rows previews, and one row more is refused', async () => {
+		const { owner, checking } = await budgetWithChecking();
+		const rows = Array.from({ length: 251 }, (_, index) => ({
+			...coffee,
+			bankText: `SAMPLE SHOP ${String(index)}`
+		}));
+		const preview = (count: number) =>
+			owner.query(api.imports.preview, {
+				accountId: checking,
+				source: 'csv',
+				rows: rows.slice(0, count)
+			});
+
+		expect(await preview(250)).toHaveLength(250);
+		expect(await publicErrorCode(preview(251))).toBe('INVALID_INPUT');
 	});
 
 	test('a deleted imported Transaction does not come back with the same file', async () => {
