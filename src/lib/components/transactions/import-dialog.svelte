@@ -78,6 +78,7 @@
 		session += 1;
 		reads += 1;
 		reading = false;
+		saving = false;
 		accountId = defaultAccountId ?? accounts.all[0]?._id ?? '';
 		file = undefined;
 		picks = [];
@@ -121,8 +122,8 @@
 		error = '';
 		const args = { accountId: account._id, source: file.source, rows: rowsWithPicks(file) };
 		const committed = await attempt(() => commit(args));
-		saving = false;
 		if (started !== session) return;
+		saving = false;
 		if (committed.ok) open = false;
 		else error = committed.error?.message ?? "Budge couldn't save the import. Try again.";
 	}

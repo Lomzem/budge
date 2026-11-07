@@ -107,6 +107,7 @@ test('leaving Split and choosing it again starts fresh from the current amount a
 	await category.selectOption({ label: 'Split across Categories' });
 	await dialog.getByLabel('Line 1 Category').selectOption({ label: 'Gifts' });
 	await dialog.getByLabel('Line 1 amount').fill('30.00');
+	await dialog.getByLabel('Line 1 memo').fill('Sample line note');
 	await dialog.getByLabel('Line 2 amount').fill('20.00');
 	await dialog.getByRole('button', { name: 'Add line' }).click();
 
@@ -115,6 +116,7 @@ test('leaving Split and choosing it again starts fresh from the current amount a
 	await category.selectOption({ label: 'Split across Categories' });
 
 	await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('80.00');
+	await expect(dialog.getByLabel('Line 1 memo')).toHaveValue('');
 	await expect(dialog.getByLabel('Line 1 Category').locator('option:checked')).toHaveText(
 		'Groceries'
 	);

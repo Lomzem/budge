@@ -3,6 +3,7 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient } from 'convex-svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -37,7 +38,11 @@
 		return formatSynced(connection.lastSyncedAt, connections.now);
 	}
 
-	function open(connectionId: Id<'bankConnections'>, result = '') {
+	const unseenReconnectResults = new SvelteMap<Id<'bankConnections'>, string>();
+
+	function open(connectionId: Id<'bankConnections'>) {
+		const result = unseenReconnectResults.get(connectionId) ?? '';
+		unseenReconnectResults.delete(connectionId);
 		dialog.open({ connectionId, syncing: false, result });
 		connections.tick();
 	}
@@ -68,8 +73,14 @@
 	async function reconnect(connectionId: Id<'bankConnections'>) {
 		dialog.dismiss();
 		const message = await connections.reconnect(connectionId);
-		const noOtherDialogOpenedMeanwhile = dialog.current === null;
-		if (message !== null && noOtherDialogOpenedMeanwhile) open(connectionId, message);
+		if (message === null) return;
+		const showing = dialog.current;
+		if (showing?.connectionId === connectionId) {
+			showing.result = message;
+			return;
+		}
+		unseenReconnectResults.set(connectionId, message);
+		if (showing === null) open(connectionId);
 	}
 </script>
 

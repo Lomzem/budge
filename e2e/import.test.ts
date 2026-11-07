@@ -82,6 +82,7 @@ test('an import save that finishes after the dialog was closed leaves the next o
 
 		await page.getByRole('button', { name: 'Import file' }).click();
 		await expect(dialog.getByLabel('File')).toHaveValue('');
+		await expect(dialog.getByLabel('File')).toBeEnabled();
 		commit.release();
 
 		await expect(slowRow.first()).toBeVisible();

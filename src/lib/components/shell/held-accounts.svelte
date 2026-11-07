@@ -110,6 +110,10 @@
 			dialog.close(session);
 			return;
 		}
+		if (saved.value === null) {
+			session.error = 'That Account is gone. Choose another Account.';
+			return;
+		}
 		session.mapped = saved.value;
 	}
 </script>
