@@ -14,7 +14,7 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { requireCents } from './input';
 import { importedPayee, ImportedPayees } from './payees';
 import { publicError } from './publicError';
-import { bankRowsOf, insertTransaction, refreshSearchText } from './transactions';
+import { allBankRowsOf, insertTransaction, refreshSearchText } from './transactions';
 import { requireCutoverDate, requireIsoDate } from './settings';
 
 export const fileSource = v.union(v.literal('qfx'), v.literal('csv'));
@@ -29,13 +29,14 @@ export const fileRow = v.object({
 });
 export type FileRow = Infer<typeof fileRow>;
 
-export const MAX_FILE_ROWS = 1_000;
+export const MAX_FILE_ROWS = 250;
 
 const MAX_BANK_TEXT = 500;
 
 export interface IncomingRow extends BankRow {
 	merchantName?: string | undefined;
 	pick?: Id<'transactions'> | 'new' | undefined;
+	heldId?: Id<'imports'> | undefined;
 }
 
 export interface ImportPlan<R extends IncomingRow = FileRow> {
@@ -66,7 +67,8 @@ export async function planBankRows<R extends IncomingRow>(
 	ctx: QueryCtx,
 	accountId: Id<'accounts'>,
 	source: BankSource,
-	rows: R[]
+	rows: R[],
+	mappedFeed?: Id<'connectionAccounts'>
 ): Promise<ImportPlan<R>> {
 	if (rows.length === 0) return { rows, decisions: [], candidates: new Map() };
 
@@ -110,21 +112,21 @@ export async function planBankRows<R extends IncomingRow>(
 		);
 	for await (const transaction of nearby) {
 		if (!rows.some((row) => row.amount === transaction.amount)) continue;
-		const linked = await bankRowsOf(ctx, transaction._id);
 		candidates.set(transaction._id, transaction);
 		matchCandidates.push({
 			id: transaction._id,
 			date: transaction.date,
 			amount: transaction.amount,
 			cleared: transaction.cleared !== 'uncleared',
-			linkedSources: linked.map((row) => row.source)
+			...(await linkedInventory(ctx, transaction._id, mappedFeed))
 		});
 	}
 
 	const decisions = matchBankRows(source, rows, {
 		knownImportIds,
 		knownRowsWithoutId,
-		candidates: matchCandidates
+		candidates: matchCandidates,
+		...(mappedFeed === undefined ? {} : { matchImported: true })
 	});
 	return { rows, decisions, candidates };
 }
@@ -157,6 +159,20 @@ export async function applyBankRows(
 			bankText: row.bankText,
 			state: 'linked' as const
 		};
+		const writeBankRow = async (transactionId: Id<'transactions'>, matched: boolean) => {
+			if (row.heldId === undefined) {
+				await ctx.db.insert('imports', { ...bankRow, transactionId, matched });
+			} else {
+				await ctx.db.patch('imports', row.heldId, {
+					accountId,
+					transactionId,
+					matched,
+					state: 'linked',
+					merchantName: undefined
+				});
+			}
+			await refreshSearchText(ctx, transactionId);
+		};
 		if (decision.kind === 'match') {
 			const matchedStaysLockedIfReconciled =
 				candidates.get(decision.transactionId)?.cleared === 'reconciled';
@@ -164,19 +180,14 @@ export async function applyBankRows(
 				cleared: matchedStaysLockedIfReconciled ? 'reconciled' : 'cleared',
 				approved: false
 			});
-			await ctx.db.insert('imports', {
-				...bankRow,
-				transactionId: decision.transactionId,
-				matched: true
-			});
-			await refreshSearchText(ctx, decision.transactionId);
+			await writeBankRow(decision.transactionId, true);
 			counts.matched++;
 		} else if (decision.kind === 'skip') {
+			if (row.heldId !== undefined) await ctx.db.delete('imports', row.heldId);
 			counts.skipped++;
 		} else {
 			const transactionId = await insertImported(ctx, accountId, row, payees);
-			await ctx.db.insert('imports', { ...bankRow, transactionId, matched: false });
-			await refreshSearchText(ctx, transactionId);
+			await writeBankRow(transactionId, false);
 			counts.added++;
 		}
 	}
@@ -232,4 +243,18 @@ function requireFileRow(input: FileRow, source: FileSource, cutoverDate: string)
 		...(sourceId === undefined ? {} : { sourceId }),
 		...(row.pick === undefined ? {} : { pick: row.pick })
 	};
+}
+
+async function linkedInventory(
+	ctx: QueryCtx,
+	transactionId: Id<'transactions'>,
+	mappedFeed: Id<'connectionAccounts'> | undefined
+) {
+	const linkedSources: BankSource[] = [];
+	let linkedFromFeed = false;
+	for await (const row of allBankRowsOf(ctx, transactionId)) {
+		linkedSources.push(row.source);
+		linkedFromFeed ||= row.connectionAccountId === mappedFeed;
+	}
+	return mappedFeed === undefined ? { linkedSources } : { linkedSources, linkedFromFeed };
 }

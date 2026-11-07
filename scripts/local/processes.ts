@@ -72,8 +72,16 @@ export function reachable(url: string) {
 	);
 }
 
+const FIRST_UNPRIVILEGED_PORT = 1024;
+const UNPRIVILEGED_PORTS = 65536 - FIRST_UNPRIVILEGED_PORT;
+
 export async function freePort(preferred: number, taken: number[] = []) {
-	for (let port = preferred; port < preferred + 100; port++) {
+	if (!Number.isInteger(preferred) || preferred < FIRST_UNPRIVILEGED_PORT)
+		throw new Error(`preferred port ${String(preferred)} is below 1024`);
+	for (let offset = 0; offset < 100; offset++) {
+		const port =
+			FIRST_UNPRIVILEGED_PORT +
+			((preferred - FIRST_UNPRIVILEGED_PORT + offset) % UNPRIVILEGED_PORTS);
 		if (!taken.includes(port) && !(await portInUse(port))) return port;
 	}
 	throw new Error(`no free port from ${String(preferred)}`);

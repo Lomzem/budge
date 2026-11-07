@@ -1,7 +1,12 @@
 import { Context, Duration, Effect, Layer, Schedule, Schema } from 'effect';
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http';
 
-import { decodeSyncPage, type SyncPage } from '../../src/lib/domain/plaid';
+import {
+	decodeAccounts,
+	decodeSyncPage,
+	type BankAccount,
+	type SyncPage
+} from '../../src/lib/domain/plaid';
 
 export class PlaidTransport extends Schema.TaggedError<
 	PlaidTransport,
@@ -47,6 +52,21 @@ interface PlaidClientShape {
 
 	readonly setWebhook: (accessToken: string, webhook: string) => Effect.Effect<void, PlaidError>;
 	readonly webhookVerificationKey: (keyId: string) => Effect.Effect<WebhookKey, PlaidError>;
+	readonly linkTokenCreate: (request: UpdateLinkRequest) => Effect.Effect<string, PlaidError>;
+	readonly itemGet: (accessToken: string) => Effect.Effect<ItemState, PlaidError>;
+	readonly accountsGet: (
+		accessToken: string,
+		accountIds?: readonly string[]
+	) => Effect.Effect<BankAccount[], PlaidError>;
+}
+
+export interface UpdateLinkRequest {
+	accessToken: string;
+	clientUserId: string;
+}
+
+export interface ItemState {
+	consentExpiresAt: number | null;
 }
 
 export interface WebhookKey {
@@ -97,7 +117,10 @@ export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>(
 			transactionsSync: fake.transactionsSync ?? unexpected('transactionsSync'),
 			transactionsRefresh: fake.transactionsRefresh ?? unexpected('transactionsRefresh'),
 			setWebhook: fake.setWebhook ?? unexpected('setWebhook'),
-			webhookVerificationKey: fake.webhookVerificationKey ?? unexpected('webhookVerificationKey')
+			webhookVerificationKey: fake.webhookVerificationKey ?? unexpected('webhookVerificationKey'),
+			linkTokenCreate: fake.linkTokenCreate ?? unexpected('linkTokenCreate'),
+			itemGet: fake.itemGet ?? unexpected('itemGet'),
+			accountsGet: fake.accountsGet ?? unexpected('accountsGet')
 		});
 	}
 }
@@ -113,6 +136,25 @@ const WebhookKeyBody = Schema.Struct({
 });
 
 const PlaidErrorBody = Schema.Struct({ error_code: Schema.String, request_id: Schema.String });
+
+const LinkTokenBody = Schema.Struct({ link_token: Schema.String });
+
+const ItemGetBody = Schema.Struct({
+	item: Schema.Struct({ consent_expiration_time: Schema.NullOr(Schema.String) })
+});
+
+function decodeItem(body: unknown): Effect.Effect<ItemState, unknown> {
+	return Schema.decodeUnknownEffect(ItemGetBody)(body).pipe(
+		Effect.flatMap(({ item }): Effect.Effect<ItemState, PlaidDecode> => {
+			const at = item.consent_expiration_time;
+			if (at === null) return Effect.succeed({ consentExpiresAt: null });
+			const consentExpiresAt = Date.parse(at);
+			return Number.isNaN(consentExpiresAt)
+				? Effect.fail(new PlaidDecode())
+				: Effect.succeed({ consentExpiresAt });
+		})
+	);
+}
 
 function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClientShape {
 	const baseUrl = `https://${config.environment}.plaid.com`;
@@ -197,6 +239,29 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 						}))
 					),
 				WITHIN_PLAIDS_WEBHOOK_DEADLINE
+			),
+		linkTokenCreate: ({ accessToken, clientUserId }) =>
+			post(
+				'/link/token/create',
+				{
+					access_token: accessToken,
+					client_name: 'Budge',
+					language: 'en',
+					country_codes: ['US'],
+					user: { client_user_id: clientUserId }
+				},
+				(body) =>
+					Schema.decodeUnknownEffect(LinkTokenBody)(body).pipe(Effect.map((b) => b.link_token))
+			),
+		itemGet: (accessToken) => post('/item/get', { access_token: accessToken }, decodeItem),
+		accountsGet: (accessToken, accountIds) =>
+			post(
+				'/accounts/get',
+				{
+					access_token: accessToken,
+					...(accountIds === undefined ? {} : { options: { account_ids: accountIds } })
+				},
+				decodeAccounts
 			)
 	};
 }

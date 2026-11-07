@@ -96,6 +96,47 @@ describe('decoding a bank file', () => {
 	);
 
 	it.effect.each([
+		[
+			'a byte order mark',
+			'﻿Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,Restaurants\n'
+		],
+		[
+			'CRLF line endings',
+			'Trans. Date,Post Date,Description,Amount,Category\r\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,Restaurants\r\n'
+		],
+		[
+			'trailing blank lines',
+			'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,Restaurants\n\n,,,,\n\n'
+		],
+		[
+			'blank columns after the last header',
+			'Trans. Date,Post Date,Description,Amount,Category,,\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,Restaurants,,\n'
+		]
+	] as const)('reads a Discover CSV with %s', ([, text]) =>
+		Effect.gen(function* () {
+			const file = yield* decodeBankFile(text, cutoverDate);
+
+			expect(file.rows).toEqual([
+				{ date: '2026-08-14', amount: -1_825, bankText: 'SAMPLE TACO STAND' }
+			]);
+		})
+	);
+
+	it.effect('reads a quote inside an unquoted Description as part of the text', () =>
+		Effect.gen(function* () {
+			const file = yield* decodeBankFile(
+				'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,SAMPLE 12" PIZZA,18.25,Restaurants\n08/16/2026,08/16/2026,SAMPLE BAKERY,4.50,Restaurants\n',
+				cutoverDate
+			);
+
+			expect(file.rows).toEqual([
+				{ date: '2026-08-14', amount: -1_825, bankText: 'SAMPLE 12" PIZZA' },
+				{ date: '2026-08-16', amount: -450, bankText: 'SAMPLE BAKERY' }
+			]);
+		})
+	);
+
+	it.effect.each([
 		['an unknown layout', 'Date,Thing\n08/14/2026,1\n', 'not a Capital One or Discover'],
 		[
 			'a date that does not exist',
@@ -107,7 +148,42 @@ describe('decoding a bank file', () => {
 			'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/14/2026,SAMPLE,1.005,X\n',
 			'Row 2'
 		],
-		['an empty file', '', 'not a Capital One or Discover']
+		['an empty file', '', 'not a Capital One or Discover'],
+		[
+			'a quote that never closes',
+			'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,"Restaurants\n08/18/2026,08/18/2026,SAMPLE PAYMENT,-200.00,Payments\n',
+			'Row 2 opens a quote'
+		],
+		[
+			'text after a closing quote',
+			'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,"SAMPLE TACO"STAND,18.25,Restaurants\n',
+			'Row 2 has text after a closing quote'
+		],
+		[
+			'a header that names a column twice',
+			'Trans. Date,Post Date,Description,Amount, Amount\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,99.00\n',
+			'“Amount” more than once'
+		],
+		[
+			'a row with more cells than the header has columns',
+			'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,Gas, Auto\n',
+			'Row 2 has 6 cells'
+		],
+		[
+			'a QFX cut off inside a Transaction',
+			fixture('capital-one-checking.qfx').split('<FITID>DEMO-0002')[0] ?? '',
+			'Transaction 2 never closes'
+		],
+		[
+			'a QFX Transaction left open at the end of its list',
+			fixture('capital-one-card.qfx').replace('</STMTTRN>', ''),
+			'Transaction 1 never closes'
+		],
+		[
+			'a QFX Transaction left open before the next one',
+			fixture('capital-one-checking.qfx').replace('&amp; CO\r\n</STMTTRN>', '&amp; CO\r\n'),
+			'Transaction 2 never closes'
+		]
 	] as const)('refuses %s', ([, text, message]) =>
 		Effect.gen(function* () {
 			const error = yield* Effect.flip(decodeBankFile(text, cutoverDate));

@@ -48,7 +48,7 @@ export async function runConvex(
 	try {
 		const child = spawn(
 			process.execPath,
-			['--no-env-file', convexCli, ...args, '--env-file', envFile],
+			[...noAutomaticEnvFile(), convexCli, ...args, '--env-file', envFile],
 			{
 				cwd: dir,
 				env: inheritedEnvWithoutDeploymentSettings(),
@@ -62,6 +62,10 @@ export async function runConvex(
 	} finally {
 		rmSync(binding, { recursive: true, force: true });
 	}
+}
+
+function noAutomaticEnvFile() {
+	return process.versions.bun === undefined ? [] : ['--no-env-file'];
 }
 
 function backendStillRunning(dir: string) {
@@ -87,13 +91,13 @@ function moveLocalConfig(dir: string, ports: BackendPorts) {
 	writeFileSync(path, `${JSON.stringify({ ...config, ports }, null, 2)}\n`);
 }
 
-export async function claimBackendPorts(dir: string): Promise<BackendPorts> {
+export async function claimBackendPorts(dir: string, preferred?: number): Promise<BackendPorts> {
 	if (backendStillRunning(dir)) {
 		throw new Error(
 			"a backend for this checkout's .convex/local is still running outside `bun run app up`; stop it first."
 		);
 	}
-	const cloud = await freePort(readLocalConfig(dir)?.cloudPort ?? 3210);
+	const cloud = await freePort(preferred ?? readLocalConfig(dir)?.cloudPort ?? 3210);
 	const site = await freePort(cloud + 1, [cloud]);
 	moveLocalConfig(dir, { cloud, site });
 	return { cloud, site };

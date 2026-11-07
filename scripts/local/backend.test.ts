@@ -71,6 +71,19 @@ test('moves the local config to free ports when another server holds its port', 
 	expect(savedConfig(checkout).adminKey).toBe('anonymous-agent|invented-admin-key-0000');
 });
 
+test('keeps both backend ports valid and distinct when the config sits on the last port', async () => {
+	const checkout = checkoutWithConfigOn(65535);
+
+	const ports = await claimBackendPorts(checkout);
+
+	for (const port of [ports.cloud, ports.site]) {
+		expect(port).toBeGreaterThanOrEqual(1024);
+		expect(port).toBeLessThanOrEqual(65535);
+	}
+	expect(ports.site).not.toBe(ports.cloud);
+	expect(savedConfig(checkout).ports).toEqual(ports);
+});
+
 test("refuses while a backend for this checkout's local state is still running", async () => {
 	const held = await occupy();
 	const checkout = checkoutWithConfigOn(held);

@@ -52,6 +52,7 @@ export interface Webhook {
 	type: string;
 	code: string;
 	itemId: string;
+	errorCode: string | null;
 }
 
 export function readWebhook(body: Uint8Array): Webhook | null {
@@ -60,12 +61,19 @@ export function readWebhook(body: Uint8Array): Webhook | null {
 	const {
 		webhook_type: type,
 		webhook_code: code,
-		item_id: itemId
+		item_id: itemId,
+		error
 	} = parsed as Record<string, unknown>;
 	if (typeof type !== 'string' || typeof code !== 'string' || typeof itemId !== 'string') {
 		return null;
 	}
-	return { type, code, itemId };
+	return { type, code, itemId, errorCode: readErrorCode(error) };
+}
+
+function readErrorCode(error: unknown): string | null {
+	if (typeof error !== 'object' || error === null) return null;
+	const { error_code: code } = error as Record<string, unknown>;
+	return typeof code === 'string' ? code : null;
 }
 
 export const verifyWebhook = Effect.fnUntraced(function* (input: {
