@@ -50,7 +50,10 @@
 			return;
 		}
 		open = false;
-		await goto(resolve('/(app)/accounts/[accountId]', { accountId: added.value }));
+		const accountPage = resolve('/(app)/accounts/[accountId]', { accountId: added.value });
+		await goto(accountPage).catch(() => {
+			location.assign(accountPage);
+		});
 	}
 </script>
 

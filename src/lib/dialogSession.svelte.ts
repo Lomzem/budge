@@ -21,6 +21,12 @@ export class DialogSession<Opening extends object = object, Operation extends st
 		this.#live = { opening, pending: {}, started: {} };
 	}
 
+	openOrResume(opening: Opening, operation: Operation): boolean {
+		if (this.pending(operation)) return false;
+		this.open(opening);
+		return true;
+	}
+
 	close(opening: Opening) {
 		if (this.#live?.opening === opening) this.#live = null;
 	}

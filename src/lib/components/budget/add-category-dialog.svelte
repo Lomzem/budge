@@ -33,8 +33,7 @@
 	}
 
 	export function reset() {
-		if (saving()) return;
-		dialog.open({});
+		if (!dialog.openOrResume({}, 'save')) return;
 		name = '';
 		error = '';
 		groupId = groups[0]?.id ?? '';

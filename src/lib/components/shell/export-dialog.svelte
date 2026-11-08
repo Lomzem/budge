@@ -20,7 +20,7 @@
 	$effect(() => {
 		if (open)
 			untrack(() => {
-				if (!busy) dialog.open({});
+				dialog.openOrResume({}, 'export');
 			});
 	});
 
