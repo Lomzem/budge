@@ -8,10 +8,10 @@ import { PlaidApi, PlaidClient, type SyncRequest } from './lib/plaidClient';
 import { setupConnection, SyncStore, syncConnection } from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
 import {
-	newBackend,
 	publicErrorCode,
 	publicErrorMessage,
 	publicErrorOf,
+	startBudget,
 	useOwnerEnv
 } from './test.helper';
 
@@ -62,14 +62,9 @@ function changes(
 type FakePlaid = Parameters<typeof PlaidClient.layerTest>[0];
 
 async function syncedBudget() {
-	const backend = newBackend();
+	const backend = await startBudget({ accounts: { Checking: ['cash', 100_000] } });
 	const { owner, t } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 100_000
-	});
+	const { Checking: checking } = backend.accounts;
 	const run = <A, E>(
 		plaid: FakePlaid,
 		program: Effect.Effect<A, E, PlaidClient | TokenCipher | SyncStore>

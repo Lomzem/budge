@@ -8,21 +8,16 @@ import checkingCsv from '../src/lib/domain/fixtures/synthetic/capital-one-checki
 import checkingQfx from '../src/lib/domain/fixtures/synthetic/capital-one-checking.qfx?raw';
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
+import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
 const cutoverDate = '2026-08-01';
 
 async function budgetWithChecking() {
-	const backend = newBackend();
+	const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 100_000] } });
 	const { owner } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 100_000
-	});
+	const { Checking: checking } = backend.accounts;
 	const rows = async () =>
 		(
 			await owner.query(api.transactions.list, {

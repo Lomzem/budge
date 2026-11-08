@@ -2,35 +2,26 @@ import { assert, describe, expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
+import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
-async function startBudget() {
-	const backend = newBackend();
-	const { owner } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 500_000
+async function budgetWithGroceries() {
+	const backend = await startBudget({
+		accounts: { Checking: ['cash', 500_000], Savings: ['cash', 100_000] },
+		groups: { Everyday: ['Groceries'] }
 	});
-	const savings = await owner.mutation(api.accounts.create, {
-		name: 'Savings',
-		kind: 'cash',
-		startingBalance: 100_000
-	});
-	const everyday = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
-	const groceries = await owner.mutation(api.categories.create, {
-		groupId: everyday,
-		name: 'Groceries'
-	});
-	const { readyToAssignId } = await owner.query(api.categories.list, {});
-	assert(readyToAssignId !== null, 'Ready to Assign was not created.');
-	return { ...backend, checking, savings, everyday, groceries, readyToAssignId };
+	const { Checking: checking, Savings: savings } = backend.accounts;
+	return {
+		...backend,
+		checking,
+		savings,
+		everyday: backend.groups.Everyday,
+		groceries: backend.categories.Groceries
+	};
 }
 
-type Budget = Awaited<ReturnType<typeof startBudget>>;
+type Budget = Awaited<ReturnType<typeof budgetWithGroceries>>;
 
 async function layout(b: Budget) {
 	const { groups } = await b.owner.query(api.categories.list, {});
@@ -130,7 +121,7 @@ async function readTotals(b: Budget) {
 
 describe('deleting a Category', () => {
 	test('leaves every month as if its history had been in the destination all along', async () => {
-		const deleted = await startBudget();
+		const deleted = await budgetWithGroceries();
 		const dining = await deleted.owner.mutation(api.categories.create, {
 			groupId: deleted.everyday,
 			name: 'Dining Out'
@@ -141,7 +132,7 @@ describe('deleting a Category', () => {
 			destinationId: deleted.groceries
 		});
 
-		const allAlong = await startBudget();
+		const allAlong = await budgetWithGroceries();
 		await enterHistory(allAlong, allAlong.groceries);
 
 		expect(await groceriesByMonth(deleted)).toEqual(await groceriesByMonth(allAlong));
@@ -154,7 +145,7 @@ describe('deleting a Category', () => {
 	});
 
 	test('rebuilds the totals it touches from the Transactions, not the cache', async () => {
-		const b = await startBudget();
+		const b = await budgetWithGroceries();
 		const dining = await b.owner.mutation(api.categories.create, {
 			groupId: b.everyday,
 			name: 'Dining Out'
@@ -183,7 +174,7 @@ describe('deleting a Category', () => {
 
 describe('deleting a Category Group', () => {
 	test('moves its Categories, with their history, to the end of the group picked', async () => {
-		const b = await startBudget();
+		const b = await budgetWithGroceries();
 		const fun = await b.owner.mutation(api.categories.createGroup, { name: 'Fun' });
 		const games = await b.owner.mutation(api.categories.create, { groupId: fun, name: 'Games' });
 		await b.owner.mutation(api.categories.create, { groupId: fun, name: 'Concerts' });
@@ -212,7 +203,7 @@ describe('deleting a Category Group', () => {
 	});
 
 	test('with no Categories needs no destination', async () => {
-		const b = await startBudget();
+		const b = await budgetWithGroceries();
 		const empty = await b.owner.mutation(api.categories.createGroup, { name: 'Someday' });
 		await b.owner.mutation(api.categories.removeGroup, { groupId: empty });
 		expect((await layout(b)).map((g) => g.name)).toEqual(['Everyday']);
@@ -220,7 +211,7 @@ describe('deleting a Category Group', () => {
 });
 
 test('renaming trims the name and refuses a blank one', async () => {
-	const b = await startBudget();
+	const b = await budgetWithGroceries();
 	await b.owner.mutation(api.categories.rename, { categoryId: b.groceries, name: ' Food ' });
 	await b.owner.mutation(api.categories.renameGroup, { groupId: b.everyday, name: 'Daily' });
 	expect(
@@ -233,7 +224,7 @@ test('renaming trims the name and refuses a blank one', async () => {
 
 describe('reordering', () => {
 	test('moves a Category within its group or into another', async () => {
-		const b = await startBudget();
+		const b = await budgetWithGroceries();
 		const bills = await b.owner.mutation(api.categories.createGroup, { name: 'Bills' });
 		const rent = await b.owner.mutation(api.categories.create, { groupId: bills, name: 'Rent' });
 		await b.owner.mutation(api.categories.create, { groupId: bills, name: 'Phone' });
@@ -269,7 +260,7 @@ describe('reordering', () => {
 	});
 
 	test('moves a Category Group', async () => {
-		const b = await startBudget();
+		const b = await budgetWithGroceries();
 		await b.owner.mutation(api.categories.createGroup, { name: 'Bills' });
 		await b.owner.mutation(api.categories.createGroup, { name: 'Goals' });
 		await b.owner.mutation(api.categories.moveGroup, { groupId: b.everyday, index: 2 });
@@ -278,7 +269,7 @@ describe('reordering', () => {
 });
 
 test('hiding takes a Category or group out of the budget table, and unhiding brings it back', async () => {
-	const b = await startBudget();
+	const b = await budgetWithGroceries();
 	await b.owner.mutation(api.budget.setAssigned, {
 		month: '2026-10',
 		categoryId: b.groceries,
@@ -306,7 +297,7 @@ test('hiding takes a Category or group out of the budget table, and unhiding bri
 });
 
 test('Budge manages Ready to Assign and its group, so the owner cannot change them', async () => {
-	const b = await startBudget();
+	const b = await budgetWithGroceries();
 	const systemGroup = await b.t.run(async (ctx) => {
 		const category = await ctx.db.get('categories', b.readyToAssignId);
 		assert(category !== null, 'Ready to Assign is missing.');
@@ -344,7 +335,7 @@ describe('a Target', () => {
 			?.categories[0];
 
 	test('can be set, edited, switched to another kind, and cleared', async () => {
-		const b = await startBudget();
+		const b = await budgetWithGroceries();
 		const setTarget = (
 			target: Parameters<typeof b.owner.mutation<typeof api.categories.setTarget>>[1]['target']
 		) => b.owner.mutation(api.categories.setTarget, { categoryId: b.groceries, target });
@@ -387,7 +378,7 @@ describe('a Target', () => {
 			{ kind: 'byDate', amount: 5_000, firstDate: '2027-02-03', everyMonths: 1.5 }
 		]
 	] as const)('refuses %s', async (_, target) => {
-		const b = await startBudget();
+		const b = await budgetWithGroceries();
 
 		expect(
 			await publicErrorCode(
@@ -398,7 +389,7 @@ describe('a Target', () => {
 	});
 
 	test('cannot be given to Ready to Assign', async () => {
-		const b = await startBudget();
+		const b = await budgetWithGroceries();
 
 		expect(
 			await publicErrorCode(

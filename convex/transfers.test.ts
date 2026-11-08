@@ -2,20 +2,21 @@ import { assert, describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
+import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
 async function budgetWithThreeAccounts() {
-	const backend = newBackend();
+	const backend = await startBudget({
+		accounts: {
+			Checking: ['cash', 100_000],
+			Savings: ['cash', 500_000],
+			Card: ['creditCard', -20_000],
+			Wallet: ['cash', 10_000]
+		}
+	});
 	const { owner } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-	const account = (name: string, kind: 'cash' | 'creditCard', startingBalance: number) =>
-		owner.mutation(api.accounts.create, { name, kind, startingBalance });
-	const checking = await account('Checking', 'cash', 100_000);
-	const savings = await account('Savings', 'cash', 500_000);
-	const card = await account('Card', 'creditCard', -20_000);
-	const wallet = await account('Wallet', 'cash', 10_000);
+	const { Checking: checking, Savings: savings, Card: card, Wallet: wallet } = backend.accounts;
 	const balances = async () =>
 		Object.fromEntries(
 			(await owner.query(api.accounts.list, {})).map((row) => [row.name, row.balance])

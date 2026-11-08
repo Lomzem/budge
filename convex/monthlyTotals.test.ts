@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { newBackend, useOwnerEnv } from './test.helper';
+import { startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -25,25 +25,23 @@ const smallAmountsSoEditsOftenBringATotalBackToZero = [-500, 500, -1_250, 1_250,
 test.each([1, 2, 3, 4, 5])(
 	'the rebuilt monthly totals equal the kept ones after any writes (sequence %i)',
 	async (seed) => {
-		const { t, owner } = newBackend();
 		const rand = replayableSeededRandom(seed);
-		await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-		const accounts: Id<'accounts'>[] = [];
-		for (const name of ['Checking', 'Savings', 'Card']) {
-			accounts.push(
-				await owner.mutation(api.accounts.create, {
-					name,
-					kind: name === 'Card' ? 'creditCard' : 'cash',
-					startingBalance: rand.int(200_000) - 50_000
-				})
-			);
-		}
-		const groupId = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
+		const startingBalance = () => rand.int(200_000) - 50_000;
+		const budget = await startBudget({
+			accounts: {
+				Checking: ['cash', startingBalance()],
+				Savings: ['cash', startingBalance()],
+				Card: ['creditCard', startingBalance()]
+			},
+			groups: { Everyday: ['Groceries', 'Transit'] }
+		});
+		const { t, owner } = budget;
+		const accounts = Object.values(budget.accounts);
 		const categories = [
 			undefined,
-			(await owner.query(api.categories.list, {})).readyToAssignId ?? undefined,
-			await owner.mutation(api.categories.create, { groupId, name: 'Groceries' }),
-			await owner.mutation(api.categories.create, { groupId, name: 'Transit' })
+			budget.readyToAssignId,
+			budget.categories.Groceries,
+			budget.categories.Transit
 		];
 		const lineCategories = categories.filter((c) => c !== undefined);
 		let splitsEntered = 0;

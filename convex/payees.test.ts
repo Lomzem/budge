@@ -2,22 +2,18 @@ import { assert, describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { newBackend, useOwnerEnv } from './test.helper';
+import { startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
 async function budgetWithChecking() {
-	const backend = newBackend();
-	const { owner } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 100_000
+	const backend = await startBudget({
+		accounts: { Checking: ['cash', 100_000] },
+		groups: { Everyday: ['Dining', 'Groceries'] }
 	});
-	const groupId = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
-	const dining = await owner.mutation(api.categories.create, { groupId, name: 'Dining' });
-	const groceries = await owner.mutation(api.categories.create, { groupId, name: 'Groceries' });
+	const { owner } = backend;
+	const { Checking: checking } = backend.accounts;
+	const { Dining: dining, Groceries: groceries } = backend.categories;
 	const rows = async () =>
 		(
 			await owner.query(api.transactions.list, {
