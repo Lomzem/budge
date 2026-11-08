@@ -38,4 +38,26 @@ The user asked for this on 2026-11-07. Remove worktrees, branches, and scratch f
 
 - A worktree or branch whose commits are all on `main` and that has no uncommitted changes can be removed.
 - A worktree or branch with unmerged commits or uncommitted edits is listed for the user, not deleted.
-- Untracked user files, such as `.scratch/v1/deployment-wizard.sh` and `docs/research/`, are listed for the user, not deleted.
+- `.scratch/v1/deployment-wizard.sh` and `docs/research/` were deleted at the user's request on 2026-11-07, because both were stale.
+
+## Corrections and maintenance (2026-11-07)
+
+A `/correct` pass and a `/maintain-verification-skill` pass ran after the five tickets landed on the integration branch.
+
+Corrections committed to the branch:
+
+- `export/files` checks the JSON against its own list of source tables, checks that `bankConnections.provider` is absent, checks the CSV file names past Chromium's ten-download burst, and keeps the downloaded files with `keepAsEvidence` (`e2e/journeys/{journey,export}.ts`, `scripts/app/verify.ts`, `e2e/journeys.test.ts`).
+- The `featureMap` test finds nested Convex modules (`lib/transactions`). It also finds journey names that have a typo in their feature. The old version passed both of these mistakes.
+- `local/owned-writes` follows the database through aliases and destructuring, and refuses detached write methods. The updater import restriction now matches paths that end in a file extension. All five new cases fail on the old rule.
+- The account dialog's full-page-load fallback was deleted. SvelteKit's `goto` never rejects for an internal route, and it already reloads the page when a redeploy removes its code.
+- The AGENTS.md rule table lists only rules that a check enforces: the monthly totals rebuild (ADR 0002) row was added, the dialog row was narrowed, and three rows that only types or module privacy hold were removed.
+- The new `settings/cutover` journey covers the first-date gate on Add Account, reload, Cancel, the Previous month bound, and the refusal to move the date past a Starting Balance.
+- Product fix: Budget's Add Category listed Credit Card Payments, and `categories.create` refuses to save into that group. It now lists only groups a Category can join. The new first step of `categories/manage` failed before the fix and passes after it.
+
+Maintenance: Sol source-checked every one of the 19 feature files, and its corrections are committed. Every feature was exercised live: `maintain-live-1` (33/33), `fixes-live-1` and `ccp-after-fix` under `test-results/verify-budge/`. Three paths are unreachable without credentials: real Plaid sync, the Link outcomes (both need authorized Sandbox access), and auth rejection for a non-owner or an expired session (needs a second identity).
+
+Review dispositions:
+
+- Ticket 04 evidence: covered by the local evidence directories above.
+- Evidence that ticket 01's reviewers ran the principles: deferred, because it cannot be produced after the fact. The requirement applies to every delegate from now on.
+- Cross-references from feature files to other journeys are allowed. They are marked as cross-references, not as coverage.
