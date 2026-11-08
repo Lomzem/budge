@@ -212,14 +212,14 @@
 				{@const saved = savedCategoryOf(transaction, line.categoryId)}
 				{@const number = index + 1}
 				<li class="flex flex-col gap-2">
-					<div class="flex items-end gap-2">
-						<div class="flex min-w-0 flex-1 flex-col gap-1">
+					<div class="flex flex-wrap items-end gap-2">
+						<div class="flex min-w-40 flex-1 flex-col gap-1">
 							<Label for={`split-category-${String(line.key)}`}>Line {number} Category</Label>
 							<select
 								id={`split-category-${String(line.key)}`}
 								bind:value={line.categoryId}
 								required
-								class="h-8 min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+								class="h-9 min-w-0 rounded-md border border-input bg-card px-2.5 text-base md:text-sm pointer-coarse:h-11"
 							>
 								<option value="" disabled>Pick a Category</option>
 								{@render categoryOptions(saved?.id, saved?.name)}
@@ -237,8 +237,8 @@
 							/>
 						</div>
 					</div>
-					<div class="flex items-end gap-2">
-						<div class="flex min-w-0 flex-1 flex-col gap-1">
+					<div class="flex flex-wrap items-end gap-2">
+						<div class="flex min-w-40 flex-1 flex-col gap-1">
 							<Label for={`split-memo-${String(line.key)}`}>Line {number} memo</Label>
 							<Input
 								id={`split-memo-${String(line.key)}`}
@@ -320,7 +320,7 @@
 					bind:value={draft.accountId}
 					disabled={locked || startingBalance}
 					required
-					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+					class="h-9 rounded-md border border-input bg-card px-2.5 text-base disabled:cursor-not-allowed disabled:opacity-50 md:text-sm pointer-coarse:h-11"
 				>
 					{#each accounts.all as account (account._id)}
 						<option value={account._id}>{account.name}</option>
@@ -365,7 +365,7 @@
 							draft = choose(draft, option, world);
 						}
 					}
-					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+					class="h-9 rounded-md border border-input bg-card px-2.5 text-base md:text-sm pointer-coarse:h-11"
 				>
 					{#if shown.selection.kind === 'recalling' || shown.selection.kind === 'recallFailed'}
 						<option value={optionOf(shown.selection)} disabled>

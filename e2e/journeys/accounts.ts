@@ -18,15 +18,16 @@ function heldRegion(page: Page) {
 
 async function openHeld(page: Page, bankAccount: string, waiting?: string) {
 	await page.goto('/bank');
-	if (waiting !== undefined) {
-		await expect(
-			heldRegion(page).getByRole('listitem').filter({ hasText: bankAccount })
-		).toContainText(waiting);
-	}
 	const held = heldRegion(page).getByRole('button', {
 		name: `Set up ${bankAccount}`,
 		exact: true
 	});
+	if (waiting !== undefined) {
+		const row = heldRegion(page)
+			.getByRole('listitem')
+			.filter({ has: page.getByRole('button', { name: `Set up ${bankAccount}`, exact: true }) });
+		await expect(row).toContainText(waiting);
+	}
 	await held.click();
 	return held;
 }

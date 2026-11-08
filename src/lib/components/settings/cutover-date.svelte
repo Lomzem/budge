@@ -66,5 +66,5 @@
 			<Button variant="outline" onclick={startChange}>Change</Button>
 		</div>
 	{/if}
-	<p role="alert" class="min-h-6 text-sm text-destructive">{error}</p>
+	<p role="alert" class={['text-sm text-destructive', error === '' && '-mt-3']}>{error}</p>
 </section>

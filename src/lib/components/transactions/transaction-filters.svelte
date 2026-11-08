@@ -2,6 +2,7 @@
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { useQuery } from 'convex-svelte';
+	import { untrack } from 'svelte';
 
 	import { api } from '$convex/_generated/api';
 	import { getAccounts } from '$lib/accounts.svelte';
@@ -9,7 +10,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 
-	import { noFilters, type TransactionFilterValues } from './filters';
+	import { noFilters, UNAPPROVED, UNCATEGORIZED, type TransactionFilterValues } from './filters';
 
 	let {
 		values = $bindable({ ...noFilters }),
@@ -27,7 +28,7 @@
 	const narrowed = $derived(
 		Object.entries(values).filter(([key, value]) => key !== 'search' && value !== '').length
 	);
-	let filtersOpen = $state(false);
+	let filtersOpen = $state(untrack(() => narrowed > 0));
 
 	const selectClass =
 		'h-9 w-full min-w-0 rounded-md border border-input bg-card px-2.5 text-base pointer-coarse:h-11';
@@ -83,7 +84,7 @@
 		id="transaction-filter-fields"
 		class={[
 			'grid-cols-2 gap-3 @3xl:grid',
-			showAccount ? '@3xl:grid-cols-5' : '@3xl:grid-cols-4',
+			showAccount ? '@3xl:grid-cols-6' : '@3xl:grid-cols-5',
 			filtersOpen ? 'grid' : 'hidden'
 		]}
 	>
@@ -104,6 +105,7 @@
 				<option value="">
 					{categories.error ? "Categories didn't load. Reload to filter by one." : 'Any Category'}
 				</option>
+				<option value={UNCATEGORIZED}>Uncategorized</option>
 				{#if categories.data}
 					{#if categories.data.readyToAssignId !== null}
 						<option value={categories.data.readyToAssignId}>Ready to Assign</option>
@@ -116,6 +118,13 @@
 						</optgroup>
 					{/each}
 				{/if}
+			</select>
+		</div>
+		<div class="flex flex-col gap-1">
+			<Label for="transaction-filter-status">Status</Label>
+			<select id="transaction-filter-status" bind:value={values.status} class={selectClass}>
+				<option value="">Any status</option>
+				<option value={UNAPPROVED}>Unapproved</option>
 			</select>
 		</div>
 		<div class="flex flex-col gap-1">

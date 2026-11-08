@@ -34,7 +34,14 @@
 					aria-current={currentness(section.href)}
 					class="group flex h-16 flex-col items-center justify-center gap-1 text-xs text-muted-foreground aria-[current]:text-sidebar-accent-foreground"
 				>
-					<span class="group-aria-[current]:font-bold">{section.label}</span>
+					<span class="grid text-center">
+						<span aria-hidden="true" class="invisible col-start-1 row-start-1 font-bold"
+							>{section.label}</span
+						>
+						<span class="col-start-1 row-start-1 group-aria-[current]:font-bold"
+							>{section.label}</span
+						>
+					</span>
 					<span
 						class="relative order-first flex h-7 w-14 items-center justify-center rounded-full group-aria-[current]:bg-sidebar-accent"
 					>

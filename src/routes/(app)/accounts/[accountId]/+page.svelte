@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import { attempt } from '$lib/attempt';
+	import { getBankConnections } from '$lib/bankConnections.svelte';
 	import ReconcileDialog from '$lib/components/accounts/reconcile-dialog.svelte';
 	import RenameAccountDialog from '$lib/components/accounts/rename-account-dialog.svelte';
 	import StartingBalanceStep from '$lib/components/accounts/starting-balance-step.svelte';
@@ -12,6 +13,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { formatDate } from '$lib/domain/dates';
+	import { formatSynced } from '$lib/domain/freshness';
 	import { formatCents } from '$lib/domain/money';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 
@@ -21,6 +23,12 @@
 
 	const accounts = getAccounts();
 	const account = $derived(accounts.find(params.accountId));
+	const bank = getBankConnections();
+	const feeder = $derived(
+		bank.all.find((connection) =>
+			connection.feeds.some((feed) => feed.accountId === params.accountId)
+		)
+	);
 	let renameOpen = $state(false);
 	let reconcileOpen = $state(false);
 	let moveError = $state('');
@@ -63,6 +71,18 @@
 			<div class="flex min-w-0 flex-col gap-1">
 				<p class="text-sm text-muted-foreground">
 					{account.kind === 'creditCard' ? 'Credit card' : 'Cash'} Account
+				</p>
+				<p class="min-h-5 truncate text-sm text-muted-foreground" data-testid="account-sync">
+					{#if feeder}
+						{formatSynced(feeder.lastSyncedAt, bank.now)} from
+						<a
+							href={resolve('/bank')}
+							class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
+							>{feeder.name}</a
+						>
+					{:else if bank.loaded}
+						Entered by hand or from bank files
+					{/if}
 				</p>
 				<div class="-mr-2 flex min-w-0 items-center gap-1">
 					<h1 class="truncate text-2xl font-bold tracking-tight">{account.name}</h1>

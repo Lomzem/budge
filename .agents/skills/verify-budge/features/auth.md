@@ -10,7 +10,7 @@ Admit the configured owner and preserve authenticated navigation while excluding
 
 ## How to get to it (user POV)
 
-- Signed-out protected route → `/sign-in`; Settings → Session → Sign out.
+- Signed-out protected route → `/sign-in`; Settings → This device → Sign out.
 - Direct `/`, `/categories`, `/accounts`, and `/accounts/<id>` after authentication.
 
 ## Driving it with Playwright

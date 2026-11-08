@@ -14,7 +14,8 @@ Inspect bank freshness, request sync, and see when a Bank Connection needs a rec
 
 - The `Bank` Section (sidebar on desktop, tab bar on phone, direct `/bank`). Its badge counts the things that need the owner: held bank Accounts plus cards that need a look.
 - Bank page → `Connect a bank` (disabled with a notice when this server has no Plaid credentials or no cutover date is set; a Sandbox server explains the `user_good`/`pass_good` login).
-- Each Bank Connection is an `article` card in the `Bank Connections` list: name, freshness, `Sync now`, and `Reconnect`. A card that needs a reconnect or whose consent is ending says so on its status line.
+- Each Bank Connection is an `article` card in the `Bank Connections` list: name, a `Feeds` line linking each Budge Account it feeds (or `Feeds no Budge Account yet.`), a health line (freshness, or that it needs a reconnect or its consent is ending), a message line with the last Sync now / Reconnect result (or, idle on a server without Plaid credentials, `Bank sync isn't set up on this server, so this can't sync.`), `Sync now`, and `Reconnect`.
+- A named Account fed by a Bank Connection shows `Synced … from <connection>` under its balance, linking to the Bank page; other Accounts read `Entered by hand or from bank files`.
 - Budget page → `Needs you` region → link `Bank: N things need you` → Bank page.
 - Webhook/cron have no direct UI entry; their user-visible result is automatic arrival/freshness.
 

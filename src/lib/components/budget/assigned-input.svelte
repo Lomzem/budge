@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tick } from 'svelte';
+
 	import { attempt } from '$lib/attempt';
 	import { Input } from '$lib/components/ui/input';
 	import { formatCents, parseCents } from '$lib/domain/money';
@@ -34,10 +36,8 @@
 		(event.currentTarget as HTMLInputElement).select();
 	}
 
-	async function commit() {
-		if (!editing) return;
-		editing = false;
-		const cents = parseCents(text);
+	async function save(typed: string) {
+		const cents = parseCents(typed);
 		if (cents === undefined) {
 			error = 'Enter an amount, such as 120.00.';
 			return;
@@ -47,13 +47,31 @@
 		if (!saved.ok) error = "Budge couldn't save Assigned. Try again.";
 	}
 
+	async function commit() {
+		if (!editing) return;
+		editing = false;
+		await save(text);
+	}
+
+	async function restart(input: HTMLInputElement, next: string) {
+		text = next;
+		await tick();
+		input.select();
+	}
+
 	function keydown(event: KeyboardEvent) {
 		const input = event.currentTarget as HTMLInputElement;
-		if (event.key === 'Enter') input.blur();
-		if (event.key === 'Escape') {
-			editing = false;
+		if (event.key === 'Enter') {
+			event.preventDefault();
 			error = '';
-			input.blur();
+			const typed = text;
+			const cents = parseCents(typed);
+			void save(typed);
+			void restart(input, cents === undefined ? typed : shown(cents));
+		}
+		if (event.key === 'Escape') {
+			error = '';
+			void restart(input, shown(amount));
 		}
 	}
 </script>

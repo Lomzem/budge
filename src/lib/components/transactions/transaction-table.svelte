@@ -6,6 +6,7 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { useMutation, usePaginatedQuery, useQuery } from 'convex-svelte';
 
+	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { attempt } from '$lib/attempt';
@@ -18,7 +19,7 @@
 
 	import ImportDialog from './import-dialog.svelte';
 	import TransactionDialog from './transaction-dialog.svelte';
-	import { noFilters } from './filters';
+	import { filtersFromUrl, UNAPPROVED, UNCATEGORIZED } from './filters';
 	import TransactionFilters from './transaction-filters.svelte';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
@@ -33,8 +34,21 @@
 		return undefined;
 	}
 
+	function categoryFilter(value: string) {
+		if (value === '') return {};
+		if (value === UNCATEGORIZED) return { uncategorized: true as const };
+		return { categoryId: value as Id<'categories'> };
+	}
+
 	const SEARCH_PAUSE_MS = 300;
-	let filterValues = $state({ ...noFilters });
+	let filterValues = $state(filtersFromUrl(page.url));
+	let arrivedWith = page.url.search;
+	$effect(() => {
+		const search = page.url.search;
+		if (search === arrivedWith) return;
+		arrivedWith = search;
+		filterValues = filtersFromUrl(page.url);
+	});
 
 	let search = $state('');
 	$effect(() => {
@@ -50,6 +64,7 @@
 	});
 
 	const allAccounts = $derived(accountId === undefined);
+	const memoFrom = $derived(allAccounts ? '8xl' : '6xl');
 
 	const scopeAccountId = $derived(
 		accountId ??
@@ -58,9 +73,8 @@
 	const scope = $derived(scopeAccountId === undefined ? {} : { accountId: scopeAccountId });
 	const filters = $derived({
 		...(search === '' ? {} : { search }),
-		...(filterValues.categoryId === ''
-			? {}
-			: { categoryId: filterValues.categoryId as Id<'categories'> }),
+		...categoryFilter(filterValues.categoryId),
+		...(filterValues.status === UNAPPROVED ? { approval: 'unapproved' as const } : {}),
 		...(filterValues.payeeId === '' ? {} : { payeeId: filterValues.payeeId as Id<'payees'> }),
 		...(filterValues.from === '' ? {} : { from: filterValues.from }),
 		...(filterValues.to === '' ? {} : { to: filterValues.to })
@@ -181,7 +195,12 @@
 		</Button>
 	</div>
 	<TransactionFilters bind:values={filterValues} showAccount={allAccounts} />
-	<p role="alert" class="-my-1 min-h-6 text-sm text-destructive">
+	<p
+		role="alert"
+		class={problem === ''
+			? 'sr-only'
+			: 'fixed inset-x-4 bottom-20 z-50 mx-auto max-w-md rounded-md border border-destructive bg-popover px-4 py-3 text-sm text-destructive shadow-lg lg:bottom-6'}
+	>
 		{problem}
 	</p>
 
@@ -189,16 +208,17 @@
 		<Table.Root layout="fixed">
 			<Table.Header>
 				<Table.Row>
-					<Table.Head width="date" showFrom="md">Date</Table.Head>
+					<Table.Head width="date" showFrom="2xl">Date</Table.Head>
 					{#if allAccounts}
-						<Table.Head width="name" showFrom="2xl">Account</Table.Head>
+						<Table.Head width="name" showFrom="5xl">Account</Table.Head>
 					{/if}
 					<Table.Head>Payee</Table.Head>
-					<Table.Head width="name" showFrom="lg">Category</Table.Head>
-					<Table.Head width="note" showFrom="xl">Memo</Table.Head>
+					<Table.Head width="name" showFrom="4xl">Category</Table.Head>
+					<Table.Head width="note" showFrom={memoFrom}>Memo</Table.Head>
 					<Table.Head width="amount" align="end">Amount</Table.Head>
 					<Table.Head width="check" align="center">Cleared</Table.Head>
-					<Table.Head width="action" showFrom="md"><span class="sr-only">Approval</span></Table.Head
+					<Table.Head width="action" showFrom="2xl"
+						><span class="sr-only">Approval</span></Table.Head
 					>
 				</Table.Row>
 			</Table.Header>
@@ -210,17 +230,17 @@
 					{@const categoryClass =
 						row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
 					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
-						<Table.Cell numeric showFrom="md">
+						<Table.Cell numeric showFrom="2xl">
 							<time datetime={row.date} class="block truncate">{formatDate(row.date)}</time>
 						</Table.Cell>
 						{#if allAccounts}
-							<Table.Cell showFrom="2xl">
+							<Table.Cell showFrom="5xl">
 								<span class="block truncate">{row.accountName}</span>
 							</Table.Cell>
 						{/if}
 						<Table.Cell>
 							<button
-								class="block max-w-full truncate rounded-sm text-left hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+								class="block max-w-full truncate rounded-sm text-left hover:underline"
 								onclick={() => {
 									edit(row);
 								}}
@@ -241,28 +261,33 @@
 							{/if}
 							<time
 								datetime={row.date}
-								class="block truncate text-xs font-normal text-muted-foreground tabular-nums @md:hidden"
+								class="block truncate text-xs font-normal text-muted-foreground tabular-nums @2xl:hidden"
 							>
 								{formatDate(row.date, 'short')}
 							</time>
-							<span class="block truncate text-xs font-normal text-muted-foreground @lg:hidden">
+							<span class="block truncate text-xs font-normal text-muted-foreground @4xl:hidden">
 								<span class={categoryClass}>{category}</span>
 							</span>
 							{#if allAccounts}
-								<span class="block truncate text-xs font-normal text-muted-foreground @2xl:hidden">
+								<span class="block truncate text-xs font-normal text-muted-foreground @5xl:hidden">
 									{row.accountName}
 								</span>
 							{/if}
 							{#if row.memo}
-								<span class="block truncate text-xs font-normal text-muted-foreground @xl:hidden">
+								<span
+									class={[
+										'block truncate text-xs font-normal text-muted-foreground',
+										allAccounts ? '@8xl:hidden' : '@6xl:hidden'
+									]}
+								>
 									{row.memo}
 								</span>
 							{/if}
 						</Table.Cell>
-						<Table.Cell showFrom="lg">
+						<Table.Cell showFrom="4xl">
 							<span class={['block truncate', categoryClass]}>{category}</span>
 						</Table.Cell>
-						<Table.Cell showFrom="xl">
+						<Table.Cell showFrom={memoFrom}>
 							<span class="block truncate">{row.memo ?? ''}</span>
 						</Table.Cell>
 						<Table.Cell align="end" numeric>{formatCents(row.amount)}</Table.Cell>
@@ -279,7 +304,7 @@
 								/>
 							{/if}
 						</Table.Cell>
-						<Table.Cell showFrom="md">
+						<Table.Cell showFrom="2xl">
 							{#if !row.approved}
 								<Button
 									size="sm"

@@ -423,6 +423,37 @@ describe('importing a bank file', () => {
 });
 
 describe('approving', () => {
+	test('Unapproved narrows with a date range or Uncategorized, and approved rows leave it', async () => {
+		const { owner, checking } = await budgetWithChecking();
+		await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			date: '2026-08-30',
+			amount: -1_000,
+			payee: 'Sample Market',
+			memo: ''
+		});
+		const { source, rows: bankRows } = decode(checkingCsv);
+		await owner.mutation(api.imports.commit, { accountId: checking, source, rows: bankRows });
+		const dates = async (filters: { from?: string; uncategorized?: true }) =>
+			(
+				await owner.query(api.transactions.list, {
+					approval: 'unapproved',
+					...filters,
+					paginationOpts: { numItems: 50, cursor: null }
+				})
+			).page.map((row) => row.date);
+
+		expect(await dates({ from: '2026-08-15' })).toEqual(['2026-08-16', '2026-08-16', '2026-08-15']);
+		expect(await dates({ uncategorized: true })).toEqual([
+			'2026-08-16',
+			'2026-08-16',
+			'2026-08-15',
+			'2026-08-14'
+		]);
+		await owner.mutation(api.transactions.approveAll, { accountId: checking });
+		expect(await dates({ uncategorized: true })).toEqual([]);
+	});
+
 	test('editing approves, and Approve all approves the rest; Unapproved list first', async () => {
 		const { owner, checking } = await budgetWithChecking();
 		await owner.mutation(api.transactions.create, {

@@ -75,6 +75,7 @@ export const list = query({
 		approval: v.optional(approval),
 		search: v.optional(v.string()),
 		categoryId: v.optional(v.id('categories')),
+		uncategorized: v.optional(v.literal(true)),
 		payeeId: v.optional(v.id('payees')),
 		from: v.optional(v.string()),
 		to: v.optional(v.string()),
@@ -88,7 +89,7 @@ export const list = query({
 			throw publicError('NOT_FOUND');
 		}
 		const searching = (args.search ?? '').trim() !== '';
-		const filters = requireFilters(args, searching, approval);
+		const filters = requireFilters(args);
 
 		const searchOfOnlyPunctuation = searching && filters.search === '';
 		if (searchOfOnlyPunctuation) return { page: [], isDone: true, continueCursor: '' };
@@ -105,6 +106,7 @@ interface Filters {
 	accountId?: Id<'accounts'> | undefined;
 	search: string;
 	categoryId?: Id<'categories'> | undefined;
+	uncategorized?: true | undefined;
 	payeeId?: Id<'payees'> | undefined;
 	from?: string | undefined;
 	to?: string | undefined;
@@ -114,23 +116,15 @@ interface Filters {
 type Approval = Infer<typeof approval>;
 
 function requireFilters(
-	args: Omit<Filters, 'search' | 'splitLines'> & { search?: string; splitLines?: boolean },
-	searching: boolean,
-	approval: Approval | undefined
+	args: Omit<Filters, 'search' | 'splitLines'> & { search?: string; splitLines?: boolean }
 ): Filters {
 	const filters: Filters = {
 		...args,
 		search: searchTerms(args.search ?? ''),
 		splitLines: args.splitLines === true
 	};
-	const filtering =
-		searching ||
-		filters.categoryId !== undefined ||
-		filters.payeeId !== undefined ||
-		filters.from !== undefined ||
-		filters.to !== undefined;
-	if (approval !== undefined && filtering) {
-		throw publicError('INVALID_INPUT', 'Unapproved first takes no filter.');
+	if (filters.uncategorized === true && filters.categoryId !== undefined) {
+		throw publicError('INVALID_INPUT', 'Pick a Category or Uncategorized, not both.');
 	}
 	if (filters.splitLines && filters.categoryId === undefined) {
 		throw publicError('INVALID_INPUT', 'Pick the Category the split lines are in.');
@@ -147,12 +141,48 @@ async function pageOf(
 	approval: Approval | undefined,
 	paginationOpts: PaginationOptions
 ): Promise<PaginationResult<Doc<'transactions'>>> {
-	if (searching) return await searched(ctx, filters, paginationOpts);
-	if (filters.splitLines) return await withLinesIn(ctx, filters, paginationOpts);
-	if (approval === 'unapproved') {
+	if (searching) return await searched(ctx, filters, approval, paginationOpts);
+	if (filters.splitLines) return await withLinesIn(ctx, filters, approval, paginationOpts);
+	const narrowed =
+		filters.categoryId !== undefined ||
+		filters.uncategorized === true ||
+		filters.payeeId !== undefined ||
+		filters.from !== undefined ||
+		filters.to !== undefined;
+	if (approval === 'unapproved' && !narrowed) {
 		return await unapproved(ctx, filters.accountId).order('desc').paginate(paginationOpts);
 	}
-	return await filtered(ctx, filters, approval === 'approved', paginationOpts);
+	return await filtered(ctx, filters, approval, paginationOpts);
+}
+
+function isUncategorized(transaction: Doc<'transactions'>) {
+	return (
+		transaction.categoryId === undefined &&
+		transaction.split !== true &&
+		transaction.transferTransactionId === undefined
+	);
+}
+
+function hasApproval(transaction: Doc<'transactions'>, approval: Approval | undefined) {
+	if (approval === undefined) return true;
+	return approval === 'unapproved'
+		? transaction.approved === false
+		: transaction.approved !== false;
+}
+
+function wordsOf(text: string) {
+	return text
+		.toLowerCase()
+		.split(/[^\p{Alphabetic}\p{N}]+/u)
+		.filter((word) => word !== '');
+}
+
+function hasEveryTerm(searchText: string | undefined, search: string) {
+	const words = wordsOf(searchText ?? '');
+	const terms = wordsOf(search);
+	return terms.every((term, index) =>
+		index === terms.length - 1 ? words.some((word) => word.startsWith(term)) : words.includes(term)
+	);
 }
 
 const MAX_SEARCH_TERMS = 16;
@@ -168,7 +198,12 @@ function searchTerms(search: string) {
 const FIRST_DATE = '0000-01-01';
 const LAST_DATE = '9999-12-31';
 
-async function searched(ctx: QueryCtx, filters: Filters, paginationOpts: PaginationOptions) {
+async function searched(
+	ctx: QueryCtx,
+	filters: Filters,
+	approval: Approval | undefined,
+	paginationOpts: PaginationOptions
+) {
 	const { accountId, payeeId, categoryId, from, to } = filters;
 	const result = await ctx.db
 		.query('transactions')
@@ -184,6 +219,9 @@ async function searched(ctx: QueryCtx, filters: Filters, paginationOpts: Paginat
 	const page = [];
 	for (const transaction of result.page) {
 		if (transaction.date < (from ?? FIRST_DATE) || transaction.date > (to ?? LAST_DATE)) continue;
+		if (!hasEveryTerm(transaction.searchText, filters.search)) continue;
+		if (!hasApproval(transaction, approval)) continue;
+		if (filters.uncategorized === true && !isUncategorized(transaction)) continue;
 		if (filters.splitLines) {
 			const lines = await splitLinesOf(ctx, transaction._id);
 			if (!lines.some((line) => line.categoryId === categoryId)) continue;
@@ -193,7 +231,12 @@ async function searched(ctx: QueryCtx, filters: Filters, paginationOpts: Paginat
 	return { ...result, page };
 }
 
-async function withLinesIn(ctx: QueryCtx, filters: Filters, paginationOpts: PaginationOptions) {
+async function withLinesIn(
+	ctx: QueryCtx,
+	filters: Filters,
+	approval: Approval | undefined,
+	paginationOpts: PaginationOptions
+) {
 	const { categoryId, accountId, payeeId, from, to } = filters;
 	if (categoryId === undefined) throw publicError('INVALID_INPUT');
 	const lines = await ctx.db
@@ -216,6 +259,7 @@ async function withLinesIn(ctx: QueryCtx, filters: Filters, paginationOpts: Pagi
 		if (transaction === null) continue;
 		if (accountId !== undefined && transaction.accountId !== accountId) continue;
 		if (payeeId !== undefined && transaction.payeeId !== payeeId) continue;
+		if (!hasApproval(transaction, approval)) continue;
 		page.push(transaction);
 	}
 	return { ...lines, page };
@@ -223,18 +267,26 @@ async function withLinesIn(ctx: QueryCtx, filters: Filters, paginationOpts: Pagi
 
 async function filtered(
 	ctx: QueryCtx,
-	{ accountId, categoryId, payeeId, from, to }: Filters,
-	approvedOnly: boolean,
+	{ accountId, categoryId, uncategorized, payeeId, from, to }: Filters,
+	approval: Approval | undefined,
 	paginationOpts: PaginationOptions
 ) {
-	return await narrowestIndex(ctx, { accountId, categoryId, payeeId, from, to })
+	return await narrowestIndex(ctx, { accountId, categoryId, uncategorized, payeeId, from, to })
 		.order('desc')
 		// eslint-disable-next-line @convex-dev/no-filter-in-query
 		.filter((q) =>
 			q.and(
-				approvedOnly ? q.neq(q.field('approved'), false) : true,
+				approval === 'approved' ? q.neq(q.field('approved'), false) : true,
+				approval === 'unapproved' ? q.eq(q.field('approved'), false) : true,
 				accountId === undefined ? true : q.eq(q.field('accountId'), accountId),
-				categoryId === undefined ? true : q.eq(q.field('categoryId'), categoryId)
+				categoryId === undefined ? true : q.eq(q.field('categoryId'), categoryId),
+				uncategorized === true
+					? q.and(
+							q.eq(q.field('categoryId'), undefined),
+							q.neq(q.field('split'), true),
+							q.eq(q.field('transferTransactionId'), undefined)
+						)
+					: true
 			)
 		)
 		.paginate(paginationOpts);
@@ -242,7 +294,14 @@ async function filtered(
 
 function narrowestIndex(
 	ctx: QueryCtx,
-	{ accountId, categoryId, payeeId, from, to }: Omit<Filters, 'search' | 'splitLines'>
+	{
+		accountId,
+		categoryId,
+		uncategorized,
+		payeeId,
+		from,
+		to
+	}: Omit<Filters, 'search' | 'splitLines'>
 ) {
 	const first = from ?? FIRST_DATE;
 	const last = to ?? LAST_DATE;
@@ -252,7 +311,7 @@ function narrowestIndex(
 			q.eq('payeeId', payeeId).gte('date', first).lte('date', last)
 		);
 	}
-	if (categoryId !== undefined) {
+	if (categoryId !== undefined || uncategorized === true) {
 		return transactions.withIndex('by_category_date', (q) =>
 			q.eq('categoryId', categoryId).gte('date', first).lte('date', last)
 		);

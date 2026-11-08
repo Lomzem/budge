@@ -70,22 +70,22 @@
 						Download everything in Budge as a backup, as CSV or JSON.
 					</p>
 				</div>
-				<div class="flex flex-wrap gap-2">
+				<div>
 					<Button variant="outline" onclick={() => (exportOpen = true)}>
 						<DownloadIcon aria-hidden="true" />
 						Export…
 					</Button>
+				</div>
+			</section>
+			<section aria-labelledby="session-heading" class="flex flex-col gap-3 p-5 sm:p-6">
+				<h2 id="session-heading" class="text-lg font-bold">This device</h2>
+				<div class="flex flex-wrap gap-2">
 					{#if !installed.current}
 						<Button variant="outline" onclick={() => (homeScreenOpen = true)}>
 							<SmartphoneIcon aria-hidden="true" />
 							Add to Home Screen
 						</Button>
 					{/if}
-				</div>
-			</section>
-			<section aria-labelledby="session-heading" class="flex flex-col gap-3 p-5 sm:p-6">
-				<h2 id="session-heading" class="text-lg font-bold">Session</h2>
-				<div>
 					<Button variant="outline" onclick={() => void clerk.clerk?.signOut()}>
 						<LogOutIcon aria-hidden="true" />
 						Sign out

@@ -35,7 +35,7 @@ Preconditions:
 
 ## Gotchas
 
-- **Manual drive:** unfiltered lists put Unapproved Transactions first and load 50 per page via Show more. Above the table, `Approve all N` approves at most 1,000 at a time; with more, the button reads `Approve 1,000`. Approve inside Edit Transaction leaves balances unchanged; desktop row Approve is also available. Verify Uncategorized count links on Budget.
+- **Manual drive:** unfiltered lists put Unapproved Transactions first and load 50 per page via Show more. Above the table, `Approve all N` approves at most 1,000 at a time; with more, the button reads `Approve 1,000`. Approve inside Edit Transaction leaves balances unchanged; desktop row Approve is also available. The Budget's `Needs you` chips for Uncategorized and Unapproved land on this list already filtered (see [search.md](search.md)).
 - **Manual drive:** check Payee Category recall and lookup/loading/failure states using [payees.md](payees.md). A Starting Balance keeps its Account, has no Payee, and cannot Split or become a Transfer. A Date before cutover must fail with `Budge starts on the cutover date; pick a later date.` and save nothing.
 
 - Amounts follow the selected Direction; changing a field without Save is not persistence.

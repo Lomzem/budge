@@ -72,7 +72,7 @@
 						id="add-category-group"
 						bind:value={groupId}
 						required
-						class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+						class="h-9 rounded-md border border-input bg-card px-2.5 text-base md:text-sm pointer-coarse:h-11"
 					>
 						{#each groups as group (group.id)}
 							<option value={group.id}>{group.name}</option>

@@ -127,8 +127,8 @@ const synced = (result: { ok: true; value: unknown } | { ok: false }) =>
 	result.ok ? result.value : result;
 
 describe('setting up a Bank Connection', () => {
-	test('seals the token, maps the Account, and points the webhook at Budge', async () => {
-		const { t, webhooks, connection, connectionId, checking } = await connectedBudget();
+	test('seals the token, maps the Account it feeds, and points the webhook at Budge', async () => {
+		const { t, owner, webhooks, connection, connectionId, checking } = await connectedBudget();
 
 		expect(webhooks).toEqual(['https://budge.example.test/plaid/webhook']);
 		const saved = await connection();
@@ -140,6 +140,9 @@ describe('setting up a Bank Connection', () => {
 		expect(JSON.stringify(saved)).not.toContain(accessToken);
 		expect(await t.run((ctx) => ctx.db.query('connectionAccounts').collect())).toMatchObject([
 			{ connectionId, externalId, state: 'mapped', accountId: checking }
+		]);
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toMatchObject([
+			{ _id: connectionId, feeds: [{ accountId: checking, name: 'Checking' }] }
 		]);
 	});
 
@@ -812,6 +815,7 @@ describe('the Bank Connection status', () => {
 		expect(Object.keys(status ?? {}).sort()).toEqual([
 			'_id',
 			'consentEndsAt',
+			'feeds',
 			'lastError',
 			'lastSyncedAt',
 			'name',

@@ -6,6 +6,7 @@
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import { untrack } from 'svelte';
 
+	import { resolve } from '$app/paths';
 	import type { Id } from '$convex/_generated/dataModel';
 	import {
 		getBankConnections,
@@ -61,18 +62,23 @@
 		if (reconnecting) return 'Reconnecting…';
 		return result;
 	});
+	const serverCanSync = $derived(bank.service?.available !== false);
 	const reconnectFirst = $derived(
 		connection.status === 'needsAttention' || connection.consentEndsAt !== null
 	);
 
-	interface Row {
+	interface Seen {
 		_id: Id<'connectionAccounts'>;
 		label: string;
+		name: string;
+		mask: string | null;
 		waiting: string;
+	}
+	interface Row extends Seen {
 		held: HeldAccount | null;
 		outcome: string | null;
 	}
-	let seen: { _id: Id<'connectionAccounts'>; label: string; waiting: string }[] = $state([]);
+	let seen: Seen[] = $state([]);
 	const held = $derived(bank.heldFrom(connection._id));
 
 	$effect(() => {
@@ -80,10 +86,17 @@
 		for (const account of held) {
 			const label = labelOf(account);
 			const waiting = rowsOf(account);
-			const index = known.findIndex((row) => row._id === account._id);
-			if (index === -1) seen.push({ _id: account._id, label, waiting });
+			const row = {
+				_id: account._id,
+				label,
+				name: account.name ?? 'An unnamed bank Account',
+				mask: account.mask,
+				waiting
+			};
+			const index = known.findIndex((candidate) => candidate._id === account._id);
+			if (index === -1) seen.push(row);
 			else if (known[index]?.label !== label || known[index].waiting !== waiting) {
-				seen[index] = { _id: account._id, label, waiting };
+				seen[index] = row;
 			}
 		}
 	});
@@ -116,27 +129,46 @@
 			>
 				<LandmarkIcon aria-hidden="true" class="size-5" />
 			</span>
-			<div class="flex min-w-0 flex-1 flex-col">
-				<h3 id="connection-{connection._id}" class="truncate text-lg font-bold">
+			<div class="flex min-w-0 flex-1 flex-col gap-1">
+				<h3 id="connection-{connection._id}" class="text-lg font-bold break-words">
 					{connection.name}
 				</h3>
+				<p class="text-sm break-words text-muted-foreground">
+					{#if connection.feeds.length === 0}
+						Feeds no Budge Account yet.
+					{:else}
+						Feeds
+						{#each connection.feeds as feed, index (feed.accountId)}
+							<a
+								href={resolve('/(app)/accounts/[accountId]', { accountId: feed.accountId })}
+								class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
+								>{feed.name}</a
+							>{index < connection.feeds.length - 1 ? ', ' : '.'}
+						{/each}
+					{/if}
+				</p>
 				<p
-					title={message || health.text}
 					class={[
-						'flex h-12 items-start gap-1.5 text-sm sm:h-6',
-						message === '' && health.tone === 'bad' && 'text-destructive',
-						message === '' && health.tone === 'warn' && 'text-warning',
-						(message !== '' || health.tone === 'ok') && 'text-muted-foreground'
+						'flex items-start gap-1.5 text-sm break-words',
+						health.tone === 'bad' && 'text-destructive',
+						health.tone === 'warn' && 'text-warning',
+						health.tone === 'ok' && 'text-muted-foreground'
 					]}
 				>
-					{#if message === '' && health.tone === 'ok'}
+					{#if health.tone === 'ok'}
 						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
-					{:else if message === ''}
-						<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
 					{:else}
-						<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+						<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
 					{/if}
-					<span class="line-clamp-2 sm:line-clamp-1">{message || health.text}</span>
+					<span class="min-w-0">{health.text}</span>
+				</p>
+				<p class="flex min-h-5 items-start gap-1.5 text-sm break-words text-muted-foreground">
+					{#if message !== ''}
+						<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+						<span class="min-w-0">{message}</span>
+					{:else if !serverCanSync}
+						<span class="min-w-0">Bank sync isn't set up on this server, so this can't sync.</span>
+					{/if}
 				</p>
 				<span role="status" class="sr-only">{result}</span>
 			</div>
@@ -175,8 +207,11 @@
 			<ul class="flex flex-col divide-y">
 				{#each rows as row (row._id)}
 					<li class="flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
-						<div class="flex min-w-0 flex-col">
-							<span class="truncate font-bold">{row.label}</span>
+						<div class="flex min-w-0 flex-1 basis-48 flex-col">
+							<span class="font-bold break-words">{row.name}</span>
+							{#if row.mask !== null}
+								<span class="text-sm text-muted-foreground">Ending {row.mask}</span>
+							{/if}
 							<span class="text-sm text-muted-foreground">
 								{row.outcome ?? row.waiting}
 							</span>

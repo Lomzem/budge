@@ -1,6 +1,4 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
-
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getBudgetMonth, type BudgetView } from '$lib/budget.svelte';
 	import * as Table from '$lib/components/ui/table';
@@ -13,25 +11,54 @@
 	let {
 		groups,
 		selectedId,
-		onselect,
-		inline
+		onselect
 	}: {
 		groups: BudgetView['groups'];
 
 		selectedId: Id<'categories'> | null;
 
 		onselect: (id: Id<'categories'>) => void;
-
-		inline?: Snippet | undefined;
 	} = $props();
 
 	const budget = getBudgetMonth();
 </script>
 
+{#snippet name(category: (typeof groups)[number]['categories'][number])}
+	{@const status = availableStatus(category)}
+	{@const selected = category.id === selectedId}
+	<button
+		type="button"
+		class="block w-full rounded-sm pl-3 text-left font-medium break-words whitespace-normal underline-offset-4 hover:underline pointer-coarse:py-2.5"
+		aria-expanded={selected}
+		aria-controls={selected ? 'category-inspector' : undefined}
+		data-category-id={category.id}
+		onclick={() => {
+			onselect(category.id);
+		}}
+	>
+		{category.name}
+	</button>
+	{#if category.target}
+		<div class="mt-1 pl-3">
+			<TargetBar
+				progress={category.target.progress}
+				label="{category.name} Target"
+				text={status?.text ?? ''}
+			/>
+		</div>
+	{/if}
+	<span class="block min-h-5 pl-3 text-xs whitespace-normal {status?.class ?? ''}"
+		>{status?.text ?? ''}</span
+	>
+	{#each paymentNotes(category) as note (note)}
+		<span class="block pl-3 text-xs whitespace-normal text-muted-foreground">{note}</span>
+	{/each}
+{/snippet}
+
 <Table.Root layout="fixed">
 	<Table.Header>
 		<Table.Row>
-			<Table.Head>Category</Table.Head>
+			<Table.Head showFrom="screen-sm">Category</Table.Head>
 			<Table.Head width="amount" align="end">Assigned</Table.Head>
 			<Table.Head width="amount" align="end" showFrom="screen-sm">Activity</Table.Head>
 			<Table.Head width="amount" align="end">Available</Table.Head>
@@ -39,8 +66,15 @@
 	</Table.Header>
 	{#each groups as group (group.id)}
 		<Table.Body>
+			<Table.Row part="phoneLead">
+				<Table.Head scope="colgroup" colspan={4} lead>
+					<span class="block text-base font-semibold break-words whitespace-normal text-foreground"
+						>{group.name}</span
+					>
+				</Table.Head>
+			</Table.Row>
 			<Table.Row>
-				<Table.Head scope="rowgroup">
+				<Table.Head scope="rowgroup" showFrom="screen-sm">
 					<span class="block truncate font-semibold">{group.name}</span>
 				</Table.Head>
 				<Table.Cell align="end" numeric>
@@ -56,36 +90,11 @@
 			{#each group.categories as category (category.id)}
 				{@const status = availableStatus(category)}
 				{@const selected = category.id === selectedId}
+				<Table.Row part="phoneLead" data-state={selected ? 'selected' : undefined}>
+					<Table.Cell colspan={4} lead>{@render name(category)}</Table.Cell>
+				</Table.Row>
 				<Table.Row data-state={selected ? 'selected' : undefined}>
-					<Table.Cell>
-						<button
-							type="button"
-							class="block w-full rounded-sm pl-3 text-left break-words whitespace-normal underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-							aria-expanded={selected}
-							aria-controls={selected ? 'category-inspector' : undefined}
-							data-category-id={category.id}
-							onclick={() => {
-								onselect(category.id);
-							}}
-						>
-							{category.name}
-						</button>
-						{#if category.target}
-							<div class="mt-1 pl-3">
-								<TargetBar
-									progress={category.target.progress}
-									label="{category.name} Target"
-									text={status?.text ?? ''}
-								/>
-							</div>
-						{/if}
-						<span class="block min-h-5 pl-3 text-xs whitespace-normal {status?.class ?? ''}"
-							>{status?.text ?? ''}</span
-						>
-						{#each paymentNotes(category) as note (note)}
-							<span class="block pl-3 text-xs whitespace-normal text-muted-foreground">{note}</span>
-						{/each}
-					</Table.Cell>
+					<Table.Cell showFrom="screen-sm">{@render name(category)}</Table.Cell>
 					<Table.Cell align="end">
 						<AssignedInput
 							amount={category.assigned}
@@ -100,13 +109,6 @@
 						<span class={status?.class}>{formatCents(category.available)}</span>
 					</Table.Cell>
 				</Table.Row>
-				{#if selected && inline}
-					<Table.Row>
-						<Table.Cell colspan={4}>
-							<div class="px-1 py-2 whitespace-normal">{@render inline()}</div>
-						</Table.Cell>
-					</Table.Row>
-				{/if}
 			{:else}
 				<Table.Row>
 					<Table.Cell colspan={4}>

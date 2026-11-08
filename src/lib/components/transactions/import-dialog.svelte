@@ -146,7 +146,7 @@
 					bind:value={accountId}
 					onchange={() => (picks = [])}
 					required
-					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+					class="h-9 rounded-md border border-input bg-card px-2.5 text-base md:text-sm pointer-coarse:h-11"
 				>
 					{#each accounts.all as option (option._id)}
 						<option value={option._id}>{option.name}</option>
@@ -249,7 +249,7 @@
 		<select
 			bind:value={picks[index]}
 			required
-			class="h-8 max-w-56 rounded-lg border border-input bg-background px-2 text-base md:text-sm"
+			class="h-9 max-w-56 rounded-md border border-input bg-card px-2 text-base md:text-sm pointer-coarse:h-11"
 		>
 			<option value="">Pick one</option>
 			{#each candidates as candidate (candidate._id)}

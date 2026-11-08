@@ -13,8 +13,9 @@ Create Cash and Credit Card Accounts, arrange them, and decide where an unknown 
 ## How to get to it (user POV)
 
 - Desktop sidebar `Add Account` beside the Accounts heading; on every width, the Accounts page's `Add Account`.
-- Named Account page → `<name> actions` → Rename, Move up, Move down.
-- Bank page → the connection's card → `New bank Accounts` region → `Set up <name> ending <mask>` (the row says `<n> rows waiting`) → dialog `<name> ending <mask>` → radio `Into <Account>` / `Into a new Account` / `Nowhere: ignore this bank Account` → `Bring in its rows` or `Ignore` → dialog `Starting balance for <Account name>` → `Confirm`, `Skip` or `Suggest again`.
+- Named Account page → `<name> actions` → Rename, Move up, Move down. Under the balance, `getByTestId("account-sync")` names the Bank Connection that feeds it (see [plaid.md](plaid.md)).
+- Below `lg`, the Accounts page folds the Account list into a `Your Accounts <count>` disclosure, open on a plain visit and closed when arriving with a filter in the URL.
+- Bank page → the connection's card → `New bank Accounts` region → `Set up <name> ending <mask>` (the row shows the name, `Ending <mask>` on its own line, then `<n> rows waiting`) → dialog `<name> ending <mask>` → radio `Into <Account>` / `Into a new Account` / `Nowhere: ignore this bank Account` → `Bring in its rows` or `Ignore` → dialog `Starting balance for <Account name>` → `Confirm`, `Skip` or `Suggest again`.
 
 ## Driving it with Playwright
 

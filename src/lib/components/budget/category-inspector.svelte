@@ -230,7 +230,7 @@
 				id="move-category"
 				bind:value={otherId}
 				required
-				class="h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+				class="h-9 w-full min-w-0 rounded-md border border-input bg-card px-2.5 text-base md:text-sm pointer-coarse:h-11"
 			>
 				<option value="" disabled>Pick a Category</option>
 				{#each others as group (group.key)}

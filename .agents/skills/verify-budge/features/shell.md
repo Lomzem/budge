@@ -14,7 +14,7 @@ Navigate between budgeting views, retain theme choice, and expose iPhone install
 - Desktop (`lg` and up): the `Budget and Accounts` sidebar lists the Sections, then each Account under its Cash/Credit group with balances; `Add Account` sits beside the Accounts heading.
 - Phone: the `Sections` tab bar at the bottom. Accounts lists the Accounts as a `nav` named `Accounts` above All Transactions; an Account page keeps the Accounts tab current (`aria-current="true"`).
 - Badges: Accounts shows the Unapproved count, Bank the things that need the owner. Screen readers hear `Accounts, 3 Unapproved`.
-- Settings → Theme radio group; Settings → Your data → `Add to Home Screen` (only when not already standalone).
+- Settings → Theme radio group; Settings → This device → `Add to Home Screen` (only when not already standalone).
 
 ## Driving it with Playwright
 

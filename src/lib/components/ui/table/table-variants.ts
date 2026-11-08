@@ -12,19 +12,28 @@ export const tableColumnVariants = tv({
 			amount: 'w-28 sm:w-36',
 			date: 'w-32',
 			name: 'w-44',
-			note: 'w-56'
+			note: 'w-48'
 		},
 		showFrom: {
 			always: '',
-			md: 'hidden @md:table-cell',
 			lg: 'hidden @lg:table-cell',
-			xl: 'hidden @xl:table-cell',
 			'2xl': 'hidden @2xl:table-cell',
+			'4xl': 'hidden @4xl:table-cell',
+			'5xl': 'hidden @5xl:table-cell',
+			'6xl': 'hidden @6xl:table-cell',
+			'8xl': 'hidden @8xl:table-cell',
 			'screen-sm': 'hidden sm:table-cell'
 		},
-		numeric: { true: 'tabular-nums', false: '' }
+		numeric: { true: 'tabular-nums', false: '' },
+		lead: { true: 'h-auto pt-2.5 pb-0', false: '' }
 	},
-	defaultVariants: { align: 'start', width: 'auto', showFrom: 'always', numeric: false }
+	defaultVariants: {
+		align: 'start',
+		width: 'auto',
+		showFrom: 'always',
+		numeric: false,
+		lead: false
+	}
 });
 
 export type TableColumnVariants = VariantProps<typeof tableColumnVariants>;

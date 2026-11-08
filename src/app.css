@@ -144,6 +144,7 @@
 	--text-3xl--line-height: 2.5rem;
 	--text-4xl: 2.4883rem;
 	--text-4xl--line-height: 3rem;
+	--container-8xl: 88rem;
 }
 
 @theme inline {
@@ -247,6 +248,10 @@
 	:focus-visible {
 		outline: 2px solid var(--ring);
 		outline-offset: 2px;
+	}
+	/* The filter bar has its own Clear button; the native one shifts the text. */
+	input[type='search']::-webkit-search-cancel-button {
+		appearance: none;
 	}
 	@media (prefers-reduced-motion: reduce) {
 		*,

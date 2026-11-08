@@ -30,5 +30,5 @@ Preconditions:
 ## Gotchas
 
 - At the cutover month, `Previous month` is disabled.
-- Settings also holds Theme, Your data (Export…, Add to Home Screen) and Session (Sign out); see `shell.md`, `export.md`, `auth.md`.
+- Settings also holds Theme, Your data (Export…) and This device (Add to Home Screen, Sign out); see `shell.md`, `export.md`, `auth.md`.
 - Sources: ticket 03, 05, 23; public `settings.get/setCutoverDate`. Real production setup in ticket 23 is owner work and outside this local proof.

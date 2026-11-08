@@ -3,6 +3,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import AccountDialog from '$lib/components/accounts/account-dialog.svelte';
 	import TransactionTable from '$lib/components/transactions/transaction-table.svelte';
@@ -13,6 +14,7 @@
 	const sum = (list: Account[]) => list.reduce((total, account) => total + account.balance, 0);
 	const total = $derived(sum(accounts.all));
 	let addOpen = $state(false);
+	const listOpenOnArrival = page.url.search === '';
 </script>
 
 <svelte:head>
@@ -49,35 +51,47 @@
 			</p>
 		</section>
 	{:else}
-		<nav aria-label="Accounts" class="flex flex-col gap-4 lg:hidden">
-			{#each accounts.groups as group (group.label)}
-				<section aria-labelledby="list-{group.label}" class="flex flex-col gap-2">
-					<h2
-						id="list-{group.label}"
-						class="flex items-baseline justify-between gap-2 px-1 text-sm font-bold text-muted-foreground"
-					>
-						{group.label}
-						<span>{formatCents(sum(group.accounts))}</span>
-					</h2>
-					<ul class="flex flex-col divide-y rounded-lg border bg-card">
-						{#each group.accounts as account (account._id)}
-							<li>
-								<a
-									href={resolve('/(app)/accounts/[accountId]', { accountId: account._id })}
-									class="flex min-h-12 items-center gap-3 px-4 py-2 hover:bg-accent"
-								>
-									<span class="flex-1 truncate font-bold">{account.name}</span>
-									<span class={['shrink-0', account.balance < 0 && 'text-destructive']}>
-										{formatCents(account.balance)}
-									</span>
-									<ChevronRightIcon aria-hidden="true" class="size-4 text-muted-foreground" />
-								</a>
-							</li>
-						{/each}
-					</ul>
-				</section>
-			{/each}
-		</nav>
+		<details class="group lg:hidden" open={listOpenOnArrival}>
+			<summary
+				class="-mx-1 flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md px-1 font-bold [&::-webkit-details-marker]:hidden"
+			>
+				<ChevronRightIcon
+					aria-hidden="true"
+					class="size-4 text-muted-foreground transition-transform group-open:rotate-90 motion-reduce:transition-none"
+				/>
+				Your Accounts
+				<span class="font-normal text-muted-foreground">{accounts.all.length}</span>
+			</summary>
+			<nav aria-label="Accounts" class="flex flex-col gap-4 pt-2">
+				{#each accounts.groups as group (group.label)}
+					<section aria-labelledby="list-{group.label}" class="flex flex-col gap-2">
+						<h2
+							id="list-{group.label}"
+							class="flex items-baseline justify-between gap-2 px-1 text-sm font-bold text-muted-foreground"
+						>
+							{group.label}
+							<span>{formatCents(sum(group.accounts))}</span>
+						</h2>
+						<ul class="flex flex-col divide-y rounded-lg border bg-card">
+							{#each group.accounts as account (account._id)}
+								<li>
+									<a
+										href={resolve('/(app)/accounts/[accountId]', { accountId: account._id })}
+										class="flex min-h-12 items-center gap-3 px-4 py-2 hover:bg-accent"
+									>
+										<span class="flex-1 truncate font-bold">{account.name}</span>
+										<span class={['shrink-0', account.balance < 0 && 'text-destructive']}>
+											{formatCents(account.balance)}
+										</span>
+										<ChevronRightIcon aria-hidden="true" class="size-4 text-muted-foreground" />
+									</a>
+								</li>
+							{/each}
+						</ul>
+					</section>
+				{/each}
+			</nav>
+		</details>
 		<section aria-labelledby="all-transactions" class="flex flex-col gap-3">
 			<h2 id="all-transactions" class="text-lg font-bold">All Transactions</h2>
 			<TransactionTable />

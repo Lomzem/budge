@@ -55,6 +55,7 @@ export const settings = {
 				await expectCutover(page, cutover);
 				await region.getByRole('button', { name: 'Change' }).click();
 				await saveCutover(page, dayEarlier);
+				await expectCutover(page, dayEarlier);
 				await page.reload();
 				await expectCutover(page, dayEarlier);
 			});

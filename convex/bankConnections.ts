@@ -14,7 +14,8 @@ import {
 	internalQuery,
 	query,
 	type ActionCtx,
-	type MutationCtx
+	type MutationCtx,
+	type QueryCtx
 } from './_generated/server';
 import { applyBankChange, applyBankRemoval, syncedBankRow } from './lib/bankChanges';
 import { applyBankRows, planBankRows, requireBankRow, type IncomingRow } from './lib/imports';
@@ -59,6 +60,7 @@ import { failureOf, failureOfPlaidCode } from './lib/syncFailure';
 import { TokenCipher } from './lib/tokenCipher';
 
 export const MAX_BANK_CONNECTIONS = 20;
+const MAX_FED_ACCOUNTS = 50;
 
 export const list = query({
 	args: { now: v.number() },
@@ -70,23 +72,41 @@ export const list = query({
 			lastSyncedAt: v.union(v.number(), v.null()),
 			overdue: v.boolean(),
 			consentEndsAt: v.union(v.number(), v.null()),
-			lastError: v.union(v.object({ at: v.number(), message: v.string() }), v.null())
+			lastError: v.union(v.object({ at: v.number(), message: v.string() }), v.null()),
+			feeds: v.array(v.object({ accountId: v.id('accounts'), name: v.string() }))
 		})
 	),
 	handler: async (ctx, { now }) => {
 		await requireOwner(ctx);
 		const connections = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
-		return connections.map((connection) => ({
-			_id: connection._id,
-			name: connection.name,
-			status: connection.status,
-			lastSyncedAt: connection.lastSyncedAt ?? null,
-			overdue: isSyncOverdue(connection.lastSyncedAt ?? null, now),
-			consentEndsAt: renewalDue(connection.consentExpiresAt ?? null, now),
-			lastError: connection.lastError ?? null
-		}));
+		return await Promise.all(
+			connections.map(async (connection) => ({
+				_id: connection._id,
+				name: connection.name,
+				status: connection.status,
+				lastSyncedAt: connection.lastSyncedAt ?? null,
+				overdue: isSyncOverdue(connection.lastSyncedAt ?? null, now),
+				consentEndsAt: renewalDue(connection.consentExpiresAt ?? null, now),
+				lastError: connection.lastError ?? null,
+				feeds: await feedsOf(ctx, connection._id)
+			}))
+		);
 	}
 });
+
+async function feedsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>) {
+	const linked = await ctx.db
+		.query('connectionAccounts')
+		.withIndex('by_connection_externalId', (q) => q.eq('connectionId', connectionId))
+		.take(MAX_FED_ACCOUNTS);
+	const feeds: { accountId: Id<'accounts'>; name: string }[] = [];
+	for (const row of linked) {
+		if (row.state !== 'mapped') continue;
+		const account = await ctx.db.get('accounts', row.accountId);
+		if (account !== null) feeds.push({ accountId: account._id, name: account.name });
+	}
+	return feeds;
+}
 
 const ownerSyncResult = v.union(
 	v.object({ kind: v.literal('synced'), added: v.number(), matched: v.number() }),

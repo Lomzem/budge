@@ -20,6 +20,7 @@
 	import UpcomingList from '$lib/components/budget/upcoming-list.svelte';
 	import CutoverDate from '$lib/components/settings/cutover-date.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import { formatMonth } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
@@ -55,13 +56,18 @@
 	const wide = new MediaQuery('(min-width: 1024px)');
 	let selectedId: Id<'categories'> | null = $state(null);
 
-	const selected = $derived(
-		view?.groups.flatMap((group) => group.categories).find((c) => c.id === selectedId)
-	);
+	const shownCategories = $derived(view?.groups.flatMap((group) => group.categories) ?? []);
+	const selected = $derived(shownCategories.find((c) => c.id === selectedId));
+	let lastSelected = $state<typeof selected>();
+	$effect.pre(() => {
+		if (selected) lastSelected = selected;
+	});
+	const inspected = $derived(selected ?? lastSelected);
 
 	interface Need {
 		text: string;
-		href?: '/accounts' | '/bank';
+		link?: { path: '/accounts' | '/bank'; query: string };
+		action?: () => void;
 		tone: 'bad' | 'warn';
 	}
 
@@ -76,8 +82,10 @@
 		}
 		if (view.overspent.length > 0) {
 			const count = view.overspent.length;
+			const first = view.overspent.find((over) => shownCategories.some((c) => c.id === over.id));
 			list.push({
 				text: `${String(count)} ${count === 1 ? 'Category' : 'Categories'} overspent`,
+				...(first === undefined ? {} : { action: () => void select(first.id, true) }),
 				tone: 'bad'
 			});
 		}
@@ -85,29 +93,29 @@
 			const count = view.uncategorizedCount;
 			list.push({
 				text: `${String(count)} ${count === 1 ? 'Transaction needs' : 'Transactions need'} a Category`,
-				href: '/accounts',
+				link: { path: '/accounts', query: '?category=uncategorized' },
 				tone: 'warn'
 			});
 		}
 		if (unapprovedCount > 0) {
 			list.push({
 				text: `${formatUnapprovedCount(unapprovedCount)} Unapproved`,
-				href: '/accounts',
+				link: { path: '/accounts', query: '?status=unapproved' },
 				tone: 'warn'
 			});
 		}
 		if (bank.needingYou > 0) {
 			list.push({
 				text: `Bank: ${String(bank.needingYou)} ${bank.needingYou === 1 ? 'thing needs' : 'things need'} you`,
-				href: '/bank',
+				link: { path: '/bank', query: '' },
 				tone: 'warn'
 			});
 		}
 		return list;
 	});
 
-	async function select(id: Id<'categories'>) {
-		selectedId = selectedId === id ? null : id;
+	async function select(id: Id<'categories'>, keepOpen = false) {
+		selectedId = selectedId === id && !keepOpen ? null : id;
 		if (selectedId !== null && wide.current) {
 			await tick();
 			document.getElementById('category-inspector')?.focus();
@@ -119,7 +127,9 @@
 		selectedId = null;
 		await tick();
 		if (id !== null) {
-			document.querySelector<HTMLElement>(`[data-category-id="${id}"]`)?.focus();
+			[...document.querySelectorAll<HTMLElement>(`[data-category-id="${id}"]`)]
+				.find((button) => button.checkVisibility())
+				?.focus();
 		}
 	}
 
@@ -204,39 +214,39 @@
 			</div>
 		{/if}
 
-		<section aria-label="Needs you" class="-my-1 flex h-10 items-center">
+		<section aria-label="Needs you" class="-my-1 flex min-h-10 items-center">
 			{#if needs.length === 0}
 				<p class="flex items-center gap-2 text-muted-foreground">
 					<CircleCheckIcon aria-hidden="true" class="size-5 text-funded" />
 					Nothing needs you right now.
 				</p>
 			{:else}
-				<ul class="-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto px-1 py-1">
+				<ul class="flex min-w-0 flex-1 flex-wrap gap-2 py-1">
 					{#each needs as need (need.text)}
-						{@const tone =
+						{@const chip = [
+							'flex min-h-8 items-center rounded-full px-3 text-left text-sm font-bold pointer-coarse:min-h-11',
 							need.tone === 'bad'
 								? 'bg-destructive-tint text-destructive'
-								: 'bg-warning-tint text-warning'}
-						<li class="shrink-0">
-							{#if need.href}
+								: 'bg-warning-tint text-warning'
+						]}
+						<li>
+							{#if need.link}
 								<a
-									href={resolve(need.href)}
-									class={[
-										'flex h-8 items-center rounded-full px-3 text-sm font-bold whitespace-nowrap underline-offset-4 hover:underline',
-										tone
-									]}
+									href="{resolve(need.link.path)}{need.link.query}"
+									class={[chip, 'underline-offset-4 hover:underline']}
 								>
 									{need.text}
 								</a>
-							{:else}
-								<span
-									class={[
-										'flex h-8 items-center rounded-full px-3 text-sm font-bold whitespace-nowrap',
-										tone
-									]}
+							{:else if need.action}
+								<button
+									type="button"
+									class={[chip, 'underline-offset-4 hover:underline']}
+									onclick={need.action}
 								>
 									{need.text}
-								</span>
+								</button>
+							{:else}
+								<span class={chip}>{need.text}</span>
 							{/if}
 						</li>
 					{/each}
@@ -293,12 +303,7 @@
 			{#if view.groups.length > 0}
 				<div class="lg:flex lg:items-start lg:gap-8" aria-busy={budget.stale}>
 					<div class={['min-w-0 flex-1', budget.stale && 'opacity-60']} inert={budget.stale}>
-						<BudgetTable
-							groups={view.groups}
-							selectedId={selected?.id ?? null}
-							onselect={select}
-							inline={selected && !wide.current ? inspector : undefined}
-						/>
+						<BudgetTable groups={view.groups} selectedId={selected?.id ?? null} onselect={select} />
 					</div>
 					{#if wide.current}
 						<aside class="sticky top-8 flex w-80 shrink-0 flex-col gap-6">
@@ -357,12 +362,35 @@
 {/if}
 
 {#snippet inspector()}
-	{#if view && selected}
-		{#key selected.id}
-			<CategoryInspector category={selected} {view} onclose={closeInspector} />
+	{#if view && inspected}
+		{#key inspected.id}
+			<CategoryInspector category={inspected} {view} onclose={closeInspector} />
 		{/key}
 	{/if}
 {/snippet}
+
+{#if !wide.current}
+	<Dialog.Root
+		open={selected !== undefined}
+		onOpenChange={(open) => {
+			if (!open) void closeInspector();
+		}}
+	>
+		<Dialog.Content
+			showCloseButton={false}
+			aria-labelledby="inspector-heading"
+			onOpenAutoFocus={(event: Event) => {
+				event.preventDefault();
+				document.getElementById('category-inspector')?.focus();
+			}}
+			onCloseAutoFocus={(event: Event) => {
+				event.preventDefault();
+			}}
+		>
+			{@render inspector()}
+		</Dialog.Content>
+	</Dialog.Root>
+{/if}
 
 <AccountDialog bind:open={addAccountOpen} />
 <AddCategoryDialog

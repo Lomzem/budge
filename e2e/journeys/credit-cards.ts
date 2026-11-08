@@ -12,7 +12,9 @@ export const creditCards = {
 				const seededCardsStartingDebtNothingHasCovered = '$612.48 of card debt not yet covered';
 				const group = page.getByRole('rowgroup').filter({ hasText: 'Credit Card Payments' });
 				await expect(group.getByRole('button', { name: 'Card', exact: true })).toBeVisible();
-				await expect(group.getByText(seededCardsStartingDebtNothingHasCovered)).toBeVisible();
+				await expect(
+					group.getByText(seededCardsStartingDebtNothingHasCovered).filter({ visible: true })
+				).toBeVisible();
 			});
 		}
 	}
