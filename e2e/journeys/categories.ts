@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import { holdResponseTo } from '../heldResponse';
-import type { Journey } from './journey';
+import { openBudget, type Journey } from './journey';
 
 async function act(page: Page, name: string, action: string) {
 	const trigger = page.getByRole('button', {
@@ -23,6 +23,17 @@ export const categories = {
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			await page.setViewportSize({ width: 320, height: 640 });
+
+			await step("Budget's Add Category offers only groups a Category can join", async () => {
+				await openBudget(page);
+				await page.getByRole('button', { name: 'Add Category', exact: true }).click();
+				const addCategory = page.getByRole('dialog', { name: 'Add Category' });
+				const groups = addCategory.getByLabel('Category Group').getByRole('option');
+				await expect(groups).not.toHaveCount(0);
+				await expect(groups.filter({ hasText: 'Credit Card Payments' })).toHaveCount(0);
+				await page.keyboard.press('Escape');
+				await expect(addCategory).toBeHidden();
+			});
 
 			await step('add a Category Group and a Category in it', async () => {
 				await openCategories(page);

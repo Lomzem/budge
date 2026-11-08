@@ -36,7 +36,11 @@
 
 	const view = $derived(budget.view);
 	const readyToAssign = $derived(budget.readyToAssign);
-	const groups = $derived(view?.groups.map((group) => ({ id: group.id, name: group.name })) ?? []);
+	const groupsACategoryCanJoin = $derived(
+		view?.groups
+			.filter((group) => group.kind === 'normal')
+			.map((group) => ({ id: group.id, name: group.name })) ?? []
+	);
 
 	const wide = new MediaQuery('(min-width: 1024px)');
 	let selectedId: Id<'categories'> | null = $state(null);
@@ -193,7 +197,7 @@
 				>
 					Add Category Group
 				</Button>
-				{#if groups.length > 0}
+				{#if groupsACategoryCanJoin.length > 0}
 					<Button
 						variant="outline"
 						size="sm"
@@ -205,7 +209,7 @@
 				{/if}
 				<Button variant="ghost" size="sm" href={resolve('/categories')}>Manage Categories</Button>
 			</div>
-			{#if groups.length > 0}
+			{#if view.groups.length > 0}
 				<div class="lg:flex lg:items-start lg:gap-6">
 					<div class="min-w-0 lg:flex-1">
 						<BudgetTable
@@ -264,4 +268,9 @@
 {/snippet}
 
 <AccountDialog bind:open={addAccountOpen} />
-<AddCategoryDialog bind:this={addDialog} bind:open={addingOpen} kind={adding} {groups} />
+<AddCategoryDialog
+	bind:this={addDialog}
+	bind:open={addingOpen}
+	kind={adding}
+	groups={groupsACategoryCanJoin}
+/>
