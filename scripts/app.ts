@@ -5,9 +5,10 @@ import { reset } from './app/reset';
 import { seed } from './app/seed';
 import { up } from './app/up';
 import type { Verb } from './app/verb';
+import { verify } from './app/verify';
 import { redact } from './local/redaction';
 
-const VERBS: Record<string, Verb> = { doctor, up, down, login, reset, seed };
+const VERBS: Record<string, Verb> = { doctor, up, down, login, reset, seed, verify };
 
 function listVerbs() {
 	console.log('usage: bun run app <verb> [--help]\n');
