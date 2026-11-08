@@ -66,7 +66,7 @@ Run these for each ticket, scoped to the ticket's diff. A ticket is not done unt
 | Every E2E test starts from its own fixture.                                                          | `e2e/test.ts`; `no-restricted-imports` in `eslint.config.js`; `eslint/rules/e2e-imports.test.js`                                                                                                                    |
 | Each E2E run owns its frontend and backend ports.                                                    | `scripts/local/e2e-ports.ts`, `scripts/local/preview.ts`, `playwright.config.ts`; `scripts/local/e2e-ports.test.ts`                                                                                                 |
 | The admitted import file cap fits the measured preview and commit transaction limits.                | `bun run capacity:check`, in `bun run check` and CI's Import capacity contract step                                                                                                                                 |
-| Search and Bank Row decisions read every Bank Row; only the list row reads the capped display slice. | `allBankRowsOf` in `convex/lib/transactions.ts`; the `bankRowsShown` selector in `no-restricted-syntax`; `eslint/rules/display-bank-rows.test.js`                                                                   |
+| Search and Bank Row decisions read every Bank Row; only the list row reads the capped display slice. | `bankRowsShown` is private to `convex/lib/transactionRows.ts`, whose only export is the list row `toRow`; `allBankRowsOf` in `convex/lib/transactions.ts` reads every Bank Row                                      |
 
 <!-- convex-ai-start -->
 

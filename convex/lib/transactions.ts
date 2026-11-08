@@ -469,7 +469,7 @@ export function allBankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) 
 		.withIndex('by_transactionId_state', (q) => q.eq('transactionId', transactionId));
 }
 
-function bankRowsIn(
+export function bankRowsIn(
 	ctx: QueryCtx,
 	transactionId: Id<'transactions'>,
 	state: Doc<'imports'>['state']
@@ -494,20 +494,4 @@ async function bankTextsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
 	const bankTexts: string[] = [];
 	for await (const bankRow of allBankRowsOf(ctx, transactionId)) bankTexts.push(bankRow.bankText);
 	return bankTexts;
-}
-
-const BANK_ROWS_SHOWN = 10;
-
-export async function bankRowsShown(ctx: QueryCtx, transactionId: Id<'transactions'>) {
-	const read: Doc<'imports'>[] = [];
-	for (const state of ['changed', 'removed', 'linked'] as const) {
-		if (read.length > BANK_ROWS_SHOWN) break;
-		read.push(
-			...(await bankRowsIn(ctx, transactionId, state).take(BANK_ROWS_SHOWN + 1 - read.length))
-		);
-	}
-	return {
-		bankRows: read.slice(0, BANK_ROWS_SHOWN),
-		moreBankRows: read.length > BANK_ROWS_SHOWN
-	};
 }

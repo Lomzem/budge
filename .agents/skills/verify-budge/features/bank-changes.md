@@ -41,4 +41,4 @@ The fixture syncs Sample Credit Union twice through the production sync mutation
 
 - `e2e/bank-changes.test.ts` owns both resolution journeys; `convex/bankChanges.test.ts` owns sync and resolution semantics (edited versus untouched, Transfers, reconciled rows). Drive the UI here; do not reassert backend states.
 - The fixture's bank login token never decrypts, so Sync now and Reconnect on these connections fail with `Couldn't reach the bank; try again later.` That is expected and does not block these journeys.
-- Sources: tickets 19, 21; `convex/seedBankSync.ts`; public `imports.resolveBankChange`; `bankRowsShown` in `convex/lib/transactions.ts`.
+- Sources: tickets 19, 21; `convex/seedBankSync.ts`; public `imports.resolveBankChange`; `bankRowsShown` in `convex/lib/transactionRows.ts`.

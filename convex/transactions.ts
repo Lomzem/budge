@@ -13,8 +13,8 @@ import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/s
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { requireIsoDate } from './lib/settings';
+import { toRow } from './lib/transactionRows';
 import {
-	bankRowsShown,
 	deleteTransaction,
 	payeeNameOf,
 	requireUnlocked,
@@ -417,59 +417,4 @@ async function requireTransaction(ctx: MutationCtx, transactionId: Id<'transacti
 	const transaction = await ctx.db.get('transactions', transactionId);
 	if (transaction === null) throw publicError('NOT_FOUND');
 	return transaction;
-}
-
-async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
-	const { bankRows, moreBankRows } = await bankRowsShown(ctx, transaction._id);
-	const account = await ctx.db.get('accounts', transaction.accountId);
-	const category =
-		transaction.categoryId === undefined
-			? null
-			: await ctx.db.get('categories', transaction.categoryId);
-	return {
-		_id: transaction._id,
-		accountId: transaction.accountId,
-		accountName: account?.name ?? '',
-		date: transaction.date,
-		amount: transaction.amount,
-		payeeName: await payeeNameOf(ctx, transaction),
-		startingBalance: transaction.kind === 'startingBalance',
-		categoryId: transaction.categoryId ?? null,
-		categoryName: category?.name ?? null,
-		memo: transaction.memo ?? null,
-		cleared: transaction.cleared !== 'uncleared',
-		reconciled: transaction.cleared === 'reconciled',
-		approved: transaction.approved !== false,
-		bankRows: bankRows.map((bankRow) => ({
-			_id: bankRow._id,
-			bankText: bankRow.bankText,
-			matched: bankRow.matched,
-			state: bankRow.state === 'held' ? ('linked' as const) : bankRow.state,
-			date: bankRow.date,
-			amount: bankRow.amount
-		})),
-		moreBankRows,
-		transfer: await transferOf(ctx, transaction),
-		splits: await splitsOf(ctx, transaction)
-	};
-}
-
-async function splitsOf(ctx: QueryCtx, transaction: Doc<'transactions'>) {
-	if (transaction.split !== true) return null;
-	return await Promise.all(
-		(await splitLinesOf(ctx, transaction._id)).map(async (line) => ({
-			categoryId: line.categoryId,
-			categoryName: (await ctx.db.get('categories', line.categoryId))?.name ?? '',
-			amount: line.amount,
-			memo: line.memo ?? null
-		}))
-	);
-}
-
-async function transferOf(ctx: QueryCtx, transaction: Doc<'transactions'>) {
-	if (transaction.transferTransactionId === undefined) return null;
-	const counterpart = await ctx.db.get('transactions', transaction.transferTransactionId);
-	if (counterpart === null) return null;
-	const account = await ctx.db.get('accounts', counterpart.accountId);
-	return { accountId: counterpart.accountId, accountName: account?.name ?? '' };
 }
