@@ -19,7 +19,7 @@
 
 	function rememberedOpen() {
 		const stored = Result.try(() => localStorage.getItem(LIST_KEY));
-		return !Result.isSuccess(stored) || stored.success !== 'false';
+		return Result.isSuccess(stored) && stored.success === 'true';
 	}
 
 	function remember(event: Event) {

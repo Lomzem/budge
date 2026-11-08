@@ -403,7 +403,9 @@ function splitsOf(draft: Draft, world: World) {
 		splits.push({ categoryId, amount, memo: line.memo });
 	}
 	if (splits.length < 2) return 'A split needs two or more lines.';
-	if (remainderOf(draft) !== 0) return 'The lines must add up to the amount.';
+	const remainder = remainderOf(draft) ?? 0;
+	if (remainder > 0) return `${formatCents(remainder)} is still left to split.`;
+	if (remainder < 0) return `The lines are ${formatCents(-remainder)} over the amount.`;
 	return splits;
 }
 

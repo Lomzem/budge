@@ -11,11 +11,15 @@ import { insertTransaction, markCleared, transactionFields } from './lib/transac
 
 export const clearedBalance = query({
 	args: { accountId: v.id('accounts') },
-	returns: v.number(),
+	returns: v.object({ balance: v.number(), unapproved: v.number() }),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
 		await requireAccount(ctx, accountId);
-		return await clearedBalanceOf(ctx, accountId);
+		let unapproved = 0;
+		for await (const transaction of byCleared(ctx, accountId, 'cleared')) {
+			if (transaction.approved === false) unapproved += 1;
+		}
+		return { balance: await clearedBalanceOf(ctx, accountId), unapproved };
 	}
 });
 

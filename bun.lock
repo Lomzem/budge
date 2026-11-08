@@ -54,6 +54,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "convex-svelte@0.15.1": "patches/convex-svelte@0.15.1.patch",
+  },
   "packages": {
     "@cacheable/memory": ["@cacheable/memory@2.2.0", "", { "dependencies": { "@cacheable/utils": "^2.5.0", "@keyv/bigmap": "^1.3.1", "hookified": "^1.15.1", "keyv": "^5.6.0" } }, "sha512-CTLKqLItRCEixEAewD3/j9DB3/o96gpTPD4eJ1v+DGOlxZRZncRQkGYqqnAGCscYd6RNeXfGeiuCphsPtqyIfQ=="],
 

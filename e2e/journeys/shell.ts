@@ -51,6 +51,7 @@ export const shell = {
 						).toBe(true);
 					}
 					await tabs.getByRole('link', { name: /^Accounts/ }).click();
+					await page.getByText('Your Accounts').click();
 					await page
 						.getByRole('navigation', { name: 'Accounts' })
 						.getByRole('link', { name: /^Checking/ })
@@ -93,6 +94,7 @@ export const shell = {
 
 			await step('the Checking register loads in place and scrolls to its end', async () => {
 				await page.goto('/accounts');
+				await page.getByText('Your Accounts').click();
 				await page
 					.getByRole('navigation', { name: 'Accounts' })
 					.getByRole('link', { name: /^Checking/ })

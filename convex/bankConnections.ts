@@ -116,6 +116,13 @@ const ownerSyncResult = v.union(
 	v.object({ kind: v.literal('noToken') })
 );
 
+export const needsReconnect = internalQuery({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.boolean(),
+	handler: async (ctx, { connectionId }) =>
+		(await ctx.db.get('bankConnections', connectionId))?.status === 'needsAttention'
+});
+
 export const syncNow = action({
 	args: { connectionId: v.id('bankConnections') },
 	returns: ownerSyncResult,
@@ -129,6 +136,7 @@ export const sync = internalAction({
 	args: { connectionId: v.id('bankConnections') },
 	returns: v.null(),
 	handler: async (ctx, { connectionId }) => {
+		if (!bankSyncService().available) return null;
 		await Effect.runPromise(
 			syncConnection(connectionId, { refresh: false }).pipe(
 				Effect.ignore,
@@ -341,6 +349,11 @@ async function ownerSync(
 		discover = false
 	}: { refresh: boolean; resume?: boolean; discover?: boolean }
 ): Promise<Infer<typeof ownerSyncResult>> {
+	if (!bankSyncService().available) {
+		const paused = await ctx.runQuery(internal.bankConnections.needsReconnect, { connectionId });
+		const refusal = paused ? needsLogin : syncUnavailable;
+		throw publicError(refusal.code, refusal.message);
+	}
 	const outcome = await runEffect(
 		syncConnection(connectionId, { refresh, resume, discover }).pipe(
 			Effect.provide(liveLayer(ctx))
@@ -493,7 +506,7 @@ export function liveLayer(ctx: ActionCtx) {
 
 const needsLogin = {
 	code: 'BANK_CONNECTION_NEEDS_LOGIN',
-	message: 'The bank needs you to reconnect.'
+	message: 'Reconnect this bank first.'
 } as const satisfies PublicError;
 
 export function toPublicError(error: SyncError): PublicError {

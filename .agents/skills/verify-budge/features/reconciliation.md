@@ -24,7 +24,7 @@ Preconditions:
 - Authenticated baseline from the index; reseed before independent mutations.
 
 - **Equal:** click Reconcile, scope dialog `Reconcile <Account>`; read displayed cleared balance and fill the matching bank balance label (inspect whether Cash or card amount-owed wording). Set Date, click Reconcile. Require no adjustment and `getByTestId("last-reconciled")` date; all Cleared Transactions now Reconciled after reload, including ones dated after the Reconciliation Date (manual drive).
-- **Difference:** fresh seed; enter a bank balance differing by an invented $1.00. Require one Reconciliation Adjustment row with correct sign, Ready to Assign category and reconciled state; verify Account balance and Budget change. Repeat Cash and Card with card sign rules.
+- **Difference:** fresh seed; enter a bank balance differing by an invented $1.00. The submit button reads `Reconcile with −$1.00 adjustment` (plain `Reconcile` when it matches). When Cleared Transactions are still Unapproved (`bank-sync` or an import), a warning line says how many and that reconciling locks them as they are. Require one Reconciliation Adjustment row with correct sign, Ready to Assign category and reconciled state; verify Account balance and Budget change. Repeat Cash and Card with card sign rules.
 - **Lock:** open a reconciled row, require Amount/Date/Account and Direction radios disabled and no Delete. Payee/memo/Category may still change. Click Unlock; require protected fields editable and Cleared remains checked after reload. For a Starting Balance, Account remains disabled, Payee is absent and Split/Transfer choices stay unavailable (manual drive). Capture before/action/result.
 
 ## Gotchas

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import CheckCheckIcon from '@lucide/svelte/icons/check-check';
-	import CheckIcon from '@lucide/svelte/icons/check';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UploadIcon from '@lucide/svelte/icons/upload';
@@ -344,7 +343,7 @@
 							>
 								<span
 									class={[
-										'line-clamp-2 break-words @4xl:line-clamp-1',
+										'line-clamp-2 break-words whitespace-normal @4xl:line-clamp-1',
 										row.payeeName === null && !row.transfer && 'text-muted-foreground'
 									]}
 								>
@@ -396,12 +395,12 @@
 								{#if !row.approved}
 									<Button
 										data-approve={row._id}
-										size="icon-sm"
+										size="sm"
 										variant="outline"
 										onclick={() => approveRow(row, payee)}
 										aria-label="Approve {payee}, {formatDate(row.date)}"
 									>
-										<CheckIcon aria-hidden="true" />
+										Approve
 									</Button>
 								{/if}
 								<span class="flex @lg:hidden">{@render cleared(row, payee)}</span>

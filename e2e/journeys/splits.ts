@@ -12,7 +12,7 @@ export const splits = {
 			const row = page.getByRole('row').filter({ hasText: memo });
 			const dialog = page.getByRole('dialog');
 			const remainder = dialog.getByText(
-				/left to split|left for the empty line|over the amount|Fully split/
+				/(left to split|left for the empty line|over the amount|Fully split)$/
 			);
 
 			await step('start a $50.00 Transaction on Card and choose Split', async () => {
@@ -50,7 +50,7 @@ export const splits = {
 					await expect(remainder).toHaveText('$1.00 over the amount');
 					await dialog.getByRole('button', { name: 'Save' }).click();
 					await expect(dialog.getByRole('alert')).toHaveText(
-						'The lines must add up to the amount.'
+						'The lines are $1.00 over the amount.'
 					);
 					await dialog.getByLabel('Line 3 amount').fill('8.00');
 					await expect(remainder).toHaveText('Fully split');

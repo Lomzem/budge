@@ -35,6 +35,8 @@
 	const reconnecting = $derived(bank.linking === connection._id);
 	let result: Report | null = $state(null);
 
+	const withoutCode = (message: string) => message.replace(/ \([A-Z_]+\)(?=\.?$)/, '');
+
 	const exactTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 	const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
@@ -48,13 +50,20 @@
 			];
 		}
 		const found: { tone: 'warn' | 'bad'; text: string }[] = [];
+		const failedAt =
+			connection.lastError === null ? null : exactTime.format(connection.lastError.at);
 		if (connection.status === 'needsAttention') {
-			found.push({ tone: 'bad', text: 'Needs you to reconnect before it can sync again.' });
-		}
-		if (connection.lastError !== null) {
 			found.push({
 				tone: 'bad',
-				text: `The sync at ${exactTime.format(connection.lastError.at)} failed: ${connection.lastError.message}`
+				text:
+					failedAt === null
+						? 'Needs you to reconnect before it can sync again.'
+						: `Needs you to reconnect before it can sync again. The bank stopped its sync at ${failedAt}.`
+			});
+		} else if (connection.lastError !== null) {
+			found.push({
+				tone: 'bad',
+				text: `The sync at ${String(failedAt)} failed: ${withoutCode(connection.lastError.message)}`
 			});
 		}
 		if (connection.consentEndsAt !== null) {
@@ -213,7 +222,7 @@
 		<div class="grid grid-cols-2 gap-2 sm:flex">
 			<div class="grid sm:w-36">
 				<Button
-					variant={reconnectFirst ? 'default' : 'outline'}
+					variant={reconnectFirst && connection.bankLogin ? 'default' : 'outline'}
 					aria-disabled={reconnectBlocked}
 					aria-describedby={connection.bankLogin ? undefined : `problems-${connection._id}`}
 					onclick={reconnect}
@@ -223,7 +232,7 @@
 			</div>
 			<div class="grid sm:w-36">
 				<Button
-					variant={reconnectFirst ? 'outline' : 'default'}
+					variant={reconnectFirst || !connection.bankLogin ? 'outline' : 'default'}
 					aria-disabled={syncBlocked}
 					aria-describedby={connection.bankLogin ? undefined : `problems-${connection._id}`}
 					onclick={sync}

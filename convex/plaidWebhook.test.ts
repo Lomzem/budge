@@ -685,6 +685,17 @@ describe('the daily sync', () => {
 		).toBe(connections);
 	});
 
+	test('on a server without a token key, records no failure on any Bank Connection', async () => {
+		const backend = await connectedBudget();
+		vi.stubEnv('BUDGE_TOKEN_KEY', undefined);
+
+		await backend.t.mutation(internal.bankConnections.syncAll, {});
+		await runScheduled(backend);
+
+		const [connection] = await backend.owner.query(api.bankConnections.list, { now: Date.now() });
+		expect(connection?.lastError).toBeNull();
+	});
+
 	test('makes no Plaid call for the seeded Bank Connection, which has no token', async () => {
 		const backend = newBackend();
 		await backend.t.mutation(internal.seed.run, {});
@@ -762,13 +773,23 @@ describe('connecting a bank from the app', () => {
 		}
 	);
 
-	test('Sync now on a server without Plaid credentials says bank sync is not set up', async () => {
-		const { owner, connectionId } = await connectedBudget();
-		vi.stubEnv('PLAID_SECRET', undefined);
-		expect(
-			await publicErrorOf(owner.action(api.bankConnections.syncNow, { connectionId }))
-		).toEqual({ code: 'BANK_SYNC_UNAVAILABLE', message: "Bank sync isn't set up on this server." });
-	});
+	test.each(['PLAID_SECRET', 'BUDGE_TOKEN_KEY'])(
+		'Sync now on a server without %s says bank sync is not set up, calls no bank and leaves the connection without a failure',
+		async (name) => {
+			const { owner, connectionId } = await connectedBudget();
+			const called = plaid.paths.length;
+			vi.stubEnv(name, undefined);
+			expect(
+				await publicErrorOf(owner.action(api.bankConnections.syncNow, { connectionId }))
+			).toEqual({
+				code: 'BANK_SYNC_UNAVAILABLE',
+				message: "Bank sync isn't set up on this server."
+			});
+			expect(plaid.paths).toHaveLength(called);
+			const [connection] = await owner.query(api.bankConnections.list, { now: Date.now() });
+			expect(connection?.lastError).toBeNull();
+		}
+	);
 
 	test('with credentials and a token key, bank sync is available', async () => {
 		const { owner } = await startBudget({ cutoverDate });

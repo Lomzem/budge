@@ -88,7 +88,34 @@ describe('importing a bank file', () => {
 			await owner.mutation(api.imports.commit, {
 				accountId: checking,
 				source: 'csv',
-				rows: [coffee]
+				rows: [{ ...coffee, date: addDays(coffee.date, 1) }]
+			})
+		).toEqual({ added: 1, matched: 0, skipped: 0 });
+		expect((await rows()).filter((row) => row.amount === coffee.amount)).toHaveLength(2);
+	});
+
+	test('a CSV row on the day of a Transaction already imported from a CSV previews as its likely duplicate, skipped unless picked as new', async () => {
+		const { owner, checking, rows } = await budgetWithChecking();
+		await owner.mutation(api.imports.commit, {
+			accountId: checking,
+			source: 'csv',
+			rows: [coffee]
+		});
+		const relabelled = { ...coffee, bankText: 'SAMPLE COFFEE' };
+		const file = { accountId: checking, source: 'csv' as const, rows: [relabelled] };
+
+		const [held] = await owner.query(api.imports.preview, file);
+		assert(held?.kind === 'skip');
+		expect(held.alike).toMatchObject({ date: coffee.date, amount: coffee.amount });
+		expect(await owner.mutation(api.imports.commit, file)).toEqual({
+			added: 0,
+			matched: 0,
+			skipped: 1
+		});
+		expect(
+			await owner.mutation(api.imports.commit, {
+				...file,
+				rows: [{ ...relabelled, pick: 'new' as const }]
 			})
 		).toEqual({ added: 1, matched: 0, skipped: 0 });
 		expect((await rows()).filter((row) => row.amount === coffee.amount)).toHaveLength(2);

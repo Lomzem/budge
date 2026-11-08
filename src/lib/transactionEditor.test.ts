@@ -264,7 +264,12 @@ describe('splitting across Categories', () => {
 		{
 			problem: 'the lines fall short of the amount',
 			draft: filled('outflow', ['10.00', '1.00']),
-			message: 'The lines must add up to the amount.'
+			message: '$1.50 is still left to split.'
+		},
+		{
+			problem: 'the lines go over the amount',
+			draft: filled('outflow', ['10.00', '3.00']),
+			message: 'The lines are $0.50 over the amount.'
 		}
 	])('refuses to save when $problem', ({ draft, message }) => {
 		expect(payloadOf(draft, remembering)).toEqual({ kind: 'invalid', message });

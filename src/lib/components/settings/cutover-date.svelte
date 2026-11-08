@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { useMutation, useQuery } from 'convex-svelte';
+	import { tick } from 'svelte';
 
 	import { api } from '$convex/_generated/api';
 	import { attempt } from '$lib/attempt';
@@ -15,11 +16,21 @@
 	let date = $state(localIsoDate(new Date()));
 	let error = $state('');
 	let saving = $state(false);
+	let dateInput: HTMLInputElement | null = $state(null);
+	let changeButton: HTMLElement | null = $state(null);
 
-	function startChange() {
+	async function startChange() {
 		if (cutoverDate !== null) date = cutoverDate;
 		error = '';
 		changing = true;
+		await tick();
+		dateInput?.focus();
+	}
+
+	async function stopChange() {
+		changing = false;
+		await tick();
+		changeButton?.focus();
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -28,7 +39,7 @@
 		error = '';
 		const saved = await attempt(() => setCutoverDate({ cutoverDate: date }));
 		saving = false;
-		if (saved.ok) changing = false;
+		if (saved.ok) await stopChange();
 		else error = saved.error?.message ?? "Budge couldn't save the date. Try again.";
 	}
 </script>
@@ -45,13 +56,20 @@
 	{:else if changing || cutoverDate === null}
 		<form class="flex flex-wrap items-center gap-2" onsubmit={submit}>
 			<div class="w-44">
-				<Input id="cutover-date" type="date" aria-label="Cutover date" bind:value={date} required />
+				<Input
+					id="cutover-date"
+					type="date"
+					aria-label="Cutover date"
+					bind:ref={dateInput}
+					bind:value={date}
+					required
+				/>
 			</div>
 			<div class="grid min-w-20">
 				<Button type="submit" disabled={saving}>Save</Button>
 			</div>
 			{#if cutoverDate !== null}
-				<Button type="button" variant="ghost" onclick={() => (changing = false)}>Cancel</Button>
+				<Button type="button" variant="ghost" onclick={stopChange}>Cancel</Button>
 			{/if}
 		</form>
 	{:else}
@@ -63,7 +81,7 @@
 					>.</span
 				>
 			</p>
-			<Button variant="outline" onclick={startChange}>Change</Button>
+			<Button variant="outline" bind:ref={changeButton} onclick={startChange}>Change</Button>
 		</div>
 	{/if}
 	<p role="alert" class={['text-sm text-destructive', error === '' && '-mt-3']}>{error}</p>

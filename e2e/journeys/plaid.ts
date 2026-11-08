@@ -65,7 +65,7 @@ export const plaid = {
 
 			await step('releasing both reports each result on its own card only', async () => {
 				sync.release();
-				await expect(savings.getByRole('status')).toHaveText('The bank needs you to reconnect.');
+				await expect(savings.getByRole('status')).toHaveText('Reconnect this bank first.');
 				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
 				await expect(sandbox.getByRole('status')).toHaveText('');
 			});

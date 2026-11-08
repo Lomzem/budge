@@ -69,6 +69,23 @@ export const budget = {
 					.getByLabel(label, { exact: true })
 					.locator('option:checked');
 
+			await step('the first item is painted on screen, not only present in the page', async () => {
+				await openBudget(page);
+				const first = needsYou.getByRole('listitem').first();
+				await expect(first).toBeVisible();
+				const clip = await first.boundingBox();
+				if (clip === null) throw new Error('The first Needs you item has no box.');
+				const painted = await page.screenshot({ clip });
+				await first.evaluate((item) => {
+					item.style.visibility = 'hidden';
+				});
+				const blank = await page.screenshot({ clip });
+				await first.evaluate((item) => {
+					item.style.visibility = '';
+				});
+				expect(painted.equals(blank)).toBe(false);
+			});
+
 			for (const [link, filter, option, count] of [
 				[/^6 Transactions need a Category$/, 'Category', 'Uncategorized', 6],
 				[/^3 Unapproved$/, 'Status', 'Unapproved', 3]

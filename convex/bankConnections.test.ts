@@ -554,7 +554,7 @@ describe('syncing a Bank Connection', () => {
 			await publicErrorOf(owner.action(api.bankConnections.syncNow, { connectionId }))
 		).toEqual({
 			code: 'BANK_CONNECTION_NEEDS_LOGIN',
-			message: 'The bank needs you to reconnect.'
+			message: 'Reconnect this bank first.'
 		});
 	});
 

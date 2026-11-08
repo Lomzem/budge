@@ -29,6 +29,7 @@ const HELD_ACCOUNTS = [
 ] as const;
 
 const DAYS_FROM_NOW_UNTIL_CONSENT_ENDS = 5;
+const DAYS_SINCE_SAVINGS_BANK_LAST_SYNCED = 1;
 const DAY_MS = 86_400_000;
 
 type SyncRow = Infer<typeof syncRow>;
@@ -120,6 +121,9 @@ export const run = internalMutation({
 			accounts: []
 		});
 		await sync(ctx, savingsBank, { discover: false });
+		await ctx.db.patch('bankConnections', savingsBank, {
+			lastSyncedAt: Date.now() - DAYS_SINCE_SAVINGS_BANK_LAST_SYNCED * DAY_MS
+		});
 		await ctx.runMutation(internal.bankConnections.flagItem, {
 			itemId: SAVINGS_BANK.itemId,
 			code: 'ITEM_LOGIN_REQUIRED'

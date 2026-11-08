@@ -27,9 +27,13 @@
 	{...restProps}
 >
 	{#if error !== undefined}
-		<p role="alert" class="min-h-5 text-sm text-destructive sm:min-w-0 sm:flex-1">{error}</p>
+		<p role="alert" class="min-h-5 text-sm text-destructive sm:min-h-10 sm:min-w-0 sm:flex-1">
+			{error}
+		</p>
 	{/if}
-	<div class="flex flex-col-reverse gap-2 sm:ml-auto sm:flex-row sm:justify-end">
+	<div
+		class="flex flex-wrap gap-2 *:flex-1 sm:ml-auto sm:flex-nowrap sm:justify-end sm:*:flex-none"
+	>
 		{@render children?.()}
 		{#if showCloseButton}
 			<DialogPrimitive.Close>

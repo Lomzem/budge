@@ -36,6 +36,9 @@ export const reconciliation = {
 					const bankOwedOneDollarMoreThanCleared = owed + 100;
 					await page.keyboard.type(typed(bankOwedOneDollarMoreThanCleared));
 					await expect(dialog.getByRole('status')).toContainText('differs by −$1.00');
+					await expect(
+						dialog.getByRole('button', { name: 'Reconcile with −$1.00 adjustment' })
+					).toBeVisible();
 					await page.keyboard.press('Enter');
 					await expect(dialog).toBeHidden();
 				}

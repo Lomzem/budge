@@ -195,6 +195,10 @@
 		);
 	}
 
+	function keepEditorFocus(event: Event) {
+		if (!open) event.preventDefault();
+	}
+
 	async function deleteTransaction() {
 		if (!transaction) return;
 		const transactionId = transaction._id;
@@ -590,7 +594,7 @@
 				{#if transaction && !locked}
 					<Button
 						type="button"
-						variant="outline"
+						variant="destructive"
 						disabled={saving}
 						onclick={() => (confirmDelete = true)}
 					>
@@ -609,7 +613,7 @@
 </Dialog.Root>
 
 <AlertDialog.Root bind:open={confirmDelete}>
-	<AlertDialog.Content>
+	<AlertDialog.Content onCloseAutoFocus={keepEditorFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>
 				{transaction?.transfer ? 'Delete this Transfer?' : 'Delete this Transaction?'}
@@ -625,7 +629,9 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel>Keep it</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={deleteTransaction} disabled={saving}>Delete</AlertDialog.Action>
+			<AlertDialog.Action variant="destructive" onclick={deleteTransaction} disabled={saving}
+				>Delete</AlertDialog.Action
+			>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
@@ -636,7 +642,7 @@
 		if (!next) confirmBankRemoval = null;
 	}}
 >
-	<AlertDialog.Content>
+	<AlertDialog.Content onCloseAutoFocus={keepEditorFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>
 				{transaction?.transfer ? 'Delete this Transfer too?' : 'Delete this Transaction too?'}
@@ -653,6 +659,7 @@
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel>Keep it</AlertDialog.Cancel>
 			<AlertDialog.Action
+				variant="destructive"
 				disabled={saving}
 				onclick={() => {
 					if (confirmBankRemoval !== null) void resolveBankRow(confirmBankRemoval, 'bank');

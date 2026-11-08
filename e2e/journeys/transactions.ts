@@ -16,10 +16,10 @@ export const transactions = {
 				return balance();
 			});
 
-			await step('add a $12.34 outflow, and the balance drops by it', async () => {
+			await step('type a new Payee and a $12.34 outflow, and the balance drops by it', async () => {
 				await page.getByRole('button', { name: 'Add Transaction' }).click();
 				const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
-				await dialog.getByLabel('Payee').fill('Smoke Test Bakery');
+				await dialog.getByLabel('Payee').pressSequentially('Smoke Test Bakery');
 				await dialog.getByLabel('Amount').fill('12.34');
 				await dialog.getByRole('button', { name: 'Save' }).click();
 				await expect(dialog).toBeHidden();

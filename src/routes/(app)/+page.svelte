@@ -8,8 +8,10 @@
 	import { tick } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 
-	import { goto } from '$app/navigation';
+	import { goto, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import type { ResolvedPathname } from '$app/types';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
@@ -24,13 +26,34 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { formatMonth } from '$lib/domain/dates';
+	import { formatMonth, isIsoMonth, monthOf } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
 
 	const accounts = getAccounts();
 	const bank = getBankConnections();
 	const budget = getBudgetMonth();
+
+	const monthIn = (url: URL) => {
+		const linked = url.searchParams.get('month');
+		return linked !== null && isIsoMonth(linked) ? linked : undefined;
+	};
+	budget.month = monthIn(page.url) ?? budget.month;
+	let arrivedAt = page.url;
+	$effect(() => {
+		const url = page.url;
+		if (url === arrivedAt) return;
+		arrivedAt = url;
+		const linked = monthIn(url);
+		if (linked !== undefined) budget.month = linked;
+	});
+	$effect(() => {
+		const kept = new URL(location.href);
+		if (budget.month === monthOf(budget.today)) kept.searchParams.delete('month');
+		else kept.searchParams.set('month', budget.month);
+		if (kept.href === location.href) return;
+		replaceState(`${kept.pathname}${kept.search}${kept.hash}` as ResolvedPathname, page.state);
+	});
 	const settings = useQuery(api.settings.get, {});
 	const unapproved = useQuery(api.transactions.unapprovedCount, {});
 	const unapprovedCount = $derived(unapproved.data ?? 0);
@@ -152,6 +175,15 @@
 		};
 	});
 
+	function scrollNeeds(direction: -1 | 1) {
+		if (needsList === null) return;
+		const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+		needsList.scrollBy({
+			left: direction * needsList.clientWidth * 0.75,
+			behavior: still ? 'instant' : 'smooth'
+		});
+	}
+
 	async function select(id: Id<'categories'>, keepOpen = false) {
 		selectedId = selectedId === id && !keepOpen ? null : id;
 		if (selectedId !== null && wide.current) {
@@ -223,11 +255,18 @@
 			{#if readyToAssign}
 				<div
 					class={[
-						'flex w-full flex-wrap items-center justify-between gap-x-4 rounded-lg px-4 py-2 sm:w-auto sm:min-w-56 sm:flex-col sm:items-end sm:px-5 sm:py-3',
+						'flex w-full items-center justify-between gap-x-6 rounded-lg px-4 py-2 sm:w-auto sm:min-w-56 sm:px-5 sm:py-3',
 						readyToAssign.amount < 0 ? 'bg-destructive-tint' : 'bg-funded-tint'
 					]}
 				>
-					<p class="text-sm font-bold">Ready to Assign</p>
+					<div class="flex flex-col">
+						<p class="text-sm font-bold">Ready to Assign</p>
+						<p class="min-h-4 text-xs">
+							{#if readyToAssign.uncategorized !== 0}
+								includes {formatCents(readyToAssign.uncategorized)} Uncategorized
+							{/if}
+						</p>
+					</div>
 					<p
 						data-testid="ready-to-assign"
 						class={[
@@ -236,11 +275,6 @@
 						]}
 					>
 						{formatCents(readyToAssign.amount)}
-					</p>
-					<p class="min-h-5 w-full text-xs sm:mt-1 sm:w-auto">
-						{#if readyToAssign.uncategorized !== 0}
-							includes {formatCents(readyToAssign.uncategorized)} Uncategorized
-						{/if}
 					</p>
 				</div>
 			{/if}
@@ -252,6 +286,27 @@
 			</div>
 		{/if}
 
+		{#snippet needsScroller(direction: -1 | 1, shown: boolean)}
+			<button
+				type="button"
+				tabindex="-1"
+				aria-hidden="true"
+				class={[
+					'absolute top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:text-foreground pointer-coarse:hidden',
+					direction === 1 ? 'right-0' : 'left-0',
+					!shown && 'invisible'
+				]}
+				onclick={() => {
+					scrollNeeds(direction);
+				}}
+			>
+				{#if direction === 1}
+					<ChevronRightIcon class="size-4" />
+				{:else}
+					<ChevronLeftIcon class="size-4" />
+				{/if}
+			</button>
+		{/snippet}
 		<section
 			aria-label="Needs you"
 			class="relative -my-1 flex h-10 items-center pointer-coarse:h-13"
@@ -266,9 +321,9 @@
 					bind:this={needsList}
 					onscroll={measureNeeds}
 					class={[
-						'-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto mask-r-to-0 mask-l-to-0 p-1',
-						needsBefore ? 'mask-l-from-10' : 'mask-l-from-0',
-						needsAfter ? 'mask-r-from-10' : 'mask-r-from-0'
+						'-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto fade-edges p-1',
+						needsBefore && 'fade-start',
+						needsAfter && 'fade-end'
 					]}
 				>
 					{#each needs as need (need.text)}
@@ -300,13 +355,8 @@
 						</li>
 					{/each}
 				</ul>
-				<ChevronRightIcon
-					aria-hidden="true"
-					class={[
-						'pointer-events-none absolute right-0 size-5 text-muted-foreground',
-						!needsAfter && 'invisible'
-					]}
-				/>
+				{@render needsScroller(-1, needsBefore)}
+				{@render needsScroller(1, needsAfter)}
 			{/if}
 		</section>
 
@@ -406,6 +456,10 @@
 						>
 							{#if selected}
 								<div class="rounded-lg border bg-card p-5">{@render inspector()}</div>
+							{:else}
+								<p class="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+									Select a Category to see its Target, move money or cover overspending here.
+								</p>
 							{/if}
 							<UpcomingList upcoming={view.upcoming} />
 						</aside>
@@ -423,22 +477,6 @@
 			{/if}
 		</section>
 
-		{#if view.overspent.length > 0}
-			<section aria-labelledby="overspent-heading" class="flex flex-col gap-2">
-				<h2 id="overspent-heading" class="text-lg font-bold">Overspent</h2>
-				<ul class="flex max-w-md flex-col divide-y rounded-lg border bg-card">
-					{#each view.overspent as category (category.id)}
-						<li class="flex justify-between gap-4 px-4 py-2">
-							<span class="truncate">{category.name}</span>
-							<span class="shrink-0 text-destructive">
-								Overspent by {formatCents(-category.available)}
-							</span>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/if}
-
 		{#if view.hidden.length > 0}
 			<section aria-labelledby="hidden-heading" class="flex flex-col gap-2">
 				<h2 id="hidden-heading" class="text-lg font-bold">Hidden Categories</h2>
@@ -446,8 +484,8 @@
 					{#each view.hidden as category (category.id)}
 						<li class="flex justify-between gap-4 px-4 py-2">
 							<span class="truncate">{category.name}</span>
-							<span class="shrink-0">
-								<span class="sr-only">Available</span>
+							<span class={['shrink-0', category.available < 0 && 'text-destructive']}>
+								<span class="sr-only">{category.available < 0 ? 'Overspent' : 'Available'}</span>
 								{formatCents(category.available)}
 							</span>
 						</li>

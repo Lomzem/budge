@@ -38,9 +38,23 @@
 	const owed = (cents: number) => (isCard && cents !== 0 ? -cents : cents);
 	const bankBalance = $derived(entered === undefined ? undefined : owed(entered));
 
-	const clearedShown = $derived(cleared.data === undefined ? undefined : owed(cleared.data));
+	const clearedBalance = $derived(cleared.data?.balance);
+	const unapproved = $derived(cleared.data?.unapproved ?? 0);
+	const clearedShown = $derived(clearedBalance === undefined ? undefined : owed(clearedBalance));
 	const difference = $derived(
-		bankBalance === undefined || cleared.data === undefined ? undefined : bankBalance - cleared.data
+		bankBalance === undefined || clearedBalance === undefined
+			? undefined
+			: bankBalance - clearedBalance
+	);
+	const unapprovedWarning = $derived(
+		unapproved === 1
+			? '1 Cleared Transaction is still Unapproved. Reconciling locks it as it is, so review it first if anything looks wrong.'
+			: `${String(unapproved)} Cleared Transactions are still Unapproved. Reconciling locks them as they are, so review them first if anything looks wrong.`
+	);
+	const submitLabel = $derived(
+		difference === undefined || difference === 0
+			? 'Reconcile'
+			: `Reconcile with ${formatCents(difference)} adjustment`
 	);
 
 	$effect(() => {
@@ -105,6 +119,9 @@
 				<Label for="reconcile-date">Date</Label>
 				<Input id="reconcile-date" type="date" bind:value={date} required />
 			</div>
+			{#if unapproved > 0}
+				<p class="text-sm text-warning">{unapprovedWarning}</p>
+			{/if}
 			<p role="status" class="text-sm text-muted-foreground">
 				{#if difference === 0}
 					It matches the cleared balance.
@@ -114,7 +131,7 @@
 				{/if}
 			</p>
 			<Dialog.Footer {error}>
-				<Button type="submit" disabled={dialog.pending('save')}>Reconcile</Button>
+				<Button type="submit" disabled={dialog.pending('save')}>{submitLabel}</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

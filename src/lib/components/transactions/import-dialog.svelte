@@ -200,7 +200,7 @@
 								{#each file.rows as row, index (index)}
 									<Table.Row>
 										<Table.Cell numeric>
-											<time datetime={row.date}>{formatDate(row.date, 'short')}</time>
+											<time datetime={row.date}>{formatDate(row.date)}</time>
 										</Table.Cell>
 										<Table.Cell width="fill">
 											<span class="block max-w-full truncate">{row.bankText}</span>
@@ -234,6 +234,8 @@
 	{@const decision = decisions[index]}
 	{#if decision === undefined}
 		<span class="text-muted-foreground">…</span>
+	{:else if (decision.kind === 'skip' || decision.kind === 'new') && decision.alike !== undefined}
+		{@render twin(index, decision.alike)}
 	{:else if decision.kind !== 'skip' && decision.candidates !== undefined}
 		{@render picker(index, decision.candidates)}
 	{:else if decision.kind === 'new'}
@@ -243,8 +245,7 @@
 	{:else}
 		<span class="text-xs">
 			Matches {decision.transaction.payeeName ?? 'No Payee'}, {formatDate(
-				decision.transaction.date,
-				'short'
+				decision.transaction.date
 			)}
 		</span>
 	{/if}
@@ -261,12 +262,27 @@
 			<option value="">Pick one</option>
 			{#each candidates as candidate (candidate._id)}
 				<option value={candidate._id}>
-					{candidate.payeeName ?? 'No Payee'}, {formatDate(candidate.date, 'short')}{candidate.memo
+					{candidate.payeeName ?? 'No Payee'}, {formatDate(candidate.date)}{candidate.memo
 						? `, ${candidate.memo}`
 						: ''}
 				</option>
 			{/each}
 			<option value="new">None, add as new</option>
+		</select>
+	</label>
+{/snippet}
+
+{#snippet twin(index: number, alike: PreviewCandidate)}
+	<label class="flex flex-col gap-1 text-xs">
+		<span class="text-warning">
+			Likely already here: {alike.payeeName ?? 'No Payee'}, {formatDate(alike.date)}
+		</span>
+		<select
+			bind:value={picks[index]}
+			class="h-9 max-w-56 rounded-md border border-input bg-card px-2 text-base md:text-sm pointer-coarse:h-11"
+		>
+			<option value="">Skip this row</option>
+			<option value="new">Add it as new</option>
 		</select>
 	</label>
 {/snippet}

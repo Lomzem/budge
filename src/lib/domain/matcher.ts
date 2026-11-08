@@ -30,10 +30,10 @@ export interface MatchContext<T> {
 }
 
 export type MatchDecision<T> =
-	| { kind: 'skip' }
+	| { kind: 'skip'; alike?: T }
 	| { kind: 'match'; transactionId: T; candidates?: T[] }
 	| { kind: 'ask'; candidates: T[] }
-	| { kind: 'new'; candidates?: T[] };
+	| { kind: 'new'; candidates?: T[]; alike?: T };
 
 export const MATCH_WINDOW_DAYS = 10;
 
@@ -52,13 +52,15 @@ export function matchBankRows<T>(
 		context.matchImported === true
 			? linkedSources.length > 0
 			: fromFile && linkedSources.includes('plaid');
+	const linkedHere = (candidate: MatchCandidate<T>) =>
+		candidate.linkedFromFeed ?? candidate.linkedSources.includes(source);
 	const pool = context.candidates
 		.filter(
-			(candidate) =>
-				(!candidate.cleared || takesImported(candidate)) &&
-				!(candidate.linkedFromFeed ?? candidate.linkedSources.includes(source))
+			(candidate) => (!candidate.cleared || takesImported(candidate)) && !linkedHere(candidate)
 		)
 		.map(({ id, date, amount }) => ({ id, date, amount, time: Date.parse(date) }));
+	const alikes = fromFile ? context.candidates.filter(linkedHere) : [];
+	const alikeTaken = new Set<T>();
 
 	return rows.map((row) => {
 		if (row.sourceId !== undefined) {
@@ -89,6 +91,18 @@ export function matchBankRows<T>(
 			.sort((a, b) => Math.abs(a.time - at) - Math.abs(b.time - at))
 			.map((candidate) => candidate.id);
 
+		if (candidates.length === 0 && row.sourceId === undefined) {
+			const alike = alikes.find(
+				(candidate) =>
+					!alikeTaken.has(candidate.id) &&
+					candidate.amount === row.amount &&
+					candidate.date === row.date
+			)?.id;
+			if (alike !== undefined) {
+				alikeTaken.add(alike);
+				return row.pick === 'new' ? { kind: 'new', alike } : { kind: 'skip', alike };
+			}
+		}
 		if (row.pick === 'new')
 			return candidates.length > 0
 				? { kind: 'new', candidates: listed(candidates) }

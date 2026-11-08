@@ -86,9 +86,9 @@ describe('reconciling a Cash Account', () => {
 		const b = await budgetToReconcile();
 		await b.buy(b.checking, -4_250);
 		await b.buy(b.checking, -1_000, false);
-		expect(await b.owner.query(api.reconciliation.clearedBalance, { accountId: b.checking })).toBe(
-			295_750
-		);
+		expect(
+			(await b.owner.query(api.reconciliation.clearedBalance, { accountId: b.checking })).balance
+		).toBe(295_750);
 
 		expect(await b.reconcile(b.checking, 295_750)).toBe(0);
 
@@ -122,11 +122,28 @@ describe('reconciling a Cash Account', () => {
 		});
 		expect(rest.map((r) => r.reconciled)).toEqual([true, true]);
 		expect(await b.account(b.checking)).toMatchObject({ balance: 295_000 });
-		expect(await b.owner.query(api.reconciliation.clearedBalance, { accountId: b.checking })).toBe(
-			295_000
-		);
+		expect(
+			(await b.owner.query(api.reconciliation.clearedBalance, { accountId: b.checking })).balance
+		).toBe(295_000);
 		expect((await b.view()).readyToAssign.amount).toBe(299_250);
 		await b.expectTotalsInStep();
+	});
+
+	test('counts the Cleared Transactions still Unapproved, which reconciling would lock', async () => {
+		const b = await budgetToReconcile();
+		await b.buy(b.checking, -4_250);
+		await b.owner.mutation(api.imports.commit, {
+			accountId: b.checking,
+			source: 'csv',
+			rows: [{ date: '2026-08-12', amount: -1_500, bankText: 'SAMPLE BAKERY 0042' }]
+		});
+		const cleared = () =>
+			b.owner.query(api.reconciliation.clearedBalance, { accountId: b.checking });
+		expect(await cleared()).toEqual({ balance: 294_250, unapproved: 1 });
+
+		await b.reconcile(b.checking, 294_250);
+
+		expect(await cleared()).toEqual({ balance: 294_250, unapproved: 0 });
 	});
 
 	test("the adjustment's Category can be changed afterwards", async () => {
@@ -259,9 +276,9 @@ describe('a Reconciled Transaction', () => {
 		await b.owner.mutation(api.transactions.unlock, { transactionId: b.id });
 		expect((await b.rows(b.checking))[0]).toMatchObject({ cleared: true, reconciled: false });
 		await b.edit({ amount: -4_000 });
-		expect(await b.owner.query(api.reconciliation.clearedBalance, { accountId: b.checking })).toBe(
-			296_000
-		);
+		expect(
+			(await b.owner.query(api.reconciliation.clearedBalance, { accountId: b.checking })).balance
+		).toBe(296_000);
 
 		await b.owner.mutation(api.transactions.remove, { transactionId: b.id });
 		expect(await b.rows(b.checking)).toHaveLength(1);

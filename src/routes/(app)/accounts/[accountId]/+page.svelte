@@ -74,12 +74,18 @@
 				</p>
 				<p class="min-h-6 truncate text-sm/6 text-muted-foreground" data-testid="account-sync">
 					{#if feeder}
+						{#if needsALook(feeder)}
+							<span
+								class="mr-1 rounded-full bg-warning-tint px-2 py-0.5 text-xs font-bold text-warning"
+								>Needs you</span
+							>
+						{/if}
 						{formatSynced(feeder.lastSyncedAt, bank.now)} from
 						<a
 							href={resolve('/bank')}
 							class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
 							>{feeder.name}</a
-						>{#if needsALook(feeder)}<span class="font-medium text-warning"> · needs you</span>{/if}
+						>
 					{:else if bank.loaded}
 						Entered by hand or from bank files
 					{/if}
