@@ -11,6 +11,7 @@ import { payees } from './payees';
 import { plaid } from './plaid';
 import { reconciliation } from './reconciliation';
 import { search } from './search';
+import { settings } from './settings';
 import { shell } from './shell';
 import { splits } from './splits';
 import { targets } from './targets';
@@ -32,6 +33,7 @@ const byFeature: Record<string, Record<string, Journey>> = {
 	plaid,
 	reconciliation,
 	search,
+	settings,
 	shell,
 	splits,
 	targets,
