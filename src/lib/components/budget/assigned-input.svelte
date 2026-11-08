@@ -4,7 +4,7 @@
 
 	import { attempt } from '$lib/attempt';
 	import { Input } from '$lib/components/ui/input';
-	import { formatCents, parseCentsSum } from '$lib/domain/money';
+	import { formatCents, parseAssigned } from '$lib/domain/money';
 
 	let {
 		amount,
@@ -23,6 +23,8 @@
 	let draft: string | null = $state(null);
 	let error = $state('');
 	let input: HTMLInputElement | null = $state(null);
+	let focused = $state(false);
+	let hovered = $state(false);
 	const errorId = $props.id();
 
 	const read = () => draft ?? shown(amount);
@@ -31,6 +33,7 @@
 	};
 
 	function start(event: FocusEvent) {
+		focused = true;
 		if (error === '') draft = shown(amount);
 		(event.currentTarget as HTMLInputElement).select();
 	}
@@ -43,9 +46,10 @@
 
 	function settle(): number | undefined {
 		if (draft === null) return undefined;
-		const cents = parseCentsSum(draft);
+		const cents = parseAssigned(draft, amount);
 		if (cents === undefined) {
-			error = 'Enter an amount, such as 120.00 or 100+20. Escape puts back the saved amount.';
+			error =
+				'Enter an amount, such as 120.00, 100+20, or +5 to add. Escape puts back the saved amount.';
 			return undefined;
 		}
 		error = '';
@@ -54,6 +58,7 @@
 	}
 
 	function commit() {
+		focused = false;
 		if (settle() !== undefined) draft = null;
 	}
 
@@ -92,7 +97,12 @@
 	}
 </script>
 
-<div class="ml-auto w-24 sm:w-28">
+<div
+	class="ml-auto w-24 sm:w-28"
+	role="presentation"
+	onpointerenter={() => (hovered = true)}
+	onpointerleave={() => (hovered = false)}
+>
 	<Input
 		bind:ref={input}
 		bind:value={read, write}
@@ -107,7 +117,8 @@
 		aria-keyshortcuts="ArrowUp ArrowDown"
 		data-assigned
 	/>
-	<Popover.Root open={error !== ''}>
+	<span id={errorId} role="alert" class="sr-only">{error}</span>
+	<Popover.Root open={error !== '' && (focused || hovered)}>
 		<Popover.Portal>
 			<Popover.Content
 				customAnchor={input}
@@ -126,7 +137,7 @@
 				}}
 				class="z-50 w-60 rounded-md border border-destructive bg-popover px-3 py-2 text-xs text-destructive shadow-md"
 			>
-				<span id={errorId} role="alert">{error}</span>
+				<span aria-hidden="true">{error}</span>
 			</Popover.Content>
 		</Popover.Portal>
 	</Popover.Root>

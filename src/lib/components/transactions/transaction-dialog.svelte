@@ -410,9 +410,14 @@
 <Dialog.Root bind:open={() => open, requestOpen}>
 	<Dialog.Content
 		onOpenAutoFocus={(event: Event) => {
-			if (bankChange === null) return;
+			if (bankChange !== null) {
+				event.preventDefault();
+				bankChange.focus();
+				return;
+			}
+			if (transaction !== undefined || defaultAccountId === undefined) return;
 			event.preventDefault();
-			bankChange.focus();
+			document.getElementById('transaction-payee')?.focus();
 		}}
 		onCloseAutoFocus={(event: Event) => {
 			const target = returnFocus?.();
@@ -424,7 +429,7 @@
 		<Dialog.Header>
 			<Dialog.Title>{transaction ? 'Edit Transaction' : 'Add Transaction'}</Dialog.Title>
 		</Dialog.Header>
-		<form class="flex flex-col gap-4" novalidate onsubmit={submit}>
+		<form class="flex flex-col gap-3 sm:gap-4" novalidate onsubmit={submit}>
 			{#if flagged.length > 0}
 				<section
 					bind:this={bankChange}
@@ -554,31 +559,33 @@
 					A starting balance stays in its Account, with no Payee and one Category.
 				</p>
 			{/if}
-			<fieldset>
-				<legend class="mb-2 text-sm font-medium">Direction</legend>
-				<RadioGroup.Root bind:value={draft.direction} disabled={locked}>
-					<div class="flex items-center gap-2">
-						<RadioGroup.Item value="outflow" id="transaction-outflow" />
-						<Label for="transaction-outflow">Outflow</Label>
-					</div>
-					<div class="flex items-center gap-2">
-						<RadioGroup.Item value="inflow" id="transaction-inflow" />
-						<Label for="transaction-inflow">Inflow</Label>
-					</div>
-				</RadioGroup.Root>
-			</fieldset>
-			<div class="flex flex-col gap-2">
-				<Label for="transaction-amount">Amount</Label>
-				<Input
-					id="transaction-amount"
-					bind:value={draft.amount}
-					{...marked('transaction-amount')}
-					inputmode="decimal"
-					placeholder="0.00"
-					autocomplete="off"
-					disabled={locked}
-					required
-				/>
+			<div class="flex items-start gap-6">
+				<fieldset>
+					<legend class="mb-2 text-sm font-medium">Direction</legend>
+					<RadioGroup.Root bind:value={draft.direction} disabled={locked}>
+						<div class="flex items-center gap-2">
+							<RadioGroup.Item value="outflow" id="transaction-outflow" />
+							<Label for="transaction-outflow">Outflow</Label>
+						</div>
+						<div class="flex items-center gap-2">
+							<RadioGroup.Item value="inflow" id="transaction-inflow" />
+							<Label for="transaction-inflow">Inflow</Label>
+						</div>
+					</RadioGroup.Root>
+				</fieldset>
+				<div class="flex min-w-0 flex-1 flex-col gap-2">
+					<Label for="transaction-amount">Amount</Label>
+					<Input
+						id="transaction-amount"
+						bind:value={draft.amount}
+						{...marked('transaction-amount')}
+						inputmode="decimal"
+						placeholder="0.00"
+						autocomplete="off"
+						disabled={locked}
+						required
+					/>
+				</div>
 			</div>
 			<div class="flex flex-col gap-2">
 				<Label for="transaction-category"

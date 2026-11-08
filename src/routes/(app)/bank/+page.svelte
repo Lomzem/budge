@@ -99,12 +99,8 @@
 		<div class="flex max-w-prose flex-col gap-1">
 			<h1 class="text-2xl font-bold tracking-tight">Bank</h1>
 			<p class="text-muted-foreground">
-				<span
-					>New transactions arrive Unapproved as they post, ready to review on each Account.</span
-				>
-				<span class="hidden sm:inline"
-					>They count in your balances and budget right away, and Budge checks each bank daily.</span
-				>
+				New transactions arrive Unapproved as they post, ready to review on each Account. They count
+				in your budget right away, and Budge checks each bank daily.
 			</p>
 		</div>
 		<div class="grid min-w-44">

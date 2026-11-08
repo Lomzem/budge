@@ -122,7 +122,11 @@
 	const approveAll = useMutation(api.transactions.approveAll);
 	const approveMany = useMutation(api.transactions.approveMany);
 	const unapprove = useMutation(api.transactions.unapprove);
-	let undoable = $state<{ scopeKey: string; transactionIds: Id<'transactions'>[] } | null>(null);
+	let undoable = $state<{
+		scopeKey: string;
+		transactionIds: Id<'transactions'>[];
+		text: string;
+	} | null>(null);
 	const scopeKey = $derived(JSON.stringify([scope, filters]));
 	const undo = $derived(undoable?.scopeKey === scopeKey ? undoable : null);
 
@@ -256,16 +260,22 @@
 	async function approveRow(row: Row, payee: string) {
 		rowError = '';
 		undoable = null;
+		const approvedIn = scopeKey;
 		const at = rows.findIndex((other) => other._id === row._id);
-		const waiting = rows.slice(at + 1).filter((other) => !other.approved);
+		const waiting = [...rows.slice(at + 1), ...rows.slice(0, at).reverse()].filter(
+			(other) => !other.approved
+		);
 		const approved = await attempt(() => approve({ transactionId: row._id }));
 		if (!approved.ok) {
 			rowError = "Budge couldn't approve the Transaction. Try again.";
 			return;
 		}
+		undoable = { scopeKey: approvedIn, transactionIds: [row._id], text: `Approved ${payee}.` };
 		announce(`Approved ${payee}`);
 		await tick();
-		const next = waiting.find((other) => rows.some((shown) => shown._id === other._id));
+		const next = waiting.find((other) =>
+			rows.some((shown) => shown._id === other._id && !shown.approved)
+		);
 		const target =
 			(next && (shownOf(`[data-approve="${next._id}"]`) ?? editButtonOf(next))) ?? approveAllButton;
 		target?.focus();
@@ -299,7 +309,11 @@
 			rowError = "Budge couldn't approve the Transactions. Try again.";
 			return;
 		}
-		undoable = { scopeKey: approvedIn, transactionIds: approved.value };
+		undoable = {
+			scopeKey: approvedIn,
+			transactionIds: approved.value,
+			text: approvedText(approved.value.length)
+		};
 	}
 
 	function approvedText(count: number) {
@@ -312,8 +326,16 @@
 		undoable = null;
 		rowError = '';
 		const restored = await attempt(() => unapprove({ transactionIds }));
-		if (!restored.ok) rowError = "Budge couldn't undo the approvals. Try again.";
-		else announce(`${String(restored.value)} back to Unapproved`);
+		if (!restored.ok) {
+			rowError = "Budge couldn't undo the approvals. Try again.";
+			return;
+		}
+		announce(`${String(restored.value)} back to Unapproved`);
+		await tick();
+		const back = transactionIds
+			.map((transactionId) => shownOf(`[data-approve="${transactionId}"]`))
+			.find((button) => button !== undefined);
+		(back ?? approveAllButton)?.focus();
 	}
 </script>
 
@@ -472,7 +494,7 @@
 				class="flex min-h-6 max-w-full min-w-0 items-center gap-2 text-sm text-muted-foreground"
 			>
 				{#if undo}
-					<span class="truncate">{approvedText(undo.transactionIds.length)}</span>
+					<span class="truncate">{undo.text}</span>
 					<button
 						type="button"
 						class="relative -my-0.5 min-h-6 shrink-0 rounded-sm px-1 font-medium text-foreground underline underline-offset-4 after:absolute after:-inset-x-2 after:-inset-y-2.5 hover:no-underline"

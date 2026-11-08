@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { formatCents, parseCents, parseCentsSum } from './money';
+import { formatCents, parseAssigned, parseCents, parseCentsSum } from './money';
 
 describe('parseCents', () => {
 	test.each([
@@ -40,6 +40,24 @@ describe('parseCentsSum', () => {
 
 	test.each(['', '100+', '+', '5++5', '5+abc', '1.2.3+1'])('rejects %j', (text) => {
 		expect(parseCentsSum(text)).toBeUndefined();
+	});
+});
+
+describe('parseAssigned', () => {
+	test.each([
+		['120', 120],
+		['100+20', 120],
+		['+5', 115],
+		['+5+2.50', 117.5],
+		['-5', 105],
+		['−10.25', 99.75],
+		['+$1,000', 1110]
+	])('reads %j against a saved 110.00 as %d dollars', (text, dollars) => {
+		expect(parseAssigned(text, 11_000)).toBe(dollars * 100);
+	});
+
+	test.each(['', '+', '++5', '+abc', '-'])('rejects %j', (text) => {
+		expect(parseAssigned(text, 11_000)).toBeUndefined();
 	});
 });
 

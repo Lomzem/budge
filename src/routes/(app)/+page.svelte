@@ -139,7 +139,7 @@
 		if (view.uncategorizedCount > 0) {
 			const count = view.uncategorizedCount;
 			list.push({
-				text: `${String(count)} ${count === 1 ? 'Transaction needs' : 'Transactions need'} a Category`,
+				text: `${String(count)} Uncategorized`,
 				link: { path: '/accounts', query: '?category=uncategorized' },
 				tone: 'warn'
 			});
@@ -153,7 +153,7 @@
 		}
 		if (bankChangeCount > 0) {
 			list.push({
-				text: `${String(bankChangeCount)} ${bankChangeCount === 1 ? 'Transaction' : 'Transactions'} the bank changed`,
+				text: `${String(bankChangeCount)} ${bankChangeCount === 1 ? 'bank change' : 'bank changes'}`,
 				link: { path: '/accounts', query: '?status=bank-changes' },
 				tone: 'warn'
 			});

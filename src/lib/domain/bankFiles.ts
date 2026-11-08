@@ -145,10 +145,16 @@ const csvProfiles = [
 	)
 ];
 
-const unknownLayout = () =>
-	new BankFileError({
-		message: 'This file is not a Capital One or Discover CSV, or a QFX file.'
+const unknownLayout = (columns: readonly string[]) => {
+	const named = columns.filter((name) => name !== '').slice(0, 6);
+	const found =
+		named.length === 0
+			? ' It has no column names.'
+			: ` Its columns are ${named.map((name) => `“${name}”`).join(', ')}${columns.length > named.length ? ', …' : ''}.`;
+	return new BankFileError({
+		message: `This file is not a Capital One or Discover CSV, or a QFX file.${found} Download the CSV from your bank's transactions page.`
 	});
+};
 
 const formatIssue = SchemaIssue.makeFormatterDefault();
 
@@ -160,7 +166,7 @@ const decodeCsv = Effect.fnUntraced(function* (
 	const profile = csvProfiles.find((candidate) =>
 		candidate.headers.every((name) => columns.includes(name))
 	);
-	if (profile === undefined) return yield* unknownLayout();
+	if (profile === undefined) return yield* unknownLayout(columns);
 	const repeated = columns.find((name, column) => name !== '' && columns.indexOf(name) !== column);
 	if (repeated !== undefined) {
 		return yield* new BankFileError({

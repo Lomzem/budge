@@ -96,7 +96,7 @@ export const budget = {
 			});
 
 			for (const [link, filter, option, count] of [
-				[/^6 Transactions need a Category$/, 'Category', 'Uncategorized', 6],
+				[/^6 Uncategorized$/, 'Category', 'Uncategorized', 6],
 				[/^3 Unapproved$/, 'Status', 'Unapproved', 3]
 			] as const) {
 				await step(`${option} opens the register already narrowed to ${option}`, async () => {

@@ -19,9 +19,10 @@ export const transactions = {
 			const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
 
 			await step(
-				'Enter in Payee moves to Amount, and Save without an amount says why until one is typed',
+				'Add Transaction on an Account opens on Payee, Enter in Payee moves to Amount, and Save without an amount says why until one is typed',
 				async () => {
 					await page.getByRole('button', { name: 'Add Transaction' }).click();
+					await expect(dialog.getByLabel('Payee')).toBeFocused();
 					await dialog.getByLabel('Payee').pressSequentially('Smoke Test Bakery');
 					await page.keyboard.press('Enter');
 					await expect(dialog.getByLabel('Amount')).toBeFocused();
@@ -126,6 +127,19 @@ export const transactions = {
 						page.getByRole('rowheader', { name: 'Approved', exact: true })
 					).toBeVisible();
 					return approveAll.textContent();
+				}
+			);
+
+			await step(
+				"a row's Approve offers Undo, which puts it back and focuses its Approve again",
+				async () => {
+					const rowApprove = page.getByRole('button', { name: /^Approve SAMPLE BOOKSHOP 0193,/ });
+					await rowApprove.click();
+					await expect(page.getByText('Approved SAMPLE BOOKSHOP 0193.')).toBeVisible();
+					await expect(rowApprove).toHaveCount(0);
+					await page.getByRole('button', { name: 'Undo', exact: true }).click();
+					await expect(rowApprove).toBeFocused();
+					await expect(approveAll).toHaveText(label ?? '');
 				}
 			);
 

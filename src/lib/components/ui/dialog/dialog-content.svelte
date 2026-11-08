@@ -23,6 +23,16 @@
 
 		size?: 'default' | 'wide';
 	} = $props();
+
+	let body: HTMLDivElement | null = $state(null);
+	let scrolled = $state(false);
+	let heading = $state('');
+
+	function onscroll() {
+		scrolled = (body?.scrollTop ?? 0) > 8;
+		if (scrolled)
+			heading = body?.querySelector('[data-slot="dialog-title"]')?.textContent.trim() ?? '';
+	}
 </script>
 
 <DialogPortal {...portalProps}>
@@ -38,22 +48,41 @@
 		{...restProps}
 	>
 		<div
+			bind:this={body}
+			{onscroll}
 			data-slot="dialog-body"
-			class="grid min-h-0 scroll-pb-40 gap-5 overflow-y-auto overscroll-contain p-5 sm:scroll-pb-24 sm:p-6"
+			class={[
+				'grid min-h-0 scroll-pb-40 gap-5 overflow-y-auto overscroll-contain p-5 sm:scroll-pb-24 sm:p-6',
+				showCloseButton && 'scroll-pt-16 pointer-coarse:scroll-pt-20'
+			]}
 		>
 			{@render children()}
 		</div>
 		{#if showCloseButton}
-			<DialogPrimitive.Close data-slot="dialog-close">
-				{#snippet child({ props })}
-					<div class="absolute top-3 right-3 rounded-md bg-popover">
-						<Button variant="ghost" size="icon" {...props}>
-							<XIcon />
-							<span class="sr-only">Close</span>
-						</Button>
-					</div>
-				{/snippet}
-			</DialogPrimitive.Close>
+			<div
+				data-slot="dialog-bar"
+				class={[
+					'pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 rounded-t-xl border-b py-3 pr-3 pl-5 sm:pl-6',
+					scrolled ? 'border-border bg-popover' : 'border-transparent'
+				]}
+			>
+				<p
+					aria-hidden="true"
+					class={['min-w-0 flex-1 truncate text-base font-bold', !scrolled && 'invisible']}
+				>
+					{heading}
+				</p>
+				<DialogPrimitive.Close data-slot="dialog-close">
+					{#snippet child({ props })}
+						<div class="pointer-events-auto rounded-md bg-popover">
+							<Button variant="ghost" size="icon" {...props}>
+								<XIcon />
+								<span class="sr-only">Close</span>
+							</Button>
+						</div>
+					{/snippet}
+				</DialogPrimitive.Close>
+			</div>
 		{/if}
 	</DialogPrimitive.Content>
 </DialogPortal>

@@ -24,6 +24,15 @@ export function parseCentsSum(text: string): number | undefined {
 	return Number.isSafeInteger(total) ? total : undefined;
 }
 
+export function parseAssigned(text: string, saved: number): number | undefined {
+	const trimmed = text.trim();
+	const relative = /^[+\-−]/.test(trimmed);
+	const cents = parseCentsSum(relative ? `0${trimmed}` : trimmed);
+	if (cents === undefined) return undefined;
+	const total = relative ? saved + cents : cents;
+	return Number.isSafeInteger(total) ? total : undefined;
+}
+
 const dollars = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
 export function formatCents(cents: number): string {

@@ -219,7 +219,7 @@
 						onclick={() => onstep?.(step.id)}
 					>
 						{#if index === 0}<ChevronLeftIcon aria-hidden="true" />{/if}
-						<span class="min-w-0 truncate">{step.name}</span>
+						<span class="line-clamp-2 min-w-0 break-words">{step.name}</span>
 						{#if index === 1}<ChevronRightIcon aria-hidden="true" />{/if}
 					</Button>
 				{:else}

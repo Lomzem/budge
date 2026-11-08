@@ -101,6 +101,13 @@
 	const reconnectFirst = $derived(
 		connection.status === 'needsAttention' || connection.consentEndsAt !== null
 	);
+	const hinted = $derived(
+		connection.bankLogin && !reconnectFirst && pending === null && result === null
+	);
+	const reconnectReason = $derived.by(() => {
+		if (!connection.bankLogin) return `problems-${connection._id}`;
+		return hinted ? `reconnect-hint-${connection._id}` : undefined;
+	});
 
 	interface Seen {
 		_id: Id<'connectionAccounts'>;
@@ -292,6 +299,10 @@
 						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
 					{/if}
 					<span class="min-w-0">{result.text}</span>
+				{:else if hinted}
+					<span id="reconnect-hint-{connection._id}" class="min-w-0"
+						>Reconnect if the bank asks you to sign in again.</span
+					>
 				{/if}
 			</p>
 			<span role="status" class="sr-only">{result?.text ?? ''}</span>
@@ -300,7 +311,7 @@
 					<Button
 						variant={reconnectFirst && connection.bankLogin ? 'default' : 'outline'}
 						aria-disabled={reconnectBlocked}
-						aria-describedby={connection.bankLogin ? undefined : `problems-${connection._id}`}
+						aria-describedby={reconnectReason}
 						onclick={reconnect}
 					>
 						{reconnecting ? 'Reconnecting…' : 'Reconnect'}

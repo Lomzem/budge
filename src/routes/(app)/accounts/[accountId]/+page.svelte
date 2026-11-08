@@ -166,21 +166,26 @@
 					{/if}
 				</p>
 			</div>
-			<div class="flex flex-wrap items-end gap-x-6 gap-y-3">
-				<div class="flex flex-col items-start sm:items-end">
-					<p class="text-sm font-bold">Balance</p>
+			<div
+				class="grid w-full items-end gap-x-4 sm:flex sm:w-auto sm:flex-wrap sm:gap-x-6 sm:gap-y-3"
+			>
+				<div class="contents sm:flex sm:flex-col sm:items-end">
+					<p class="col-start-1 text-sm font-bold">Balance</p>
 					<p
 						data-testid="account-balance"
 						class={[
-							'border-b-4 border-double border-current text-2xl font-bold',
+							'col-start-1 w-fit border-b-4 border-double border-current text-2xl font-bold',
 							account.balance < 0 && 'text-destructive'
 						]}
 					>
 						{formatCents(account.balance)}
 					</p>
 				</div>
-				<div class="flex flex-col items-start gap-1">
-					<p class="text-sm text-muted-foreground" data-testid="last-reconciled">
+				<div class="contents sm:flex sm:flex-col sm:items-start sm:gap-1">
+					<p
+						class="col-start-1 mt-1 text-sm text-muted-foreground sm:mt-0"
+						data-testid="last-reconciled"
+					>
 						{#if account.lastReconciledOn}
 							Reconciled
 							<time datetime={account.lastReconciledOn}>{formatDate(account.lastReconciledOn)}</time
@@ -189,9 +194,11 @@
 							Not reconciled yet
 						{/if}
 					</p>
-					<Button variant="outline" size="sm" onclick={() => (reconcileOpen = true)}>
-						Reconcile
-					</Button>
+					<div class="col-start-2 row-span-3 row-start-1 self-end justify-self-end">
+						<Button variant="outline" size="sm" onclick={() => (reconcileOpen = true)}>
+							Reconcile
+						</Button>
+					</div>
 				</div>
 			</div>
 		</header>

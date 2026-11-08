@@ -12,14 +12,14 @@ Give money a job by editing a Category's Assigned amount and see Ready to Assign
 - `budget-negative`: assigning more than Ready to Assign shows the negative Ready to Assign warning.
 - `budget-groups`: each Category Group header row totals its shown and Hidden Categories' Assigned, Activity and Available.
 - `budget-carry`: a Category's Available rolls forward into the next month.
-- `budget-review-links`: the `Needs you` chips: `N Transactions need a Category`, `N Unapproved` and `N Transactions the bank changed` link into the Accounts page already filtered (the last to Status `Bank changes`); `N Categories overspent` opens the first overspent Category's inspector. The Budget waits for every count before it paints, so chips never arrive one at a time; a strip that overflows fades at the clipped edge.
+- `budget-review-links`: the `Needs you` chips: `N Uncategorized`, `N Unapproved` and `N bank changes` link into the Accounts page already filtered (the last to Status `Bank changes`); `N Categories overspent` opens the first overspent Category's inspector. The Budget waits for every count before it paints, so chips never arrive one at a time; a strip that overflows fades at the clipped edge.
 
 ## How to get to it (user POV)
 
 - Open `/` directly after sign-in.
 - Choose `Budget` in the desktop sidebar or the phone tab bar.
 - Below `sm` the month is an h2 between `Previous month` and `Next month`, and `Edit Categories` is an icon button at the end of that row whose menu offers `Add Category Group` and `Add Category` (only when a group can take a Category; Credit Card Payments never can).
-- From Budget, the `Needs you` region's `… need a Category` and `… Unapproved` links lead to `/accounts?category=uncategorized` and `/accounts?status=unapproved`; the `… overspent` chip is a button that opens the inspector.
+- From Budget, the `Needs you` region's `… Uncategorized` and `… Unapproved` links lead to `/accounts?category=uncategorized` and `/accounts?status=unapproved`; the `… overspent` chip is a button that opens the inspector.
 
 ## Driving it with Playwright
 
@@ -34,7 +34,7 @@ Preconditions for the manual recipes: baseline fixture and authenticated `page`;
 - **Negative warning (manual):** fill Groceries Assigned with Ready to Assign plus $1 more than its current amount and press Enter. Require `getByRole('status').filter({ hasText: 'Ready to Assign is negative' })` naming $1.00 over. Restore and require the warning gone.
 - **Group totals (manual):** scope `getByRole('rowgroup').filter({ hasText: 'Credit Card Payments' })` style per group; require its header row's Assigned, Activity (desktop only) and Available to equal the sum of all its Categories, including Hidden Categories outside the table. Change one Assigned and require the header total to move by the same amount.
 - **Carry-forward (manual):** record Groceries Available, click `Next month`, and require next month's Available to start from that amount plus next month's Assigned and Activity.
-- **Review links (manual):** on the seeded Budget, require the `Transaction(s) need a Category` and `… Unapproved` links when the fixture has such rows; click each and require the `Accounts` heading with the Category filter at `Uncategorized` (or Status at `Unapproved`) and only matching rows. When a shown Category is overspent, click `N Categories overspent` and require the `Category inspector` region for the first one. If the fixture has none, the link is absent by design: record the journey as blocked by fixture, not passed.
+- **Review links (manual):** on the seeded Budget, require the `N Uncategorized` and `… Unapproved` links when the fixture has such rows; click each and require the `Accounts` heading with the Category filter at `Uncategorized` (or Status at `Unapproved`) and only matching rows. When a shown Category is overspent, click `N Categories overspent` and require the `Category inspector` region for the first one. If the fixture has none, the link is absent by design: record the journey as blocked by fixture, not passed.
 
 ## Gotchas
 

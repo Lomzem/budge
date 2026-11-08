@@ -12,7 +12,7 @@ Keep approved or edited Transactions safe when the bank changes history, while a
 ## How to get to it (user POV)
 
 - The Accounts page (`/accounts`) or an Account page (sidebar `Sections and Accounts` → `Checking`) → Transaction row with a `Bank changed this` or `Bank removed this` line under its Payee.
-- Or the Budget's `N Transactions the bank changed` chip, which opens `/accounts?status=bank-changes` (Status `Bank changes`), listing every flagged Transaction.
+- Or the Budget's `N bank changes` chip, which opens `/accounts?status=bank-changes` (Status `Bank changes`), listing every flagged Transaction.
 - Click the row's Payee button → dialog `Edit Transaction`, which opens focused on a region at the top named `Your bank changed this Transaction` (or `Your bank removed this Transaction`) that says `The bank now says <amount> on <date>.` or `The bank removed it.` with its Bank Text → `Use the bank's version` / `Delete it` / `Keep mine`.
 - `Delete it` opens alert dialog `Delete this Transaction too?` (`Delete this Transfer too?` for a Transfer) → `Delete`.
 
