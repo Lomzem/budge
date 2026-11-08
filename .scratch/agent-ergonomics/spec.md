@@ -23,6 +23,7 @@ Make the next agent's change smaller and its proof cheaper. Each recurring mista
 - Each ticket migrates its callers and deletes the legacy API in the same ticket.
 - Each new or changed test passes the `test-audit` authoring gate.
 - When a structural rule becomes enforceable, it gets a row in the AGENTS.md "Enforced rules" table. The coordinator writes those rows.
+- Every subagent, whether implementer, reviewer, or scout, runs the principles skill (`~/.claude/skills/principles/SKILL.md`, which re-reads `~/.agents/principles/README.md` and every matching reference) before designing, before writing tests, and before declaring completion. It reports the principles that changed a choice. This is a user requirement from 2026-11-07.
 - One integration branch, `refactor/agent-ergonomics`, and one PR into `main`. The user waived CodeRabbit for this PR; the merge gate is green CI.
 
 ## Done when
