@@ -4,7 +4,7 @@ import { internalMutation, mutation, query } from './_generated/server';
 import { findPayeeNamed, lastCategoryOf } from './lib/payees';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import { refreshPayeeSearchText } from './lib/search';
+import { refreshPayeeSearchText } from './lib/transactions';
 
 const PAYEE_LIST_LIMIT = 1_000;
 

@@ -14,7 +14,13 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { requireCents } from './input';
 import { importedPayee, ImportedPayees } from './payees';
 import { publicError } from './publicError';
-import { allBankRowsOf, insertTransaction, refreshSearchText } from './transactions';
+import {
+	addImportedTransaction,
+	allBankRowsOf,
+	dropHeldBankRow,
+	matchBankRow,
+	type ImportedFields
+} from './transactions';
 import { requireCutoverDate, requireIsoDate } from './settings';
 
 export const fileSource = v.union(v.literal('qfx'), v.literal('csv'));
@@ -141,7 +147,7 @@ export async function applyBankRows(
 	ctx: MutationCtx,
 	accountId: Id<'accounts'>,
 	source: BankSource,
-	{ rows, decisions, candidates }: ImportPlan<IncomingRow>,
+	{ rows, decisions }: ImportPlan<IncomingRow>,
 	payees: ImportedPayees,
 	connectionAccountId?: Id<'connectionAccounts'>
 ): Promise<ImportCounts> {
@@ -157,62 +163,34 @@ export async function applyBankRows(
 			date: row.date,
 			amount: row.amount,
 			bankText: row.bankText,
-			state: 'linked' as const
-		};
-		const writeBankRow = async (transactionId: Id<'transactions'>, matched: boolean) => {
-			if (row.heldId === undefined) {
-				await ctx.db.insert('imports', { ...bankRow, transactionId, matched });
-			} else {
-				await ctx.db.patch('imports', row.heldId, {
-					accountId,
-					transactionId,
-					matched,
-					state: 'linked',
-					merchantName: undefined
-				});
-			}
-			await refreshSearchText(ctx, transactionId);
+			...(row.heldId === undefined ? {} : { heldId: row.heldId })
 		};
 		if (decision.kind === 'match') {
-			const matchedStaysLockedIfReconciled =
-				candidates.get(decision.transactionId)?.cleared === 'reconciled';
-			await ctx.db.patch('transactions', decision.transactionId, {
-				cleared: matchedStaysLockedIfReconciled ? 'reconciled' : 'cleared',
-				approved: false
-			});
-			await writeBankRow(decision.transactionId, true);
+			await matchBankRow(ctx, decision.transactionId, bankRow);
 			counts.matched++;
 		} else if (decision.kind === 'skip') {
-			if (row.heldId !== undefined) await ctx.db.delete('imports', row.heldId);
+			if (row.heldId !== undefined) await dropHeldBankRow(ctx, row.heldId);
 			counts.skipped++;
 		} else {
-			const transactionId = await insertImported(ctx, accountId, row, payees);
-			await writeBankRow(transactionId, false);
+			await addImportedTransaction(ctx, await importedFields(ctx, accountId, row, payees), bankRow);
 			counts.added++;
 		}
 	}
 	return counts;
 }
 
-export async function insertImported(
+export async function importedFields(
 	ctx: MutationCtx,
 	accountId: Id<'accounts'>,
 	row: { date: string; amount: number; bankText: string; merchantName?: string | undefined },
 	payees?: ImportedPayees
-) {
-	return await insertTransaction(
-		ctx,
-		{
-			accountId,
-			date: row.date,
-			amount: row.amount,
-			...(await importedPayee(ctx, row, payees)),
-			cleared: 'cleared',
-			approved: false
-		},
-		[],
-		{ deferSearchText: true }
-	);
+): Promise<ImportedFields> {
+	return {
+		accountId,
+		date: row.date,
+		amount: row.amount,
+		...(await importedPayee(ctx, row, payees))
+	};
 }
 
 export function requireBankRow<R extends BankRow>(row: R, cutoverDate: string): R {

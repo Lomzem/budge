@@ -1,10 +1,11 @@
+import { internal } from '../_generated/api';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
-import { addDays } from '../../src/lib/domain/dates';
+import { addDays, monthOf } from '../../src/lib/domain/dates';
 import { MATCH_WINDOW_DAYS } from '../../src/lib/domain/matcher';
 import { SPLIT_LINE_LIMIT } from '../../src/lib/domain/splits';
 import { requireCents } from './input';
-import { countTransaction, lineCounted } from './monthlyTotals';
+import { countTransaction, lineCounted, rebuildTotals } from './monthlyTotals';
 import { payeeNamed, rememberCategory, rememberRename } from './payees';
 import { requireCutoverDate, requireIsoDate } from './settings';
 import { publicError } from './publicError';
@@ -365,12 +366,20 @@ async function writeTransfer(ctx: MutationCtx, first: Side, second: Side) {
 export async function insertTransaction(
 	ctx: MutationCtx,
 	fields: TransactionFields,
-	lines: readonly SplitLine[] = [],
-	{ deferSearchText = false }: { deferSearchText?: boolean } = {}
+	lines: readonly SplitLine[] = []
+) {
+	const id = await insertCounted(ctx, fields, lines);
+	await refreshSearchText(ctx, id);
+	return id;
+}
+
+async function insertCounted(
+	ctx: MutationCtx,
+	fields: TransactionFields,
+	lines: readonly SplitLine[]
 ) {
 	const id = await ctx.db.insert('transactions', fields);
 	await putIn(ctx, id, fields, lines);
-	if (!deferSearchText) await refreshSearchText(ctx, id);
 	return id;
 }
 
@@ -388,6 +397,182 @@ export async function replaceTransaction(
 	);
 	await putIn(ctx, existing._id, fields, lines);
 	await refreshSearchText(ctx, existing._id);
+}
+
+export type ImportedFields = Omit<TransactionFields, 'cleared' | 'approved'>;
+
+export type IncomingBankRow = Omit<
+	Doc<'imports'>,
+	'_id' | '_creationTime' | 'accountId' | 'transactionId' | 'matched' | 'state' | 'merchantName'
+> & { accountId: Id<'accounts'>; heldId?: Id<'imports'> | undefined };
+
+export async function addImportedTransaction(
+	ctx: MutationCtx,
+	fields: ImportedFields,
+	bankRow: IncomingBankRow
+) {
+	const transactionId = await insertCounted(
+		ctx,
+		{ ...fields, cleared: 'cleared', approved: false },
+		[]
+	);
+	await attachBankRow(ctx, transactionId, false, bankRow);
+	return transactionId;
+}
+
+export async function matchBankRow(
+	ctx: MutationCtx,
+	transactionId: Id<'transactions'>,
+	bankRow: IncomingBankRow
+) {
+	const matched = await ctx.db.get('transactions', transactionId);
+	await ctx.db.patch('transactions', transactionId, {
+		cleared: matched?.cleared === 'reconciled' ? 'reconciled' : 'cleared',
+		approved: false
+	});
+	await attachBankRow(ctx, transactionId, true, bankRow);
+}
+
+async function attachBankRow(
+	ctx: MutationCtx,
+	transactionId: Id<'transactions'>,
+	matched: boolean,
+	{ heldId, ...bankRow }: IncomingBankRow
+) {
+	if (heldId === undefined) {
+		await ctx.db.insert('imports', { ...bankRow, transactionId, matched, state: 'linked' });
+	} else {
+		await ctx.db.patch('imports', heldId, {
+			accountId: bankRow.accountId,
+			transactionId,
+			matched,
+			state: 'linked',
+			merchantName: undefined
+		});
+	}
+	await refreshSearchText(ctx, transactionId);
+}
+
+export async function unmatchBankRow(
+	ctx: MutationCtx,
+	bankRowId: Id<'imports'>,
+	matchedId: Id<'transactions'>,
+	fields: ImportedFields
+) {
+	const matched = await ctx.db.get('transactions', matchedId);
+	if (matched !== null) requireUnlocked(matched, 'to unmatch it');
+	const transactionId = await insertCounted(
+		ctx,
+		{ ...fields, cleared: 'cleared', approved: false },
+		[]
+	);
+	await ctx.db.patch('imports', bankRowId, { transactionId, matched: false, state: 'linked' });
+	await refreshSearchText(ctx, transactionId);
+	await refreshSearchText(ctx, matchedId);
+	if (!(await hasBankRow(ctx, matchedId))) {
+		await ctx.db.patch('transactions', matchedId, { cleared: 'uncleared', approved: true });
+	}
+	return transactionId;
+}
+
+export async function keepAfterBankRemoval(
+	ctx: MutationCtx,
+	bankRowId: Id<'imports'>,
+	transactionId: Id<'transactions'>
+) {
+	await ctx.db.patch('imports', bankRowId, { transactionId: undefined, matched: false });
+	await ctx.db.patch('transactions', transactionId, { approved: true });
+	await refreshSearchText(ctx, transactionId);
+}
+
+export interface BankRowChange {
+	date?: string;
+	amount?: number;
+	bankText?: string;
+	merchantName?: string | undefined;
+	state?: Doc<'imports'>['state'];
+}
+
+export async function updateBankRow(
+	ctx: MutationCtx,
+	bankRow: Pick<Doc<'imports'>, '_id' | 'bankText' | 'transactionId'>,
+	change: BankRowChange
+) {
+	await ctx.db.patch('imports', bankRow._id, change);
+	const bankTextChanged = change.bankText !== undefined && change.bankText !== bankRow.bankText;
+	if (bankTextChanged && bankRow.transactionId !== undefined) {
+		await refreshSearchText(ctx, bankRow.transactionId);
+	}
+}
+
+export async function holdBankRow(
+	ctx: MutationCtx,
+	bankRow: Omit<Doc<'imports'>, '_id' | '_creationTime' | 'transactionId' | 'matched' | 'state'>
+) {
+	await ctx.db.insert('imports', { ...bankRow, matched: false, state: 'held' });
+}
+
+export async function dropHeldBankRow(ctx: MutationCtx, heldId: Id<'imports'>) {
+	await ctx.db.delete('imports', heldId);
+}
+
+export async function markCleared(
+	ctx: MutationCtx,
+	transactionId: Id<'transactions'>,
+	cleared: Doc<'transactions'>['cleared']
+) {
+	await ctx.db.patch('transactions', transactionId, { cleared });
+}
+
+export async function markApproved(ctx: MutationCtx, transactionId: Id<'transactions'>) {
+	await ctx.db.patch('transactions', transactionId, { approved: true });
+}
+
+export async function moveCategoryHistory(
+	ctx: MutationCtx,
+	from: Id<'categories'>,
+	to: Id<'categories'>
+) {
+	const monthAccountKeysMoved = new Map<string, { month: string; accountId: Id<'accounts'> }>();
+	const transactions = ctx.db
+		.query('transactions')
+		.withIndex('by_category_date', (q) => q.eq('categoryId', from));
+	for await (const transaction of transactions) {
+		const key = { month: monthOf(transaction.date), accountId: transaction.accountId };
+		monthAccountKeysMoved.set(`${key.month}|${key.accountId}`, key);
+		await ctx.db.patch('transactions', transaction._id, { categoryId: to });
+	}
+	const lines = ctx.db
+		.query('transactionSplits')
+		.withIndex('by_category_date', (q) => q.eq('categoryId', from));
+	for await (const line of lines) {
+		const parent = await ctx.db.get('transactions', line.transactionId);
+		if (parent === null) continue;
+		const key = { month: monthOf(line.date), accountId: parent.accountId };
+		monthAccountKeysMoved.set(`${key.month}|${key.accountId}`, key);
+		await ctx.db.patch('transactionSplits', line._id, { categoryId: to });
+	}
+	await rebuildTotals(ctx, [from, to], monthAccountKeysMoved.values());
+}
+
+export const PAYEE_RENAME_BATCH = 50;
+
+export async function refreshPayeeSearchText(
+	ctx: MutationCtx,
+	payeeId: Id<'payees'>,
+	cursor: string | null
+) {
+	const { page, isDone, continueCursor } = await ctx.db
+		.query('transactions')
+		.withIndex('by_payee_date', (q) => q.eq('payeeId', payeeId))
+		.paginate({ numItems: PAYEE_RENAME_BATCH, cursor });
+	for (const transaction of page) await refreshSearchText(ctx, transaction._id);
+	if (!isDone) {
+		await ctx.scheduler.runAfter(0, internal.payees.refreshSearchText, {
+			payeeId,
+			cursor: continueCursor
+		});
+	}
 }
 
 export async function refreshSearchText(ctx: MutationCtx, transactionId: Id<'transactions'>) {

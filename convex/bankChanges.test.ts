@@ -657,6 +657,25 @@ describe('resolving a bank removal', () => {
 		await budget.expectTotalsRebuild();
 	});
 
+	test("the owner's version is no longer found by the removed row's Bank Text", async () => {
+		const { budget, importId } = await flaggedRemoval();
+		const grocerRow = await budget.row('SAMPLE GROCER 0193');
+		await budget.owner.mutation(api.transactions.update, {
+			transactionId: grocerRow._id,
+			accountId: grocerRow.accountId,
+			date: grocerRow.date,
+			amount: grocerRow.amount,
+			payee: 'Corner Market',
+			memo: 'weekly shop'
+		});
+		expect(await budget.search('grocer')).toEqual([grocerRow._id]);
+
+		await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'mine' });
+
+		expect(await budget.search('grocer')).toEqual([]);
+		expect(await budget.search('corner')).toEqual([grocerRow._id]);
+	});
+
 	test("the bank's version is refused while another statement row still backs the Transaction", async () => {
 		const { budget, importId } = await flaggedRemoval();
 		const grocerRow = await budget.row('SAMPLE GROCER 0193');

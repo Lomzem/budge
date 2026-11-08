@@ -3,7 +3,7 @@ import { assert, describe, expect, onTestFinished, test, vi } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { PAYEE_RENAME_BATCH } from './lib/search';
+import { PAYEE_RENAME_BATCH } from './lib/transactions';
 import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();

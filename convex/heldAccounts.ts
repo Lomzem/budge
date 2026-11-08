@@ -27,7 +27,7 @@ import {
 	suggestStartingBalance as suggest,
 	syncConnection
 } from './lib/sync';
-import { allBankRowsOf } from './lib/transactions';
+import { allBankRowsOf, dropHeldBankRow } from './lib/transactions';
 
 export const HELD_BATCH = 200;
 const MAX_COUNTED = 1_000;
@@ -289,12 +289,12 @@ async function settleHeld(ctx: MutationCtx, connectionAccountId: Id<'connectionA
 	if (owner === null || owner.state === 'held') return;
 	const batch = await heldRows(ctx, connectionAccountId, HELD_BATCH);
 	if (owner.state !== 'mapped') {
-		for (const row of batch) await ctx.db.delete('imports', row._id);
+		for (const row of batch) await dropHeldBankRow(ctx, row._id);
 	} else {
 		const cutoverDate = await requireCutoverDate(ctx);
 		const rows: IncomingRow[] = [];
 		for (const row of batch) {
-			if (row.date < cutoverDate) await ctx.db.delete('imports', row._id);
+			if (row.date < cutoverDate) await dropHeldBankRow(ctx, row._id);
 			else {
 				rows.push({
 					date: row.date,
