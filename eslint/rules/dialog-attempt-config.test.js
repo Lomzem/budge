@@ -1,7 +1,13 @@
 import { ESLint } from 'eslint';
+import ts from 'typescript-eslint';
 import { expect, test } from 'vitest';
 
-const eslint = new ESLint();
+const eslint = new ESLint({
+	overrideConfig: {
+		...ts.configs.disableTypeChecked,
+		languageOptions: { parserOptions: { projectService: false, project: false } }
+	}
+});
 
 const restricted = async (filePath) => {
 	const code = `<script lang="ts">\n\timport { attempt } from '$lib/attempt';\n\tvoid attempt;\n</script>\n`;
