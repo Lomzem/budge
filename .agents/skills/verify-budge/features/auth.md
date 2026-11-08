@@ -28,4 +28,4 @@ Preconditions:
 
 - Never create Clerk users or request passwords/codes in chat. Existing CLI uses a backend sign-in token and existing invented CI identity; it does not exercise GitHub/email verification.
 - No second identity or expired-session fixture is provided. Mark those paths blocked until available; production and 7-day real-device sessions are unverified.
-- Sources: ticket 02, 23; `docs/agents/authentication.md`, `e2e/shell.test.ts`; public `owner.whoami` and all owner-guarded APIs.
+- Sources: ticket 02, 23; `docs/agents/authentication.md`, `e2e/journeys.test.ts` (signs in before each journey); public `owner.whoami` and all owner-guarded APIs.

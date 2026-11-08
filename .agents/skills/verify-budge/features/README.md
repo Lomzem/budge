@@ -8,11 +8,11 @@ Follow [Launch and Doctor](../SKILL.md): own this checkout's instance, authentic
 
 ## Driving conventions
 
-Recipes use `page` from an authenticated Playwright context and `expect` from `@playwright/test`. Start each independent mutation recipe from a fresh seed unless stated otherwise; reseeding destroys this instance's previous changes. Use roles, names, labels, and test IDs. Open Account routes through the sidebar's `navigation` named `Budget and Accounts`; at 320 px use `button` named `View …`, then the corresponding `menuitem`. Never share this checkout's seeded data with another driver.
+Run a feature's journeys with `bun run app verify <feature>/<key>` (see [Journeys](../SKILL.md#journeys)); each feature file lists them at the top of its Driving section, and the manual recipes below them cover what they leave out. Recipes use `page` from an authenticated Playwright context and `expect` from `@playwright/test`. Start each independent mutation recipe from a fresh seed unless stated otherwise; reseeding destroys this instance's previous changes. Use roles, names, labels, and test IDs. Open Account routes through the sidebar's `navigation` named `Budget and Accounts`; at 320 px use `button` named `View …`, then the corresponding `menuitem`. Never share this checkout's seeded data with another driver.
 
 ## Proof and skip reporting
 
-Capture action and result screenshots plus `await page.locator('body').ariaSnapshot()`. Save under a unique `test-results/verify-budge/<run>/` directory. Require persistence and side effects through another user-facing view for mutations. Record each sub-feature ID and entry point as passed, failed, or blocked with the exact unmet precondition. Verifying one entry point leaves other entry points unverified. Cleanup runs after failures too and preserves evidence; the skill owns the lifecycle and proof rules.
+`bun run app verify` captures this for each journey step. For manual recipes, capture action and result screenshots plus `await page.locator('body').ariaSnapshot()`. Save under a unique `test-results/verify-budge/<run>/` directory. Require persistence and side effects through another user-facing view for mutations. Record each sub-feature ID and entry point as passed, failed, or blocked with the exact unmet precondition. Verifying one entry point leaves other entry points unverified. Cleanup runs after failures too and preserves evidence; the skill owns the lifecycle and proof rules.
 
 ## Features
 
@@ -38,25 +38,10 @@ Capture action and result screenshots plus `await page.locator('body').ariaSnaps
 | [Export](export.md)                 | JSON/CSV completeness and exclusions                                     | 13         |
 | [Shell](shell.md)                   | Routes, responsive navigation, theme, Home Screen/device checks          | 02, 04, 23 |
 
-## Route and public API audit
+## Route and public API coverage
 
 Route consumers: `/sign-in` → Auth; `/` → Budget/Inspector/Targets/Settings/Credit cards; `/categories` → Categories; `/accounts` and `/accounts/[accountId]` → Accounts/Transactions/Search/Imports/Transfers/Splits/Reconciliation/Payees. Shell, Plaid and Export span the authenticated routes.
 
-Public Convex exports were checked against `convex/*.ts` (queries, mutations and actions, excluding internal operations). Map additions must keep this inventory covered:
-
-| Public module     | Exports                                                                                                                                            | Map                                                              |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `owner`           | `whoami`                                                                                                                                           | Auth                                                             |
-| `settings`        | `get`, `setCutoverDate`                                                                                                                            | Settings                                                         |
-| `accounts`        | `list`, `create`, `rename`, `reorder`, `setStartingBalance`                                                                                        | Accounts                                                         |
-| `budget`          | `month`, `setAssigned`, `moveMoney`, `cover`, `assignTarget`                                                                                       | Budget, Inspector, Targets, Credit cards                         |
-| `categories`      | `list`, `createGroup`, `create`, `rename`, `setTarget`, `renameGroup`, `move`, `moveGroup`, `setHidden`, `setGroupHidden`, `remove`, `removeGroup` | Categories, Targets                                              |
-| `transactions`    | `list`, `create`, `update`, `transferCandidates`, `remove`, `setCleared`, `unlock`, `approve`, `approveAll`, `unapprovedCount`                     | Transactions, Transfers, Splits, Reconciliation, Imports, Search |
-| `imports`         | `preview`, `commit`, `unmatch`, `resolveBankChange`                                                                                                | Imports, Bank changes                                            |
-| `payees`          | `list`, `lastCategory`, `rename`                                                                                                                   | Payees (global rename has no UI), Search                         |
-| `reconciliation`  | `clearedBalance`, `reconcile`                                                                                                                      | Reconciliation                                                   |
-| `bankConnections` | `list`, `syncNow`, `reconnect`, `syncAfterReconnect`                                                                                               | Plaid                                                            |
-| `heldAccounts`    | `list`, `map`, `createAccount`, `ignore`, `suggestStartingBalance`                                                                                 | Accounts                                                         |
-| `export`          | `tables`, `page`                                                                                                                                   | Export                                                           |
+Each feature file's Sources line names the public Convex functions it covers. `scripts/app/featureMap.test.ts`, part of `bun run check`, fails when a public query, mutation or action is named in no feature file, when a journey is missing from its feature file, or when a feature file names a journey that does not exist.
 
 Tickets 01 (scaffold) and 04 (hosting/preview setup) supply operational prerequisites rather than additional app controls. Ticket 23's production credentials, real-bank setup, usage measurements and real-iPhone checks require owner/external access and remain outside a local seeded proof. Their user journeys are mapped under Accounts, Settings, Plaid, Auth and Shell. Internal seed/migrations/cache rebuild and provisioning are setup, not alternate user entry points.

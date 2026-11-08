@@ -21,15 +21,15 @@ Run `bun run app doctor` first whenever anything looks off. Require all `ok` lin
 
 ## Drive
 
-Use the installed `@playwright/test` library and `browser.newContext({ baseURL: appUrl, storageState: loginPath })`. Take `appUrl` from startup (also `.local-app/running.json`'s `appUrl`) and `loginPath` from `login` (currently `.local-app/storage-state.json`). Navigate using `page.goto('/')`, then wait for `page.getByRole('heading', { level: 1, name: 'Budget', exact: true })` and fixture controls. Drive each selected feature's exact selectors and assert each listed outcome. Wait on locators or `expect.poll`, not fixed sleeps.
+Run the feature's journeys first (see [Journeys](#journeys)); drive by hand only what they leave out. For a manual recipe, use the installed `@playwright/test` library and `browser.newContext({ baseURL: appUrl, storageState: loginPath })`. Take `appUrl` from startup (also `.local-app/running.json`'s `appUrl`) and `loginPath` from `login` (currently `.local-app/storage-state.json`). Navigate using `page.goto('/')`, then wait for `page.getByRole('heading', { level: 1, name: 'Budget', exact: true })` and fixture controls. Drive each selected feature's exact selectors and assert each listed outcome. Wait on locators or `expect.poll`, not fixed sleeps.
 
 The [feature map](features/README.md) is the maintained verification source. Read matching files; account for every selected sub-feature and listed entry point. A missing precondition is a failed/blocked journey, never a pass through an easier entry. Desktop sidebar navigation changes to the `View …` menu on phones. Check 1280×800 and 320×640 when layout or interaction changes.
 
-Existing `e2e/*.test.ts` provide additional selectors for Transfers, splits, Targets, Reconciliation, and export alongside the feature maps. Read the relevant spec when those behaviors change, drive the real path, and extend the map. The standard Playwright config starts a separate build/preview server on the runner's `E2E_PREVIEW_PORT` (4173 only for direct CI invocation) and its global setup signs in independently: do not run `bun run test:e2e` against the owner's configured backend. For the complete isolated suite use the documented `bun run test:e2e:local`; for this skill use the running app and `login` storage state, as the helper does.
+Each journey in `e2e/journeys/<feature>.ts` is also an E2E test (`e2e/journeys.test.ts`), so its selectors are the maintained ones. When a behavior changes, change or add its journey, and list it in the feature file. The standard Playwright config starts a separate build/preview server on the runner's `E2E_PREVIEW_PORT` (4173 only for direct CI invocation) and its global setup signs in independently: do not run `bun run test:e2e` against the owner's configured backend. For the complete isolated suite use the documented `bun run test:e2e:local`; for this skill use the running app and `login` storage state, as `bun run app verify` does.
 
 ## Evidence
 
-Create a unique directory under `test-results/verify-budge/` in this checkout. Record fixture, checkout/commit, feature IDs, entry points, commands with exit codes, readiness, assertions, and any blocked journeys. Keep screenshots and ARIA snapshots before the action, with the draft/action visible, after completion, and after reload or a second user-facing view. For mutations, assert the balance/count/Assigned side effect as well as the visible row; reopen or reload to prove persistence. For downloads save and inspect the actual files.
+`bun run app verify` writes the evidence below for each journey it runs. For manual recipes, create a unique directory under `test-results/verify-budge/` in this checkout. Record fixture, checkout/commit, feature IDs, entry points, commands with exit codes, readiness, assertions, and any blocked journeys. Keep screenshots and ARIA snapshots before the action, with the draft/action visible, after completion, and after reload or a second user-facing view. For mutations, assert the balance/count/Assigned side effect as well as the visible row; reopen or reload to prove persistence. For downloads save and inspect the actual files.
 
 Exercise user controls. Internal setters, direct database writes, and test-only endpoints are not behavior proof. Seed is setup, not proof. Mock only at an existing production boundary and label the unverified external behavior. A seeded Bank Connection without a login cannot prove Plaid sync. For any safe/test/dry-run path, observe what actually changed (downloads, network, stored values); its name is not evidence. Avoid raw request traces, auth headers, session state, env files, or real bank data in artifacts.
 
@@ -39,14 +39,25 @@ Close the Playwright browser in `finally`. After **every** successful or failed 
 
 `down` retains local backend data and private auth state; the next run's `seed` resets data. Keep credentials and storage state gitignored. Cleanup preserves `test-results/verify-budge/`: after teardown require the evidence files still exist and are nonempty, and report their absolute paths. A failed attempt also retains evidence; create a new run directory for the retry.
 
-## Helpers
+## Journeys
 
-After Launch, run from the repository root:
+After Launch, run named journeys from the checkout root:
 
 ```sh
-.agents/skills/verify-budge/features/prove-budget.sh .local-app/storage-state.json
+bun run app verify --list
+bun run app verify budget/assign shell/navigate --run budget-check
 ```
 
-This executable helper uses the existing app instance and installed Playwright; it does not launch a second harness/server, reseed, or perform auth independently. It proves all journeys in [Budget](features/budget.md), captures screenshots/ARIA/action results, restores the Assigned value on success, and prints only its evidence directory. Even if it fails, run Cleanup. Other feature files use the same `page`/`expect` context recipe.
+Each feature file lists its journeys by name (`<feature>/<key>`). The verb drives the app recorded by `up` with the storage state saved by `login`; it starts no server and signs in no one. Before each journey it reseeds the local backend with that journey's fixture, so it destroys earlier changes in this checkout, exactly as `seed` does.
+
+Evidence goes to `test-results/verify-budge/<run>/` (`--run` names it; the default is the start time, and an existing name is refused):
+
+- `<feature>/<key>/NN-<step>.png` and `NN-<step>.aria.yml` after each step, with `-failed` on the step that failed;
+- `<feature>/<key>/trace.zip` per journey (`bunx playwright show-trace <path>`);
+- `summary.json`: the result, checkout, commit, whether there were uncommitted changes, app URL, and each journey's steps, trace and error.
+
+It prints `pass` or `FAIL` per journey and the evidence directory, and exits non-zero if any journey fails. `down` keeps the evidence. Even if a journey fails, run Cleanup.
+
+A journey asserts only through what the user sees. To add one, export it from `e2e/journeys/<feature>.ts` and register it in `e2e/journeys/index.ts`; `bun run test:e2e:local` then runs it as a test, and `scripts/app/featureMap.test.ts` fails until the feature file lists it.
 
 To keep the map current as the app changes, use `/maintain-verification-skill` in Claude Code or `$maintain-verification-skill` in Codex.

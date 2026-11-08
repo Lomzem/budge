@@ -16,6 +16,12 @@ Reuse the last Category for a Payee and remember an edited imported Payee for ex
 
 ## Driving it with Playwright
 
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/payees.ts`, also run by `bun run test:e2e:local`):
+
+- `payees/last-category`: the Category memory recipe up to keeping an explicitly picked Category.
+
+The recipes below cover what the journeys leave out.
+
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
@@ -28,4 +34,4 @@ Preconditions:
 
 - `payees.rename` exists publicly but is not wired to UI. Record that missing entry point explicitly.
 - Rename-memory rows are created through real imported-Transaction edits; do not seed them through internal setters.
-- Sources: ticket 15–16; `e2e/transactions.test.ts`; public `payees.list/lastCategory/rename`.
+- Sources: ticket 15–16; public `payees.list/lastCategory/rename`.

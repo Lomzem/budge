@@ -13,6 +13,13 @@ Divide one Transaction across Categories and memos while preserving its total an
 
 ## Driving it with Playwright
 
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/splits.ts`, also run by `bun run test:e2e:local`):
+
+- `splits/lines`: a split shows Split in the list, and lines are added, edited and removed (`split-create`, `split-edit`, `split-remove`).
+- `splits/restart`: leaving Split and choosing it again starts from the current amount and Category.
+
+The recipes below cover what the journeys leave out.
+
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
@@ -24,4 +31,4 @@ Preconditions:
 ## Gotchas
 
 - 2–50 lines, sums in whole cents; a negative line reverses Direction. A split cannot also be a Transfer.
-- Sources: ticket 11; `e2e/splits.test.ts`; public Transaction create/update and list.
+- Sources: ticket 11; public Transaction create/update and list.

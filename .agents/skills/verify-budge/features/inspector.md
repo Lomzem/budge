@@ -14,6 +14,12 @@ Inspect a Category, move Assigned between jobs, and cover Overspending from Read
 
 ## Driving it with Playwright
 
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/inspector.ts`, also run by `bun run test:e2e:local`):
+
+- `inspector/move-money`: `inspect-open` and `move-money` by keyboard, and the inspector under its row at 320 px.
+
+The recipes below cover what the journeys leave out.
+
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
@@ -25,4 +31,4 @@ Preconditions:
 ## Gotchas
 
 - Cover requires actual negative Available; if fixture has no negative Category create Overspending via UI or report blocked, not passed by opening an inspector.
-- Sources: ticket 07; `e2e/inspector.test.ts`; public `budget.moveMoney/cover/month`.
+- Sources: ticket 07; public `budget.moveMoney/cover/month`.
