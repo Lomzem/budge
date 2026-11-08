@@ -30,3 +30,11 @@ Make the next agent's change smaller and its proof cheaper. Each recurring mista
 - `bun run check` and `bun run test:e2e:local` pass on the integration branch.
 - verify-budge's maintenance pass (`/maintain-verification-skill`) covers every feature live, with evidence in `test-results/verify-budge/`.
 - CI is green on the PR. The PR is merged, and the Vercel production deployment of the merge commit succeeds.
+
+## Cleanup (after merge)
+
+The user asked for this on 2026-11-07. Remove worktrees, branches, and scratch files that are no longer needed.
+
+- A worktree or branch whose commits are all on `main` and that has no uncommitted changes can be removed.
+- A worktree or branch with unmerged commits or uncommitted edits is listed for the user, not deleted.
+- Untracked user files, such as `.scratch/v1/deployment-wizard.sh` and `docs/research/`, are listed for the user, not deleted.
