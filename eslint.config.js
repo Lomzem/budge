@@ -22,6 +22,9 @@ const browserOnlyGlobals = new Set([
 	'location'
 ]);
 
+const journeyRunsOutsidePlaywrightTest =
+	'A journey also runs outside Playwright Test, under `bun run app verify`; report steps through its context instead.';
+
 export default defineConfig(
 	globalIgnores([
 		'.svelte-kit/',
@@ -188,6 +191,24 @@ export default defineConfig(
 							message:
 								"Import `test` from './test', which reloads a seed fixture before every test."
 						}
+					]
+				}
+			]
+		}
+	},
+	{
+		files: ['e2e/journeys/**/*.ts'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: '@playwright/test',
+							importNames: ['test'],
+							message: journeyRunsOutsidePlaywrightTest
+						},
+						{ name: '../test', message: journeyRunsOutsidePlaywrightTest }
 					]
 				}
 			]
