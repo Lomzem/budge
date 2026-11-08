@@ -25,8 +25,7 @@
 
 	let adding: 'group' | 'category' = $state('group');
 	let addingOpen = $state(false);
-	let addingSaving = $state(false);
-	let addDialog: { reset: () => void } | undefined = $state();
+	let addDialog: { reset: () => void; saving: () => boolean } | undefined = $state();
 
 	let renameTarget: RenameTarget | undefined = $state();
 	let renameOpen = $state(false);
@@ -100,7 +99,7 @@
 			<Button
 				variant="outline"
 				size="sm"
-				disabled={addingSaving && adding !== 'group'}
+				disabled={addDialog?.saving() === true && adding !== 'group'}
 				onclick={() => {
 					add('group');
 				}}
@@ -111,7 +110,7 @@
 				<Button
 					variant="outline"
 					size="sm"
-					disabled={addingSaving && adding !== 'category'}
+					disabled={addDialog?.saving() === true && adding !== 'category'}
 					onclick={() => {
 						add('category');
 					}}
@@ -286,7 +285,6 @@
 <AddCategoryDialog
 	bind:this={addDialog}
 	bind:open={addingOpen}
-	bind:saving={addingSaving}
 	kind={adding}
 	groups={groups.map((group) => ({ id: group._id, name: group.name }))}
 />

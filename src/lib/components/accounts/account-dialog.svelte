@@ -4,12 +4,12 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { api } from '$convex/_generated/api';
-	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { formatDate } from '$lib/domain/dates';
 	import { parseCents } from '$lib/domain/money';
 
@@ -22,12 +22,13 @@
 	let kind: 'cash' | 'creditCard' = $state('cash');
 	let balance = $state('');
 	let error = $state('');
-	let saving = $state(false);
+	const dialog = new DialogSession();
 
 	const cutoverDate = $derived(settings.data?.cutoverDate);
 
 	$effect(() => {
 		if (open) {
+			dialog.open({});
 			name = '';
 			kind = 'cash';
 			balance = '';
@@ -42,15 +43,14 @@
 			error = 'Enter the balance as an amount, such as 1,250.00.';
 			return;
 		}
-		saving = true;
 		const startingBalance = kind === 'creditCard' ? -cents : cents;
-		const added = await attempt(async () => {
-			const accountId = await createAccount({ name, kind, startingBalance });
-			open = false;
-			await goto(resolve('/(app)/accounts/[accountId]', { accountId }));
-		});
-		saving = false;
-		if (!added.ok) error = added.error?.message ?? "Budge couldn't add the Account. Try again.";
+		const added = await dialog.run('save', () => createAccount({ name, kind, startingBalance }));
+		if (!added.ok) {
+			error = added.error?.message ?? "Budge couldn't add the Account. Try again.";
+			return;
+		}
+		open = false;
+		await goto(resolve('/(app)/accounts/[accountId]', { accountId: added.value }));
 	}
 </script>
 
@@ -104,7 +104,7 @@
 					<p role="alert" class="text-sm text-destructive">{error}</p>
 				{/if}
 				<Dialog.Footer>
-					<Button type="submit" disabled={saving}>Add Account</Button>
+					<Button type="submit" disabled={dialog.pending('save')}>Add Account</Button>
 				</Dialog.Footer>
 			</form>
 		{/if}

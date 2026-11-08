@@ -6,12 +6,12 @@
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
-	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as Table from '$lib/components/ui/table';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 	import type { BankFile } from '$lib/domain/bankFiles';
 	import { formatDate } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
@@ -37,12 +37,11 @@
 	let file: BankFile | undefined = $state();
 
 	let picks: string[] = $state([]);
-	let reading = $state(false);
-
-	let reads = 0;
-	let session = 0;
-	let saving = $state(false);
 	let error = $state('');
+
+	const dialog = new DialogSession<object, 'read' | 'save'>();
+	const reading = $derived(dialog.pending('read'));
+	const saving = $derived(dialog.pending('save'));
 
 	const account = $derived(accounts.find(accountId));
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? null);
@@ -75,10 +74,7 @@
 	});
 
 	function reset() {
-		session += 1;
-		reads += 1;
-		reading = false;
-		saving = false;
+		dialog.open({});
 		accountId = defaultAccountId ?? accounts.all[0]?._id ?? '';
 		file = undefined;
 		picks = [];
@@ -95,12 +91,7 @@
 			error = 'Set the cutover date before importing.';
 			return;
 		}
-		const read = ++reads;
-		reading = true;
-		const opened = await attempt(() => readBankFile(chosen, cutoverDate));
-		const anotherFileChosenWhileThisWasRead = read !== reads;
-		if (anotherFileChosenWhileThisWasRead) return;
-		reading = false;
+		const opened = await dialog.run('read', () => readBankFile(chosen, cutoverDate));
 		if (!opened.ok) error = "Budge couldn't read this file.";
 		else if (opened.value.ok) file = opened.value.file;
 		else error = opened.value.message;
@@ -117,13 +108,9 @@
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
 		if (!account || !file || !ready) return;
-		const started = session;
-		saving = true;
 		error = '';
 		const args = { accountId: account._id, source: file.source, rows: rowsWithPicks(file) };
-		const committed = await attempt(() => commit(args));
-		if (started !== session) return;
-		saving = false;
+		const committed = await dialog.run('save', () => commit(args));
 		if (committed.ok) open = false;
 		else error = committed.error?.message ?? "Budge couldn't save the import. Try again.";
 	}

@@ -7,7 +7,6 @@
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { attempt } from '$lib/attempt';
 	import { getBankConnections, type BankConnection } from '$lib/bankConnections.svelte';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -19,11 +18,14 @@
 	const client = useConvexClient();
 	const connections = getBankConnections();
 
-	const dialog = new DialogSession<{
-		connectionId: Id<'bankConnections'>;
-		syncing: boolean;
-		result: string;
-	}>();
+	const dialog = new DialogSession<
+		{
+			connectionId: Id<'bankConnections'>;
+			result: string;
+		},
+		'sync'
+	>();
+	const syncing = $derived(dialog.pending('sync'));
 	const opened = $derived(
 		connections.all.find((connection) => connection._id === dialog.current?.connectionId)
 	);
@@ -43,7 +45,7 @@
 	function open(connectionId: Id<'bankConnections'>) {
 		const result = unseenReconnectResults.get(connectionId) ?? '';
 		unseenReconnectResults.delete(connectionId);
-		dialog.open({ connectionId, syncing: false, result });
+		dialog.open({ connectionId, result });
 		connections.tick();
 	}
 
@@ -58,13 +60,14 @@
 	async function syncNow() {
 		const session = dialog.current;
 		if (session === null) return;
-		session.syncing = true;
 		session.result = '';
-		const synced = await attempt(() =>
-			client.action(api.bankConnections.syncNow, { connectionId: session.connectionId })
+		const synced = await dialog.run('sync', () =>
+			client
+				.action(api.bankConnections.syncNow, { connectionId: session.connectionId })
+				.finally(() => {
+					connections.tick();
+				})
 		);
-		session.syncing = false;
-		connections.tick();
 		session.result = synced.ok
 			? describeSync(synced.value)
 			: (synced.error?.message ?? "Budge couldn't sync. Try again.");
@@ -155,18 +158,15 @@
 				{#if opened.status === 'needsAttention' || opened.consentEndsAt !== null}
 					<Button
 						variant="outline"
-						disabled={connections.reconnecting !== null || (dialog.current?.syncing ?? false)}
+						disabled={connections.reconnecting !== null || syncing}
 						onclick={() => reconnect(opened._id)}
 					>
 						{connections.reconnecting === opened._id ? 'Reconnecting…' : 'Reconnect'}
 					</Button>
 				{/if}
-				<Button
-					disabled={(dialog.current?.syncing ?? false) || connections.reconnecting !== null}
-					onclick={syncNow}
-				>
-					<RefreshCwIcon aria-hidden="true" class={dialog.current?.syncing ? 'animate-spin' : ''} />
-					{dialog.current?.syncing ? 'Syncing…' : 'Sync now'}
+				<Button disabled={syncing || connections.reconnecting !== null} onclick={syncNow}>
+					<RefreshCwIcon aria-hidden="true" class={syncing ? 'animate-spin' : ''} />
+					{syncing ? 'Syncing…' : 'Sync now'}
 				</Button>
 			</Dialog.Footer>
 		{/if}

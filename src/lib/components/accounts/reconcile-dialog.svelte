@@ -3,11 +3,11 @@
 
 	import { api } from '$convex/_generated/api';
 	import type { Account } from '$lib/accounts.svelte';
-	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { localToday } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
 
@@ -30,7 +30,7 @@
 	let balance = $state('');
 	let date = $state('');
 	let error = $state('');
-	let saving = $state(false);
+	const dialog = new DialogSession();
 
 	const isCard = $derived(account.kind === 'creditCard');
 	const entered = $derived(balance.trim() === '' ? undefined : parseCents(balance));
@@ -45,6 +45,7 @@
 
 	$effect(() => {
 		if (open) {
+			dialog.open({});
 			balance = '';
 			date = localToday();
 			error = '';
@@ -57,11 +58,9 @@
 			error = 'Enter the balance as an amount, such as 1,250.00.';
 			return;
 		}
-		saving = true;
-		const reconciled = await attempt(() =>
+		const reconciled = await dialog.run('save', () =>
 			reconcile({ accountId: account._id, balance: bankBalance, date })
 		);
-		saving = false;
 		if (!reconciled.ok) {
 			error = reconciled.error?.message ?? "Budge couldn't reconcile the Account. Try again.";
 			return;
@@ -118,7 +117,7 @@
 				<p role="alert" class="text-sm text-destructive">{error}</p>
 			{/if}
 			<Dialog.Footer>
-				<Button type="submit" disabled={saving}>Reconcile</Button>
+				<Button type="submit" disabled={dialog.pending('save')}>Reconcile</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

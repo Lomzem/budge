@@ -19,11 +19,13 @@ Preconditions:
 
 - **Create:** click `Add Category Group`; dialog label `Name` = `Sample Verification Group`, button `Add`. Then `Add Category` (exact), labels `Category Group` and `Name` = `Sample Verification Category`; click `Add`. Require both on Budget after reload. Repeat Budget’s creation entry points.
 - **Actions:** focus `getByRole("button", { name: "Sample Verification Category actions", exact: true })`, press Enter, then choose menuitem `Rename`; fill Name and Save. Exercise `Move up`, `Move down`, and group placement options from the current menu; assert visible order after reload. Use the corresponding Group actions menu to rename and reorder the group.
+- **Late rename:** hold the `categories:rename` response with `e2e/heldResponse.ts`, Save a new Name, press Escape, and reopen Rename for the same Category. After releasing, require the new name in the list while the reopened dialog stays open with the old Name, Save enabled and no alert.
 - **Visibility:** choose `Hide from budget` on Category and Group in separate runs; require the hidden indication in Categories and absence from the normal Budget section. Use the menu’s show action to restore and verify after reload.
 - **Delete/history:** give the Category an invented Transaction, assignment, and split line first through their mapped UI. Choose `Delete…`, dialog `Delete <name>`, select `Move its history to` = Groceries, then `Delete Category`. Require source absent and each Transaction, split line and budget amount moved to Groceries. Delete a populated Group through its `Delete…` dialog, selecting `Move its Categories to` before `Delete group`; verify the Categories appear in the destination in order. An empty Group requires no destination. capture 320 px state.
 
 ## Gotchas
 
 - Exact visibility/menu text varies for hidden versus visible rows; inspect the ARIA snapshot before selecting the inverse action.
+- Add Category preselects the first Category Group, which can be Credit Card Payments; select an ordinary Group such as Everyday before adding.
 - Credit Card Payment Categories and system Categories have restrictions; do not treat disabled actions as editable ordinary Categories.
 - Sources: ticket 06; `e2e/categories.test.ts`; public `categories.list/createGroup/create/rename/renameGroup/move/moveGroup/setHidden/setGroupHidden/remove/removeGroup`.
