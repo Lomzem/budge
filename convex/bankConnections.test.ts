@@ -814,6 +814,7 @@ describe('the Bank Connection status', () => {
 
 		expect(Object.keys(status ?? {}).sort()).toEqual([
 			'_id',
+			'bankLogin',
 			'consentEndsAt',
 			'feeds',
 			'lastError',
@@ -822,7 +823,12 @@ describe('the Bank Connection status', () => {
 			'overdue',
 			'status'
 		]);
-		expect(status).toMatchObject({ _id: connectionId, name: 'Sample Bank', lastError: null });
+		expect(status).toMatchObject({
+			_id: connectionId,
+			name: 'Sample Bank',
+			lastError: null,
+			bankLogin: true
+		});
 		expect(JSON.stringify(status)).not.toMatch(/item-synthetic|cursor-synthetic|v1\./);
 	});
 

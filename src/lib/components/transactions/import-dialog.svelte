@@ -212,8 +212,7 @@
 				</section>
 			{/if}
 
-			<p role="alert" class="min-h-6 text-sm text-destructive">{error}</p>
-			<Dialog.Footer>
+			<Dialog.Footer {error}>
 				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
 				<Button type="submit" disabled={!ready || saving}>
 					{saving ? 'Saving…' : 'Save'}

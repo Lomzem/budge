@@ -49,7 +49,9 @@ export const reconciliation = {
 					);
 					await expect(page.getByTestId('last-reconciled')).toContainText(/^Reconciled \w+/);
 					await expect(adjustment).toHaveCount(1);
-					await expect(adjustment.getByText('Reconciled', { exact: true })).toBeAttached();
+					await expect(
+						adjustment.getByText('Reconciled', { exact: true }).filter({ visible: true })
+					).toHaveCount(1);
 					await expect(
 						adjustment.getByText('Ready to Assign').filter({ visible: true })
 					).toBeVisible();

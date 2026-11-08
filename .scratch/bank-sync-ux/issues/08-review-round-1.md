@@ -1,6 +1,6 @@
 # 08 — Fixes from review round 1
 
-Status: in progress (round 2 next)
+Status: done (round 2 followed; see 09)
 
 Round 1 scores: Sol 6, Sol 6, Opus 4. The fixes below answer their findings.
 

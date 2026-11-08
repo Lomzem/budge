@@ -57,6 +57,7 @@
 	const resolveBankChange = useMutation(api.imports.resolveBankChange);
 	const unlock = useMutation(api.transactions.unlock);
 	const categories = useQuery(api.categories.list, () => (open ? {} : 'skip'));
+	const payees = useQuery(api.payees.list, () => (open ? {} : 'skip'));
 
 	const freshDraft = () =>
 		openDraft({
@@ -261,7 +262,7 @@
 				</li>
 			{/each}
 		</ol>
-		<div class="flex flex-wrap items-center justify-between gap-2">
+		<div class="flex items-center justify-between gap-2">
 			<Button
 				type="button"
 				variant="outline"
@@ -271,9 +272,9 @@
 					draft = addLine(draft);
 				}}>Add line</Button
 			>
-			<p aria-live="polite" class="text-sm font-medium">
+			<p aria-live="polite" class="min-w-0 text-right text-sm font-medium">
 				{#if shown.remainder === undefined}
-					Enter amounts such as 12.50 to see what is left.
+					Enter amounts to see what's left.
 				{:else if shown.remainder === 0 && shown.blankLine}
 					Nothing left for the empty line
 				{:else if shown.remainder === 0}
@@ -344,8 +345,14 @@
 						id="transaction-payee"
 						bind:value={draft.payee}
 						autocomplete="off"
+						list="transaction-payees"
 						disabled={startingBalance}
 					/>
+					<datalist id="transaction-payees">
+						{#each payees.data ?? [] as payee (payee._id)}
+							<option value={payee.name}></option>
+						{/each}
+					</datalist>
 				</div>
 			{/if}
 			{#if startingBalance}
@@ -353,6 +360,31 @@
 					A starting balance stays in its Account, with no Payee and one Category.
 				</p>
 			{/if}
+			<fieldset>
+				<legend class="mb-2 text-sm font-medium">Direction</legend>
+				<RadioGroup.Root bind:value={draft.direction} disabled={locked}>
+					<div class="flex items-center gap-2">
+						<RadioGroup.Item value="outflow" id="transaction-outflow" />
+						<Label for="transaction-outflow">Outflow</Label>
+					</div>
+					<div class="flex items-center gap-2">
+						<RadioGroup.Item value="inflow" id="transaction-inflow" />
+						<Label for="transaction-inflow">Inflow</Label>
+					</div>
+				</RadioGroup.Root>
+			</fieldset>
+			<div class="flex flex-col gap-2">
+				<Label for="transaction-amount">Amount</Label>
+				<Input
+					id="transaction-amount"
+					bind:value={draft.amount}
+					inputmode="decimal"
+					placeholder="0.00"
+					autocomplete="off"
+					disabled={locked}
+					required
+				/>
+			</div>
 			<div class="flex flex-col gap-2">
 				<Label for="transaction-category"
 					>{startingBalance ? 'Category' : 'Category or Transfer'}</Label
@@ -434,31 +466,6 @@
 					</RadioGroup.Root>
 				</fieldset>
 			{/if}
-			<fieldset>
-				<legend class="mb-2 text-sm font-medium">Direction</legend>
-				<RadioGroup.Root bind:value={draft.direction} disabled={locked}>
-					<div class="flex items-center gap-2">
-						<RadioGroup.Item value="outflow" id="transaction-outflow" />
-						<Label for="transaction-outflow">Outflow</Label>
-					</div>
-					<div class="flex items-center gap-2">
-						<RadioGroup.Item value="inflow" id="transaction-inflow" />
-						<Label for="transaction-inflow">Inflow</Label>
-					</div>
-				</RadioGroup.Root>
-			</fieldset>
-			<div class="flex flex-col gap-2">
-				<Label for="transaction-amount">Amount</Label>
-				<Input
-					id="transaction-amount"
-					bind:value={draft.amount}
-					inputmode="decimal"
-					placeholder="0.00"
-					autocomplete="off"
-					disabled={locked}
-					required
-				/>
-			</div>
 			<div class="flex flex-col gap-2">
 				<Label for="transaction-memo">Memo</Label>
 				<Input id="transaction-memo" bind:value={draft.memo} autocomplete="off" />
@@ -528,8 +535,7 @@
 					{/if}
 				</section>
 			{/if}
-			<p role="alert" class="min-h-6 text-sm text-destructive">{error}</p>
-			<Dialog.Footer>
+			<Dialog.Footer {error}>
 				{#if transaction && !locked}
 					<Button
 						type="button"

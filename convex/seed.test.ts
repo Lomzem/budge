@@ -82,7 +82,8 @@ describe('seed:run', () => {
 				name: 'Sample Bank (Sandbox)',
 				status: 'ok',
 				lastSyncedAt: Date.parse('2026-10-27T10:00:00Z'),
-				lastError: null
+				lastError: null,
+				bankLogin: false
 			}
 		]);
 	});

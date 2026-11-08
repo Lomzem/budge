@@ -34,7 +34,10 @@
 	<BrandMark class="size-7" />
 	Budge
 </a>
-<nav aria-label="Budget and Accounts" class="flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-6">
+<nav
+	aria-label="Sections and Accounts"
+	class="flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-6"
+>
 	<ul class="flex flex-col gap-0.5">
 		{#each SECTIONS as section (section.href)}
 			{@const Icon = section.icon}
@@ -89,7 +92,7 @@
 								class={[linkClass, 'justify-between']}
 							>
 								<span class="truncate">{account.name}</span>
-								<span class={['shrink-0', account.balance < 0 && 'text-destructive']}>
+								<span class={['shrink-0 font-normal', account.balance < 0 && 'text-destructive']}>
 									{formatCents(account.balance)}
 								</span>
 							</a>

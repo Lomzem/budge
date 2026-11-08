@@ -5,7 +5,7 @@
 	import { formatCents } from '$lib/domain/money';
 
 	import AssignedInput from './assigned-input.svelte';
-	import { availableStatus, paymentNotes } from './status';
+	import { availableStatus, waitingNotes } from './status';
 	import TargetBar from './target-bar.svelte';
 
 	let {
@@ -28,7 +28,7 @@
 	{@const selected = category.id === selectedId}
 	<button
 		type="button"
-		class="block w-full rounded-sm pl-3 text-left font-medium break-words whitespace-normal underline-offset-4 hover:underline pointer-coarse:py-2.5"
+		class="block w-full rounded-sm pl-3 text-left font-medium break-words whitespace-normal underline-offset-4 hover:underline pointer-coarse:py-2"
 		aria-expanded={selected}
 		aria-controls={selected ? 'category-inspector' : undefined}
 		data-category-id={category.id}
@@ -47,10 +47,10 @@
 			/>
 		</div>
 	{/if}
-	<span class="block min-h-5 pl-3 text-xs whitespace-normal {status?.class ?? ''}"
-		>{status?.text ?? ''}</span
-	>
-	{#each paymentNotes(category) as note (note)}
+	{#if status}
+		<span class="block pl-3 text-xs whitespace-normal {status.class}">{status.text}</span>
+	{/if}
+	{#each waitingNotes(category) as note (note)}
 		<span class="block pl-3 text-xs whitespace-normal text-muted-foreground">{note}</span>
 	{/each}
 {/snippet}
@@ -58,26 +58,19 @@
 <Table.Root layout="fixed">
 	<Table.Header>
 		<Table.Row>
-			<Table.Head showFrom="screen-sm">Category</Table.Head>
-			<Table.Head width="amount" align="end">Assigned</Table.Head>
+			<Table.Head>Category</Table.Head>
+			<Table.Head width="amount" align="end" showFrom="screen-sm">Assigned</Table.Head>
 			<Table.Head width="amount" align="end" showFrom="screen-sm">Activity</Table.Head>
 			<Table.Head width="amount" align="end">Available</Table.Head>
 		</Table.Row>
 	</Table.Header>
 	{#each groups as group (group.id)}
 		<Table.Body>
-			<Table.Row part="phoneLead">
-				<Table.Head scope="colgroup" colspan={4} lead>
-					<span class="block text-base font-semibold break-words whitespace-normal text-foreground"
-						>{group.name}</span
-					>
-				</Table.Head>
-			</Table.Row>
 			<Table.Row>
-				<Table.Head scope="rowgroup" showFrom="screen-sm">
-					<span class="block truncate font-semibold">{group.name}</span>
+				<Table.Head scope="rowgroup">
+					<span class="block font-semibold break-words whitespace-normal">{group.name}</span>
 				</Table.Head>
-				<Table.Cell align="end" numeric>
+				<Table.Cell align="end" numeric showFrom="screen-sm">
 					<span class="font-medium">{formatCents(group.assigned)}</span>
 				</Table.Cell>
 				<Table.Cell align="end" numeric showFrom="screen-sm">
@@ -90,12 +83,9 @@
 			{#each group.categories as category (category.id)}
 				{@const status = availableStatus(category)}
 				{@const selected = category.id === selectedId}
-				<Table.Row part="phoneLead" data-state={selected ? 'selected' : undefined}>
-					<Table.Cell colspan={4} lead>{@render name(category)}</Table.Cell>
-				</Table.Row>
 				<Table.Row data-state={selected ? 'selected' : undefined}>
-					<Table.Cell showFrom="screen-sm">{@render name(category)}</Table.Cell>
-					<Table.Cell align="end">
+					<Table.Cell>{@render name(category)}</Table.Cell>
+					<Table.Cell align="end" showFrom="screen-sm">
 						<AssignedInput
 							amount={category.assigned}
 							label="Assigned for {category.name}"
@@ -106,7 +96,7 @@
 						{formatCents(category.activity)}
 					</Table.Cell>
 					<Table.Cell align="end" numeric>
-						<span class={status?.class}>{formatCents(category.available)}</span>
+						<span class={['font-medium', status?.class]}>{formatCents(category.available)}</span>
 					</Table.Cell>
 				</Table.Row>
 			{:else}

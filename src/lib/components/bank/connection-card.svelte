@@ -2,6 +2,7 @@
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import ClockIcon from '@lucide/svelte/icons/clock';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import { untrack } from 'svelte';
@@ -11,7 +12,8 @@
 	import {
 		getBankConnections,
 		type BankConnection,
-		type HeldAccount
+		type HeldAccount,
+		type Report
 	} from '$lib/bankConnections.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { formatSynced } from '$lib/domain/freshness';
@@ -31,12 +33,15 @@
 	const bank = getBankConnections();
 	const syncing = $derived(bank.syncing.has(connection._id));
 	const reconnecting = $derived(bank.linking === connection._id);
-	let result = $state('');
+	let result: Report | null = $state(null);
 
 	const exactTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 	const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
-	const health = $derived.by((): { tone: 'ok' | 'warn' | 'bad'; text: string } => {
+	const problem = $derived.by((): { tone: 'warn' | 'bad'; text: string } | null => {
+		if (!connection.bankLogin) {
+			return { tone: 'warn', text: 'Has no bank login, so it never syncs.' };
+		}
 		if (connection.status === 'needsAttention') {
 			return { tone: 'bad', text: 'Needs you to reconnect before it can sync again.' };
 		}
@@ -52,17 +57,23 @@
 				text: `Your consent at the bank ends ${day.format(connection.consentEndsAt)}. Reconnect to renew it.`
 			};
 		}
-		if (connection.overdue && connection.lastSyncedAt !== null) {
-			return { tone: 'warn', text: `Not synced since ${day.format(connection.lastSyncedAt)}.` };
+		if (connection.overdue) {
+			return { tone: 'warn', text: 'Has missed its daily sync. Try Sync now.' };
 		}
-		return { tone: 'ok', text: `${formatSynced(connection.lastSyncedAt, bank.now)}.` };
+		return null;
 	});
-	const message = $derived.by(() => {
+	const synced = $derived(
+		connection.lastSyncedAt === null
+			? 'Never synced.'
+			: `${formatSynced(connection.lastSyncedAt, bank.now)}.`
+	);
+	const pending = $derived.by(() => {
 		if (syncing) return 'Syncing…';
 		if (reconnecting) return 'Reconnecting…';
-		return result;
+		return null;
 	});
-	const serverCanSync = $derived(bank.service?.available !== false);
+	const reconnectBlocked = $derived(bank.linking !== null || syncing);
+	const syncBlocked = $derived(syncing || reconnecting);
 	const reconnectFirst = $derived(
 		connection.status === 'needsAttention' || connection.consentEndsAt !== null
 	);
@@ -111,13 +122,15 @@
 	);
 
 	async function sync() {
-		result = '';
+		if (syncBlocked) return;
+		result = null;
 		result = await bank.sync(connection._id);
 	}
 
 	async function reconnect() {
-		result = '';
-		result = (await bank.reconnect(connection._id)) ?? '';
+		if (reconnectBlocked) return;
+		result = null;
+		result = await bank.reconnect(connection._id);
 	}
 </script>
 
@@ -147,46 +160,60 @@
 						{/each}
 					{/if}
 				</p>
-				<p
-					class={[
-						'flex items-start gap-1.5 text-sm break-words',
-						health.tone === 'bad' && 'text-destructive',
-						health.tone === 'warn' && 'text-warning',
-						health.tone === 'ok' && 'text-muted-foreground'
-					]}
-				>
-					{#if health.tone === 'ok'}
+				{#if problem !== null}
+					<p
+						class={[
+							'flex items-start gap-1.5 text-sm font-medium break-words',
+							problem.tone === 'bad' ? 'text-destructive' : 'text-warning'
+						]}
+					>
+						<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+						<span class="min-w-0">{problem.text}</span>
+					</p>
+				{/if}
+				<p class="flex items-start gap-1.5 text-sm break-words text-muted-foreground">
+					{#if problem === null}
 						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
 					{:else}
-						<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-					{/if}
-					<span class="min-w-0">{health.text}</span>
-				</p>
-				<p class="flex min-h-5 items-start gap-1.5 text-sm break-words text-muted-foreground">
-					{#if message !== ''}
 						<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-						<span class="min-w-0">{message}</span>
-					{:else if !serverCanSync}
-						<span class="min-w-0">Bank sync isn't set up on this server, so this can't sync.</span>
+					{/if}
+					<span class="min-w-0">{synced}</span>
+				</p>
+				<p
+					class={[
+						'flex min-h-5 items-start gap-1.5 text-sm break-words',
+						pending === null && result?.failed ? 'text-destructive' : 'text-muted-foreground'
+					]}
+				>
+					{#if pending !== null}
+						<RefreshCwIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 animate-spin" />
+						<span class="min-w-0">{pending}</span>
+					{:else if result !== null}
+						{#if result.failed}
+							<TriangleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+						{:else}
+							<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
+						{/if}
+						<span class="min-w-0">{result.text}</span>
 					{/if}
 				</p>
-				<span role="status" class="sr-only">{result}</span>
+				<span role="status" class="sr-only">{result?.text ?? ''}</span>
 			</div>
 		</div>
 		<div class="grid grid-cols-2 gap-2 sm:flex">
-			<div class="grid sm:min-w-32">
+			<div class="grid sm:w-36">
 				<Button
 					variant={reconnectFirst ? 'default' : 'outline'}
-					disabled={bank.linking !== null || syncing}
+					aria-disabled={reconnectBlocked}
 					onclick={reconnect}
 				>
 					{reconnecting ? 'Reconnecting…' : 'Reconnect'}
 				</Button>
 			</div>
-			<div class="grid sm:min-w-32">
+			<div class="grid sm:w-36">
 				<Button
 					variant={reconnectFirst ? 'outline' : 'default'}
-					disabled={syncing || reconnecting}
+					aria-disabled={syncBlocked}
 					onclick={sync}
 				>
 					<RefreshCwIcon aria-hidden="true" class={syncing ? 'animate-spin' : ''} />

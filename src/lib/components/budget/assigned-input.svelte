@@ -92,7 +92,7 @@
 		id={errorId}
 		role="alert"
 		class={[
-			'absolute top-full right-0 z-20 mt-1 w-56 rounded-md border border-destructive bg-popover px-3 py-2 text-left text-xs whitespace-normal text-destructive shadow-md',
+			'absolute top-1/2 right-full z-20 mr-2 w-60 -translate-y-1/2 rounded-md border border-destructive bg-popover px-3 py-2 text-left text-xs whitespace-normal text-destructive shadow-md',
 			!error && 'hidden'
 		]}>{error}</span
 	>

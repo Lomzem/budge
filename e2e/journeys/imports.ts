@@ -32,9 +32,9 @@ export const imports = {
 
 			await step('the sidebar counts Unapproved Transactions; open Savings', async () => {
 				await page.goto('/');
-				const sidebar = page.getByRole('navigation', { name: 'Budget and Accounts' });
+				const sidebar = page.getByRole('navigation', { name: 'Sections and Accounts' });
 				await expect(
-					sidebar.getByRole('link', { name: /^Accounts\s*,?\s*\d+ Unapproved$/ })
+					sidebar.getByRole('link', { name: /^Accounts \d+ Unapproved$/ })
 				).toBeVisible();
 				await openAccount(page, 'Savings');
 			});

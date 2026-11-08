@@ -90,8 +90,7 @@
 						</select>
 					</div>
 				{/if}
-				<p role="alert" class="min-h-6 text-sm text-destructive">{error}</p>
-				<Dialog.Footer>
+				<Dialog.Footer {error}>
 					<Button type="submit" variant="destructive" disabled={dialog.pending('save')}
 						>Delete group</Button
 					>

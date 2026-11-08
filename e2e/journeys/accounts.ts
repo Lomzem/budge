@@ -88,7 +88,7 @@ export const accounts = {
 			await step("Checking's balance moves, and Savings' dialog keeps what was typed", async () => {
 				await expect(
 					page
-						.getByRole('navigation', { name: 'Budget and Accounts' })
+						.getByRole('navigation', { name: 'Sections and Accounts' })
 						.getByRole('link', { name: /^Checking/ })
 				).toContainText(balanceAfter);
 				await expect(

@@ -30,7 +30,7 @@ export function typed(amountInCents: number) {
 
 export async function openAccount(page: Page, name: string) {
 	await page
-		.getByRole('navigation', { name: 'Budget and Accounts' })
+		.getByRole('navigation', { name: 'Sections and Accounts' })
 		.getByRole('link', { name: new RegExp(`^${name}`) })
 		.click();
 	await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();

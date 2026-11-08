@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import { Result } from 'effect';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -14,7 +15,21 @@
 	const sum = (list: Account[]) => list.reduce((total, account) => total + account.balance, 0);
 	const total = $derived(sum(accounts.all));
 	let addOpen = $state(false);
-	const listOpenOnArrival = page.url.search === '';
+	const LIST_KEY = 'budge.accountListOpen';
+
+	function rememberedOpen() {
+		const stored = Result.try(() => localStorage.getItem(LIST_KEY));
+		return !Result.isSuccess(stored) || stored.success !== 'false';
+	}
+
+	function remember(event: Event) {
+		const open = (event.currentTarget as HTMLDetailsElement).open;
+		Result.try(() => {
+			localStorage.setItem(LIST_KEY, String(open));
+		});
+	}
+
+	const listOpenOnArrival = page.url.search === '' && rememberedOpen();
 </script>
 
 <svelte:head>
@@ -51,7 +66,7 @@
 			</p>
 		</section>
 	{:else}
-		<details class="group lg:hidden" open={listOpenOnArrival}>
+		<details class="group lg:hidden" open={listOpenOnArrival} ontoggle={remember}>
 			<summary
 				class="-mx-1 flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md px-1 font-bold [&::-webkit-details-marker]:hidden"
 			>

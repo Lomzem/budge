@@ -11,6 +11,7 @@ Inspect a Category, move Assigned between jobs, and cover Overspending from Read
 ## How to get to it (user POV)
 
 - Budget table → Category-name button. The Overspent list has no buttons; open the Category in the table, then use Cover in its inspector.
+- At 1024 px and up the inspector sits in a sticky side panel that scrolls on its own; opening it focuses the region without scrolling the page. Below that it opens as a dialog whose `Assigned this month` row is an editable amount field (the table hides its Assigned column below `sm`).
 
 ## Driving it with Playwright
 

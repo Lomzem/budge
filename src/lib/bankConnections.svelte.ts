@@ -23,12 +23,20 @@ export function needsALook(connection: BankConnection) {
 	);
 }
 
-export function describeSync(outcome: SyncOutcome): string {
-	if (outcome.kind === 'busy') return 'A sync is already running.';
+export interface Report {
+	text: string;
+	failed: boolean;
+}
+
+export function describeSync(outcome: SyncOutcome): Report {
+	if (outcome.kind === 'busy') return { text: 'A sync is already running.', failed: false };
 	if (outcome.kind === 'noToken') {
-		return 'This Bank Connection has no bank login, so it never syncs.';
+		return { text: 'This Bank Connection has no bank login, so it never syncs.', failed: true };
 	}
-	return `Synced. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`;
+	return {
+		text: `Synced. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`,
+		failed: false
+	};
 }
 
 export class BankConnections {
@@ -105,7 +113,7 @@ export class BankConnections {
 		return `Connected ${connected.value}. Choose where each bank Account's rows go.`;
 	}
 
-	async reconnect(connectionId: Id<'bankConnections'>): Promise<string | null> {
+	async reconnect(connectionId: Id<'bankConnections'>): Promise<Report | null> {
 		this.linking = connectionId;
 		const reconnected = await attempt(async () => {
 			const { linkToken } = await this.#client.action(api.bankConnections.reconnect, {
@@ -118,17 +126,25 @@ export class BankConnections {
 		this.linking = null;
 		this.tick();
 		if (!reconnected.ok) {
-			return reconnected.error?.message ?? "Budge couldn't reconnect. Try again.";
+			return {
+				text: reconnected.error?.message ?? "Budge couldn't reconnect. Try again.",
+				failed: true
+			};
 		}
 		const outcome = reconnected.value;
 		if (outcome === 'exit') return null;
-		if (outcome === 'unavailable') return "Plaid Link didn't load. Try again.";
-		return outcome.kind === 'synced'
-			? `Reconnected. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`
-			: 'Reconnected.';
+		if (outcome === 'unavailable')
+			return { text: "Plaid Link didn't load. Try again.", failed: true };
+		return {
+			text:
+				outcome.kind === 'synced'
+					? `Reconnected. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`
+					: 'Reconnected.',
+			failed: false
+		};
 	}
 
-	async sync(connectionId: Id<'bankConnections'>): Promise<string> {
+	async sync(connectionId: Id<'bankConnections'>): Promise<Report> {
 		this.syncing.add(connectionId);
 		const synced = await attempt(() =>
 			this.#client.action(api.bankConnections.syncNow, { connectionId })
@@ -137,7 +153,7 @@ export class BankConnections {
 		this.tick();
 		return synced.ok
 			? describeSync(synced.value)
-			: (synced.error?.message ?? "Budge couldn't sync. Try again.");
+			: { text: synced.error?.message ?? "Budge couldn't sync. Try again.", failed: true };
 	}
 }
 

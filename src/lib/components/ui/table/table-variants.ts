@@ -9,7 +9,7 @@ export const tableColumnVariants = tv({
 			fill: 'w-full max-w-0',
 			action: 'w-28',
 			check: 'w-16 sm:w-20',
-			amount: 'w-28 sm:w-36',
+			amount: 'w-28 sm:w-32',
 			date: 'w-32',
 			name: 'w-44',
 			note: 'w-48'
@@ -24,15 +24,13 @@ export const tableColumnVariants = tv({
 			'8xl': 'hidden @8xl:table-cell',
 			'screen-sm': 'hidden sm:table-cell'
 		},
-		numeric: { true: 'tabular-nums', false: '' },
-		lead: { true: 'h-auto pt-2.5 pb-0', false: '' }
+		numeric: { true: 'tabular-nums', false: '' }
 	},
 	defaultVariants: {
 		align: 'start',
 		width: 'auto',
 		showFrom: 'always',
-		numeric: false,
-		lead: false
+		numeric: false
 	}
 });
 

@@ -2,12 +2,17 @@
 	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { useQuery } from 'convex-svelte';
+	import { untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { resolve } from '$app/paths';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { getBankConnections, type HeldAccount } from '$lib/bankConnections.svelte';
+	import {
+		getBankConnections,
+		type BankConnection,
+		type HeldAccount
+	} from '$lib/bankConnections.svelte';
 	import ConnectionCard from '$lib/components/bank/connection-card.svelte';
 	import HeldAccountDialog from '$lib/components/bank/held-account-dialog.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -17,6 +22,8 @@
 	const outcomes = new SvelteMap<Id<'connectionAccounts'>, string>();
 	let heldDialog: { open: (account: HeldAccount) => void } | undefined = $state();
 	let result = $state('');
+	let connectButton: HTMLButtonElement | null = $state(null);
+	let order: Id<'bankConnections'>[] = $state([]);
 
 	const ready = $derived(bank.loaded && settings.data !== undefined);
 	const blocker = $derived.by(() => {
@@ -25,8 +32,32 @@
 		return null;
 	});
 	const connecting = $derived(bank.linking === 'connecting');
+	const connectBlocked = $derived(bank.linking !== null);
+
+	function urgency(connection: BankConnection) {
+		if (connection.status === 'needsAttention' || connection.lastError !== null) return 0;
+		if (connection.consentEndsAt !== null || connection.overdue) return 1;
+		if (bank.heldFrom(connection._id).length > 0) return 2;
+		if (!connection.bankLogin) return 3;
+		return 4;
+	}
+
+	$effect(() => {
+		if (!bank.loaded) return;
+		const known = untrack(() => order);
+		const arrived = bank.all
+			.filter((connection) => !known.includes(connection._id))
+			.sort((a, b) => urgency(a) - urgency(b))
+			.map((connection) => connection._id);
+		if (arrived.length > 0) order.push(...arrived);
+	});
+
+	const connections = $derived(
+		bank.all.toSorted((a, b) => order.indexOf(a._id) - order.indexOf(b._id))
+	);
 
 	async function connect() {
+		if (connectBlocked) return;
 		result = '';
 		result = (await bank.connect()) ?? '';
 	}
@@ -47,7 +78,12 @@
 			</p>
 		</div>
 		<div class="grid min-w-44">
-			<Button disabled={!ready || blocker !== null || bank.linking !== null} onclick={connect}>
+			<Button
+				bind:ref={connectButton}
+				disabled={!ready || blocker !== null}
+				aria-disabled={connectBlocked}
+				onclick={connect}
+			>
 				<PlusIcon aria-hidden="true" />
 				{connecting ? 'Connecting…' : 'Connect a bank'}
 			</Button>
@@ -80,7 +116,6 @@
 				<kbd class="font-bold">pass_good</kbd>.
 			</p>
 		{/if}
-		<p role="status" class="-my-3 min-h-12 sm:min-h-6">{result}</p>
 
 		<section aria-labelledby="connections-heading" class="flex flex-col gap-3">
 			<h2 id="connections-heading" class="text-lg font-bold">Connections</h2>
@@ -97,7 +132,7 @@
 				</div>
 			{:else}
 				<ul aria-label="Bank Connections" class="flex flex-col gap-4">
-					{#each bank.all as connection (connection._id)}
+					{#each connections as connection (connection._id)}
 						<li>
 							<ConnectionCard
 								{connection}
@@ -111,6 +146,26 @@
 				</ul>
 			{/if}
 		</section>
+	{/if}
+</div>
+
+<div
+	class={result === ''
+		? 'sr-only'
+		: 'fixed inset-x-4 bottom-20 z-50 mx-auto flex max-w-md items-center gap-3 rounded-md border bg-popover py-2 pr-2 pl-4 text-sm shadow-lg lg:bottom-6'}
+>
+	<p role="status" class="min-w-0 flex-1">{result}</p>
+	{#if result !== ''}
+		<Button
+			variant="ghost"
+			size="sm"
+			onclick={() => {
+				result = '';
+				connectButton?.focus();
+			}}
+		>
+			Dismiss
+		</Button>
 	{/if}
 </div>
 

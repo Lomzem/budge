@@ -137,6 +137,7 @@
 	);
 	let rowError = $state('');
 	let approvingAll = $state(false);
+	const approveAllBlocked = $derived(approvingAll || (unapprovedCount.data ?? 0) === 0);
 
 	function add() {
 		editingSnapshot = undefined;
@@ -167,6 +168,7 @@
 	}
 
 	async function approveEvery() {
+		if (approveAllBlocked) return;
 		rowError = '';
 		approvingAll = true;
 		const approved = await attempt(() => approveAll(scope));
@@ -174,6 +176,18 @@
 		if (!approved.ok) rowError = "Budge couldn't approve the Transactions. Try again.";
 	}
 </script>
+
+{#snippet cleared(row: (typeof rows)[number], payee: string)}
+	{#if row.reconciled}
+		<LockIcon aria-hidden="true" class="size-4 text-muted-foreground" />
+		<span class="sr-only">Reconciled</span>
+	{:else}
+		<Checkbox
+			bind:checked={() => row.cleared, (checked: boolean) => void toggleCleared(row, checked)}
+			aria-label="Cleared: {payee}, {formatDate(row.date)}"
+		/>
+	{/if}
+{/snippet}
 
 <div class="flex flex-col gap-3">
 	<div class="flex flex-wrap items-center gap-2">
@@ -185,11 +199,7 @@
 			<UploadIcon aria-hidden="true" />
 			Import file
 		</Button>
-		<Button
-			variant="outline"
-			disabled={approvingAll || (unapprovedCount.data ?? 0) === 0}
-			onclick={approveEvery}
-		>
+		<Button variant="outline" aria-disabled={approveAllBlocked} onclick={approveEvery}>
 			<CheckCheckIcon aria-hidden="true" />
 			<span class="min-w-30 text-left">{approveAllLabel}</span>
 		</Button>
@@ -216,7 +226,7 @@
 					<Table.Head width="name" showFrom="4xl">Category</Table.Head>
 					<Table.Head width="note" showFrom={memoFrom}>Memo</Table.Head>
 					<Table.Head width="amount" align="end">Amount</Table.Head>
-					<Table.Head width="check" align="center">Cleared</Table.Head>
+					<Table.Head width="check" align="center" showFrom="lg">Cleared</Table.Head>
 					<Table.Head width="action" showFrom="2xl"
 						><span class="sr-only">Approval</span></Table.Head
 					>
@@ -240,15 +250,16 @@
 						{/if}
 						<Table.Cell>
 							<button
-								class="block max-w-full truncate rounded-sm text-left hover:underline"
+								class="block max-w-full rounded-sm text-left hover:underline"
 								onclick={() => {
 									edit(row);
 								}}
 							>
 								<span
-									class={row.payeeName === null && !row.transfer
-										? 'text-muted-foreground'
-										: undefined}
+									class={[
+										'line-clamp-2 break-words @4xl:line-clamp-1',
+										row.payeeName === null && !row.transfer && 'text-muted-foreground'
+									]}
 								>
 									{payee}
 								</span>
@@ -259,14 +270,11 @@
 							{#if flag}
 								<span class="block truncate text-xs font-normal text-warning">{flag}</span>
 							{/if}
-							<time
-								datetime={row.date}
-								class="block truncate text-xs font-normal text-muted-foreground tabular-nums @2xl:hidden"
-							>
-								{formatDate(row.date, 'short')}
-							</time>
-							<span class="block truncate text-xs font-normal text-muted-foreground @4xl:hidden">
-								<span class={categoryClass}>{category}</span>
+							<span class="flex min-w-0 gap-x-2 text-xs font-normal text-muted-foreground">
+								<time datetime={row.date} class="shrink-0 tabular-nums @2xl:hidden">
+									{formatDate(row.date, 'short')}
+								</time>
+								<span class={['min-w-0 truncate @4xl:hidden', categoryClass]}>{category}</span>
 							</span>
 							{#if allAccounts}
 								<span class="block truncate text-xs font-normal text-muted-foreground @5xl:hidden">
@@ -290,19 +298,14 @@
 						<Table.Cell showFrom={memoFrom}>
 							<span class="block truncate">{row.memo ?? ''}</span>
 						</Table.Cell>
-						<Table.Cell align="end" numeric>{formatCents(row.amount)}</Table.Cell>
-						<Table.Cell align="center">
-							{#if row.reconciled}
-								<LockIcon aria-hidden="true" class="mx-auto size-4 text-muted-foreground" />
-								<span class="sr-only">Reconciled</span>
-							{:else}
-								<Checkbox
-									bind:checked={
-										() => row.cleared, (checked: boolean) => void toggleCleared(row, checked)
-									}
-									aria-label="Cleared: {payee}, {formatDate(row.date)}"
-								/>
-							{/if}
+						<Table.Cell align="end" numeric>
+							{formatCents(row.amount)}
+							<span class="mt-2 flex justify-end pr-1 @lg:hidden">
+								{@render cleared(row, payee)}
+							</span>
+						</Table.Cell>
+						<Table.Cell align="center" showFrom="lg">
+							<span class="flex justify-center">{@render cleared(row, payee)}</span>
 						</Table.Cell>
 						<Table.Cell showFrom="2xl">
 							{#if !row.approved}

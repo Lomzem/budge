@@ -11,7 +11,7 @@ Keep approved or edited Transactions safe when the bank changes history, while a
 
 ## How to get to it (user POV)
 
-- The Accounts page (`/accounts`) or an Account page (sidebar `Budget and Accounts` → `Checking`) → Transaction row with a `Bank changed this` or `Bank removed this` line under its Payee.
+- The Accounts page (`/accounts`) or an Account page (sidebar `Sections and Accounts` → `Checking`) → Transaction row with a `Bank changed this` or `Bank removed this` line under its Payee.
 - Click the row's Payee button → dialog `Edit Transaction` → `Bank Text` section → `Use the bank's version` / `Delete it` / `Keep mine`.
 - `Delete it` opens alert dialog `Delete this Transaction too?` (`Delete this Transfer too?` for a Transfer) → `Delete`.
 

@@ -10,8 +10,8 @@ export const shell = {
 			'the owner lands on the Budget, and the sidebar or the phone tab bar reaches all five Sections',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
-			const sidebar = page.getByRole('navigation', { name: 'Budget and Accounts' });
-			const tabs = page.getByRole('navigation', { name: 'Sections' });
+			const sidebar = page.getByRole('navigation', { name: 'Sections and Accounts' });
+			const tabs = page.getByRole('navigation', { name: 'Sections', exact: true });
 
 			await step('sign-in lands on the Budget, beside the sidebar', async () => {
 				await openBudget(page);

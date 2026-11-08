@@ -8,7 +8,7 @@ Follow [Launch and Doctor](../SKILL.md): own this checkout's instance, authentic
 
 ## Driving conventions
 
-Run a feature's journeys with `bun run app verify <feature>/<key>` (see [Journeys](../SKILL.md#journeys)); each feature file lists them at the top of its Driving section, and the manual recipes below them cover what they leave out. Recipes use `page` from an authenticated Playwright context and `expect` from `@playwright/test`. Start each independent mutation recipe from a fresh seed unless stated otherwise; reseeding destroys this instance's previous changes. Use roles, names, labels, and test IDs. Open Account routes through the sidebar's `navigation` named `Budget and Accounts`; at 320 px use `button` named `View …`, then the corresponding `menuitem`. Never share this checkout's seeded data with another driver.
+Run a feature's journeys with `bun run app verify <feature>/<key>` (see [Journeys](../SKILL.md#journeys)); each feature file lists them at the top of its Driving section, and the manual recipes below them cover what they leave out. Recipes use `page` from an authenticated Playwright context and `expect` from `@playwright/test`. Start each independent mutation recipe from a fresh seed unless stated otherwise; reseeding destroys this instance's previous changes. Use roles, names, labels, and test IDs. Open Account routes through the sidebar's `navigation` named `Sections and Accounts`; at 320 px use `button` named `View …`, then the corresponding `menuitem`. Never share this checkout's seeded data with another driver.
 
 ## Proof and skip reporting
 

@@ -10,6 +10,7 @@
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { formatCents, parseCents } from '$lib/domain/money';
 
+	import AssignedInput from './assigned-input.svelte';
 	import { availableStatus, describeTarget, paymentNotes } from './status';
 	import TargetBar from './target-bar.svelte';
 	import TargetDialog from './target-dialog.svelte';
@@ -19,11 +20,14 @@
 	let {
 		category,
 		view,
+		editAssigned = false,
 		onclose
 	}: {
 		category: CategoryBudget;
 
 		view: BudgetView;
+
+		editAssigned?: boolean;
 		onclose: () => void;
 	} = $props();
 
@@ -61,9 +65,9 @@
 	const status = $derived(availableStatus(category));
 
 	const breakdown = $derived([
-		{ label: 'Left over from last month', cents: category.priorAvailable },
-		{ label: 'Assigned this month', cents: category.assigned },
-		{ label: 'Activity', cents: category.activity }
+		{ label: 'Left over from last month', cents: category.priorAvailable, assigned: false },
+		{ label: 'Assigned this month', cents: category.assigned, assigned: true },
+		{ label: 'Activity', cents: category.activity, assigned: false }
 	]);
 
 	function findOther(id: string): Id<'categories'> | undefined {
@@ -103,7 +107,7 @@
 			coverError = covered.error?.message ?? "Budge couldn't cover the Category. Try again.";
 			return;
 		}
-		section?.focus();
+		section?.focus({ preventScroll: true });
 	}
 
 	async function assignTarget() {
@@ -115,7 +119,7 @@
 			assignError = assigned.error?.message ?? "Budge couldn't assign the money. Try again.";
 			return;
 		}
-		section?.focus();
+		section?.focus({ preventScroll: true });
 	}
 
 	function editTarget() {
@@ -146,17 +150,30 @@
 
 	<dl class="flex flex-col gap-1 text-sm">
 		{#each breakdown as row (row.label)}
-			<div class="flex justify-between gap-4">
-				<dt class="text-muted-foreground">{row.label}</dt>
-				<dd class="tabular-nums">{formatCents(row.cents)}</dd>
-			</div>
+			{#if editAssigned && row.assigned}
+				<div class="flex items-center justify-between gap-4">
+					<dt class="text-muted-foreground">{row.label}</dt>
+					<dd>
+						<AssignedInput
+							amount={row.cents}
+							label={row.label}
+							onsave={(cents: number) => budget.setAssigned(category.id, cents)}
+						/>
+					</dd>
+				</div>
+			{:else}
+				<div class="flex justify-between gap-4">
+					<dt class="text-muted-foreground">{row.label}</dt>
+					<dd class="tabular-nums">{formatCents(row.cents)}</dd>
+				</div>
+			{/if}
 		{/each}
 		<div class="flex justify-between gap-4 border-t pt-1 font-medium">
 			<dt>Available</dt>
 			<dd class={['text-right tabular-nums', status?.class]}>
 				{formatCents(category.available)}
 
-				{#if status && !category.target}
+				{#if status && !category.target && !category.payment}
 					<span class="block text-xs">{status.text}</span>
 				{/if}
 			</dd>

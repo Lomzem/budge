@@ -166,8 +166,7 @@
 				{/if}
 			{/if}
 
-			<p role="alert" class="min-h-6 text-sm text-destructive">{error}</p>
-			<Dialog.Footer>
+			<Dialog.Footer {error}>
 				{#if category.target}
 					<Button
 						type="button"

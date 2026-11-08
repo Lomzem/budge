@@ -187,8 +187,7 @@
 								Its rows are dropped, and Budge won't ask about it again.
 							</p>
 						{/if}
-						<p role="alert" class="min-h-6 text-sm text-destructive">{session.error}</p>
-						<Dialog.Footer>
+						<Dialog.Footer error={session.error}>
 							<div class="grid min-w-40">
 								<Button type="submit" disabled={dialog.pending('save')}>
 									{session.choice === 'ignore' ? 'Ignore' : 'Bring in its rows'}

@@ -8,9 +8,11 @@
 		ref = $bindable(null),
 		class: className,
 		children,
+		error,
 		showCloseButton = false,
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
+		error?: string;
 		showCloseButton?: boolean;
 	} = $props();
 </script>
@@ -19,17 +21,22 @@
 	bind:this={ref}
 	data-slot="dialog-footer"
 	class={cn(
-		'-mx-5 -mb-5 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 px-5 py-4 sm:-mx-6 sm:-mb-6 sm:flex-row sm:justify-end sm:px-6',
+		'sticky -bottom-5 z-10 -mx-5 -mb-5 flex flex-col gap-2 rounded-b-xl border-t bg-muted px-5 py-4 sm:-bottom-6 sm:-mx-6 sm:-mb-6 sm:flex-row sm:items-center sm:gap-4 sm:px-6',
 		className
 	)}
 	{...restProps}
 >
-	{@render children?.()}
-	{#if showCloseButton}
-		<DialogPrimitive.Close>
-			{#snippet child({ props })}
-				<Button variant="outline" {...props}>Close</Button>
-			{/snippet}
-		</DialogPrimitive.Close>
+	{#if error !== undefined}
+		<p role="alert" class="min-h-5 text-sm text-destructive sm:min-w-0 sm:flex-1">{error}</p>
 	{/if}
+	<div class="flex flex-col-reverse gap-2 sm:ml-auto sm:flex-row sm:justify-end">
+		{@render children?.()}
+		{#if showCloseButton}
+			<DialogPrimitive.Close>
+				{#snippet child({ props })}
+					<Button variant="outline" {...props}>Close</Button>
+				{/snippet}
+			</DialogPrimitive.Close>
+		{/if}
+	</div>
 </div>

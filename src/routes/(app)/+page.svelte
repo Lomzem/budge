@@ -118,7 +118,7 @@
 		selectedId = selectedId === id && !keepOpen ? null : id;
 		if (selectedId !== null && wide.current) {
 			await tick();
-			document.getElementById('category-inspector')?.focus();
+			document.getElementById('category-inspector')?.focus({ preventScroll: true });
 		}
 	}
 
@@ -185,7 +185,7 @@
 			{#if readyToAssign}
 				<div
 					class={[
-						'flex min-w-56 flex-col items-end rounded-lg px-5 py-3',
+						'flex w-full flex-wrap items-center justify-between gap-x-4 rounded-lg px-4 py-2 sm:w-auto sm:min-w-56 sm:flex-col sm:items-end sm:px-5 sm:py-3',
 						readyToAssign.amount < 0 ? 'bg-destructive-tint' : 'bg-funded-tint'
 					]}
 				>
@@ -193,13 +193,13 @@
 					<p
 						data-testid="ready-to-assign"
 						class={[
-							'border-b-4 border-double border-current text-3xl font-bold',
+							'border-b-4 border-double border-current text-2xl font-bold sm:text-3xl',
 							readyToAssign.amount < 0 ? 'text-destructive' : 'text-funded'
 						]}
 					>
 						{formatCents(readyToAssign.amount)}
 					</p>
-					<p class="mt-1 min-h-5 text-xs">
+					<p class="min-h-5 w-full text-xs sm:mt-1 sm:w-auto">
 						{#if readyToAssign.uncategorized !== 0}
 							includes {formatCents(readyToAssign.uncategorized)} Uncategorized
 						{/if}
@@ -214,22 +214,22 @@
 			</div>
 		{/if}
 
-		<section aria-label="Needs you" class="-my-1 flex min-h-10 items-center">
+		<section aria-label="Needs you" class="-my-1 flex h-10 items-center pointer-coarse:h-13">
 			{#if needs.length === 0}
 				<p class="flex items-center gap-2 text-muted-foreground">
 					<CircleCheckIcon aria-hidden="true" class="size-5 text-funded" />
 					Nothing needs you right now.
 				</p>
 			{:else}
-				<ul class="flex min-w-0 flex-1 flex-wrap gap-2 py-1">
+				<ul class="-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto p-1">
 					{#each needs as need (need.text)}
 						{@const chip = [
-							'flex min-h-8 items-center rounded-full px-3 text-left text-sm font-bold pointer-coarse:min-h-11',
+							'flex min-h-8 items-center rounded-full px-3 text-sm font-bold whitespace-nowrap pointer-coarse:min-h-11',
 							need.tone === 'bad'
 								? 'bg-destructive-tint text-destructive'
 								: 'bg-warning-tint text-warning'
 						]}
-						<li>
+						<li class="shrink-0">
 							{#if need.link}
 								<a
 									href="{resolve(need.link.path)}{need.link.query}"
@@ -306,7 +306,9 @@
 						<BudgetTable groups={view.groups} selectedId={selected?.id ?? null} onselect={select} />
 					</div>
 					{#if wide.current}
-						<aside class="sticky top-8 flex w-80 shrink-0 flex-col gap-6">
+						<aside
+							class="sticky top-8 -m-1 flex max-h-side-panel-height w-82 shrink-0 flex-col gap-6 overflow-y-auto overscroll-contain p-1"
+						>
 							{#if selected}
 								<div class="rounded-lg border bg-card p-5">{@render inspector()}</div>
 							{/if}
@@ -364,7 +366,12 @@
 {#snippet inspector()}
 	{#if view && inspected}
 		{#key inspected.id}
-			<CategoryInspector category={inspected} {view} onclose={closeInspector} />
+			<CategoryInspector
+				category={inspected}
+				{view}
+				editAssigned={!wide.current}
+				onclose={closeInspector}
+			/>
 		{/key}
 	{/if}
 {/snippet}

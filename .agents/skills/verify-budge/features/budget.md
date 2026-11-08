@@ -8,7 +8,7 @@ Give money a job by editing a Category's Assigned amount and see Ready to Assign
 - `budget-assign`: adding $10 to Groceries lowers Ready to Assign by $10.
 - `budget-persist`: reload retains Assigned and Ready to Assign.
 - `budget-month`: next then previous month preserves the original month's Assigned; Ready to Assign is global.
-- `budget-mobile`: 320 px entry and Assigned control remain usable without page overflow.
+- `budget-mobile`: below `sm` the table shows Category and Available only (one row per Category with its status, Target bar and card notes under the name); Assigned is edited in the Category's inspector dialog (`Assigned this month`), and nothing overflows at 320 px. Ready to Assign is a compact full-width banner, and `Needs you` is a fixed-height strip of chips that scrolls sideways instead of wrapping.
 - `budget-negative`: assigning more than Ready to Assign shows the negative Ready to Assign warning.
 - `budget-groups`: each Category Group header row totals its shown and Hidden Categories' Assigned, Activity and Available.
 - `budget-carry`: a Category's Available rolls forward into the next month.
@@ -37,7 +37,7 @@ Preconditions for the manual recipes: baseline fixture and authenticated `page`;
 
 ## Gotchas
 
-- **Manual drive:** at 320 px edit `Assigned for Groceries`; blur and Enter each save, Escape cancels, and invalid text shows alert `Enter an amount, such as 120.00.` without changing the saved amount. Reload to prove persistence.
+- **Manual drive:** at 320 px open Groceries and edit `Assigned this month` in its inspector dialog (at `sm` and up, `Assigned for Groceries` in the table); blur and Enter each save, Escape cancels, and invalid text shows alert `Enter an amount, such as 120.00.` without changing the saved amount. Reload to prove persistence.
 - **Manual drive:** navigate back to the cutover month and require `Previous month` disabled. With suitable Transactions and hidden Categories, verify `includes … Uncategorized`, the `Overspent` list and its `Overspent by …` amounts, and `Hidden Categories` with Available amounts. These lists have no Category-opening buttons.
 
 - The month is context state and may reset on reload; the recipe edits the current month.

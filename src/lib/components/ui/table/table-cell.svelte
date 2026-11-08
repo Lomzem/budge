@@ -12,7 +12,6 @@
 		width,
 		showFrom,
 		numeric,
-		lead,
 		...restProps
 	}: WithElementRef<Omit<HTMLTdAttributes, 'align'>> & TableColumnVariants = $props();
 </script>
@@ -21,8 +20,8 @@
 	bind:this={ref}
 	data-slot="table-cell"
 	class={cn(
-		'px-2 py-2 align-middle whitespace-nowrap sm:px-3 [&:has([role=checkbox])]:pr-0',
-		tableColumnVariants({ align, width, showFrom, numeric, lead }),
+		'px-2 py-2 align-middle whitespace-nowrap sm:px-3',
+		tableColumnVariants({ align, width, showFrom, numeric }),
 		className
 	)}
 	{...restProps}

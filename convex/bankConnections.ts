@@ -73,6 +73,7 @@ export const list = query({
 			overdue: v.boolean(),
 			consentEndsAt: v.union(v.number(), v.null()),
 			lastError: v.union(v.object({ at: v.number(), message: v.string() }), v.null()),
+			bankLogin: v.boolean(),
 			feeds: v.array(v.object({ accountId: v.id('accounts'), name: v.string() }))
 		})
 	),
@@ -88,6 +89,7 @@ export const list = query({
 				overdue: isSyncOverdue(connection.lastSyncedAt ?? null, now),
 				consentEndsAt: renewalDue(connection.consentExpiresAt ?? null, now),
 				lastError: connection.lastError ?? null,
+				bankLogin: connection.provider.kind === 'plaid',
 				feeds: await feedsOf(ctx, connection._id)
 			}))
 		);

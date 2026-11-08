@@ -4,7 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* `optional` never swaps after first paint, so the font can't move the page. */
+/* `optional` never swaps after first paint, so the font can't move the page; the root layout preloads the Latin file so it arrives in time. */
 @font-face {
 	font-family: 'Atkinson Hyperlegible Next';
 	font-style: normal;
@@ -154,6 +154,7 @@
 	--text-button-sm: 0.8333rem;
 	--spacing-dialog-height: calc(100dvh - 2rem);
 	--spacing-dialog-height-sm: calc(100dvh - 8rem);
+	--spacing-side-panel-height: calc(100dvh - 4rem);
 	--container-dialog-width: calc(100% - 2rem);
 	--font-sans: 'Atkinson Hyperlegible Next', 'Atkinson Fallback', sans-serif;
 	--color-sidebar-ring: var(--sidebar-ring);

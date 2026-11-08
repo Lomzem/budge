@@ -100,8 +100,7 @@
 						autocomplete="off"
 					/>
 				</div>
-				<p role="alert" class="min-h-6 text-sm text-destructive">{error}</p>
-				<Dialog.Footer>
+				<Dialog.Footer {error}>
 					<Button type="submit" disabled={dialog.pending('save')}>Add Account</Button>
 				</Dialog.Footer>
 			</form>
