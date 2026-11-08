@@ -32,8 +32,7 @@
 	let adding: 'group' | 'category' = $state('group');
 	let addingOpen = $state(false);
 
-	let addingSaving = $state(false);
-	let addDialog: { reset: () => void } | undefined = $state();
+	let addDialog: { reset: () => void; saving: () => boolean } | undefined = $state();
 
 	const view = $derived(budget.view);
 	const readyToAssign = $derived(budget.readyToAssign);
@@ -187,7 +186,7 @@
 				<Button
 					variant="outline"
 					size="sm"
-					disabled={addingSaving && adding !== 'group'}
+					disabled={addDialog?.saving() === true && adding !== 'group'}
 					onclick={() => {
 						add('group');
 					}}
@@ -198,7 +197,7 @@
 					<Button
 						variant="outline"
 						size="sm"
-						disabled={addingSaving && adding !== 'category'}
+						disabled={addDialog?.saving() === true && adding !== 'category'}
 						onclick={() => {
 							add('category');
 						}}>Add Category</Button
@@ -265,10 +264,4 @@
 {/snippet}
 
 <AccountDialog bind:open={addAccountOpen} />
-<AddCategoryDialog
-	bind:this={addDialog}
-	bind:open={addingOpen}
-	bind:saving={addingSaving}
-	kind={adding}
-	{groups}
-/>
+<AddCategoryDialog bind:this={addDialog} bind:open={addingOpen} kind={adding} {groups} />

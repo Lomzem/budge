@@ -1,4 +1,5 @@
 import { clerk } from '@clerk/testing/playwright';
+import { holdResponseTo } from './heldResponse';
 import { expect, test, type Page } from './test';
 
 const ownerEmail = process.env.E2E_CLERK_USER_EMAIL;
@@ -61,4 +62,36 @@ test('a Category can be added, renamed, hidden, and deleted, down to 320 px', as
 	await deleteGroup.getByRole('button', { name: 'Delete group' }).click();
 	await expect(deleteGroup).toBeHidden();
 	await expect(page.getByRole('heading', { level: 2, name: /^Smoke Test Group/ })).toHaveCount(0);
+});
+
+test('a rename that finishes after its dialog closed leaves the reopened dialog alone', async ({
+	page
+}) => {
+	if (!ownerEmail) throw new Error('E2E_CLERK_USER_EMAIL is not set.');
+
+	const renamed = await holdResponseTo(page, 'categories:rename');
+	await page.goto('/sign-in');
+	await clerk.signIn({ page, emailAddress: ownerEmail });
+	await page.goto('/categories');
+	await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+	const rename = page.getByRole('dialog', { name: 'Rename Category' });
+
+	await act(page, 'Groceries', 'Rename');
+	await rename.getByLabel('Name').fill('Sample Slow Groceries');
+	await rename.getByRole('button', { name: 'Save' }).click();
+	await renamed.held;
+	await page.keyboard.press('Escape');
+	await expect(rename).toBeHidden();
+
+	await act(page, 'Groceries', 'Rename');
+	await expect(rename.getByLabel('Name')).toHaveValue('Groceries');
+	renamed.release();
+
+	await expect(
+		page.getByRole('button', { name: 'Sample Slow Groceries actions', exact: true })
+	).toBeVisible();
+	await expect(rename).toHaveAttribute('data-state', 'open');
+	await expect(rename.getByLabel('Name')).toHaveValue('Groceries');
+	await expect(rename.getByRole('button', { name: 'Save' })).toBeEnabled();
+	await expect(rename.getByRole('alert')).toHaveCount(0);
 });

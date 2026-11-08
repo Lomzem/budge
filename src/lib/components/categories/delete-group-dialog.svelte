@@ -2,10 +2,10 @@
 	import { useMutation } from 'convex-svelte';
 
 	import { api } from '$convex/_generated/api';
-	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Label } from '$lib/components/ui/label';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	import type { ManagedGroup } from './types';
 
@@ -22,16 +22,15 @@
 
 	const removeGroup = useMutation(api.categories.removeGroup);
 
+	const dialog = new DialogSession();
 	let destinationId = $state('');
 	let error = $state('');
-	let saving = $state(false);
-
-	const openFor = () => group?._id;
 
 	const choices = $derived(groups.filter((g) => g._id !== group?._id));
 	const count = $derived(group?.categories.length ?? 0);
 
 	export function reset() {
+		dialog.open({});
 		destinationId = '';
 		error = '';
 	}
@@ -45,16 +44,12 @@
 			return;
 		}
 		const id = group._id;
-		saving = true;
-		const removed = await attempt(() =>
+		const removed = await dialog.run('save', () =>
 			removeGroup({
 				groupId: id,
 				...(destination ? { destinationGroupId: destination._id } : {})
 			})
 		);
-		saving = false;
-		const anotherGroupTookTheDialogOver = openFor() !== id;
-		if (anotherGroupTookTheDialogOver) return;
 		if (removed.ok) open = false;
 		else error = removed.error?.message ?? "Budge couldn't delete the group. Try again.";
 	}
@@ -99,7 +94,9 @@
 					<p role="alert" class="text-sm text-destructive">{error}</p>
 				{/if}
 				<Dialog.Footer>
-					<Button type="submit" variant="destructive" disabled={saving}>Delete group</Button>
+					<Button type="submit" variant="destructive" disabled={dialog.pending('save')}
+						>Delete group</Button
+					>
 				</Dialog.Footer>
 			</form>
 		{/if}

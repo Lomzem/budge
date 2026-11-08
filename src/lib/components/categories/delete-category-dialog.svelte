@@ -3,10 +3,10 @@
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Label } from '$lib/components/ui/label';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	import type { ManagedGroup } from './types';
 
@@ -23,11 +23,9 @@
 
 	const remove = useMutation(api.categories.remove);
 
+	const dialog = new DialogSession();
 	let destinationId = $state('');
 	let error = $state('');
-	let saving = $state(false);
-
-	const openFor = () => category?.id;
 
 	const choices = $derived(
 		groups
@@ -39,6 +37,7 @@
 	);
 
 	export function reset() {
+		dialog.open({});
 		destinationId = '';
 		error = '';
 	}
@@ -53,11 +52,9 @@
 			return;
 		}
 		const { id } = category;
-		saving = true;
-		const removed = await attempt(() => remove({ categoryId: id, destinationId: destination._id }));
-		saving = false;
-		const anotherCategoryTookTheDialogOver = openFor() !== id;
-		if (anotherCategoryTookTheDialogOver) return;
+		const removed = await dialog.run('save', () =>
+			remove({ categoryId: id, destinationId: destination._id })
+		);
 		if (removed.ok) open = false;
 		else error = removed.error?.message ?? "Budge couldn't delete the Category. Try again.";
 	}
@@ -100,7 +97,9 @@
 					<p role="alert" class="text-sm text-destructive">{error}</p>
 				{/if}
 				<Dialog.Footer>
-					<Button type="submit" variant="destructive" disabled={saving}>Delete Category</Button>
+					<Button type="submit" variant="destructive" disabled={dialog.pending('save')}
+						>Delete Category</Button
+					>
 				</Dialog.Footer>
 			</form>
 		{/if}

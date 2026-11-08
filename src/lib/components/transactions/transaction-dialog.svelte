@@ -6,7 +6,6 @@
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
-	import { attempt } from '$lib/attempt';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -53,7 +52,8 @@
 	let amount = $state('');
 	let memo = $state('');
 	let error = $state('');
-	let saving = $state(false);
+	const dialog = new DialogSession<object, 'write'>();
+	const saving = $derived(dialog.pending('write'));
 	let confirmDelete = $state(false);
 	let confirmBankRemoval = $state<Id<'imports'> | null>(null);
 	let unlocked = $state(false);
@@ -179,8 +179,6 @@
 		linkChoice = value;
 	};
 
-	const opening = new DialogSession<object>();
-
 	$effect(() => {
 		if (open) untrack(fill);
 	});
@@ -219,7 +217,7 @@
 	}
 
 	function fill() {
-		opening.open({});
+		dialog.open({});
 		error = '';
 		unlocked = false;
 		linkChoice = undefined;
@@ -323,11 +321,7 @@
 			open = false;
 		}
 	) {
-		const started = opening.current;
-		saving = true;
-		const result = await attempt(work);
-		saving = false;
-		if (started !== opening.current) return;
+		const result = await dialog.run('write', work);
 		confirmDelete = false;
 		confirmBankRemoval = null;
 		if (result.ok) succeeded();

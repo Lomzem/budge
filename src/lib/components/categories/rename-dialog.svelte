@@ -2,11 +2,11 @@
 	import { useMutation } from 'convex-svelte';
 
 	import { api } from '$convex/_generated/api';
-	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	import type { RenameTarget } from './types';
 
@@ -16,13 +16,12 @@
 	const renameCategory = useMutation(api.categories.rename);
 	const renameGroup = useMutation(api.categories.renameGroup);
 
+	const dialog = new DialogSession();
 	let name = $state('');
 	let error = $state('');
-	let saving = $state(false);
-
-	const openFor = () => target?.id;
 
 	export function reset(next: RenameTarget) {
+		dialog.open({});
 		name = next.name;
 		error = '';
 	}
@@ -37,11 +36,7 @@
 		event.preventDefault();
 		if (!target) return;
 		const item = target;
-		saving = true;
-		const renamed = await attempt(() => rename(item));
-		saving = false;
-		const anotherItemTookTheDialogOver = openFor() !== item.id;
-		if (anotherItemTookTheDialogOver) return;
+		const renamed = await dialog.run('save', () => rename(item));
 		if (renamed.ok) open = false;
 		else error = renamed.error?.message ?? "Budge couldn't rename it. Try again.";
 	}
@@ -63,7 +58,7 @@
 				<p role="alert" class="text-sm text-destructive">{error}</p>
 			{/if}
 			<Dialog.Footer>
-				<Button type="submit" disabled={saving}>Save</Button>
+				<Button type="submit" disabled={dialog.pending('save')}>Save</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

@@ -4,11 +4,11 @@
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { formatCents, parseCents } from '$lib/domain/money';
 
 	let {
@@ -25,15 +25,20 @@
 	const current = useQuery(api.accounts.startingBalance, () => ({ accountId: account._id }));
 	const owed = $derived(account.kind === 'creditCard');
 
+	const step = new DialogSession<object, 'suggest' | 'confirm'>();
+	const suggesting = $derived(step.pending('suggest'));
+	const saving = $derived(step.pending('confirm'));
 	let balance = $state('');
-	let suggesting = $state(false);
 	let synced = $state(true);
 	let suggestion = $state('');
 	let error = $state('');
-	let saving = $state(false);
 
 	onMount(() => {
+		step.open({});
 		void suggest();
+		return () => {
+			step.dismiss();
+		};
 	});
 
 	function typed(cents: number) {
@@ -47,12 +52,10 @@
 	async function suggest() {
 		const accountId = account._id;
 		const typedBefore = balance;
-		suggesting = true;
 		suggestion = '';
-		const asked = await attempt(() =>
+		const asked = await step.run('suggest', () =>
 			client.action(api.heldAccounts.suggestStartingBalance, { accountId })
 		);
-		suggesting = false;
 		if (!asked.ok) {
 			suggestion =
 				asked.error?.message ??
@@ -89,12 +92,10 @@
 		}
 		const accountId = account._id;
 		const startingBalance = owed ? -cents : cents;
-		saving = true;
 		error = '';
-		const saved = await attempt(() =>
+		const saved = await step.run('confirm', () =>
 			client.mutation(api.accounts.setStartingBalance, { accountId, startingBalance })
 		);
-		saving = false;
 		if (!saved.ok) {
 			error = saved.error?.message ?? "Budge couldn't save the starting balance. Try again.";
 			return;

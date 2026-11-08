@@ -1,20 +1,50 @@
-export class DialogSession<Session extends object> {
-	#current: Session | null = $state(null);
+import { attempt, type Attempt } from './attempt';
 
-	get current(): Session | null {
-		return this.#current;
+interface Live<Opening, Operation extends string> {
+	readonly opening: Opening;
+	readonly pending: Partial<Record<Operation, number>>;
+	readonly started: Partial<Record<Operation, number>>;
+}
+
+function neverSettles<A>(): Promise<A> {
+	return new Promise<A>(() => undefined);
+}
+
+export class DialogSession<Opening extends object = object, Operation extends string = 'save'> {
+	#live: Live<Opening, Operation> | null = $state(null);
+
+	get current(): Opening | null {
+		return this.#live?.opening ?? null;
 	}
 
-	open(session: Session): Session {
-		this.#current = session;
-		return this.#current;
+	open(opening: Opening): Opening {
+		const live: Live<Opening, Operation> = $state({ opening, pending: {}, started: {} });
+		this.#live = live;
+		return live.opening;
 	}
 
-	close(session: Session) {
-		if (this.#current === session) this.#current = null;
+	close(opening: Opening) {
+		if (this.#live?.opening === opening) this.#live = null;
 	}
 
 	dismiss() {
-		this.#current = null;
+		this.#live = null;
+	}
+
+	pending(operation: Operation): boolean {
+		return (this.#live?.pending[operation] ?? 0) > 0;
+	}
+
+	run<A>(operation: Operation, work: () => PromiseLike<A>): Promise<Attempt<A>> {
+		const live = this.#live;
+		if (live === null) return neverSettles();
+		const run = (live.started[operation] ?? 0) + 1;
+		live.started[operation] = run;
+		live.pending[operation] = (live.pending[operation] ?? 0) + 1;
+		return attempt(work).then((outcome) => {
+			live.pending[operation] = (live.pending[operation] ?? 1) - 1;
+			const latestRunOfItsOpening = this.#live === live && live.started[operation] === run;
+			return latestRunOfItsOpening ? outcome : neverSettles<Attempt<A>>();
+		});
 	}
 }

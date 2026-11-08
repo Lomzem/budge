@@ -3,11 +3,11 @@
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	let {
 		open = $bindable(false),
@@ -18,10 +18,11 @@
 	const rename = useMutation(api.accounts.rename);
 	let name = $state('');
 	let error = $state('');
-	let saving = $state(false);
+	const dialog = new DialogSession();
 
 	$effect(() => {
 		if (open) {
+			dialog.open({});
 			name = currentName;
 			error = '';
 		}
@@ -29,9 +30,7 @@
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		saving = true;
-		const renamed = await attempt(() => rename({ accountId, name }));
-		saving = false;
+		const renamed = await dialog.run('save', () => rename({ accountId, name }));
 		if (renamed.ok) open = false;
 		else error = renamed.error?.message ?? "Budge couldn't rename the Account. Try again.";
 	}
@@ -51,7 +50,7 @@
 				<p role="alert" class="text-sm text-destructive">{error}</p>
 			{/if}
 			<Dialog.Footer>
-				<Button type="submit" disabled={saving}>Save</Button>
+				<Button type="submit" disabled={dialog.pending('save')}>Save</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
