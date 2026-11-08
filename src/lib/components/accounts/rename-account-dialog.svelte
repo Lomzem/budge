@@ -46,9 +46,7 @@
 				<Label for="rename-account-name">Name</Label>
 				<Input id="rename-account-name" bind:value={name} required autocomplete="off" />
 			</div>
-			{#if error}
-				<p role="alert" class="text-sm text-destructive">{error}</p>
-			{/if}
+			<p role="alert" class="min-h-6 text-sm text-destructive">{error}</p>
 			<Dialog.Footer>
 				<Button type="submit" disabled={dialog.pending('save')}>Save</Button>
 			</Dialog.Footer>

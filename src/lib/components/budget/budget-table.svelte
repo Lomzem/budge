@@ -28,20 +28,20 @@
 	const budget = getBudgetMonth();
 </script>
 
-<Table.Root>
+<Table.Root layout="fixed">
 	<Table.Header>
 		<Table.Row>
-			<Table.Head width="fill">Category</Table.Head>
-			<Table.Head width="fit" align="end">Assigned</Table.Head>
-			<Table.Head width="fit" align="end" showFrom="screen-sm">Activity</Table.Head>
-			<Table.Head width="fit" align="end">Available</Table.Head>
+			<Table.Head>Category</Table.Head>
+			<Table.Head width="amount" align="end">Assigned</Table.Head>
+			<Table.Head width="amount" align="end" showFrom="screen-sm">Activity</Table.Head>
+			<Table.Head width="amount" align="end">Available</Table.Head>
 		</Table.Row>
 	</Table.Header>
 	{#each groups as group (group.id)}
 		<Table.Body>
 			<Table.Row>
-				<Table.Head scope="rowgroup" width="fill">
-					<span class="font-semibold">{group.name}</span>
+				<Table.Head scope="rowgroup">
+					<span class="block truncate font-semibold">{group.name}</span>
 				</Table.Head>
 				<Table.Cell align="end" numeric>
 					<span class="font-medium">{formatCents(group.assigned)}</span>
@@ -57,7 +57,7 @@
 				{@const status = availableStatus(category)}
 				{@const selected = category.id === selectedId}
 				<Table.Row data-state={selected ? 'selected' : undefined}>
-					<Table.Cell width="fill">
+					<Table.Cell>
 						<button
 							type="button"
 							class="block w-full rounded-sm pl-3 text-left break-words whitespace-normal underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -79,9 +79,9 @@
 								/>
 							</div>
 						{/if}
-						{#if status}
-							<span class="block pl-3 text-xs whitespace-normal {status.class}">{status.text}</span>
-						{/if}
+						<span class="block min-h-5 pl-3 text-xs whitespace-normal {status?.class ?? ''}"
+							>{status?.text ?? ''}</span
+						>
 						{#each paymentNotes(category) as note (note)}
 							<span class="block pl-3 text-xs whitespace-normal text-muted-foreground">{note}</span>
 						{/each}

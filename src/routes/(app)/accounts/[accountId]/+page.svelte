@@ -59,64 +59,81 @@
 
 {#if account}
 	<div class="flex flex-col gap-4">
-		<header class="flex flex-wrap items-center justify-between gap-2">
-			<div class="flex min-w-0 items-center gap-1">
-				<h1 class="truncate text-xl font-semibold">{account.name}</h1>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Button variant="ghost" size="icon" aria-label="{account.name} actions" {...props}>
-								<EllipsisIcon aria-hidden="true" />
-							</Button>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="start">
-						<DropdownMenu.Item onSelect={() => (renameOpen = true)}>Rename</DropdownMenu.Item>
-						<DropdownMenu.Item
-							disabled={!accounts.canMove(account._id, -1)}
-							onSelect={() => void move(-1)}
-						>
-							Move up
-						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							disabled={!accounts.canMove(account._id, 1)}
-							onSelect={() => void move(1)}
-						>
-							Move down
-						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							onSelect={() => {
-								editStartingBalance(account);
-							}}
-						>
-							Starting balance
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+		<header class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+			<div class="flex min-w-0 flex-col gap-1">
+				<p class="text-sm text-muted-foreground">
+					{account.kind === 'creditCard' ? 'Credit card' : 'Cash'} Account
+				</p>
+				<div class="-mr-2 flex min-w-0 items-center gap-1">
+					<h1 class="truncate text-2xl font-bold tracking-tight">{account.name}</h1>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger>
+							{#snippet child({ props })}
+								<Button variant="ghost" size="icon" aria-label="{account.name} actions" {...props}>
+									<EllipsisIcon aria-hidden="true" />
+								</Button>
+							{/snippet}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="start">
+							<DropdownMenu.Item onSelect={() => (renameOpen = true)}>Rename</DropdownMenu.Item>
+							<DropdownMenu.Item
+								disabled={!accounts.canMove(account._id, -1)}
+								onSelect={() => void move(-1)}
+							>
+								Move up
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								disabled={!accounts.canMove(account._id, 1)}
+								onSelect={() => void move(1)}
+							>
+								Move down
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								onSelect={() => {
+									editStartingBalance(account);
+								}}
+							>
+								Starting balance
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
+				</div>
 			</div>
-			<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-				<p class="tabular-nums">
-					<span class="text-muted-foreground">Balance</span>
-					<span data-testid="account-balance">{formatCents(account.balance)}</span>
-				</p>
-				<p class="text-sm text-muted-foreground" data-testid="last-reconciled">
-					{#if account.lastReconciledOn}
-						Reconciled
-						<time datetime={account.lastReconciledOn}>{formatDate(account.lastReconciledOn)}</time>
-					{:else}
-						Not reconciled yet
-					{/if}
-				</p>
-				<Button variant="outline" size="sm" onclick={() => (reconcileOpen = true)}>Reconcile</Button
-				>
+			<div class="flex flex-wrap items-end gap-x-6 gap-y-3">
+				<div class="flex flex-col items-start sm:items-end">
+					<p class="text-sm font-bold">Balance</p>
+					<p
+						data-testid="account-balance"
+						class={[
+							'border-b-4 border-double border-current text-2xl font-bold',
+							account.balance < 0 && 'text-destructive'
+						]}
+					>
+						{formatCents(account.balance)}
+					</p>
+				</div>
+				<div class="flex flex-col items-start gap-1">
+					<p class="text-sm text-muted-foreground" data-testid="last-reconciled">
+						{#if account.lastReconciledOn}
+							Reconciled
+							<time datetime={account.lastReconciledOn}>{formatDate(account.lastReconciledOn)}</time
+							>
+						{:else}
+							Not reconciled yet
+						{/if}
+					</p>
+					<Button variant="outline" size="sm" onclick={() => (reconcileOpen = true)}>
+						Reconcile
+					</Button>
+				</div>
 			</div>
 		</header>
-		{#if reconciled?.accountId === account._id}
-			<p role="status" class="text-sm">{reconciled.message}</p>
-		{/if}
-		{#if moveError}
-			<p role="alert" class="text-sm text-destructive">{moveError}</p>
-		{/if}
+		<div class="-my-1 min-h-6 text-sm">
+			<p role="status">
+				{reconciled?.accountId === account._id ? reconciled.message : ''}
+			</p>
+			<p role="alert" class="text-destructive">{moveError}</p>
+		</div>
 		{#key account._id}
 			<TransactionTable accountId={account._id} />
 		{/key}
@@ -144,9 +161,12 @@
 		</Dialog.Content>
 	</Dialog.Root>
 {:else if accounts.loaded}
-	<h1 class="text-xl font-semibold">No such Account</h1>
+	<h1 class="text-2xl font-bold tracking-tight">No such Account</h1>
 	<p class="mt-2 text-muted-foreground">
-		It may have been removed. <a class="underline" href={resolve('/accounts')}>See All Accounts</a>.
+		It may have been removed.
+		<a class="underline underline-offset-4 hover:no-underline" href={resolve('/accounts')}
+			>See every Account</a
+		>.
 	</p>
 {:else}
 	<p role="status" class="text-muted-foreground">Loading…</p>

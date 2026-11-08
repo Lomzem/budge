@@ -3,7 +3,17 @@ import { type VariantProps, tv } from 'tailwind-variants';
 export const tableColumnVariants = tv({
 	variants: {
 		align: { start: '', center: 'text-center', end: 'text-right' },
-		width: { auto: '', fit: 'w-0', fill: 'w-full max-w-0' },
+		width: {
+			auto: '',
+			fit: 'w-0',
+			fill: 'w-full max-w-0',
+			action: 'w-28',
+			check: 'w-16 sm:w-20',
+			amount: 'w-28 sm:w-36',
+			date: 'w-32',
+			name: 'w-44',
+			note: 'w-56'
+		},
 		showFrom: {
 			always: '',
 			md: 'hidden @md:table-cell',

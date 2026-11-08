@@ -1,5 +1,6 @@
 <script lang="ts">
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { useMutation, useQuery } from 'convex-svelte';
 
 	import { api } from '$convex/_generated/api';
@@ -74,27 +75,34 @@
 	<title>Categories · Budge</title>
 </svelte:head>
 
-{#snippet trigger(name: string, hidden: boolean, heading: boolean)}
+{#snippet trigger(name: string, hidden: boolean)}
 	<DropdownMenu.Trigger>
 		{#snippet child({ props })}
-			<button
-				class={[
-					'flex max-w-full min-w-0 items-center gap-1 rounded-md px-2 py-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:bg-muted',
-					heading ? 'font-semibold' : 'text-sm'
-				]}
+			<Button
+				variant="ghost"
+				size="icon"
 				aria-label="{name}{hidden ? ' (hidden)' : ''} actions"
 				{...props}
 			>
-				<span class="truncate">{name}</span>
-				<ChevronDownIcon aria-hidden="true" class="size-4 shrink-0 text-muted-foreground" />
-			</button>
+				<EllipsisIcon aria-hidden="true" />
+			</Button>
 		{/snippet}
 	</DropdownMenu.Trigger>
 {/snippet}
 
+{#snippet hiddenTag()}
+	<span class="shrink-0 rounded-full bg-muted px-2 text-xs text-muted-foreground">Hidden</span>
+{/snippet}
+
 <div class="flex flex-col gap-6">
-	<header class="flex flex-col gap-3">
-		<h1 class="text-xl font-semibold">Categories</h1>
+	<header class="flex flex-col gap-4">
+		<div class="flex max-w-prose flex-col gap-1">
+			<h1 class="text-2xl font-bold tracking-tight">Categories</h1>
+			<p class="text-muted-foreground">
+				Rename, reorder, hide, or delete Categories and their groups. Assign money to them on the
+				Budget.
+			</p>
+		</div>
 		<div class="flex flex-wrap gap-2">
 			<Button
 				variant="outline"
@@ -104,6 +112,7 @@
 					add('group');
 				}}
 			>
+				<PlusIcon aria-hidden="true" />
 				Add Category Group
 			</Button>
 			{#if groups.length > 0}
@@ -115,15 +124,14 @@
 						add('category');
 					}}
 				>
+					<PlusIcon aria-hidden="true" />
 					Add Category
 				</Button>
 			{/if}
 		</div>
 	</header>
 
-	{#if actionError}
-		<p role="alert" class="text-sm text-destructive">{actionError}</p>
-	{/if}
+	<p role="alert" class="-my-4 min-h-6 text-sm text-destructive">{actionError}</p>
 
 	{#if list.error}
 		<p role="alert" class="text-sm text-destructive">
@@ -136,65 +144,71 @@
 			No Categories yet. Add a Category Group, then Categories to assign money to.
 		</p>
 	{:else}
-		<div class="flex max-w-2xl flex-col gap-6">
+		<div class="flex max-w-2xl flex-col gap-4">
 			{#each groups as group, groupIndex (group._id)}
-				<section aria-labelledby="group-{group._id}" class="flex flex-col gap-1">
-					<div class="flex items-center gap-2 border-b pb-1">
-						<h2 id="group-{group._id}" class="min-w-0">
-							<DropdownMenu.Root>
-								{@render trigger(group.name, group.hidden, true)}
-								<DropdownMenu.Content align="start">
-									<DropdownMenu.Item
-										onSelect={() => {
-											rename({ kind: 'group', id: group._id, name: group.name });
-										}}
-									>
-										Rename
-									</DropdownMenu.Item>
-									<DropdownMenu.Item
-										disabled={groupIndex === 0}
-										onSelect={() =>
-											void run(() => moveGroup({ groupId: group._id, index: groupIndex - 1 }))}
-									>
-										Move up
-									</DropdownMenu.Item>
-									<DropdownMenu.Item
-										disabled={groupIndex === groups.length - 1}
-										onSelect={() =>
-											void run(() => moveGroup({ groupId: group._id, index: groupIndex + 1 }))}
-									>
-										Move down
-									</DropdownMenu.Item>
-									<DropdownMenu.Item
-										onSelect={() =>
-											void run(() => setGroupHidden({ groupId: group._id, hidden: !group.hidden }))}
-									>
-										{group.hidden ? 'Show in budget' : 'Hide from budget'}
-									</DropdownMenu.Item>
-									<DropdownMenu.Separator />
-									<DropdownMenu.Item
-										variant="destructive"
-										onSelect={() => {
-											deleteGroup(group);
-										}}
-									>
-										Delete…
-									</DropdownMenu.Item>
-								</DropdownMenu.Content>
-							</DropdownMenu.Root>
-						</h2>
+				<section aria-labelledby="group-{group._id}" class="rounded-lg border bg-card">
+					<div class="flex min-h-12 items-center gap-2 border-b py-1 pr-2 pl-4">
+						<h2 id="group-{group._id}" class="min-w-0 flex-1 truncate font-bold">{group.name}</h2>
 						{#if group.hidden}
-							<span class="text-sm text-muted-foreground">Hidden</span>
+							{@render hiddenTag()}
 						{/if}
+						<DropdownMenu.Root>
+							{@render trigger(group.name, group.hidden)}
+							<DropdownMenu.Content align="start">
+								<DropdownMenu.Item
+									onSelect={() => {
+										rename({ kind: 'group', id: group._id, name: group.name });
+									}}
+								>
+									Rename
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									disabled={groupIndex === 0}
+									onSelect={() =>
+										void run(() => moveGroup({ groupId: group._id, index: groupIndex - 1 }))}
+								>
+									Move up
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									disabled={groupIndex === groups.length - 1}
+									onSelect={() =>
+										void run(() => moveGroup({ groupId: group._id, index: groupIndex + 1 }))}
+								>
+									Move down
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									onSelect={() =>
+										void run(() => setGroupHidden({ groupId: group._id, hidden: !group.hidden }))}
+								>
+									{group.hidden ? 'Show in budget' : 'Hide from budget'}
+								</DropdownMenu.Item>
+								<DropdownMenu.Separator />
+								<DropdownMenu.Item
+									variant="destructive"
+									onSelect={() => {
+										deleteGroup(group);
+									}}
+								>
+									Delete…
+								</DropdownMenu.Item>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
 					</div>
 					{#if group.categories.length === 0}
-						<p class="py-1 pl-3 text-sm text-muted-foreground">No Categories yet.</p>
+						<p class="px-4 py-3 text-muted-foreground">No Categories yet.</p>
 					{:else}
-						<ul class="flex flex-col">
+						<ul class="flex flex-col divide-y">
 							{#each group.categories as category, index (category._id)}
-								<li class="flex min-w-0 items-center gap-2 pl-3">
+								<li class="flex min-h-11 min-w-0 items-center gap-2 py-1 pr-2 pl-4">
+									<span
+										class={['min-w-0 flex-1 truncate', category.hidden && 'text-muted-foreground']}
+										>{category.name}</span
+									>
+									{#if category.hidden}
+										{@render hiddenTag()}
+									{/if}
 									<DropdownMenu.Root>
-										{@render trigger(category.name, category.hidden, false)}
+										{@render trigger(category.name, category.hidden)}
 										<DropdownMenu.Content align="start">
 											<DropdownMenu.Item
 												onSelect={() => {
@@ -269,9 +283,6 @@
 											</DropdownMenu.Item>
 										</DropdownMenu.Content>
 									</DropdownMenu.Root>
-									{#if category.hidden}
-										<span class="text-sm text-muted-foreground">Hidden</span>
-									{/if}
 								</li>
 							{/each}
 						</ul>

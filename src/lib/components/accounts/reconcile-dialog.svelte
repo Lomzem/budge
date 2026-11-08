@@ -113,9 +113,7 @@
 					in Ready to Assign, which you can change later.
 				{/if}
 			</p>
-			{#if error}
-				<p role="alert" class="text-sm text-destructive">{error}</p>
-			{/if}
+			<p role="alert" class="min-h-6 text-sm text-destructive">{error}</p>
 			<Dialog.Footer>
 				<Button type="submit" disabled={dialog.pending('save')}>Reconcile</Button>
 			</Dialog.Footer>

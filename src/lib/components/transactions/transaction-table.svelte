@@ -1,5 +1,8 @@
 <script lang="ts">
+	import CheckCheckIcon from '@lucide/svelte/icons/check-check';
 	import LockIcon from '@lucide/svelte/icons/lock';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import UploadIcon from '@lucide/svelte/icons/upload';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useMutation, usePaginatedQuery, useQuery } from 'convex-svelte';
 
@@ -85,6 +88,22 @@
 	const approve = useMutation(api.transactions.approve);
 	const approveAll = useMutation(api.transactions.approveAll);
 
+	const approveAllLabel = $derived.by(() => {
+		const count = unapprovedCount.data ?? 0;
+		if (count === 0) return 'Approve all';
+		if (count > UNAPPROVED_COUNT_LIMIT)
+			return `Approve ${formatUnapprovedCount(UNAPPROVED_COUNT_LIMIT)}`;
+		if (count === 1) return 'Approve 1';
+		return `Approve all ${formatUnapprovedCount(count)}`;
+	});
+
+	const problem = $derived.by(() => {
+		if (rowError !== '') return rowError;
+		if (first.error ?? second.error)
+			return "Budge couldn't load Transactions. Try reloading the page.";
+		return '';
+	});
+
 	const secondShown = $derived(first.status === 'Exhausted' && hasSecond);
 
 	const rows = $derived(
@@ -143,36 +162,46 @@
 </script>
 
 <div class="flex flex-col gap-3">
-	<TransactionFilters bind:values={filterValues} showAccount={allAccounts} />
 	<div class="flex flex-wrap items-center gap-2">
-		<Button onclick={add}>Add Transaction</Button>
-		<Button variant="outline" onclick={() => (importOpen = true)}>Import file</Button>
-		{#if (unapprovedCount.data ?? 0) > 0}
-			<Button variant="outline" disabled={approvingAll} onclick={approveEvery}>
-				{(unapprovedCount.data ?? 0) > UNAPPROVED_COUNT_LIMIT
-					? `Approve ${formatUnapprovedCount(UNAPPROVED_COUNT_LIMIT)}`
-					: `Approve all ${formatUnapprovedCount(unapprovedCount.data ?? 0)}`}
+		<Button onclick={add}>
+			<PlusIcon aria-hidden="true" />
+			Add Transaction
+		</Button>
+		<Button variant="outline" onclick={() => (importOpen = true)}>
+			<UploadIcon aria-hidden="true" />
+			Import file
+		</Button>
+		<div class="grid min-w-36">
+			<Button
+				variant="outline"
+				disabled={approvingAll || (unapprovedCount.data ?? 0) === 0}
+				onclick={approveEvery}
+			>
+				<CheckCheckIcon aria-hidden="true" />
+				{approveAllLabel}
 			</Button>
-		{/if}
+		</div>
 	</div>
-	{#if rowError}
-		<p role="alert" class="text-sm text-destructive">{rowError}</p>
-	{/if}
+	<TransactionFilters bind:values={filterValues} showAccount={allAccounts} />
+	<p role="alert" class="-my-1 min-h-6 text-sm text-destructive">
+		{problem}
+	</p>
 
 	<div class="@container">
-		<Table.Root>
+		<Table.Root layout="fixed">
 			<Table.Header>
 				<Table.Row>
-					<Table.Head width="fit" showFrom="md">Date</Table.Head>
+					<Table.Head width="date" showFrom="md">Date</Table.Head>
 					{#if allAccounts}
-						<Table.Head showFrom="2xl">Account</Table.Head>
+						<Table.Head width="name" showFrom="2xl">Account</Table.Head>
 					{/if}
-					<Table.Head width="fill">Payee</Table.Head>
-					<Table.Head showFrom="lg">Category</Table.Head>
-					<Table.Head showFrom="xl">Memo</Table.Head>
-					<Table.Head width="fit" align="end">Amount</Table.Head>
-					<Table.Head width="fit" align="center">Cleared</Table.Head>
-					<Table.Head width="fit" showFrom="md"><span class="sr-only">Approval</span></Table.Head>
+					<Table.Head>Payee</Table.Head>
+					<Table.Head width="name" showFrom="lg">Category</Table.Head>
+					<Table.Head width="note" showFrom="xl">Memo</Table.Head>
+					<Table.Head width="amount" align="end">Amount</Table.Head>
+					<Table.Head width="check" align="center">Cleared</Table.Head>
+					<Table.Head width="action" showFrom="md"><span class="sr-only">Approval</span></Table.Head
+					>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
@@ -184,12 +213,14 @@
 						row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
 					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
 						<Table.Cell numeric showFrom="md">
-							<time datetime={row.date}>{formatDate(row.date)}</time>
+							<time datetime={row.date} class="block truncate">{formatDate(row.date)}</time>
 						</Table.Cell>
 						{#if allAccounts}
-							<Table.Cell showFrom="2xl">{row.accountName}</Table.Cell>
+							<Table.Cell showFrom="2xl">
+								<span class="block truncate">{row.accountName}</span>
+							</Table.Cell>
 						{/if}
-						<Table.Cell width="fill">
+						<Table.Cell>
 							<button
 								class="block max-w-full truncate rounded-sm text-left hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 								onclick={() => {
@@ -231,10 +262,10 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell showFrom="lg">
-							<span class={['block max-w-48 truncate', categoryClass]}>{category}</span>
+							<span class={['block truncate', categoryClass]}>{category}</span>
 						</Table.Cell>
 						<Table.Cell showFrom="xl">
-							<span class="block max-w-60 truncate">{row.memo ?? ''}</span>
+							<span class="block truncate">{row.memo ?? ''}</span>
 						</Table.Cell>
 						<Table.Cell align="end" numeric>{formatCents(row.amount)}</Table.Cell>
 						<Table.Cell align="center">
@@ -293,11 +324,6 @@
 				{more.status === 'LoadingMore' ? 'Loading…' : 'Show more'}
 			</Button>
 		</div>
-	{/if}
-	{#if first.error ?? second.error}
-		<p role="alert" class="text-sm text-destructive">
-			Budge couldn't load Transactions. Try reloading the page.
-		</p>
 	{/if}
 </div>
 

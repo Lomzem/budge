@@ -168,9 +168,7 @@
 			<Button size="wrap" disabled={covering} onclick={cover}>
 				Cover {formatCents(-category.available)} from Ready to Assign
 			</Button>
-			{#if coverError}
-				<p role="alert" class="text-sm text-destructive">{coverError}</p>
-			{/if}
+			<p role="alert" class="min-h-6 text-sm text-destructive">{coverError}</p>
 		</div>
 	{/if}
 
@@ -201,9 +199,7 @@
 						Assign {formatCents(category.target.needed)}
 					</Button>
 				{/if}
-				{#if assignError}
-					<p role="alert" class="text-sm text-destructive">{assignError}</p>
-				{/if}
+				<p role="alert" class="min-h-6 text-sm text-destructive">{assignError}</p>
 			{:else}
 				<p class="text-sm text-muted-foreground">No Target yet.</p>
 			{/if}
@@ -257,9 +253,7 @@
 				required
 			/>
 		</div>
-		{#if moveError}
-			<p role="alert" class="text-sm text-destructive">{moveError}</p>
-		{/if}
+		<p role="alert" class="min-h-6 text-sm text-destructive">{moveError}</p>
 		<Button type="submit" variant="outline" disabled={moving}>Move money</Button>
 	</form>
 </section>

@@ -133,9 +133,7 @@
 		{/if}
 	</div>
 	<p role="status" class="text-sm text-muted-foreground">{suggestion}</p>
-	{#if error}
-		<p role="alert" class="text-sm text-destructive">{error}</p>
-	{/if}
+	<p role="alert" class="min-h-6 text-sm text-destructive">{error}</p>
 	<Dialog.Footer>
 		{#if synced}
 			<Button variant="outline" type="button" disabled={suggesting} onclick={suggest}>
