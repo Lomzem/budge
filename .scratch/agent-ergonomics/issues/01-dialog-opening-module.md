@@ -105,3 +105,8 @@ Three runs, each from a fresh read of `~/.agents/principles/README.md`, with eve
 - Standards review (Sol, same range): the reviewer raised Add Category, Export, and the Account `goto` as well. My call:
   - **Resume on reopen is kept.** It is `main`'s behavior, and the spec forbids changing behavior. Both reviewers misread it as an accident, so it is now named in the interface: `DialogSession.openOrResume(opening, operation)` replaces the two hand-written `if (pending) return; open()` checks, and the AGENTS.md dialog row states the rule.
   - **A failed `goto` now falls back** to `location.assign` of the new Account's page. The Account exists either way, so recovery opens it without creating it again.
+- Re-decided on merit after the user allowed behavior changes that improve the product:
+  - **Resume on reopen stays.** A Convex mutation can't be cancelled, so the save keeps running after a dismissal. Showing a fresh form would hide the pending save and invite a duplicate Category. Resuming shows the honest state.
+  - **Export resumes the same way.** The owner asked for the download, and it finishes either way.
+  - **The reconnect result still belongs to its Bank Connection.**
+  - The Account navigation fallback is the one deliberate improvement.

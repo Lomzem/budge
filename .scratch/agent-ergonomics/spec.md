@@ -18,7 +18,7 @@ Make the next agent's change smaller and its proof cheaper. Each recurring mista
 
 ## Constraints
 
-- No user-visible behavior changes, except the stale-result bug fix in the rename dialog (01).
+- User-visible behavior may change where it improves the product (user decision, 2026-11-07). Each change is named in its ticket's Comments and proven by a test or a verify-budge journey.
 - ADR 0001 (plain Convex functions with `v.*` validators), ADR 0002 (the monthlyTotals rebuild-equivalence test stays), and ADR 0003 (capacity limits, publicError, the pure domain module, serial E2E) hold.
 - Each ticket migrates its callers and deletes the legacy API in the same ticket.
 - Each new or changed test passes the `test-audit` authoring gate.
