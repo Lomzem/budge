@@ -2,7 +2,7 @@ import { convexTest } from 'convex-test';
 import { afterEach, assert, beforeEach, vi } from 'vitest';
 
 import { readPublicError } from '../src/lib/publicError';
-import { internal } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import schema from './schema';
 
@@ -43,6 +43,43 @@ export async function publicErrorMessage(call: Promise<unknown>) {
 }
 
 type Backend = ReturnType<typeof newBackend>['t'];
+
+type AccountKind = 'cash' | 'creditCard';
+
+export async function startBudget<
+	const Accounts extends Record<string, readonly [AccountKind, number]>,
+	const Groups extends Record<string, readonly string[]>
+>({
+	cutoverDate = '2026-08-01',
+	accounts,
+	groups
+}: { cutoverDate?: string; accounts?: Accounts; groups?: Groups } = {}) {
+	const backend = newBackend();
+	const { owner } = backend;
+	await owner.mutation(api.settings.setCutoverDate, { cutoverDate });
+	const accountIds: Record<string, Id<'accounts'>> = {};
+	for (const [name, [kind, startingBalance]] of Object.entries(accounts ?? {})) {
+		accountIds[name] = await owner.mutation(api.accounts.create, { name, kind, startingBalance });
+	}
+	const groupIds: Record<string, Id<'categoryGroups'>> = {};
+	const categoryIds: Record<string, Id<'categories'>> = {};
+	for (const [groupName, categoryNames] of Object.entries(groups ?? {})) {
+		const groupId = await owner.mutation(api.categories.createGroup, { name: groupName });
+		groupIds[groupName] = groupId;
+		for (const name of categoryNames) {
+			categoryIds[name] = await owner.mutation(api.categories.create, { groupId, name });
+		}
+	}
+	const { readyToAssignId } = await owner.query(api.categories.list, {});
+	assert(readyToAssignId !== null, 'setting the cutover date creates Ready to Assign');
+	return {
+		...backend,
+		accounts: accountIds as Readonly<Record<keyof Accounts, Id<'accounts'>>>,
+		groups: groupIds as Readonly<Record<keyof Groups, Id<'categoryGroups'>>>,
+		categories: categoryIds as Readonly<Record<Groups[keyof Groups][number], Id<'categories'>>>,
+		readyToAssignId
+	};
+}
 
 export async function makeLegacyStartingBalance(
 	t: Backend,

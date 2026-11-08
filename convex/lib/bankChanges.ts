@@ -7,11 +7,13 @@ import {
 	allBankRowsOf,
 	deleteTransaction,
 	hasBankRow,
+	keepAfterBankRemoval,
+	markApproved,
 	payeeNameOf,
-	refreshSearchText,
 	replaceTransaction,
 	saveTransaction,
-	splitLinesOf
+	splitLinesOf,
+	updateBankRow
 } from './transactions';
 
 export async function syncedBankRow(ctx: MutationCtx, accountId: Id<'accounts'>, sourceId: string) {
@@ -51,21 +53,17 @@ export async function applyBankChange(
 	const values = { date: row.date, amount: row.amount, bankText: row.bankText };
 	const transaction = await linkedTransaction(ctx, bankRow);
 	if (transaction === null) {
-		await ctx.db.patch('imports', bankRow._id, values);
+		await updateBankRow(ctx, bankRow, values);
 		return;
 	}
 	if (await changesQuietly(ctx, bankRow, transaction)) {
 		await followBank(ctx, transaction, row, bankTextChanged, payees);
-		await ctx.db.patch('imports', bankRow._id, values);
+		await updateBankRow(ctx, bankRow, values);
 	} else {
 		const differs = row.date !== transaction.date || row.amount !== transaction.amount;
 		const state = differs ? ('changed' as const) : ('linked' as const);
-		await ctx.db.patch('imports', bankRow._id, {
-			...values,
-			...(datedOrAmountChanged ? { state } : {})
-		});
+		await updateBankRow(ctx, bankRow, { ...values, ...(datedOrAmountChanged ? { state } : {}) });
 	}
-	if (bankTextChanged) await refreshSearchText(ctx, transaction._id);
 }
 
 async function followBank(
@@ -109,7 +107,7 @@ export async function applyBankRemoval(ctx: MutationCtx, bankRow: Doc<'imports'>
 	if (transaction !== null && (await changesQuietly(ctx, bankRow, transaction))) {
 		await deleteTransaction(ctx, transaction);
 	}
-	await ctx.db.patch('imports', bankRow._id, { state: 'removed' });
+	await updateBankRow(ctx, bankRow, { state: 'removed' });
 }
 
 export async function resolveBankChange(
@@ -128,15 +126,13 @@ export async function resolveBankChange(
 			await requireNoOtherBacking(ctx, transaction);
 			await deleteTransaction(ctx, transaction);
 		} else {
-			await ctx.db.patch('imports', bankRow._id, { transactionId: undefined, matched: false });
-			await ctx.db.patch('transactions', transaction._id, { approved: true });
-			await refreshSearchText(ctx, transaction._id);
+			await keepAfterBankRemoval(ctx, bankRow._id, transaction._id);
 		}
 		return;
 	}
 	if (keep === 'bank') await takeBankValues(ctx, transaction, bankRow);
-	else await ctx.db.patch('transactions', transaction._id, { approved: true });
-	await ctx.db.patch('imports', bankRow._id, { state: 'linked' });
+	else await markApproved(ctx, transaction._id);
+	await updateBankRow(ctx, bankRow, { state: 'linked' });
 }
 
 async function takeBankValues(
@@ -193,7 +189,7 @@ async function flagDisagreeingRows(ctx: MutationCtx, transactionId: Id<'transact
 	for await (const bankRow of allBankRowsOf(ctx, transactionId)) {
 		const disagrees = bankRow.date !== transaction.date || bankRow.amount !== transaction.amount;
 		if (bankRow.state === 'linked' && disagrees) {
-			await ctx.db.patch('imports', bankRow._id, { state: 'changed' });
+			await updateBankRow(ctx, bankRow, { state: 'changed' });
 		}
 	}
 }

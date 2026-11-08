@@ -18,6 +18,7 @@ import {
 } from './_generated/server';
 import { applyBankChange, applyBankRemoval, syncedBankRow } from './lib/bankChanges';
 import { applyBankRows, planBankRows, requireBankRow, type IncomingRow } from './lib/imports';
+import { holdBankRow, updateBankRow } from './lib/transactions';
 import { requireOwner } from './lib/owner';
 import { ImportedPayees } from './lib/payees';
 import { PlaidClient, type WebhookKey } from './lib/plaidClient';
@@ -643,7 +644,7 @@ async function applyBankRemovals(
 		if (target === null) continue;
 		const held = await importOf(ctx, target._id, sourceId);
 		if (held?.state === 'held') {
-			await ctx.db.patch('imports', held._id, { state: 'removed' });
+			await updateBankRow(ctx, held, { state: 'removed' });
 			continue;
 		}
 		if (target.state !== 'mapped') continue;
@@ -660,7 +661,7 @@ async function changeHeldRow(
 	const held = await importOf(ctx, connectionAccountId, row.sourceId);
 	if (held === null || held.transactionId !== undefined) return false;
 	if (held.state !== 'held') return true;
-	await ctx.db.patch('imports', held._id, {
+	await updateBankRow(ctx, held, {
 		date: row.date,
 		amount: row.amount,
 		bankText: row.bankText,
@@ -799,16 +800,14 @@ async function holdRows(
 	let held = 0;
 	for (const row of rows) {
 		if ((await importOf(ctx, connectionAccountId, row.sourceId)) !== null) continue;
-		await ctx.db.insert('imports', {
+		await holdBankRow(ctx, {
 			source: 'plaid',
 			...(row.sourceId === undefined ? {} : { sourceId: row.sourceId }),
 			connectionAccountId,
 			date: row.date,
 			amount: row.amount,
 			bankText: row.bankText,
-			...(row.merchantName === undefined ? {} : { merchantName: row.merchantName }),
-			matched: false,
-			state: 'held'
+			...(row.merchantName === undefined ? {} : { merchantName: row.merchantName })
 		});
 		held++;
 	}

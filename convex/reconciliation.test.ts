@@ -2,29 +2,18 @@ import { assert, describe, expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { newBackend, publicErrorCode, publicErrorMessage, useOwnerEnv } from './test.helper';
+import { publicErrorCode, publicErrorMessage, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
 async function budgetToReconcile() {
-	const backend = newBackend();
+	const backend = await startBudget({
+		accounts: { Checking: ['cash', 300_000], Discover: ['creditCard', -20_000] },
+		groups: { Everyday: ['Groceries'] }
+	});
 	const { owner, t } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 300_000
-	});
-	const discover = await owner.mutation(api.accounts.create, {
-		name: 'Discover',
-		kind: 'creditCard',
-		startingBalance: -20_000
-	});
-	const everyday = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
-	const groceries = await owner.mutation(api.categories.create, {
-		groupId: everyday,
-		name: 'Groceries'
-	});
+	const { Checking: checking, Discover: discover } = backend.accounts;
+	const { Groceries: groceries } = backend.categories;
 
 	const buy = async (accountId: Id<'accounts'>, amount: number, cleared = true) => {
 		const id = await owner.mutation(api.transactions.create, {

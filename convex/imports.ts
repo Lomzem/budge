@@ -3,11 +3,11 @@ import { v } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query } from './_generated/server';
 import { resolveBankChange as resolve } from './lib/bankChanges';
-import { applyBankRows, fileRow, fileSource, insertImported, planImport } from './lib/imports';
+import { applyBankRows, fileRow, fileSource, importedFields, planImport } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { ImportedPayees } from './lib/payees';
-import { hasBankRow, payeeNameOf, refreshSearchText, requireUnlocked } from './lib/transactions';
+import { payeeNameOf, unmatchBankRow } from './lib/transactions';
 
 const candidate = v.object({
 	_id: v.id('transactions'),
@@ -114,16 +114,12 @@ export const unmatch = mutation({
 		if (bankRow.state === 'removed') {
 			throw publicError('INVALID_INPUT', 'The bank removed this row. Resolve that instead.');
 		}
-		const matchedTransaction = await ctx.db.get('transactions', matchedId);
-		if (matchedTransaction !== null) requireUnlocked(matchedTransaction, 'to unmatch it');
-		const transactionId = await insertImported(ctx, bankRow.accountId, bankRow);
-		await ctx.db.patch('imports', importId, { transactionId, matched: false, state: 'linked' });
-		await refreshSearchText(ctx, transactionId);
-		await refreshSearchText(ctx, matchedId);
-		if (!(await hasBankRow(ctx, matchedId))) {
-			await ctx.db.patch('transactions', matchedId, { cleared: 'uncleared', approved: true });
-		}
-		return transactionId;
+		return await unmatchBankRow(
+			ctx,
+			importId,
+			matchedId,
+			await importedFields(ctx, bankRow.accountId, bankRow)
+		);
 	}
 });
 

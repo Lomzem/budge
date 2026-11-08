@@ -9,6 +9,7 @@ import ts from 'typescript-eslint';
 
 import noComments from './eslint/rules/no-comments.js';
 import noEffectDefects from './eslint/rules/no-effect-defects.js';
+import ownedWrites from './eslint/rules/owned-writes.js';
 import svelteConfig from './svelte.config.ts';
 
 const browserOnlyGlobals = new Set([
@@ -100,7 +101,13 @@ export default defineConfig(
 	},
 	{
 		plugins: {
-			local: { rules: { 'no-comments': noComments, 'no-effect-defects': noEffectDefects } }
+			local: {
+				rules: {
+					'no-comments': noComments,
+					'no-effect-defects': noEffectDefects,
+					'owned-writes': ownedWrites
+				}
+			}
 		},
 		rules: {
 			'local/no-comments': 'error',
@@ -123,6 +130,42 @@ export default defineConfig(
 							method: 'layerTest',
 							reason:
 								'An unexpected call means the test fake violates its declared interaction contract.'
+						}
+					]
+				}
+			]
+		}
+	},
+	{
+		files: ['convex/**/*.ts'],
+		ignores: [
+			'convex/lib/transactions.ts',
+			'convex/lib/monthlyTotals.ts',
+			'convex/migrations.ts',
+			'convex/seed.ts',
+			'convex/**/*.test.ts',
+			'convex/test.helper.ts'
+		],
+		rules: {
+			'local/owned-writes': [
+				'error',
+				{ tables: ['transactions', 'transactionSplits', 'imports', 'monthlyTotals'] }
+			],
+			'no-restricted-imports': [
+				'error',
+				{
+					patterns: [
+						{
+							regex: '(^|/)transactions$',
+							importNames: ['refreshSearchText'],
+							message:
+								'Call an operation in convex/lib/transactions.ts; it keeps search text whole.'
+						},
+						{
+							regex: '(^|/)monthlyTotals$',
+							importNames: ['countTransaction', 'rebuildTotals'],
+							message:
+								'Call an operation in convex/lib/transactions.ts; it keeps the monthly totals whole.'
 						}
 					]
 				}

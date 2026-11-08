@@ -6,23 +6,18 @@ import { addDays } from '../src/lib/domain/dates';
 import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
 import checkingCsv from '../src/lib/domain/fixtures/synthetic/capital-one-checking.csv?raw';
 import checkingQfx from '../src/lib/domain/fixtures/synthetic/capital-one-checking.qfx?raw';
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
+import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
 const cutoverDate = '2026-08-01';
 
 async function budgetWithChecking() {
-	const backend = newBackend();
+	const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 100_000] } });
 	const { owner } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 100_000
-	});
+	const { Checking: checking } = backend.accounts;
 	const rows = async () =>
 		(
 			await owner.query(api.transactions.list, {
@@ -495,5 +490,78 @@ describe('approving', () => {
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(
 			UNAPPROVED_COUNT_LIMIT + 1
 		);
+	});
+});
+
+describe('the budget month after a Bank Row write', () => {
+	async function budgetWithGroceries() {
+		const backend = await startBudget({
+			cutoverDate,
+			accounts: { Checking: ['cash', 100_000] },
+			groups: { Everyday: ['Groceries'] }
+		});
+		const { owner, t } = backend;
+		const { Checking: checking } = backend.accounts;
+		const { Groceries: groceries } = backend.categories;
+		const enter = (payee: string, date: string, amount: number) =>
+			owner.mutation(api.transactions.create, {
+				accountId: checking,
+				date,
+				amount,
+				payee,
+				categoryId: groceries,
+				memo: ''
+			});
+		const august = () => owner.query(api.budget.month, { month: '2026-08', today: '2026-08-20' });
+		const augustKeptAndRebuilt = async () => {
+			const kept = await august();
+			await t.mutation(internal.monthlyTotals.rebuild, {});
+			return { kept, rebuilt: await august() };
+		};
+		const groceriesActivity = (month: Awaited<ReturnType<typeof august>>) =>
+			month.groups.flatMap((group) => group.categories).find((c) => c.id === groceries)?.activity;
+		return { ...backend, checking, enter, augustKeptAndRebuilt, groceriesActivity };
+	}
+
+	test("a file import counts a new row in its Payee's Category and a Match once, as a rebuild would", async () => {
+		const b = await budgetWithGroceries();
+		await b.enter('SAMPLE BOOKSHOP 0193', '2026-08-02', -999);
+		await b.enter('Morning Latte', coffee.date, coffee.amount);
+
+		await b.owner.mutation(api.imports.commit, {
+			accountId: b.checking,
+			source: 'csv',
+			rows: [coffee, { date: '2026-08-12', amount: -1_240, bankText: 'SAMPLE BOOKSHOP 0193' }]
+		});
+
+		const { kept, rebuilt } = await b.augustKeptAndRebuilt();
+		expect(rebuilt).toEqual(kept);
+		expect(b.groceriesActivity(kept)).toBe(-999 - 450 - 1_240);
+		expect(kept.readyToAssign.uncategorized).toBe(0);
+	});
+
+	test('Unmatch counts the new Transaction without moving the one it leaves, as a rebuild would', async () => {
+		const b = await budgetWithGroceries();
+		const entered = await b.enter('Morning Latte', coffee.date, coffee.amount);
+		await b.owner.mutation(api.imports.commit, {
+			accountId: b.checking,
+			source: 'csv',
+			rows: [coffee]
+		});
+		const matched = (
+			await b.owner.query(api.transactions.list, {
+				accountId: b.checking,
+				paginationOpts: { numItems: 10, cursor: null }
+			})
+		).page.find((row) => row._id === entered);
+		const bankRowId = matched?.bankRows[0]?._id;
+		assert(bankRowId !== undefined, 'expected the Match');
+
+		await b.owner.mutation(api.imports.unmatch, { importId: bankRowId });
+
+		const { kept, rebuilt } = await b.augustKeptAndRebuilt();
+		expect(rebuilt).toEqual(kept);
+		expect(b.groceriesActivity(kept)).toBe(-450);
+		expect(kept.readyToAssign.uncategorized).toBe(-450);
 	});
 });

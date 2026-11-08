@@ -8,10 +8,10 @@ import { PlaidApi, PlaidClient, type SyncRequest } from './lib/plaidClient';
 import { setupConnection, SyncStore, syncConnection } from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
 import {
-	newBackend,
 	publicErrorCode,
 	publicErrorMessage,
 	publicErrorOf,
+	startBudget,
 	useOwnerEnv
 } from './test.helper';
 
@@ -62,14 +62,9 @@ function changes(
 type FakePlaid = Parameters<typeof PlaidClient.layerTest>[0];
 
 async function syncedBudget() {
-	const backend = newBackend();
+	const backend = await startBudget({ accounts: { Checking: ['cash', 100_000] } });
 	const { owner, t } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 100_000
-	});
+	const { Checking: checking } = backend.accounts;
 	const run = <A, E>(
 		plaid: FakePlaid,
 		program: Effect.Effect<A, E, PlaidClient | TokenCipher | SyncStore>
@@ -660,6 +655,25 @@ describe('resolving a bank removal', () => {
 		await replay();
 		expect(await budget.snapshot()).toEqual(resolved);
 		await budget.expectTotalsRebuild();
+	});
+
+	test("the owner's version is no longer found by the removed row's Bank Text", async () => {
+		const { budget, importId } = await flaggedRemoval();
+		const grocerRow = await budget.row('SAMPLE GROCER 0193');
+		await budget.owner.mutation(api.transactions.update, {
+			transactionId: grocerRow._id,
+			accountId: grocerRow.accountId,
+			date: grocerRow.date,
+			amount: grocerRow.amount,
+			payee: 'Corner Market',
+			memo: 'weekly shop'
+		});
+		expect(await budget.search('grocer')).toEqual([grocerRow._id]);
+
+		await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'mine' });
+
+		expect(await budget.search('grocer')).toEqual([]);
+		expect(await budget.search('corner')).toEqual([grocerRow._id]);
 	});
 
 	test("the bank's version is refused while another statement row still backs the Transaction", async () => {

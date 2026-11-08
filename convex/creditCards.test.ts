@@ -2,33 +2,18 @@ import { assert, describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
+import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
 async function budgetWithCard() {
-	const backend = newBackend();
+	const backend = await startBudget({
+		accounts: { Checking: ['cash', 300_000], Discover: ['creditCard', -20_000] },
+		groups: { Everyday: ['Groceries', 'Dining Out'] }
+	});
 	const { owner } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 300_000
-	});
-	const discover = await owner.mutation(api.accounts.create, {
-		name: 'Discover',
-		kind: 'creditCard',
-		startingBalance: -20_000
-	});
-	const everyday = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
-	const groceries = await owner.mutation(api.categories.create, {
-		groupId: everyday,
-		name: 'Groceries'
-	});
-	const dining = await owner.mutation(api.categories.create, {
-		groupId: everyday,
-		name: 'Dining Out'
-	});
+	const { Checking: checking, Discover: discover } = backend.accounts;
+	const { Groceries: groceries, 'Dining Out': dining } = backend.categories;
 
 	const buy = (date: string, amount: number, categoryId?: Id<'categories'>) =>
 		owner.mutation(api.transactions.create, {

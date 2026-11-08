@@ -7,7 +7,7 @@ import { requireCents } from './lib/input';
 import { accountBalances } from './lib/monthlyTotals';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import { insertTransaction, transactionFields } from './lib/transactions';
+import { insertTransaction, markCleared, transactionFields } from './lib/transactions';
 
 export const clearedBalance = query({
 	args: { accountId: v.id('accounts') },
@@ -42,7 +42,7 @@ export const reconcile = mutation({
 			cleared.push(transaction);
 		}
 		for (const transaction of cleared) {
-			await ctx.db.patch('transactions', transaction._id, { cleared: 'reconciled' });
+			await markCleared(ctx, transaction._id, 'reconciled');
 		}
 		await ctx.db.patch('accounts', accountId, { lastReconciledOn: date });
 		return adjustment;

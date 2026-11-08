@@ -23,7 +23,7 @@ import {
 } from './lib/sync';
 import { MAX_BANK_CONNECTIONS } from './bankConnections';
 import { TokenCipher } from './lib/tokenCipher';
-import { newBackend, publicErrorOf, useOwnerEnv } from './test.helper';
+import { newBackend, publicErrorOf, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -75,14 +75,9 @@ function plaidPages(...pages: SyncPage[]) {
 }
 
 async function connectedBudget() {
-	const backend = newBackend();
+	const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 100_000] } });
 	const { owner, t } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 100_000
-	});
+	const { Checking: checking } = backend.accounts;
 	const webhooks: string[] = [];
 	const setup = await runInAction(
 		backend,
@@ -143,13 +138,11 @@ describe('setting up a Bank Connection', () => {
 	});
 
 	test('at the Bank Connection limit, setting up an Item again replaces its token and a new Item is refused', async () => {
-		const { owner, t } = newBackend();
-		await owner.mutation(api.settings.setCutoverDate, { cutoverDate });
-		const checking = await owner.mutation(api.accounts.create, {
-			name: 'Checking',
-			kind: 'cash',
-			startingBalance: 0
+		const { t, accounts } = await startBudget({
+			cutoverDate,
+			accounts: { Checking: ['cash', 0] }
 		});
+		const { Checking: checking } = accounts;
 		await t.run(async (ctx) => {
 			for (let i = 1; i < MAX_BANK_CONNECTIONS; i++) {
 				await ctx.db.insert('bankConnections', {
