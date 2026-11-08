@@ -40,6 +40,7 @@ import type * as lib_sync from "../lib/sync.js";
 import type * as lib_syncFailure from "../lib/syncFailure.js";
 import type * as lib_targets from "../lib/targets.js";
 import type * as lib_tokenCipher from "../lib/tokenCipher.js";
+import type * as lib_transactionRows from "../lib/transactionRows.js";
 import type * as lib_transactions from "../lib/transactions.js";
 import type * as migrations from "../migrations.js";
 import type * as monthlyTotals from "../monthlyTotals.js";
@@ -87,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   "lib/syncFailure": typeof lib_syncFailure;
   "lib/targets": typeof lib_targets;
   "lib/tokenCipher": typeof lib_tokenCipher;
+  "lib/transactionRows": typeof lib_transactionRows;
   "lib/transactions": typeof lib_transactions;
   migrations: typeof migrations;
   monthlyTotals: typeof monthlyTotals;
