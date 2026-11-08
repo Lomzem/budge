@@ -29,7 +29,7 @@ Each journey in `e2e/journeys/<feature>.ts` is also an E2E test (`e2e/journeys.t
 
 ## Evidence
 
-`bun run app verify` writes the evidence below for each journey it runs. For manual recipes, create a unique directory under `test-results/verify-budge/` in this checkout. Record fixture, checkout/commit, feature IDs, entry points, commands with exit codes, readiness, assertions, and any blocked journeys. Keep screenshots and ARIA snapshots before the action, with the draft/action visible, after completion, and after reload or a second user-facing view. For mutations, assert the balance/count/Assigned side effect as well as the visible row; reopen or reload to prove persistence. For downloads save and inspect the actual files.
+`bun run app verify` writes the evidence below for each journey it runs. For manual recipes, create a unique directory under `test-results/verify-budge/` in this checkout. Record fixture, checkout/commit, feature IDs, entry points, commands with exit codes, readiness, assertions, and any blocked journeys. Keep screenshots and ARIA snapshots before the action, with the draft/action visible, after completion, and after reload or a second user-facing view. For mutations, assert the balance/count/Assigned side effect as well as the visible row; reopen or reload to prove persistence. For downloads save and inspect the actual files; journeys may retain them in their own `downloads/` folder through the journey context’s `keepAsEvidence`.
 
 Exercise user controls. Internal setters, direct database writes, and test-only endpoints are not behavior proof. Seed is setup, not proof. Mock only at an existing production boundary and label the unverified external behavior. A seeded Bank Connection without a login cannot prove Plaid sync. For any safe/test/dry-run path, observe what actually changed (downloads, network, stored values); its name is not evidence. Avoid raw request traces, auth headers, session state, env files, or real bank data in artifacts.
 
@@ -54,6 +54,7 @@ Evidence goes to `test-results/verify-budge/<run>/` (`--run` names it; the defau
 
 - `<feature>/<key>/NN-<step>.png` and `NN-<step>.aria.yml` after each step, with `-failed` on the step that failed;
 - `<feature>/<key>/trace.zip` per journey (`bunx playwright show-trace <path>`);
+- `<feature>/<key>/downloads/` when a journey retains files with `keepAsEvidence`;
 - `summary.json`: the result, checkout, commit, whether there were uncommitted changes, app URL, and each journey's steps, trace and error.
 
 It prints `pass` or `FAIL` per journey and the evidence directory, and exits non-zero if any journey fails. `down` keeps the evidence. Even if a journey fails, run Cleanup.

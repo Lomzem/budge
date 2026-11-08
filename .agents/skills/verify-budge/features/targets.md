@@ -30,5 +30,9 @@ Preconditions:
 
 ## Gotchas
 
+- Target controls appear only on non-payment Categories; Credit Card Payment Categories show Card payment instead.
+- Target progress appears in the Budget table as well as the inspector; the Monthly journey checks table progress. **Manual drive:** compare both surfaces. Upcoming uses today, even when viewing another month; due exactly 30 days ahead is excluded, and Amount shows the full Target amount rather than the funding shortfall.
+- **Manual drive:** invalid/nonpositive Amount shows an alert; By date needs a date and Repeat needs a whole interval of 1–120 months. Require failed validation to leave the dialog open and the saved Target unchanged.
+
 - Due day changes scheduling, not amount. Month-end due dates clamp; repeat interval is 1–120 months.
 - Sources: ticket 08; public `categories.setTarget`, `budget.assignTarget/month`.

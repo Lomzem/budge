@@ -27,5 +27,8 @@ Preconditions:
 
 ## Gotchas
 
+- **Manual drive:** fund starting debt by increasing the Credit Card Payment Category’s Assigned in the Budget table; require Ready to Assign to fall and uncovered debt to shrink. When fully covered, its inspector reads `Available covers the card's debt.`
+- **Manual drive:** rename the Credit Card Account and require its Credit Card Payment Category to take the same name after reload.
+
 - Assert deltas against fixture baseline; the illustrative $30/$50 case requires neutral pre-existing amounts or explicit baseline calculations.
 - Sources: ticket 10; public Accounts/Transactions/Budget operations.
