@@ -194,6 +194,28 @@ export default defineConfig(
 		}
 	},
 	{
+		files: [
+			'src/**/*-dialog.svelte',
+			'src/lib/components/accounts/starting-balance-step.svelte',
+			'src/lib/components/shell/bank-connections.svelte',
+			'src/lib/components/shell/held-accounts.svelte'
+		],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: '$lib/attempt',
+							message:
+								'Run dialog work through DialogSession.run, so a late result never lands in a newer opening.'
+						}
+					]
+				}
+			]
+		}
+	},
+	{
 		files: ['src/lib/domain/**'],
 		rules: {
 			'no-restricted-imports': [
