@@ -80,6 +80,22 @@ export const reconciliation = {
 					await expect(adjustment.getByRole('checkbox', { name: /^Cleared/ })).toBeChecked();
 				}
 			);
+
+			await step(
+				'when the bank shows the cleared balance, one tap reconciles with no new adjustment',
+				async () => {
+					await page.getByRole('button', { name: 'Reconcile' }).click();
+					await expect(dialog.getByTestId('cleared-balance')).toHaveText(/\$/);
+					await dialog
+						.getByRole('button', { name: /^The bank shows the same: reconcile at/ })
+						.click();
+					await expect(dialog).toBeHidden();
+					await expect(
+						page.getByRole('status').filter({ hasText: 'Reconciled. The balances matched.' })
+					).toBeVisible();
+					await expect(adjustment).toHaveCount(1);
+				}
+			);
 		}
 	}
 } satisfies Record<string, Journey>;

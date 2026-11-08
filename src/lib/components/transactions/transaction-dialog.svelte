@@ -22,6 +22,7 @@
 		chooseLink,
 		fillRemainder,
 		type Draft,
+		type Field,
 		followSaved,
 		linkQuery,
 		lookupOf,
@@ -78,6 +79,7 @@
 		});
 	let draft: Draft = $state(untrack(freshDraft));
 	let error = $state('');
+	let invalidField = $state<string | undefined>();
 	const dialog = new DialogSession<object, 'write'>();
 	const saving = $derived(dialog.pending('write'));
 	let confirmDelete = $state(false);
@@ -108,6 +110,7 @@
 		() => (open ? linkQuery(draft, world) : undefined) ?? 'skip'
 	);
 	const shown = $derived(view(draft, world, lookupOf(linkCandidates)));
+	const blankLine = $derived(draft.lines.some((line) => line.amount.trim() === ''));
 
 	$effect(() => {
 		if (open) untrack(fill);
@@ -126,6 +129,7 @@
 	function fill() {
 		dialog.open({});
 		error = '';
+		invalidField = undefined;
 		errorChecksDraft = false;
 		unlocked = false;
 		draft = freshDraft();
@@ -154,8 +158,30 @@
 		untrack(() => {
 			if (!errorChecksDraft || payload.kind === 'waiting') return;
 			error = payload.kind === 'invalid' ? payload.message : '';
+			invalidField = payload.kind === 'invalid' ? idOf(payload.field) : undefined;
 		});
 	});
+
+	function idOf(field: Field) {
+		switch (field.kind) {
+			case 'account':
+				return 'transaction-account';
+			case 'amount':
+				return 'transaction-amount';
+			case 'category':
+				return 'transaction-category';
+			case 'lineCategory':
+				return `split-category-${String(field.key)}`;
+			case 'lineAmount':
+				return `split-amount-${String(field.key)}`;
+		}
+	}
+
+	function marked(id: string) {
+		return invalidField === id
+			? { 'aria-invalid': true, 'aria-describedby': 'transaction-error' }
+			: {};
+	}
 
 	function moveToAmount(event: KeyboardEvent) {
 		if (event.key !== 'Enter') return;
@@ -173,6 +199,7 @@
 	) {
 		const result = await dialog.run('write', work);
 		errorChecksDraft = false;
+		invalidField = undefined;
 		confirmDelete = false;
 		confirmUnlock = false;
 		confirmBankRemoval = null;
@@ -189,6 +216,10 @@
 		if (payload.kind === 'invalid') {
 			error = payload.message;
 			errorChecksDraft = true;
+			const id = idOf(payload.field);
+			invalidField = id;
+			await tick();
+			document.getElementById(id)?.focus();
 			return;
 		}
 		const { fields } = payload;
@@ -296,7 +327,8 @@
 								id={`split-category-${String(line.key)}`}
 								bind:value={line.categoryId}
 								required
-								class="h-9 min-w-0 rounded-md border border-input bg-card px-2.5 text-base md:text-sm pointer-coarse:h-11"
+								{...marked(`split-category-${String(line.key)}`)}
+								class="h-9 min-w-0 rounded-md border border-input bg-card px-2.5 text-base aria-invalid:border-destructive md:text-sm pointer-coarse:h-11"
 							>
 								<option value="" disabled>Pick a Category</option>
 								{@render categoryOptions(saved?.id, saved?.name)}
@@ -307,6 +339,7 @@
 							<Input
 								id={`split-amount-${String(line.key)}`}
 								bind:value={line.amount}
+								{...marked(`split-amount-${String(line.key)}`)}
 								inputmode="decimal"
 								placeholder="0.00"
 								autocomplete="off"
@@ -357,8 +390,8 @@
 			<p aria-live="polite" class="min-w-0 text-right text-sm font-medium">
 				{#if shown.remainder === undefined}
 					Enter amounts to see what's left.
-				{:else if shown.remainder === 0 && shown.blankLine}
-					Nothing left for the empty line
+				{:else if shown.remainder === 0 && blankLine}
+					$0.00 left to split
 				{:else if shown.remainder === 0}
 					Fully split
 				{:else if shown.remainder > 0}
@@ -480,7 +513,8 @@
 					bind:value={draft.accountId}
 					disabled={locked || startingBalance}
 					required
-					class="h-9 rounded-md border border-input bg-card px-2.5 text-base disabled:cursor-not-allowed disabled:opacity-50 md:text-sm pointer-coarse:h-11"
+					{...marked('transaction-account')}
+					class="h-9 rounded-md border border-input bg-card px-2.5 text-base disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive md:text-sm pointer-coarse:h-11"
 				>
 					{#each accounts.all as account (account._id)}
 						<option value={account._id}>{account.name}</option>
@@ -538,6 +572,7 @@
 				<Input
 					id="transaction-amount"
 					bind:value={draft.amount}
+					{...marked('transaction-amount')}
 					inputmode="decimal"
 					placeholder="0.00"
 					autocomplete="off"
@@ -557,7 +592,8 @@
 							draft = choose(draft, option, world);
 						}
 					}
-					class="h-9 rounded-md border border-input bg-card px-2.5 text-base md:text-sm pointer-coarse:h-11"
+					{...marked('transaction-category')}
+					class="h-9 rounded-md border border-input bg-card px-2.5 text-base aria-invalid:border-destructive md:text-sm pointer-coarse:h-11"
 				>
 					{#if shown.selection.kind === 'recalling' || shown.selection.kind === 'recallFailed'}
 						<option value={optionOf(shown.selection)} disabled>
@@ -659,7 +695,7 @@
 					{/if}
 				</section>
 			{/if}
-			<Dialog.Footer {error}>
+			<Dialog.Footer {error} errorId="transaction-error">
 				{#if transaction && !locked}
 					<Button
 						type="button"

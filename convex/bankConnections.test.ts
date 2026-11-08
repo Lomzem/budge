@@ -817,6 +817,7 @@ describe('the Bank Connection status', () => {
 			'bankLogin',
 			'consentEndsAt',
 			'feeds',
+			'ignored',
 			'lastError',
 			'lastSyncedAt',
 			'name',

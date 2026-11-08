@@ -109,16 +109,53 @@ export const ignore = mutation({
 	handler: async (ctx, { connectionAccountId }) => {
 		await requireOwner(ctx);
 		const held = await requireHeld(ctx, connectionAccountId);
-		const { connectionId, externalId, name, mask, kind } = held;
-		await ctx.db.replace('connectionAccounts', held._id, {
-			connectionId,
-			externalId,
-			...(name === undefined ? {} : { name }),
-			...(mask === undefined ? {} : { mask }),
-			...(kind === undefined ? {} : { kind }),
-			state: 'ignored'
-		});
+		await setAside(ctx, held, 'ignored');
 		await settleHeld(ctx, held._id);
+		return null;
+	}
+});
+
+export const stopSyncing = mutation({
+	args: { connectionAccountId: v.id('connectionAccounts') },
+	returns: v.null(),
+	handler: async (ctx, { connectionAccountId }) => {
+		await requireOwner(ctx);
+		const mapped = await ctx.db.get('connectionAccounts', connectionAccountId);
+		if (mapped === null) throw publicError('NOT_FOUND');
+		if (mapped.state !== 'mapped') {
+			throw publicError('INVALID_INPUT', "This bank Account doesn't feed a Budge Account.");
+		}
+		await setAside(ctx, mapped, 'ignored');
+		return null;
+	}
+});
+
+export const restore = mutation({
+	args: { connectionAccountId: v.id('connectionAccounts') },
+	returns: v.null(),
+	handler: async (ctx, { connectionAccountId }) => {
+		await requireOwner(ctx);
+		const ignored = await ctx.db.get('connectionAccounts', connectionAccountId);
+		if (ignored === null) throw publicError('NOT_FOUND');
+		if (ignored.state !== 'ignored') {
+			throw publicError('INVALID_INPUT', "This bank Account isn't ignored.");
+		}
+		await setAside(ctx, ignored, 'held');
+		return null;
+	}
+});
+
+export const forget = internalMutation({
+	args: { connectionAccountId: v.id('connectionAccounts') },
+	returns: v.null(),
+	handler: async (ctx, { connectionAccountId }) => {
+		const batch = await heldRows(ctx, connectionAccountId, HELD_BATCH);
+		for (const row of batch) await dropHeldBankRow(ctx, row._id);
+		if (batch.length === HELD_BATCH) {
+			await ctx.scheduler.runAfter(0, internal.heldAccounts.forget, { connectionAccountId });
+		} else if ((await ctx.db.get('connectionAccounts', connectionAccountId)) !== null) {
+			await ctx.db.delete('connectionAccounts', connectionAccountId);
+		}
 		return null;
 	}
 });
@@ -259,6 +296,26 @@ async function requireHeld(ctx: MutationCtx, connectionAccountId: Id<'connection
 		throw publicError('INVALID_INPUT', 'This bank Account is already mapped or ignored.');
 	}
 	return held;
+}
+
+async function setAside(
+	ctx: MutationCtx,
+	bankAccount: Doc<'connectionAccounts'>,
+	state: 'held' | 'ignored'
+) {
+	const { connectionId, externalId, name, mask } = bankAccount;
+	const kind =
+		bankAccount.state === 'mapped'
+			? (await ctx.db.get('accounts', bankAccount.accountId))?.kind
+			: bankAccount.kind;
+	await ctx.db.replace('connectionAccounts', bankAccount._id, {
+		connectionId,
+		externalId,
+		...(name === undefined ? {} : { name }),
+		...(mask === undefined ? {} : { mask }),
+		...(kind === undefined ? {} : { kind }),
+		state
+	});
 }
 
 async function mapTo(ctx: MutationCtx, held: Doc<'connectionAccounts'>, accountId: Id<'accounts'>) {

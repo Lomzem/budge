@@ -7,7 +7,13 @@ import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { PlaidApi, PlaidClient } from './lib/plaidClient';
 import { HELD_BATCH } from './heldAccounts';
-import { setupConnection, suggestStartingBalance, SyncStore, syncConnection } from './lib/sync';
+import {
+	removeItem,
+	setupConnection,
+	suggestStartingBalance,
+	SyncStore,
+	syncConnection
+} from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
 import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
 
@@ -503,6 +509,105 @@ describe('a bank Account Budge does not know', () => {
 		expect(
 			await publicErrorCode(owner.mutation(api.heldAccounts.ignore, { connectionAccountId }))
 		).toBe('INVALID_INPUT');
+	});
+});
+
+describe('a bank Account the owner stops syncing', () => {
+	test('keeps its Transactions, imports nothing later, and once brought back waits for setup with its type', async () => {
+		const { owner, sync, held, transactions, checking, connectionId } = await connectedBudget();
+		await sync(rowsFor(checkingId));
+		const imported = await transactions(checking);
+		expect(imported.length).toBeGreaterThan(0);
+		const [connection] = await owner.query(api.bankConnections.list, { now: Date.now() });
+		const feed = connection?.feeds[0];
+		assert(feed !== undefined, 'Checking is fed by the connection');
+
+		await owner.mutation(api.heldAccounts.stopSyncing, {
+			connectionAccountId: feed.connectionAccountId
+		});
+		expect(await sync(rowsFor(checkingId, 'later'))).toMatchObject({ added: 0, held: 0 });
+		expect(await transactions(checking)).toEqual(imported);
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toMatchObject([
+			{ _id: connectionId, feeds: [], ignored: [{ connectionAccountId: feed.connectionAccountId }] }
+		]);
+
+		await owner.mutation(api.heldAccounts.restore, {
+			connectionAccountId: feed.connectionAccountId
+		});
+		expect(await sync(rowsFor(checkingId, 'after'))).toMatchObject({ added: 0, held: 2 });
+		expect(
+			(await held()).find((account) => account._id === feed.connectionAccountId)
+		).toMatchObject({
+			kind: 'cash',
+			rows: 2
+		});
+		expect(
+			await publicErrorCode(
+				owner.mutation(api.heldAccounts.stopSyncing, {
+					connectionAccountId: feed.connectionAccountId
+				})
+			)
+		).toBe('INVALID_INPUT');
+	});
+});
+
+describe('a removed Bank Connection', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	test('leaves its Transactions and drops its bank Accounts and held rows', async () => {
+		const { owner, t, sync, held, transactions, checking, connectionId } = await connectedBudget();
+		await sync(rowsFor(checkingId));
+		await sync(rowsFor(savingsId));
+		const imported = await transactions(checking);
+		expect(await held()).toHaveLength(1);
+		vi.useFakeTimers();
+
+		await owner.action(api.bankConnections.remove, { connectionId });
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toEqual([]);
+		expect(await held()).toEqual([]);
+		expect(await transactions(checking)).toEqual(imported);
+		expect(
+			await t.run(async (ctx) => ({
+				bankAccounts: (await ctx.db.query('connectionAccounts').collect()).length,
+				heldRows: (
+					await ctx.db
+						.query('imports')
+						.withIndex('by_state_transactionId', (q) => q.eq('state', 'held'))
+						.collect()
+				).length
+			}))
+		).toEqual({ bankAccounts: 0, heldRows: 0 });
+	});
+
+	test('is removed even when Plaid no longer knows its login', async () => {
+		const { t, connectionId } = await connectedBudget();
+		const removed: string[] = [];
+		await t.action(async (ctx) => {
+			const exit = await Effect.runPromiseExit(
+				removeItem(connectionId).pipe(
+					Effect.provide(
+						Layer.mergeAll(
+							PlaidClient.layerTest({
+								itemRemove: (token) => {
+									removed.push(token);
+									return Effect.fail(
+										new PlaidApi({ error_code: 'ITEM_NOT_FOUND', request_id: '', status: 400 })
+									);
+								}
+							}),
+							TokenCipher.layer(tokenKey),
+							SyncStore.layer(ctx)
+						)
+					)
+				)
+			);
+			assert(Exit.isSuccess(exit), 'removing an item Plaid already forgot succeeds');
+		});
+		expect(removed).toEqual([accessToken]);
 	});
 });
 

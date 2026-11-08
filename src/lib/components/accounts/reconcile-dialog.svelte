@@ -72,8 +72,17 @@
 			error = 'Enter the balance as an amount, such as 1,250.00.';
 			return;
 		}
+		await reconcileAt(bankBalance);
+	}
+
+	async function matchCleared() {
+		if (clearedBalance === undefined || dialog.pending('save')) return;
+		await reconcileAt(clearedBalance);
+	}
+
+	async function reconcileAt(balance: number) {
 		const reconciled = await dialog.run('save', () =>
-			reconcile({ accountId: account._id, balance: bankBalance, date })
+			reconcile({ accountId: account._id, balance, date })
 		);
 		if (!reconciled.ok) {
 			error = reconciled.error?.message ?? "Budge couldn't reconcile the Account. Try again.";
@@ -85,23 +94,43 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content>
+	<Dialog.Content
+		onOpenAutoFocus={(event: Event) => {
+			event.preventDefault();
+			document.getElementById('reconcile-balance')?.focus();
+		}}
+	>
 		<Dialog.Header>
 			<Dialog.Title>Reconcile {account.name}</Dialog.Title>
 			<Dialog.Description>
-				Enter what the bank shows. Budge compares it to the cleared balance, then locks the Cleared
-				Transactions as Reconciled.
+				If the bank shows the cleared balance, confirm it in one tap. Otherwise enter what the bank
+				shows; Budge adds an adjustment for the difference. Either way, the Cleared Transactions
+				lock as Reconciled.
 			</Dialog.Description>
 		</Dialog.Header>
 		<form class="flex flex-col gap-4" onsubmit={submit}>
-			<p class="text-sm tabular-nums">
-				<span class="text-muted-foreground">
-					{isCard ? 'Cleared amount owed' : 'Cleared balance'}
-				</span>
-				<span data-testid="cleared-balance">
-					{clearedShown === undefined ? '…' : formatCents(clearedShown)}
-				</span>
-			</p>
+			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+				<p class="text-sm tabular-nums">
+					<span class="text-muted-foreground">
+						{isCard ? 'Cleared amount owed' : 'Cleared balance'}
+					</span>
+					<span data-testid="cleared-balance">
+						{clearedShown === undefined ? '…' : formatCents(clearedShown)}
+					</span>
+				</p>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					aria-disabled={clearedShown === undefined || dialog.pending('save')}
+					aria-label="The bank shows the same: reconcile at {clearedShown === undefined
+						? '…'
+						: formatCents(clearedShown)}"
+					onclick={matchCleared}
+				>
+					The bank shows the same
+				</Button>
+			</div>
 			<div class="flex flex-col gap-2">
 				<Label for="reconcile-balance">
 					{isCard ? 'Amount owed, per the bank' : 'Balance, per the bank'}

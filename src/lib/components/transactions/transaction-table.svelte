@@ -24,6 +24,7 @@
 	import TransactionDialog from './transaction-dialog.svelte';
 	import {
 		BANK_CHANGES,
+		countedTransactions,
 		filtersFromUrl,
 		UNAPPROVED,
 		UNCATEGORIZED,
@@ -175,7 +176,7 @@
 		if (rows.length === 0 && loading) return 'Loading Transactions…';
 		if (rows.length === 0 && filters.bankChanges) return 'No bank changes wait on you.';
 		if (rows.length === 0) return filtering ? 'No Transactions match.' : 'No Transactions yet.';
-		const counted = `${String(rows.length)} ${rows.length === 1 ? 'Transaction' : 'Transactions'}`;
+		const counted = countedTransactions(rows.length, filterValues);
 		return canShowMore ? `${counted} shown, more below` : counted;
 	});
 	let announcement = $state('');
@@ -230,6 +231,13 @@
 		if (row.transfer) return `${row.amount < 0 ? 'To' : 'From'} ${row.transfer.accountName}`;
 		if (row.splits) return 'Split';
 		return row.categoryName ?? 'Uncategorized';
+	}
+
+	function openFromRow(event: MouseEvent, row: Row) {
+		if (!(event.target instanceof Element)) return;
+		if (event.target.closest('button, a, input, label, [role="checkbox"]')) return;
+		if ((getSelection()?.toString() ?? '') !== '') return;
+		edit(row);
 	}
 
 	function edit(row: Row) {
@@ -315,7 +323,13 @@
 	{@const flag = bankFlag(row)}
 	{@const categoryClass =
 		row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
-	<Table.Row weight={row.approved ? 'normal' : 'strong'}>
+	<Table.Row
+		weight={row.approved ? 'normal' : 'strong'}
+		opens
+		onclick={(event: MouseEvent) => {
+			openFromRow(event, row);
+		}}
+	>
 		<Table.Cell numeric showFrom="2xl">
 			<time datetime={row.date} class="block truncate">{formatDate(row.date)}</time>
 		</Table.Cell>
@@ -327,6 +341,9 @@
 		<Table.Cell>
 			<button
 				data-edit={row._id}
+				aria-label="{payee}, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(
+					row.date
+				)}"
 				class="block max-w-full rounded-sm text-left hover:underline"
 				onclick={() => {
 					edit(row);
@@ -338,10 +355,8 @@
 						row.payeeName === null && !row.transfer && 'text-muted-foreground'
 					]}
 				>
-					{payee}</span
-				><span class="sr-only"
-					>, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(row.date)}</span
-				>
+					{payee}
+				</span>
 			</button>
 			{#if flag}
 				<span class="block truncate text-xs font-normal text-warning">{flag}</span>
@@ -454,13 +469,13 @@
 		>
 			<p
 				aria-live="polite"
-				class="flex min-h-6 max-w-full min-w-0 items-center gap-2 text-sm text-muted-foreground pointer-coarse:min-h-11"
+				class="flex min-h-6 max-w-full min-w-0 items-center gap-2 text-sm text-muted-foreground"
 			>
 				{#if undo}
 					<span class="truncate">{approvedText(undo.transactionIds.length)}</span>
 					<button
 						type="button"
-						class="-my-0.5 min-h-6 shrink-0 rounded-sm px-1 font-medium text-foreground underline underline-offset-4 hover:no-underline pointer-coarse:min-h-11"
+						class="relative -my-0.5 min-h-6 shrink-0 rounded-sm px-1 font-medium text-foreground underline underline-offset-4 after:absolute after:-inset-x-2 after:-inset-y-2.5 hover:no-underline"
 						onclick={undoApproveAll}>Undo</button
 					>
 				{:else}
@@ -481,7 +496,7 @@
 
 	<div class="@container">
 		<Table.Root layout="fixed">
-			<Table.Header>
+			<Table.Header labels="lg">
 				<Table.Row>
 					<Table.Head width="date" showFrom="2xl">Date</Table.Head>
 					{#if allAccounts}

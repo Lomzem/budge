@@ -85,6 +85,12 @@
 	--sidebar-ring: #1e6847;
 }
 
+/* A theme change recolors everything at once instead of animating each control. */
+.theme-switching,
+.theme-switching * {
+	transition: none !important;
+}
+
 .dark {
 	color-scheme: dark;
 	--background: #0f1713;

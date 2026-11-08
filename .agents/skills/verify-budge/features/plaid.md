@@ -9,6 +9,7 @@ Inspect bank freshness, request sync, and see when a Bank Connection needs a rec
 - `plaid-consent`: the card's `Your consent at the bank ends …` line and its Reconnect.
 - `plaid-connect`, `plaid-reconnect`: connect a new Item; update-mode Plaid Link and the sync after it.
 - `plaid-auto`: verified webhook and daily backup sync.
+- `plaid-remove`: remove a Bank Connection, stop syncing one bank Account, and bring an ignored bank Account back.
 
 ## How to get to it (user POV)
 
@@ -19,6 +20,8 @@ Inspect bank freshness, request sync, and see when a Bank Connection needs a rec
 - Busy buttons (`Syncing…`, `Reconnecting…`, a blocked Reconnect, `Connect a bank` while linking) are `aria-disabled` rather than `disabled`, so the button keeps focus; a click while busy does nothing. Playwright's `toBeDisabled()` covers both.
 - `Connect a bank`'s result floats at the bottom of the screen with `Dismiss`, which returns focus to `Connect a bank`.
 - A named Account fed by a Bank Connection shows `Synced … from <connection>` under its balance, linking to the Bank page; other Accounts read `Entered by hand or from bank files`. When its connection needs the owner, the line starts with a pill naming the reason (`Reconnect needed`, `Last sync failed`, `Consent ends <Mon d>`, `Missed its daily sync`) that links to that connection's card; its accessible name ends `: <connection>`. The line reserves two lines below `sm` and one from `sm`, so a longer sync time never moves the page.
+- Each card's `<connection> actions` menu lists `Stop syncing <Account>` for every Budge Account it feeds, then `Remove connection…`, which opens the alert dialog `Remove <connection>?` (`Keep it` returns focus to the actions button; `Remove connection` drops the card, reports `<connection>: Removed. Its Transactions stay in your Accounts.` in the floating message, and focuses the next card, or `Connect a bank` when none is left). Removing tells Plaid to drop the Item when this server has Plaid credentials, then forgets its bank Accounts and held rows; Transactions it brought in stay.
+- `Stop syncing <Account>` (or `Stop syncing from <connection>` in a named Account's actions menu) unmaps that bank Account and ignores it: the Account keeps its Transactions and reads `Entered by hand or from bank files`. The card then lists it in an `Ignored bank Accounts` region with `Bring back <label>`; Bring back moves it to `New bank Accounts` (`No transactions waiting yet` until the next sync) and focuses its `Set up` button.
 - Budget page → `Needs you` region → link `Bank: N things need you` → Bank page.
 - Webhook/cron have no direct UI entry; their user-visible result is automatic arrival/freshness.
 
@@ -30,12 +33,14 @@ Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, 
 - `plaid/late-sync`: the late Sync now recipe (`plaid-sync`).
 - `plaid/attention`: needs attention (`plaid-attention`).
 - `plaid/consent`, `plaid/late-renew`: consent and a renew result that waits for its own Bank Connection (`plaid-consent`).
+- `plaid/remove`: Keep it, then Remove connection on Sample Community Bank; Savings keeps its Transactions (`plaid-remove`).
+- `plaid/stop-and-bring-back`: Savings stops syncing from Sample Community Bank; the card's Bring back offers `Sample Statement Savings ending 6604` for setup (`plaid-remove`).
 
 The recipes below cover what the journeys leave out.
 
 Preconditions:
 
-- Authenticated baseline from the index. `budget-with-accounts` has Sample Bank (Sandbox), with no login. `bun run app seed bank-sync` adds Sample Credit Union (feeds Checking; consent ends in 5 days), Sample Savings Bank (feeds nothing; needs attention after `ITEM_LOGIN_REQUIRED`) and Sample Community Bank (feeds Savings; healthy, last synced 3 hours ago). Both have a login token that never decrypts, so Budge reaches no bank.
+- Authenticated baseline from the index. `budget-with-accounts` has Sample Bank (Sandbox), with no login. `bun run app seed bank-sync` adds Sample Credit Union (feeds Checking; consent ends in 5 days), Sample Savings Bank (feeds nothing; needs attention after `ITEM_LOGIN_REQUIRED`) and Sample Community Bank (feeds Savings from its bank Account `Sample Statement Savings` ending 6604; healthy, last synced 3 hours ago). Both have a login token that never decrypts, so Budge reaches no bank.
 - Readiness for `bank-sync`: on `/bank`, require the Sample Savings Bank card text `Needs you to reconnect before it can sync again.`
 - A card is `getByRole("list", { name: "Bank Connections" }).getByRole("article", { name, exact: true })`.
 
@@ -59,4 +64,4 @@ Preconditions:
 - Setup saves the sealed token before it points the Item's webhook at Budge, and a token exchange is never retried: Plaid honors a public token once, so a lost response must not orphan an Item (each one spends a Production Trial slot).
 - The `bank-sync` fixture is built by `convex/seedBankSync.ts` through the production sync mutations; it refuses to run on a production deployment.
 - `bankConnections.connect`/`finishConnect` are the in-app Connect path (create-mode Plaid Link); `bankConnections.service` reports whether this server has Plaid credentials and the token key, and which Plaid environment it uses. A local backend has none, so `connect` and Sync now on a tokened connection say `Bank sync isn't set up on this server.` `bankConnections.setup` is internal provisioning. It refuses a new Item once Budge holds `MAX_BANK_CONNECTIONS` (20); setting up an existing Item again still replaces its token. Ticket 17's manual cloud Sandbox check is still open.
-- Sources: tickets 17, 18, 20, 23; public `bankConnections.list/service/connect/finishConnect/syncNow/reconnect/syncAfterReconnect`.
+- Sources: tickets 17, 18, 20, 23; public `bankConnections.list/service/connect/finishConnect/syncNow/reconnect/syncAfterReconnect/remove` and `heldAccounts.stopSyncing/restore`.

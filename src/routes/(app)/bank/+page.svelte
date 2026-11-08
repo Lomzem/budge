@@ -70,6 +70,19 @@
 		});
 	});
 
+	async function removed(connectionId: Id<'bankConnections'>, report: string) {
+		const at = connections.findIndex((connection) => connection._id === connectionId);
+		const next = connections[at + 1] ?? connections[at - 1];
+		result = report;
+		await tick();
+		const card =
+			next === undefined
+				? null
+				: document.getElementById(`connection-${next._id}`)?.closest('article');
+		if (card) card.focus();
+		else connectButton?.focus();
+	}
+
 	async function connect() {
 		if (!ready || blocker !== null || connectBlocked) return;
 		result = '';
@@ -156,6 +169,9 @@
 								{outcomes}
 								onsetup={(account: HeldAccount) => {
 									heldDialog?.open(account);
+								}}
+								onremoved={(connectionId: Id<'bankConnections'>, report: string) => {
+									void removed(connectionId, report);
 								}}
 							/>
 						</li>

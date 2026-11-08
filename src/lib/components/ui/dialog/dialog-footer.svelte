@@ -9,10 +9,12 @@
 		class: className,
 		children,
 		error,
+		errorId,
 		showCloseButton = false,
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 		error?: string;
+		errorId?: string;
 		showCloseButton?: boolean;
 	} = $props();
 </script>
@@ -27,7 +29,11 @@
 	{...restProps}
 >
 	{#if error !== undefined}
-		<p role="alert" class="min-h-5 text-sm text-destructive sm:min-h-10 sm:min-w-0 sm:flex-1">
+		<p
+			id={errorId}
+			role="alert"
+			class="min-h-5 text-sm text-destructive sm:min-h-10 sm:min-w-0 sm:flex-1"
+		>
 			{error}
 		</p>
 	{/if}

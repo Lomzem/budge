@@ -11,9 +11,7 @@ export const splits = {
 			const memo = 'Smoke test split';
 			const row = page.getByRole('row').filter({ hasText: memo });
 			const dialog = page.getByRole('dialog');
-			const remainder = dialog.getByText(
-				/(left to split|left for the empty line|over the amount|Fully split)$/
-			);
+			const remainder = dialog.getByText(/(left to split|over the amount|Fully split)$/);
 
 			await step('start a $50.00 Transaction on Card and choose Split', async () => {
 				await page.goto('/');
@@ -29,11 +27,21 @@ export const splits = {
 			});
 
 			await step(
-				"the first line starts with the whole amount, an empty second line isn't a finished split, and moving some to the second keeps the total",
+				'the first line starts with the whole amount, Save points at the first unfinished line, and moving some to the second keeps the total',
 				async () => {
 					await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('50.00');
-					await expect(remainder).toHaveText('Nothing left for the empty line');
-					await dialog.getByLabel('Line 1 Category').selectOption({ label: 'Groceries' });
+					await expect(remainder).toHaveText('$0.00 left to split');
+					await dialog.getByRole('button', { name: 'Save' }).click();
+					await expect(dialog.getByRole('alert')).toHaveText('Pick a Category for line 1.');
+					const lineOneCategory = dialog.getByLabel('Line 1 Category');
+					await expect(lineOneCategory).toBeFocused();
+					await expect(lineOneCategory).toHaveAttribute('aria-invalid', 'true');
+					await expect(lineOneCategory).toHaveAccessibleDescription('Pick a Category for line 1.');
+					await lineOneCategory.selectOption({ label: 'Groceries' });
+					await expect(dialog.getByRole('alert')).toHaveText(
+						'Line 2 is empty. Fill it in, or remove the line.'
+					);
+					await expect(lineOneCategory).not.toHaveAttribute('aria-invalid');
 					await dialog.getByLabel('Line 1 amount').fill('30.00');
 					await expect(remainder).toHaveText('$20.00 left to split');
 				}
@@ -52,6 +60,7 @@ export const splits = {
 					await expect(dialog.getByRole('alert')).toHaveText(
 						'The lines are $1.00 over the amount.'
 					);
+					await expect(dialog.getByLabel('Line 3 amount')).toBeFocused();
 					await dialog.getByLabel('Line 3 amount').fill('8.00');
 					await expect(remainder).toHaveText('Fully split');
 					await dialog.getByRole('button', { name: 'Save' }).click();

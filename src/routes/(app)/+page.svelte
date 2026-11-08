@@ -153,7 +153,7 @@
 		}
 		if (bankChangeCount > 0) {
 			list.push({
-				text: `${String(bankChangeCount)} ${bankChangeCount === 1 ? 'bank change' : 'bank changes'} to review`,
+				text: `${String(bankChangeCount)} ${bankChangeCount === 1 ? 'Transaction' : 'Transactions'} the bank changed`,
 				link: { path: '/accounts', query: '?status=bank-changes' },
 				tone: 'warn'
 			});
@@ -254,10 +254,10 @@
 {:else if !ready || view === undefined}
 	<p role="status" class="text-muted-foreground">Loading…</p>
 {:else}
-	<div class="flex flex-col gap-6">
-		<header class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-			<div class="flex flex-col gap-1">
-				<h1 class="text-2xl font-bold tracking-tight">Budget</h1>
+	<div class="flex flex-col gap-4 sm:gap-6">
+		<header class="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 sm:gap-y-4">
+			<div class="flex w-full flex-col gap-1 sm:w-auto">
+				<h1 class="text-2xl font-bold tracking-tight max-sm:sr-only">Budget</h1>
 				<div class="-ml-2 flex items-center gap-1">
 					<Button
 						variant="ghost"
@@ -270,9 +270,9 @@
 					>
 						<ChevronLeftIcon />
 					</Button>
-					<p aria-live="polite" class="min-w-40 text-center text-lg font-bold">
+					<h2 aria-live="polite" class="min-w-40 text-center text-lg font-bold">
 						{formatMonth(budget.month)}
-					</p>
+					</h2>
 					<Button
 						variant="ghost"
 						size="icon"
@@ -283,6 +283,7 @@
 					>
 						<ChevronRightIcon />
 					</Button>
+					<div class="ml-auto sm:hidden">{@render editCategoriesMenu()}</div>
 				</div>
 			</div>
 			{#if readyToAssign}
@@ -296,15 +297,17 @@
 					<p
 						data-testid="ready-to-assign"
 						class={[
-							'shrink-0 border-b-4 border-double border-current text-2xl font-bold whitespace-nowrap tabular-nums sm:text-3xl',
+							'shrink-0 text-2xl font-bold whitespace-nowrap tabular-nums sm:text-3xl',
 							readyToAssign.amount < 0 ? 'text-destructive' : 'text-funded'
 						]}
 					>
 						{formatCents(readyToAssign.amount)}
 					</p>
 					<p class="min-h-4 basis-full text-xs">
-						{#if readyToAssign.uncategorized !== 0}
-							includes {formatCents(readyToAssign.uncategorized)} Uncategorized
+						{#if readyToAssign.uncategorized < 0}
+							{formatCents(-readyToAssign.uncategorized)} of spending has no Category yet
+						{:else if readyToAssign.uncategorized > 0}
+							{formatCents(readyToAssign.uncategorized)} of income has no Category yet
 						{/if}
 					</p>
 				</div>
@@ -340,7 +343,7 @@
 		{/snippet}
 		<section
 			aria-label="Needs you"
-			class="relative -my-1 flex h-10 items-center sm:h-auto sm:min-h-10 pointer-coarse:h-13 sm:pointer-coarse:h-auto sm:pointer-coarse:min-h-13"
+			class="relative -my-1 flex h-10 items-center pointer-coarse:h-13"
 		>
 			{#if needs.length === 0}
 				<p class="flex items-center gap-2 text-muted-foreground">
@@ -352,7 +355,7 @@
 					bind:this={needsList}
 					onscroll={measureNeeds}
 					class={[
-						'-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto fade-edges p-1 sm:flex-wrap sm:overflow-visible',
+						'-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto fade-edges p-1',
 						needsBefore && 'fade-start',
 						needsAfter && 'fade-end'
 					]}
@@ -410,45 +413,6 @@
 		{/if}
 
 		<section aria-label="Categories" class="flex flex-col gap-3">
-			<div class="sm:hidden">
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Button variant="outline" size="sm" {...props}>
-								<PencilIcon aria-hidden="true" />
-								Edit Categories
-							</Button>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="start">
-						<DropdownMenu.Item
-							disabled={addDialog?.saving() === true && adding !== 'group'}
-							onSelect={() => {
-								add('group');
-							}}
-						>
-							Add Category Group
-						</DropdownMenu.Item>
-						{#if groupsACategoryCanJoin.length > 0}
-							<DropdownMenu.Item
-								disabled={addDialog?.saving() === true && adding !== 'category'}
-								onSelect={() => {
-									add('category');
-								}}
-							>
-								Add Category
-							</DropdownMenu.Item>
-						{/if}
-						<DropdownMenu.Item
-							onSelect={() => {
-								void goto(resolve('/categories'));
-							}}
-						>
-							Manage Categories
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-			</div>
 			<div class="hidden flex-wrap gap-2 sm:flex">
 				<Button
 					variant="outline"
@@ -526,6 +490,45 @@
 		{/if}
 	</div>
 {/if}
+
+{#snippet editCategoriesMenu()}
+	<DropdownMenu.Root>
+		<DropdownMenu.Trigger>
+			{#snippet child({ props })}
+				<Button variant="ghost" size="icon" aria-label="Edit Categories" {...props}>
+					<PencilIcon aria-hidden="true" />
+				</Button>
+			{/snippet}
+		</DropdownMenu.Trigger>
+		<DropdownMenu.Content align="end">
+			<DropdownMenu.Item
+				disabled={addDialog?.saving() === true && adding !== 'group'}
+				onSelect={() => {
+					add('group');
+				}}
+			>
+				Add Category Group
+			</DropdownMenu.Item>
+			{#if groupsACategoryCanJoin.length > 0}
+				<DropdownMenu.Item
+					disabled={addDialog?.saving() === true && adding !== 'category'}
+					onSelect={() => {
+						add('category');
+					}}
+				>
+					Add Category
+				</DropdownMenu.Item>
+			{/if}
+			<DropdownMenu.Item
+				onSelect={() => {
+					void goto(resolve('/categories'));
+				}}
+			>
+				Manage Categories
+			</DropdownMenu.Item>
+		</DropdownMenu.Content>
+	</DropdownMenu.Root>
+{/snippet}
 
 {#snippet inspector()}
 	{#if view && inspected}

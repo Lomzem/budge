@@ -107,6 +107,9 @@ export const budget = {
 					).toBeVisible();
 					await expect(chosen(filter)).toHaveText(option);
 					await expect(rows).toHaveCount(count);
+					await expect(
+						page.getByText(`${String(count)} ${option} Transactions`, { exact: true })
+					).toBeVisible();
 				});
 			}
 

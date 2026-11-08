@@ -55,6 +55,7 @@ interface PlaidClientShape {
 	readonly linkTokenCreate: (request: LinkRequest) => Effect.Effect<string, PlaidError>;
 	readonly publicTokenExchange: (publicToken: string) => Effect.Effect<LinkedItem, PlaidError>;
 	readonly itemGet: (accessToken: string) => Effect.Effect<ItemState, PlaidError>;
+	readonly itemRemove: (accessToken: string) => Effect.Effect<void, PlaidError>;
 	readonly accountsGet: (
 		accessToken: string,
 		accountIds?: readonly string[]
@@ -127,6 +128,7 @@ export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>(
 			linkTokenCreate: fake.linkTokenCreate ?? unexpected('linkTokenCreate'),
 			publicTokenExchange: fake.publicTokenExchange ?? unexpected('publicTokenExchange'),
 			itemGet: fake.itemGet ?? unexpected('itemGet'),
+			itemRemove: fake.itemRemove ?? unexpected('itemRemove'),
 			accountsGet: fake.accountsGet ?? unexpected('accountsGet')
 		});
 	}
@@ -275,6 +277,7 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 				EXACTLY_ONCE
 			),
 		itemGet: (accessToken) => post('/item/get', { access_token: accessToken }, decodeItem),
+		itemRemove: (accessToken) => post('/item/remove', { access_token: accessToken }, ignoreBody),
 		accountsGet: (accessToken, accountIds) =>
 			post(
 				'/accounts/get',

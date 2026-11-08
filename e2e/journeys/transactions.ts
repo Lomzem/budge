@@ -182,7 +182,7 @@ export const transactions = {
 					page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
 				).toBeVisible();
 				await expect(
-					table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193\s*, Unapproved/ })
+					table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193, Unapproved/ })
 				).toBeVisible();
 				expect(
 					await table.evaluate((container) => container.scrollWidth <= container.clientWidth)
@@ -190,12 +190,12 @@ export const transactions = {
 			});
 
 			await step('approve it from its dialog', async () => {
-				await table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193\s*, Unapproved/ }).click();
+				await table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193, Unapproved/ }).click();
 				const editing = page.getByRole('dialog', { name: 'Edit Transaction' });
 				await editing.getByRole('button', { name: 'Approve', exact: true }).click();
 				await expect(editing).toBeHidden();
 				await expect(
-					table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193\s*, edit/ })
+					table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193, edit/ })
 				).toBeVisible();
 			});
 		}

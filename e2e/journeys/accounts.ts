@@ -226,7 +226,7 @@ export const accounts = {
 				const choose = page.getByRole('dialog', { name: 'Sample Holiday Club ending 1180' });
 				await choose.getByRole('radio', { name: 'Nowhere: ignore this bank Account' }).check();
 				await expect(
-					choose.getByText("Its transactions are dropped, and Budge won't ask about it again.")
+					choose.getByText(/^Its transactions are dropped, and Budge stops asking\./)
 				).toBeVisible();
 				await choose.getByRole('button', { name: 'Ignore' }).click();
 				await expect(choose).toBeHidden();

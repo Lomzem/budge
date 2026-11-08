@@ -175,5 +175,92 @@ export const plaid = {
 				await expect(savings.getByRole('button', { name: 'Reconnect', exact: true })).toBeEnabled();
 			});
 		}
+	},
+	remove: {
+		title:
+			'removing a Bank Connection asks first, keeps its Transactions, and moves focus to the next card',
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const communityBank = card(page, 'Sample Community Bank');
+			const actions = communityBank.getByRole('button', {
+				name: 'Sample Community Bank actions'
+			});
+			const confirm = page.getByRole('alertdialog', { name: 'Remove Sample Community Bank?' });
+
+			await step('Keep it closes the confirm and leaves the card', async () => {
+				await openBank(page);
+				await actions.click();
+				await page.getByRole('menuitem', { name: 'Remove connection…' }).click();
+				await expect(confirm).toContainText('Transactions it already brought in stay');
+				await confirm.getByRole('button', { name: 'Keep it' }).click();
+				await expect(confirm).toBeHidden();
+				await expect(actions).toBeFocused();
+				await expect(communityBank).toBeVisible();
+			});
+
+			await step('Remove connection drops the card and reports it', async () => {
+				await actions.click();
+				await page.getByRole('menuitem', { name: 'Remove connection…' }).click();
+				await confirm.getByRole('button', { name: 'Remove connection' }).click();
+				await expect(communityBank).toHaveCount(0);
+				await expect(page.getByRole('status').filter({ hasText: /^Sample Community/ })).toHaveText(
+					'Sample Community Bank: Removed. Its Transactions stay in your Accounts.'
+				);
+				await expect(page.locator('article:focus')).toHaveCount(1);
+			});
+
+			await step('Savings keeps its Transactions and no longer names the bank', async () => {
+				await openAccount(page, 'Savings');
+				await expect(page.getByTestId('account-sync')).not.toContainText('Sample Community Bank');
+				await expect(page.getByRole('button', { name: /, edit/ }).first()).toBeVisible();
+			});
+		}
+	},
+	'stop-and-bring-back': {
+		title:
+			'an Account stops syncing from its bank, and the Bank card brings that bank Account back for setup',
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const communityBank = card(page, 'Sample Community Bank');
+
+			await step('Savings stops syncing from Sample Community Bank', async () => {
+				await page.goto('/');
+				await openAccount(page, 'Savings');
+				await page.getByRole('button', { name: 'Savings actions' }).click();
+				await page
+					.getByRole('menuitem', { name: 'Stop syncing from Sample Community Bank' })
+					.click();
+				await expect(page.getByRole('status').filter({ hasText: /^Stopped/ })).toHaveText(
+					'Stopped syncing from Sample Community Bank. Its Transactions stay; bring it back from the Bank page.'
+				);
+				await expect(page.getByTestId('account-sync')).not.toContainText('Sample Community Bank');
+			});
+
+			await step('the Bank card lists it under Ignored bank Accounts', async () => {
+				await openBank(page);
+				await expect(communityBank).toContainText('Feeds no Budge Account yet.');
+				await expect(
+					communityBank.getByRole('region', { name: 'Ignored bank Accounts' })
+				).toBeVisible();
+			});
+
+			await step('Bring back offers it for setup and focuses Set up', async () => {
+				await communityBank
+					.getByRole('button', { name: 'Bring back Sample Statement Savings ending 6604' })
+					.click();
+				await expect(communityBank.getByRole('status')).toHaveText(
+					'Brought back. Set it up to choose where its rows go.'
+				);
+				await expect(
+					communityBank.getByRole('region', { name: 'Ignored bank Accounts' })
+				).toHaveCount(0);
+				await expect(
+					communityBank.getByRole('button', { name: 'Set up Sample Statement Savings ending 6604' })
+				).toBeFocused();
+				await expect(
+					communityBank.getByRole('region', { name: 'New bank Accounts' })
+				).toContainText('No transactions waiting yet');
+			});
+		}
 	}
 } satisfies Record<string, Journey>;

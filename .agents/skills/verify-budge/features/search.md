@@ -10,7 +10,7 @@ Find Transactions by Payee, memo, split memo or Bank Text, then narrow by Accoun
 ## How to get to it (user POV)
 
 - The Accounts page or a named Account's register, through the sidebar or the phone tab bar. Below the filter container's `3xl` width, the Category/Status/Payee/date filters fold behind a `Filters` toggle (`aria-expanded`), which counts the active ones; `Clear search and filters` is always present and disabled when nothing is set.
-- A link from the Budget's `Needs you` chips: `/accounts?category=uncategorized` arrives with Category = `Uncategorized`, and `/accounts?status=unapproved` with Status = `Unapproved`. Arriving with a filter opens the Filters panel so the narrowing is visible.
+- A link from the Budget's `Needs you` chips: `/accounts?category=uncategorized` arrives with Category = `Uncategorized`, and `/accounts?status=unapproved` with Status = `Unapproved`. The Filters panel stays folded on arrival (so the first rows stay in view on a phone); the Filters toggle shows the count of active filters, and the count line above the table names the narrowing (`9 Uncategorized Transactions`, `3 Unapproved Transactions`).
 
 ## Driving it with Playwright
 

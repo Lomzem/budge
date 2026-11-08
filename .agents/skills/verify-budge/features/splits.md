@@ -9,7 +9,7 @@ Divide one Transaction across Categories and memos while preserving its total an
 
 ## How to get to it (user POV)
 
-- Add/Edit Transaction → Category or Transfer → Split across Categories. Amount is asked before the split lines; the `… left to split` status sits right of `Add line` in a fixed spot. Saving lines that don't add up says `$1.50 is still left to split.` when they're short or `The lines are $1.00 over the amount.` when they're over.
+- Add/Edit Transaction → Category or Transfer → Split across Categories. Amount is asked before the split lines; the `… left to split` status sits right of `Add line` in a fixed spot. Saving lines that don't add up says `$1.50 is still left to split.` when they're short or `The lines are $1.00 over the amount.` when they're over. A refused save names the field to fix and focuses it: `Line N is empty. Fill it in, or remove the line.` (its Category), `Pick a Category for line N.`, `Enter line N's amount, or remove the line.`, or the last line's amount for a short or over total; that field is `aria-invalid` and described by the alert. With a blank amount the status reads `$0.00 left to split` until it is filled.
 
 ## Driving it with Playwright
 

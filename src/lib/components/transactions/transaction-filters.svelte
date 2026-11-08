@@ -2,7 +2,6 @@
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { useQuery } from 'convex-svelte';
-	import { untrack } from 'svelte';
 
 	import { api } from '$convex/_generated/api';
 	import { getAccounts } from '$lib/accounts.svelte';
@@ -34,7 +33,7 @@
 	const narrowed = $derived(
 		Object.entries(values).filter(([key, value]) => key !== 'search' && value !== '').length
 	);
-	let filtersOpen = $state(untrack(() => narrowed > 0));
+	let filtersOpen = $state(false);
 	let searchInput: HTMLInputElement | null = $state(null);
 
 	const selectClass =

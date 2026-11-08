@@ -47,6 +47,7 @@ import {
 	MAX_SYNC_ROWS,
 	OWNER_CLIENT_USER_ID,
 	reconnectLinkToken,
+	removeItem,
 	RETRY_DELAYS_MS,
 	saveArgs,
 	setupConnection,
@@ -74,7 +75,20 @@ export const list = query({
 			consentEndsAt: v.union(v.number(), v.null()),
 			lastError: v.union(v.object({ at: v.number(), message: v.string() }), v.null()),
 			bankLogin: v.boolean(),
-			feeds: v.array(v.object({ accountId: v.id('accounts'), name: v.string() }))
+			feeds: v.array(
+				v.object({
+					connectionAccountId: v.id('connectionAccounts'),
+					accountId: v.id('accounts'),
+					name: v.string()
+				})
+			),
+			ignored: v.array(
+				v.object({
+					connectionAccountId: v.id('connectionAccounts'),
+					name: v.union(v.string(), v.null()),
+					mask: v.union(v.string(), v.null())
+				})
+			)
 		})
 	),
 	handler: async (ctx, { now }) => {
@@ -82,6 +96,7 @@ export const list = query({
 		const connections = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
 		return await Promise.all(
 			connections.map(async (connection) => ({
+				...(await bankAccountsOf(ctx, connection._id)),
 				_id: connection._id,
 				name: connection.name,
 				status: connection.status,
@@ -89,25 +104,42 @@ export const list = query({
 				overdue: isSyncOverdue(connection.lastSyncedAt ?? null, now),
 				consentEndsAt: renewalDue(connection.consentExpiresAt ?? null, now),
 				lastError: connection.lastError ?? null,
-				bankLogin: connection.provider.kind === 'plaid',
-				feeds: await feedsOf(ctx, connection._id)
+				bankLogin: connection.provider.kind === 'plaid'
 			}))
 		);
 	}
 });
 
-async function feedsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>) {
+async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>) {
 	const linked = await ctx.db
 		.query('connectionAccounts')
 		.withIndex('by_connection_externalId', (q) => q.eq('connectionId', connectionId))
 		.take(MAX_FED_ACCOUNTS);
-	const feeds: { accountId: Id<'accounts'>; name: string }[] = [];
+	const feeds: {
+		connectionAccountId: Id<'connectionAccounts'>;
+		accountId: Id<'accounts'>;
+		name: string;
+	}[] = [];
+	const ignored: {
+		connectionAccountId: Id<'connectionAccounts'>;
+		name: string | null;
+		mask: string | null;
+	}[] = [];
 	for (const row of linked) {
+		if (row.state === 'ignored') {
+			ignored.push({
+				connectionAccountId: row._id,
+				name: row.name ?? null,
+				mask: row.mask ?? null
+			});
+		}
 		if (row.state !== 'mapped') continue;
 		const account = await ctx.db.get('accounts', row.accountId);
-		if (account !== null) feeds.push({ accountId: account._id, name: account.name });
+		if (account !== null) {
+			feeds.push({ connectionAccountId: row._id, accountId: account._id, name: account.name });
+		}
 	}
-	return feeds;
+	return { feeds, ignored };
 }
 
 const ownerSyncResult = v.union(
@@ -328,6 +360,42 @@ export const reconnect = action({
 			throw publicError('INVALID_INPUT', 'This Bank Connection has no bank login to reconnect.');
 		}
 		return { linkToken: result.linkToken };
+	}
+});
+
+export const remove = action({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.null(),
+	handler: async (ctx, { connectionId }) => {
+		await requireOwner(ctx);
+		if (bankSyncService().available) {
+			await runEffect(removeItem(connectionId).pipe(Effect.provide(liveLayer(ctx))), () => ({
+				code: 'BANK_UNAVAILABLE',
+				message: "Couldn't reach the bank to remove this connection; try again later."
+			}));
+		}
+		await ctx.runMutation(internal.bankConnections.forget, { connectionId });
+		return null;
+	}
+});
+
+export const forget = internalMutation({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.null(),
+	handler: async (ctx, { connectionId }) => {
+		const bankAccounts = await ctx.db
+			.query('connectionAccounts')
+			.withIndex('by_connection_externalId', (q) => q.eq('connectionId', connectionId))
+			.take(MAX_FED_ACCOUNTS);
+		if ((await ctx.db.get('bankConnections', connectionId)) !== null) {
+			await ctx.db.delete('bankConnections', connectionId);
+		}
+		for (const bankAccount of bankAccounts) {
+			await ctx.scheduler.runAfter(0, internal.heldAccounts.forget, {
+				connectionAccountId: bankAccount._id
+			});
+		}
+		return null;
 	}
 });
 

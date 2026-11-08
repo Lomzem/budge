@@ -156,6 +156,42 @@ export class BankConnections {
 		};
 	}
 
+	async remove(connectionId: Id<'bankConnections'>): Promise<Report> {
+		const removed = await attempt(() =>
+			this.#client.action(api.bankConnections.remove, { connectionId })
+		);
+		return removed.ok
+			? { text: 'Removed. Its Transactions stay in your Accounts.', failed: false }
+			: {
+					text: removed.error?.message ?? "Budge couldn't remove the connection. Try again.",
+					failed: true
+				};
+	}
+
+	async stopSyncing(connectionAccountId: Id<'connectionAccounts'>, name: string): Promise<Report> {
+		const stopped = await attempt(() =>
+			this.#client.mutation(api.heldAccounts.stopSyncing, { connectionAccountId })
+		);
+		return stopped.ok
+			? { text: `Stopped syncing ${name}. Its Transactions stay.`, failed: false }
+			: {
+					text: stopped.error?.message ?? "Budge couldn't stop syncing. Try again.",
+					failed: true
+				};
+	}
+
+	async restore(connectionAccountId: Id<'connectionAccounts'>): Promise<Report> {
+		const restored = await attempt(() =>
+			this.#client.mutation(api.heldAccounts.restore, { connectionAccountId })
+		);
+		return restored.ok
+			? { text: 'Brought back. Set it up to choose where its rows go.', failed: false }
+			: {
+					text: restored.error?.message ?? "Budge couldn't bring it back. Try again.",
+					failed: true
+				};
+	}
+
 	async sync(connectionId: Id<'bankConnections'>): Promise<Report> {
 		this.syncing.add(connectionId);
 		const synced = await attempt(() =>

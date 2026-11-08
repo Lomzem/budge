@@ -72,3 +72,22 @@ export function urlWithFilters(url: URL, values: TransactionFilterValues): URL {
 	}
 	return next;
 }
+
+export function countedTransactions(count: number, values: TransactionFilterValues) {
+	const noun = count === 1 ? 'Transaction' : 'Transactions';
+	if (values.status === BANK_CHANGES) return `${String(count)} ${noun} the bank changed`;
+	const narrowedFurther =
+		values.search.trim() !== '' ||
+		values.accountId !== '' ||
+		(values.categoryId !== '' && values.categoryId !== UNCATEGORIZED) ||
+		values.payeeId !== '' ||
+		values.from !== '' ||
+		values.to !== '';
+	const words = [
+		...(narrowedFurther ? ['matching'] : []),
+		...(values.status === UNAPPROVED ? ['Unapproved'] : []),
+		...(values.categoryId === UNCATEGORIZED ? ['Uncategorized'] : []),
+		noun
+	];
+	return `${String(count)} ${words.join(' ')}`;
+}

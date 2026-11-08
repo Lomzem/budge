@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { useConvexClient } from 'convex-svelte';
+	import { tick } from 'svelte';
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -13,7 +14,7 @@
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 
-	import { labelOf, rowsOf } from './held';
+	import { labelOf, waitingNote } from './held';
 
 	type AccountKind = 'cash' | 'creditCard';
 	interface MappedAccount {
@@ -71,7 +72,7 @@
 			bankAccount: {
 				_id: account._id,
 				label: labelOf(account),
-				waiting: rowsOf(account),
+				waiting: waitingNote(account),
 				kind: account.kind
 			},
 			choice: sameName(account)?._id ?? 'new',
@@ -101,6 +102,13 @@
 		const target = { _id: account._id, kind: account.kind, name: account.name };
 		await client.mutation(api.heldAccounts.map, { connectionAccountId, accountId: target._id });
 		return target;
+	}
+
+	let details: HTMLElement | null = $state(null);
+
+	async function showDetails() {
+		await tick();
+		details?.scrollIntoView({ block: 'nearest' });
 	}
 
 	function mismatchOf(choice: string, bankKind: AccountKind | null) {
@@ -167,13 +175,13 @@
 					<Dialog.Header>
 						<Dialog.Title>{session.bankAccount.label}</Dialog.Title>
 						<Dialog.Description>
-							{session.bankAccount.waiting}. They wait here until you choose where they go.
+							{session.bankAccount.waiting}
 						</Dialog.Description>
 					</Dialog.Header>
 					<form class="flex flex-col gap-5" onsubmit={decide}>
 						<fieldset class="flex flex-col gap-3">
 							<legend class="mb-3 font-bold">Where its transactions go</legend>
-							<RadioGroup.Root bind:value={session.choice}>
+							<RadioGroup.Root bind:value={session.choice} onValueChange={showDetails}>
 								<div class="flex min-h-9 items-center gap-2.5">
 									<RadioGroup.Item value="new" id="held-to-new" />
 									<Label for="held-to-new">Into a new Account</Label>
@@ -204,7 +212,7 @@
 								</div>
 							</RadioGroup.Root>
 						</fieldset>
-						<div class="grid items-start">
+						<div bind:this={details} class="grid scroll-mb-36">
 							<fieldset
 								disabled={session.choice !== 'new'}
 								inert={session.choice !== 'new'}
@@ -248,7 +256,8 @@
 								</p>
 							{:else if session.choice === 'ignore'}
 								<p class="col-start-1 row-start-1 rounded-md bg-muted p-4">
-									Its transactions are dropped, and Budge won't ask about it again.
+									Its transactions are dropped, and Budge stops asking. Bring it back from its Bank
+									card any time.
 								</p>
 							{/if}
 						</div>

@@ -2,10 +2,11 @@
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import ClockIcon from '@lucide/svelte/icons/clock';
+	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 
 	import { resolve } from '$app/paths';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -15,7 +16,9 @@
 		type HeldAccount,
 		type Report
 	} from '$lib/bankConnections.svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { formatAgo } from '$lib/domain/freshness';
 
 	import { labelOf, rowsOf } from './held';
@@ -23,11 +26,13 @@
 	let {
 		connection,
 		outcomes,
-		onsetup
+		onsetup,
+		onremoved
 	}: {
 		connection: BankConnection;
 		outcomes: ReadonlyMap<Id<'connectionAccounts'>, string>;
 		onsetup: (account: HeldAccount) => void;
+		onremoved: (connectionId: Id<'bankConnections'>, report: string) => void;
 	} = $props();
 
 	const bank = getBankConnections();
@@ -140,6 +145,38 @@
 		})
 	);
 
+	let confirmRemove = $state(false);
+	let removing = $state(false);
+	let restoring = $state<Id<'connectionAccounts'> | null>(null);
+	let menuButton: HTMLButtonElement | null = $state(null);
+
+	async function stopSyncing(feed: BankConnection['feeds'][number]) {
+		result = null;
+		result = await bank.stopSyncing(feed.connectionAccountId, feed.name);
+	}
+
+	async function restore(connectionAccountId: Id<'connectionAccounts'>) {
+		if (restoring !== null) return;
+		restoring = connectionAccountId;
+		result = null;
+		const report = await bank.restore(connectionAccountId);
+		restoring = null;
+		result = report;
+		if (report.failed) return;
+		await tick();
+		document.querySelector<HTMLElement>(`[data-setup="${connectionAccountId}"]`)?.focus();
+	}
+
+	async function remove() {
+		if (removing) return;
+		removing = true;
+		const report = await bank.remove(connection._id);
+		removing = false;
+		confirmRemove = false;
+		if (report.failed) result = report;
+		else onremoved(connection._id, `${connection.name}: ${report.text}`);
+	}
+
 	async function sync() {
 		if (syncBlocked) return;
 		result = null;
@@ -165,9 +202,37 @@
 			>
 				<LandmarkIcon aria-hidden="true" class="size-5" />
 			</span>
-			<h3 id="connection-{connection._id}" class="min-w-0 text-lg font-bold break-words">
+			<h3 id="connection-{connection._id}" class="min-w-0 flex-1 text-lg font-bold break-words">
 				{connection.name}
 			</h3>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button
+							bind:ref={menuButton}
+							variant="ghost"
+							size="icon"
+							aria-label="{connection.name} actions"
+							{...props}
+						>
+							<EllipsisIcon aria-hidden="true" />
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end">
+					{#each connection.feeds as feed (feed.connectionAccountId)}
+						<DropdownMenu.Item onSelect={() => void stopSyncing(feed)}>
+							Stop syncing {feed.name}
+						</DropdownMenu.Item>
+					{/each}
+					{#if connection.feeds.length > 0}
+						<DropdownMenu.Separator />
+					{/if}
+					<DropdownMenu.Item variant="destructive" onSelect={() => (confirmRemove = true)}>
+						Remove connection…
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
 		</div>
 		<div class="flex flex-col gap-1 sm:pl-13">
 			<p class="text-sm break-words text-muted-foreground">
@@ -281,6 +346,7 @@
 							<div class="grid min-w-24">
 								<Button
 									variant="outline"
+									data-setup={row._id}
 									aria-label="Set up {row.label}"
 									onclick={() => {
 										onsetup(account);
@@ -300,4 +366,65 @@
 			</ul>
 		</section>
 	{/if}
+	{#if connection.ignored.length > 0}
+		<section
+			aria-labelledby="ignored-{connection._id}"
+			class="flex flex-col gap-1 border-t px-4 pt-3 pb-4 sm:px-5"
+		>
+			<h4 id="ignored-{connection._id}" class="font-bold">Ignored bank Accounts</h4>
+			<p class="pb-1 text-sm text-muted-foreground">
+				Budge drops their rows. Bring one back to set it up; it picks up new transactions from the
+				next sync.
+			</p>
+			<ul class="flex flex-col divide-y">
+				{#each connection.ignored as ignored (ignored.connectionAccountId)}
+					{@const name = ignored.name ?? 'An unnamed bank Account'}
+					<li class="flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
+						<div class="flex min-w-0 flex-1 basis-48 flex-col">
+							<span class="font-bold break-words">{name}</span>
+							{#if ignored.mask !== null}
+								<span class="text-sm text-muted-foreground">Ending {ignored.mask}</span>
+							{/if}
+						</div>
+						<div class="grid min-w-32">
+							<Button
+								variant="outline"
+								aria-label="Bring back {name}{ignored.mask === null
+									? ''
+									: ` ending ${ignored.mask}`}"
+								aria-disabled={restoring !== null}
+								onclick={() => void restore(ignored.connectionAccountId)}
+							>
+								{restoring === ignored.connectionAccountId ? 'Bringing back…' : 'Bring back'}
+							</Button>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
 </article>
+
+<AlertDialog.Root bind:open={confirmRemove}>
+	<AlertDialog.Content
+		onCloseAutoFocus={(event: Event) => {
+			event.preventDefault();
+			menuButton?.focus();
+		}}
+	>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Remove {connection.name}?</AlertDialog.Title>
+			<AlertDialog.Description>
+				Budge stops syncing it and forgets its bank Accounts and any rows waiting for setup.
+				Transactions it already brought in stay in your Accounts. To sync this bank again, connect
+				it again.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Keep it</AlertDialog.Cancel>
+			<AlertDialog.Action variant="destructive" disabled={removing} onclick={remove}>
+				{removing ? 'Removing…' : 'Remove connection'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

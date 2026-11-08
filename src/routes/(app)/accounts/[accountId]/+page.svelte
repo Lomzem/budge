@@ -36,10 +36,34 @@
 		account: { _id: Account['_id']; kind: Account['kind']; name: string };
 	}>();
 
-	let reconciled: { accountId: string; message: string } | undefined = $state();
+	let notice: { accountId: string; message: string } | undefined = $state();
+	const noticeText = $derived(notice?.accountId === params.accountId ? notice.message : '');
+	let actionsButton: HTMLButtonElement | null = $state(null);
+
+	function dismiss() {
+		notice = undefined;
+		moveError = '';
+		actionsButton?.focus();
+	}
+
+	async function stopSyncing() {
+		const feed = feeder?.feeds.find((candidate) => candidate.accountId === params.accountId);
+		if (!feeder || !feed) return;
+		const accountId = params.accountId;
+		const bankName = feeder.name;
+		moveError = '';
+		const report = await bank.stopSyncing(feed.connectionAccountId, feed.name);
+		if (report.failed) moveError = report.text;
+		else {
+			notice = {
+				accountId,
+				message: `Stopped syncing from ${bankName}. Its Transactions stay; bring it back from the Bank page.`
+			};
+		}
+	}
 
 	function onReconciled(adjustment: number) {
-		reconciled = {
+		notice = {
 			accountId: params.accountId,
 			message:
 				adjustment === 0
@@ -74,7 +98,13 @@
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger>
 							{#snippet child({ props })}
-								<Button variant="ghost" size="icon" aria-label="{account.name} actions" {...props}>
+								<Button
+									bind:ref={actionsButton}
+									variant="ghost"
+									size="icon"
+									aria-label="{account.name} actions"
+									{...props}
+								>
 									<EllipsisIcon aria-hidden="true" />
 								</Button>
 							{/snippet}
@@ -100,6 +130,12 @@
 							>
 								Starting balance
 							</DropdownMenu.Item>
+							{#if feeder}
+								<DropdownMenu.Separator />
+								<DropdownMenu.Item onSelect={() => void stopSyncing()}>
+									Stop syncing from {feeder.name}
+								</DropdownMenu.Item>
+							{/if}
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
 				</div>
@@ -159,15 +195,22 @@
 				</div>
 			</div>
 		</header>
-		<div class="-my-1 min-h-6 text-sm">
-			<p role="status">
-				{reconciled?.accountId === account._id ? reconciled.message : ''}
-			</p>
-			<p role="alert" class="text-destructive">{moveError}</p>
-		</div>
 		{#key account._id}
 			<TransactionTable accountId={account._id} />
 		{/key}
+	</div>
+	<div
+		class={noticeText === '' && moveError === ''
+			? 'sr-only'
+			: 'fixed inset-x-4 bottom-20 z-50 mx-auto flex max-w-md items-center gap-3 rounded-md border bg-popover py-2 pr-2 pl-4 text-sm shadow-lg lg:bottom-6'}
+	>
+		<div class="min-w-0 flex-1">
+			<p role="status">{noticeText}</p>
+			<p role="alert" class="text-destructive">{moveError}</p>
+		</div>
+		{#if noticeText !== '' || moveError !== ''}
+			<Button variant="ghost" size="sm" onclick={dismiss}>Dismiss</Button>
+		{/if}
 	</div>
 	<RenameAccountDialog bind:open={renameOpen} accountId={account._id} currentName={account.name} />
 	<ReconcileDialog bind:open={reconcileOpen} {account} {onReconciled} />

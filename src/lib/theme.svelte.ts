@@ -16,6 +16,17 @@ function storedChoice(): ThemeChoice {
 	return Result.isSuccess(stored) && isThemeChoice(stored.success) ? stored.success : 'system';
 }
 
+function switchInstantly(dark: boolean) {
+	const root = document.documentElement;
+	if (root.classList.contains('dark') === dark) return;
+	root.classList.add('theme-switching');
+	root.classList.toggle('dark', dark);
+	getComputedStyle(root).getPropertyValue('color');
+	requestAnimationFrame(() => {
+		root.classList.remove('theme-switching');
+	});
+}
+
 export class Theme {
 	choice: ThemeChoice = $state('system');
 	readonly #systemDark = new MediaQuery('(prefers-color-scheme: dark)');
@@ -26,7 +37,7 @@ export class Theme {
 	constructor() {
 		if (typeof localStorage !== 'undefined') this.choice = storedChoice();
 		$effect(() => {
-			document.documentElement.classList.toggle('dark', this.dark);
+			switchInstantly(this.dark);
 			document
 				.querySelector('meta[name="theme-color"]')
 				?.setAttribute('content', this.dark ? THEME_COLORS.dark : THEME_COLORS.light);

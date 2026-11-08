@@ -144,7 +144,17 @@ export const run = internalMutation({
 			encryptedToken: NOT_A_REAL_TOKEN,
 			accounts: [{ externalId: COMMUNITY_BANK.savings, accountId: savings }]
 		});
-		await sync(ctx, communityBank, { discover: false });
+		await sync(ctx, communityBank, {
+			discover: true,
+			recordAccounts: [
+				{
+					externalId: COMMUNITY_BANK.savings,
+					name: 'Sample Statement Savings',
+					mask: '6604',
+					kind: 'cash'
+				}
+			]
+		});
 		await ctx.db.patch('bankConnections', communityBank, {
 			lastSyncedAt: Date.now() - HOURS_SINCE_COMMUNITY_BANK_LAST_SYNCED * HOUR_MS
 		});

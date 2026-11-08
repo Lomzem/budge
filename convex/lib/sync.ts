@@ -470,3 +470,23 @@ export const reconnectLinkToken = Effect.fnUntraced(function* (
 	});
 	return { kind: 'linkToken', linkToken };
 });
+
+const ALREADY_GONE = new Set(['ITEM_NOT_FOUND', 'INVALID_ACCESS_TOKEN']);
+
+export const removeItem = Effect.fnUntraced(function* (
+	connectionId: Id<'bankConnections'>
+): Effect.fn.Return<void, SyncError, PlaidClient | TokenCipher | SyncStore> {
+	const store = yield* SyncStore;
+	const plaid = yield* PlaidClient;
+	const cipher = yield* TokenCipher;
+	const credentials = yield* store.credentials(connectionId);
+	if (credentials === 'missing' || credentials === 'noToken') return;
+	const accessToken = yield* cipher.decrypt(credentials.encryptedToken, credentials.itemId);
+	yield* plaid
+		.itemRemove(accessToken)
+		.pipe(
+			Effect.catchTag('PlaidApi', (error) =>
+				ALREADY_GONE.has(error.error_code) ? Effect.void : Effect.fail(error)
+			)
+		);
+});

@@ -1,41 +1,47 @@
 import { describe, expect, test } from 'vitest';
 
-import { filtersFromUrl, noFilters, urlWithFilters } from './components/transactions/filters';
+import {
+	BANK_CHANGES,
+	countedTransactions,
+	noFilters,
+	UNAPPROVED,
+	UNCATEGORIZED
+} from './components/transactions/filters';
 
-const at = (search: string) => new URL(`https://budge.example.test/accounts${search}`);
-
-describe('filters in the URL', () => {
-	test('every filter survives a trip through the URL, beside parameters it does not own', () => {
-		const values = {
-			search: 'corner market',
-			accountId: 'k17abc',
-			categoryId: 'uncategorized',
-			status: 'bank-changes',
-			payeeId: 'p42xyz',
-			from: '2026-08-01',
-			to: '2026-08-31'
-		};
-
-		const url = urlWithFilters(at('?tab=ledger&status=unapproved'), values);
-
-		expect(filtersFromUrl(url)).toEqual(values);
-		expect(url.searchParams.get('tab')).toBe('ledger');
-	});
-
-	test('clearing the filters leaves only the parameters they do not own', () => {
-		const url = urlWithFilters(at('?q=rent&status=unapproved&tab=ledger'), noFilters);
-
-		expect(url.search).toBe('?tab=ledger');
-	});
-
+describe('the register count names the filter that narrowed it', () => {
 	test.each([
-		{ search: '?status=everything', field: 'status' },
-		{ search: '?from=August', field: 'from' },
-		{ search: '?to=2026-02-30', field: 'to' },
-		{ search: '?account=../settings', field: 'accountId' },
-		{ search: '?payee=Robert%27);', field: 'payeeId' },
-		{ search: '?category=Rent%20%26%20Bills', field: 'categoryId' }
-	])('a malformed $field from the URL is dropped', ({ search }) => {
-		expect(filtersFromUrl(at(search))).toEqual(noFilters);
+		{ shown: 'no filter', count: 1, values: {}, line: '1 Transaction' },
+		{
+			shown: 'Uncategorized',
+			count: 9,
+			values: { categoryId: UNCATEGORIZED },
+			line: '9 Uncategorized Transactions'
+		},
+		{
+			shown: 'Unapproved and Uncategorized',
+			count: 2,
+			values: { status: UNAPPROVED, categoryId: UNCATEGORIZED },
+			line: '2 Unapproved Uncategorized Transactions'
+		},
+		{
+			shown: 'bank changes',
+			count: 1,
+			values: { status: BANK_CHANGES },
+			line: '1 Transaction the bank changed'
+		},
+		{
+			shown: 'a search on Unapproved',
+			count: 3,
+			values: { search: 'coffee', status: UNAPPROVED },
+			line: '3 matching Unapproved Transactions'
+		},
+		{
+			shown: 'a date range',
+			count: 4,
+			values: { from: '2026-10-01' },
+			line: '4 matching Transactions'
+		}
+	])('$shown reads "$line"', ({ count, values, line }) => {
+		expect(countedTransactions(count, { ...noFilters, ...values })).toBe(line);
 	});
 });

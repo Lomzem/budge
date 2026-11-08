@@ -92,9 +92,13 @@ export interface World {
 	readonly payeeMemory: Lookup<Id<'categories'> | null>;
 }
 
+export type Field =
+	| { readonly kind: 'account' | 'amount' | 'category' }
+	| { readonly kind: 'lineCategory' | 'lineAmount'; readonly key: number };
+
 export type Payload =
 	| { readonly kind: 'waiting' }
-	| { readonly kind: 'invalid'; readonly message: string }
+	| { readonly kind: 'invalid'; readonly message: string; readonly field: Field }
 	| { readonly kind: 'ready'; readonly fields: Fields };
 
 export interface View<Candidate> {
@@ -102,7 +106,6 @@ export interface View<Candidate> {
 	readonly transferAccounts: readonly AccountChoice[];
 	readonly cardPayment: boolean;
 	readonly remainder: number | undefined;
-	readonly blankLine: boolean;
 	readonly candidates: readonly Candidate[];
 	readonly link: string;
 	readonly payload: Payload;
@@ -392,20 +395,50 @@ function remainderOf(draft: Draft) {
 	return left;
 }
 
+function invalid(message: string, field: Field): Payload {
+	return { kind: 'invalid', message, field };
+}
+
 function splitsOf(draft: Draft, world: World) {
 	const splits = [];
-	for (const line of draft.lines) {
+	for (const [index, line] of draft.lines.entries()) {
+		const number = index + 1;
 		const categoryId = categoryIn(world, line.categoryId);
 		const cents = parseCents(line.amount);
-		if (categoryId === undefined) return 'Pick a Category for each line.';
-		if (cents === undefined) return "Enter each line's amount, such as 12.50.";
+		if (categoryId === undefined && line.categoryId === '' && line.amount.trim() === '') {
+			return invalid(`Line ${String(number)} is empty. Fill it in, or remove the line.`, {
+				kind: 'lineCategory',
+				key: line.key
+			});
+		}
+		if (categoryId === undefined) {
+			return invalid(`Pick a Category for line ${String(number)}.`, {
+				kind: 'lineCategory',
+				key: line.key
+			});
+		}
+		if (cents === undefined) {
+			const blank = line.amount.trim() === '';
+			return invalid(
+				blank
+					? `Enter line ${String(number)}'s amount, or remove the line.`
+					: `Enter line ${String(number)}'s amount, such as 12.50.`,
+				{ kind: 'lineAmount', key: line.key }
+			);
+		}
 		const amount = draft.direction === 'outflow' ? -cents : cents;
 		splits.push({ categoryId, amount, memo: line.memo });
 	}
-	if (splits.length < 2) return 'A split needs two or more lines.';
+	const last = draft.lines.at(-1);
+	const lastAmount: Field =
+		last === undefined ? { kind: 'category' } : { kind: 'lineAmount', key: last.key };
+	if (splits.length < 2) return invalid('A split needs two or more lines.', lastAmount);
 	const remainder = remainderOf(draft) ?? 0;
-	if (remainder > 0) return `${formatCents(remainder)} is still left to split.`;
-	if (remainder < 0) return `The lines are ${formatCents(-remainder)} over the amount.`;
+	if (remainder > 0)
+		return invalid(`${formatCents(remainder)} is still left to split.`, lastAmount);
+	if (remainder < 0) {
+		return invalid(`The lines are ${formatCents(-remainder)} over the amount.`, lastAmount);
+	}
 	return splits;
 }
 
@@ -428,9 +461,9 @@ function payloadOf(
 ): Payload {
 	const account = world.accounts.find((a) => a._id === draft.accountId);
 	const amount = signedAmount(draft);
-	if (!account) return { kind: 'invalid', message: 'Pick an Account.' };
+	if (!account) return invalid('Pick an Account.', { kind: 'account' });
 	if (amount === undefined) {
-		return { kind: 'invalid', message: 'Enter the amount, such as 12.50.' };
+		return invalid('Enter the amount, such as 12.50.', { kind: 'amount' });
 	}
 	const shared = { accountId: account._id, date: draft.date, amount, memo: draft.memo };
 	switch (choice.kind) {
@@ -443,12 +476,12 @@ function payloadOf(
 			};
 		case 'split': {
 			const splits = splitsOf(draft, world);
-			if (typeof splits === 'string') return { kind: 'invalid', message: splits };
+			if ('kind' in splits) return splits;
 			return { kind: 'ready', fields: { ...shared, payee: draft.payee, splits } };
 		}
 		case 'transfer': {
 			const other = transferAccounts.find((a) => a._id === choice.accountId);
-			if (!other) return { kind: 'invalid', message: 'Pick another Account to transfer with.' };
+			if (!other) return invalid('Pick another Account to transfer with.', { kind: 'category' });
 			const noPayeeOrCategory = { payee: '' };
 			return {
 				kind: 'ready',
@@ -495,7 +528,6 @@ export function view<Candidate extends { readonly _id: Id<'transactions'> }>(
 		transferAccounts,
 		cardPayment: isCardPayment(draft, selection, world.accounts),
 		remainder: remainderOf(draft),
-		blankLine: draft.lines.some((line) => line.amount.trim() === ''),
 		candidates,
 		link,
 		payload

@@ -226,6 +226,14 @@ describe('splitting across Categories', () => {
 		};
 	}
 
+	function uncategorizedSecondLine() {
+		const draft = filled('outflow', ['10.00', '2.50']);
+		return {
+			...draft,
+			lines: draft.lines.map((line, index) => (index === 1 ? { ...line, categoryId: '' } : line))
+		};
+	}
+
 	test.each([
 		{ direction: 'outflow', amounts: ['15.00', '-2.50'], signed: [-1500, 250], total: -1250 },
 		{ direction: 'inflow', amounts: ['10.00', '2.50'], signed: [1000, 250], total: 1250 }
@@ -252,43 +260,65 @@ describe('splitting across Categories', () => {
 
 	test.each([
 		{
-			problem: 'a line has no Category',
+			problem: 'a line is left empty',
 			draft: choose(typed, split, remembering),
-			message: 'Pick a Category for each line.'
+			message: 'Line 2 is empty. Fill it in, or remove the line.',
+			blamed: { line: 2, part: 'lineCategory' }
+		},
+		{
+			problem: 'a line has no Category',
+			draft: uncategorizedSecondLine(),
+			message: 'Pick a Category for line 2.',
+			blamed: { line: 2, part: 'lineCategory' }
 		},
 		{
 			problem: 'a line amount is not money',
 			draft: filled('outflow', ['12.50', 'lots']),
-			message: "Enter each line's amount, such as 12.50."
+			message: "Enter line 2's amount, such as 12.50.",
+			blamed: { line: 2, part: 'lineAmount' }
+		},
+		{
+			problem: 'a line has no amount',
+			draft: filled('outflow', ['12.50', '']),
+			message: "Enter line 2's amount, or remove the line.",
+			blamed: { line: 2, part: 'lineAmount' }
 		},
 		{
 			problem: 'the lines fall short of the amount',
 			draft: filled('outflow', ['10.00', '1.00']),
-			message: '$1.50 is still left to split.'
+			message: '$1.50 is still left to split.',
+			blamed: { line: 2, part: 'lineAmount' }
 		},
 		{
 			problem: 'the lines go over the amount',
 			draft: filled('outflow', ['10.00', '3.00']),
-			message: 'The lines are $0.50 over the amount.'
+			message: 'The lines are $0.50 over the amount.',
+			blamed: { line: 2, part: 'lineAmount' }
 		}
-	])('refuses to save when $problem', ({ draft, message }) => {
-		expect(payloadOf(draft, remembering)).toEqual({ kind: 'invalid', message });
+	] satisfies {
+		problem: string;
+		draft: Draft;
+		message: string;
+		blamed: { line: number; part: 'lineCategory' | 'lineAmount' };
+	}[])('refuses to save when $problem, pointing at the line', ({ draft, message, blamed }) => {
+		const line = draft.lines[blamed.line - 1];
+
+		expect(payloadOf(draft, remembering)).toEqual({
+			kind: 'invalid',
+			message,
+			field: { kind: blamed.part, key: line?.key }
+		});
 	});
 
 	test.each([
-		{ amounts: ['12.50', ''], remainder: 0, blankLine: true },
-		{ amounts: ['10.00', '1.00'], remainder: 150, blankLine: false },
-		{ amounts: ['10.00', '5.00'], remainder: -250, blankLine: false },
-		{ amounts: ['10.00', 'lots'], remainder: undefined, blankLine: false }
-	] satisfies { amounts: [string, string]; remainder: number | undefined; blankLine: boolean }[])(
+		{ amounts: ['12.50', ''], remainder: 0 },
+		{ amounts: ['10.00', '1.00'], remainder: 150 },
+		{ amounts: ['10.00', '5.00'], remainder: -250 },
+		{ amounts: ['10.00', 'lots'], remainder: undefined }
+	] satisfies { amounts: [string, string]; remainder: number | undefined }[])(
 		'lines of $amounts leave $remainder cents',
-		({ amounts, remainder, blankLine }) => {
-			const shown = view(filled('outflow', amounts), remembering, noCandidates);
-
-			expect({ remainder: shown.remainder, blankLine: shown.blankLine }).toEqual({
-				remainder,
-				blankLine
-			});
+		({ amounts, remainder }) => {
+			expect(view(filled('outflow', amounts), remembering, noCandidates).remainder).toBe(remainder);
 		}
 	);
 
@@ -416,7 +446,8 @@ describe('transferring between Accounts', () => {
 
 		expect(payloadOf(movedToTheSameAccount, worldWith())).toEqual({
 			kind: 'invalid',
-			message: 'Pick another Account to transfer with.'
+			message: 'Pick another Account to transfer with.',
+			field: { kind: 'category' }
 		});
 	});
 
@@ -465,16 +496,23 @@ describe('transferring between Accounts', () => {
 
 describe('the Transaction around the Category', () => {
 	test.each([
-		{ problem: 'no Account', changes: { accountId: '' }, message: 'Pick an Account.' },
+		{
+			problem: 'no Account',
+			changes: { accountId: '' },
+			message: 'Pick an Account.',
+			field: 'account'
+		},
 		{
 			problem: 'an amount that is not money',
 			changes: { amount: 'twelve' },
-			message: 'Enter the amount, such as 12.50.'
+			message: 'Enter the amount, such as 12.50.',
+			field: 'amount'
 		}
-	])('refuses to save with $problem', ({ changes, message }) => {
+	])('refuses to save with $problem', ({ changes, message, field }) => {
 		expect(payloadOf(newDraft({ amount: '12.50', ...changes }), worldWith())).toEqual({
 			kind: 'invalid',
-			message
+			message,
+			field: { kind: field }
 		});
 	});
 

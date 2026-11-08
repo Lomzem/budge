@@ -126,6 +126,18 @@ describe('PlaidClient', () => {
 		}).pipe(Effect.provide(plaid.layer));
 	});
 
+	it.effect('removes the Item with its access token', () => {
+		const plaid = fakePlaid(() =>
+			Promise.resolve(json(200, { request_id: 'request-synthetic-1' }))
+		);
+		return Effect.gen(function* () {
+			yield* PlaidClient.use((client) => client.itemRemove(accessToken));
+			expect(plaid.sent.map(({ url, body }) => ({ url, body }))).toEqual([
+				{ url: 'https://sandbox.plaid.com/item/remove', body: { access_token: accessToken } }
+			]);
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
 	it.effect('asks for an update-mode Link token with the access token and no products', () => {
 		const plaid = fakePlaid(() =>
 			Promise.resolve(
