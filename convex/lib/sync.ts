@@ -409,13 +409,14 @@ export const setupConnection = Effect.fnUntraced(function* (input: {
 	const plaid = yield* PlaidClient;
 	const store = yield* SyncStore;
 	const encryptedToken = yield* cipher.encrypt(input.accessToken, input.itemId);
-	yield* plaid.setWebhook(input.accessToken, input.webhook);
-	return yield* store.save({
+	const connectionId = yield* store.save({
 		name: input.name,
 		itemId: input.itemId,
 		encryptedToken,
 		accounts: input.accounts
 	});
+	yield* Effect.ignore(plaid.setWebhook(input.accessToken, input.webhook));
+	return connectionId;
 });
 
 export const OWNER_CLIENT_USER_ID = 'budge-owner';
@@ -465,7 +466,7 @@ export const reconnectLinkToken = Effect.fnUntraced(function* (
 	const linkToken = yield* plaid.linkTokenCreate({
 		mode: 'update',
 		accessToken,
-		clientUserId: connectionId
+		clientUserId: OWNER_CLIENT_USER_ID
 	});
 	return { kind: 'linkToken', linkToken };
 });

@@ -208,6 +208,22 @@ describe('PlaidClient', () => {
 		}).pipe(Effect.provide(plaid.layer));
 	});
 
+	it.effect('never retries a public token exchange, which Plaid honors only once', () => {
+		const plaid = fakePlaid(() => Promise.resolve(plaidError(500, 'INTERNAL_SERVER_ERROR')));
+		return Effect.gen(function* () {
+			const fiber = yield* Effect.forkChild(
+				Effect.flip(
+					PlaidClient.use((client) => client.publicTokenExchange('public-token-synthetic-1'))
+				)
+			);
+			yield* TestClock.adjust('1 minute');
+			const error = yield* Fiber.join(fiber);
+
+			expect(error._tag).toBe('PlaidApi');
+			expect(plaid.sent).toHaveLength(1);
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
 	it.effect(
 		'retries a network failure, making at most three attempts, with no request, token, or cause in the error',
 		() => {

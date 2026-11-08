@@ -99,6 +99,7 @@ interface CallLimits {
 }
 const EVERY_CALL: CallLimits = { attempts: ATTEMPTS, attemptTimeout: ATTEMPT_TIMEOUT };
 const WITHIN_PLAIDS_WEBHOOK_DEADLINE: CallLimits = { attempts: 1, attemptTimeout: '5 seconds' };
+const EXACTLY_ONCE: CallLimits = { attempts: 1, attemptTimeout: ATTEMPT_TIMEOUT };
 const BACKOFF = Schedule.exponential('2 seconds');
 
 export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>()(
@@ -264,10 +265,14 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 					Schema.decodeUnknownEffect(LinkTokenBody)(body).pipe(Effect.map((b) => b.link_token))
 			),
 		publicTokenExchange: (publicToken) =>
-			post('/item/public_token/exchange', { public_token: publicToken }, (body) =>
-				Schema.decodeUnknownEffect(ExchangeBody)(body).pipe(
-					Effect.map((b) => ({ accessToken: b.access_token, itemId: b.item_id }))
-				)
+			post(
+				'/item/public_token/exchange',
+				{ public_token: publicToken },
+				(body) =>
+					Schema.decodeUnknownEffect(ExchangeBody)(body).pipe(
+						Effect.map((b) => ({ accessToken: b.access_token, itemId: b.item_id }))
+					),
+				EXACTLY_ONCE
 			),
 		itemGet: (accessToken) => post('/item/get', { access_token: accessToken }, decodeItem),
 		accountsGet: (accessToken, accountIds) =>

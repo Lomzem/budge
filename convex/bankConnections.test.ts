@@ -143,6 +143,35 @@ describe('setting up a Bank Connection', () => {
 		]);
 	});
 
+	test('keeps the exchanged token when Plaid refuses the webhook update', async () => {
+		const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 0] } });
+		const setup = await runInAction(
+			backend,
+			{
+				setWebhook: () =>
+					Effect.fail(
+						new PlaidApi({
+							error_code: 'INTERNAL_SERVER_ERROR',
+							status: 500,
+							request_id: 'request-synthetic-4'
+						})
+					)
+			},
+			setupConnection({
+				name: 'Sample Bank',
+				itemId,
+				accessToken,
+				webhook: 'https://budge.example.test/plaid/webhook',
+				accounts: [{ externalId, accountId: backend.accounts.Checking }]
+			})
+		);
+
+		assert(setup.ok, 'setup failed');
+		expect(await backend.t.run((ctx) => ctx.db.get('bankConnections', setup.value))).toMatchObject({
+			provider: { kind: 'plaid', itemId }
+		});
+	});
+
 	test('at the Bank Connection limit, setting up an Item again replaces its token and a new Item is refused', async () => {
 		const { t, accounts } = await startBudget({
 			cutoverDate,
@@ -673,7 +702,7 @@ describe('reconnecting a Bank Connection', () => {
 		);
 
 		expect(synced(result)).toEqual({ kind: 'linkToken', linkToken: 'link-token-synthetic-1' });
-		expect(requests).toEqual([{ mode: 'update', accessToken, clientUserId: connectionId }]);
+		expect(requests).toEqual([{ mode: 'update', accessToken, clientUserId: 'budge-owner' }]);
 	});
 
 	test('a successful sync after Reconnect clears the needed login', async () => {
