@@ -7,5 +7,20 @@ export const generatedUiIgnores = [
 	'!src/lib/components/ui/table/table-row.svelte',
 	'!src/lib/components/ui/table/table-head.svelte',
 	'!src/lib/components/ui/table/table-cell.svelte',
-	'!src/lib/components/ui/progress/progress.svelte'
+	'!src/lib/components/ui/progress/progress.svelte',
+	'!src/lib/components/ui/dialog/dialog-overlay.svelte',
+	'!src/lib/components/ui/dialog/dialog-title.svelte',
+	'!src/lib/components/ui/dialog/dialog-description.svelte',
+	'!src/lib/components/ui/dialog/dialog-footer.svelte',
+	'!src/lib/components/ui/alert-dialog/alert-dialog-overlay.svelte',
+	'!src/lib/components/ui/alert-dialog/alert-dialog-content.svelte',
+	'!src/lib/components/ui/alert-dialog/alert-dialog-title.svelte',
+	'!src/lib/components/ui/alert-dialog/alert-dialog-footer.svelte',
+	'!src/lib/components/ui/dropdown-menu/dropdown-menu-content.svelte',
+	'!src/lib/components/ui/dropdown-menu/dropdown-menu-item.svelte',
+	'!src/lib/components/ui/dropdown-menu/dropdown-menu-radio-item.svelte',
+	'!src/lib/components/ui/checkbox/checkbox.svelte',
+	'!src/lib/components/ui/radio-group/radio-group-item.svelte',
+	'!src/lib/components/ui/label/label.svelte',
+	'!src/lib/components/ui/input/input.svelte'
 ];
