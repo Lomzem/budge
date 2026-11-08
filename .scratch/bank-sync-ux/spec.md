@@ -79,6 +79,7 @@ desktop                                        phone
 - ADR 0001, 0002, and 0003 hold. Every enforced rule in AGENTS.md holds.
 - Journeys and the verify-budge feature map change with every label or flow they cite. `featureMap.test` passes.
 - No real financial data enters the repo. Plaid fixtures stay synthetic.
+- No layout shifts. Nothing on a page moves unless the user just caused it: data that loads fills space already reserved for it, at its final size; tables have fixed column widths; status and error lines keep their slot whether empty or not; buttons keep their width when their label changes (`Sync now`/`Syncing…`); the font loads without a reflow; the scrollbar gutter is stable. Every journey fails on a layout shift that came without user input (`e2e/journeys/layoutShift.ts`, wrapped around every journey in `e2e/journeys/index.ts`). Ticket 07 owns this.
 - WCAG 2.2 AA: contrast, 24 px minimum targets (44 px on phones for primary actions), visible focus, reduced motion, landmarks, and a logical heading order.
 
 ## Done when
