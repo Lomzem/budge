@@ -20,6 +20,7 @@
 	let text = $state('');
 	let editing = $state(false);
 	let error = $state('');
+	const errorId = $props.id();
 
 	const read = () => (editing ? text : shown(amount));
 	const write = (typed: string) => {
@@ -57,7 +58,7 @@
 	}
 </script>
 
-<div class="ml-auto w-28">
+<div class="relative ml-auto w-24 sm:w-28">
 	<Input
 		bind:value={read, write}
 		onfocus={start}
@@ -65,10 +66,16 @@
 		onkeydown={keydown}
 		aria-label={label}
 		aria-invalid={error ? true : undefined}
+		aria-describedby={error ? errorId : undefined}
 		inputmode="decimal"
 		autocomplete="off"
 	/>
-	{#if error}
-		<span role="alert" class="mt-1 block text-xs whitespace-normal text-destructive">{error}</span>
-	{/if}
+	<span
+		id={errorId}
+		role="alert"
+		class={[
+			'absolute top-full right-0 z-20 mt-1 w-56 rounded-md border border-destructive bg-popover px-3 py-2 text-left text-xs whitespace-normal text-destructive shadow-md',
+			!error && 'hidden'
+		]}>{error}</span
+	>
 </div>

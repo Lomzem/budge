@@ -161,12 +161,13 @@ async function connectedBudget() {
 
 describe('a bank Account Budge does not know', () => {
 	test('is held with its rows, named from Plaid, and imports nothing', async () => {
-		const { sync, held, transactions } = await connectedBudget();
+		const { connectionId, sync, held, transactions } = await connectedBudget();
 
 		expect(await sync(rowsFor(savingsId))).toMatchObject({ kind: 'synced', added: 0, held: 2 });
 
 		expect(await held()).toEqual([
 			expect.objectContaining({
+				connectionId,
 				connectionName: 'Sample Bank',
 				name: 'Sample Savings',
 				mask: '4321',

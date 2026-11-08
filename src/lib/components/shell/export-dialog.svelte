@@ -61,14 +61,12 @@
 			JSON is one file. CSV is one file per table, so your browser may ask to allow several
 			downloads.
 		</p>
-		{#if downloading}
-			<p role="status" class="text-sm text-muted-foreground">
-				Downloading… Keep this page open until every file has started.
+		<div class="min-h-12 text-sm">
+			<p role="status" class="text-muted-foreground">
+				{downloading ? 'Downloading… Keep this page open until every file has started.' : ''}
 			</p>
-		{/if}
-		{#if error}
-			<p role="alert" class="text-sm text-destructive">{error}</p>
-		{/if}
+			<p role="alert" class="text-destructive">{error}</p>
+		</div>
 		<Dialog.Footer>
 			<Button variant="outline" disabled={busy} onclick={() => exportAs(downloadCsv)}>
 				Download CSV

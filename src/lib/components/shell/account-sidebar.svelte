@@ -6,84 +6,99 @@
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
+	import { getBankConnections } from '$lib/bankConnections.svelte';
 	import AccountDialog from '$lib/components/accounts/account-dialog.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
-	import { VIEWS } from '$lib/views';
+	import { SECTIONS } from '$lib/views';
 
-	import AppMenu from './app-menu.svelte';
-	import BankConnections from './bank-connections.svelte';
-	import HeldAccounts from './held-accounts.svelte';
+	import BrandMark from './brand-mark.svelte';
+	import SectionBadge from './section-badge.svelte';
 
 	const accounts = getAccounts();
-	const unapproved = useQuery(api.transactions.unapprovedCount, () =>
-		accounts.loaded ? {} : 'skip'
-	);
+	const bank = getBankConnections();
+	const unapproved = useQuery(api.transactions.unapprovedCount, {});
+	const unapprovedCount = $derived(unapproved.data ?? 0);
 	let addOpen = $state(false);
 
 	const total = (list: Account[]) => list.reduce((sum, account) => sum + account.balance, 0);
 	const linkClass =
-		'flex items-baseline justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground aria-[current=page]:bg-sidebar-accent aria-[current=page]:font-medium aria-[current=page]:text-sidebar-accent-foreground';
+		'flex min-h-9 items-center gap-3 rounded-md px-2.5 py-1.5 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground aria-[current=page]:bg-sidebar-accent aria-[current=page]:font-bold aria-[current=page]:text-sidebar-accent-foreground';
 </script>
 
-<nav aria-label="Budget and Accounts" class="flex flex-1 flex-col gap-4 overflow-y-auto p-3">
-	<p class="px-2 text-lg font-semibold">Budge</p>
-	<ul class="flex flex-col gap-0.5 text-sm">
-		{#each VIEWS as view (view.href)}
+<a
+	href={resolve('/')}
+	class="flex items-center gap-2.5 px-5 pt-5 pb-4 text-lg font-bold tracking-tight"
+>
+	<BrandMark class="size-7" />
+	Budge
+</a>
+<nav aria-label="Budget and Accounts" class="flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-6">
+	<ul class="flex flex-col gap-0.5">
+		{#each SECTIONS as section (section.href)}
+			{@const Icon = section.icon}
 			<li>
 				<a
-					href={resolve(view.href)}
-					aria-current={view.href === page.url.pathname ? 'page' : undefined}
+					href={resolve(section.href)}
+					aria-current={section.href === page.url.pathname ? 'page' : undefined}
 					class={linkClass}
 				>
-					{view.label}
-					{#if view.href === '/accounts' && (unapproved.data ?? 0) > 0}
-						<span class="shrink-0 text-xs tabular-nums">
-							{formatUnapprovedCount(unapproved.data ?? 0)} Unapproved
-						</span>
+					<Icon aria-hidden="true" class="size-5 shrink-0 text-muted-foreground" />
+					<span class="flex-1">{section.label}</span>
+					{#if section.href === '/accounts' && unapprovedCount > 0}
+						<SectionBadge count={formatUnapprovedCount(unapprovedCount)} label="Unapproved" />
+					{:else if section.href === '/bank' && bank.needingYou > 0}
+						<SectionBadge count={String(bank.needingYou)} label="need you" />
 					{/if}
 				</a>
 			</li>
 		{/each}
 	</ul>
-	{#each accounts.groups as group (group.label)}
-		<section aria-labelledby="sidebar-{group.label}" class="flex flex-col gap-1 text-sm">
-			<h2
-				id="sidebar-{group.label}"
-				class="flex items-baseline justify-between gap-2 px-2 text-xs font-medium text-muted-foreground"
+	<div class="flex flex-col gap-3">
+		<div class="flex items-center justify-between gap-2 pl-2.5">
+			<h2 class="text-xs font-bold text-muted-foreground">Accounts</h2>
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				aria-label="Add Account"
+				onclick={() => (addOpen = true)}
 			>
-				{group.label}
-				<span class="tabular-nums">{formatCents(total(group.accounts))}</span>
-			</h2>
-			<ul class="flex flex-col gap-0.5">
-				{#each group.accounts as account (account._id)}
-					{@const href = resolve('/(app)/accounts/[accountId]', { accountId: account._id })}
-					<li>
-						<a
-							{href}
-							aria-current={href === page.url.pathname ? 'page' : undefined}
-							class={linkClass}
-						>
-							<span class="truncate">{account.name}</span>
-							<span class="shrink-0 tabular-nums">{formatCents(account.balance)}</span>
-						</a>
-					</li>
-				{/each}
-			</ul>
-		</section>
-	{/each}
-	<button
-		class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-		onclick={() => (addOpen = true)}
-	>
-		<PlusIcon aria-hidden="true" class="size-4" />
-		Add Account
-	</button>
+				<PlusIcon aria-hidden="true" />
+			</Button>
+		</div>
+		{#if accounts.all.length === 0}
+			<p class="px-2.5 text-xs text-muted-foreground">No Accounts yet.</p>
+		{/if}
+		{#each accounts.groups as group (group.label)}
+			<section aria-labelledby="sidebar-{group.label}" class="flex flex-col gap-0.5">
+				<h3
+					id="sidebar-{group.label}"
+					class="flex items-baseline justify-between gap-2 px-2.5 pb-1 text-xs text-muted-foreground"
+				>
+					{group.label}
+					<span>{formatCents(total(group.accounts))}</span>
+				</h3>
+				<ul class="flex flex-col gap-0.5">
+					{#each group.accounts as account (account._id)}
+						{@const href = resolve('/(app)/accounts/[accountId]', { accountId: account._id })}
+						<li>
+							<a
+								{href}
+								aria-current={href === page.url.pathname ? 'page' : undefined}
+								class={[linkClass, 'justify-between']}
+							>
+								<span class="truncate">{account.name}</span>
+								<span class={['shrink-0', account.balance < 0 && 'text-destructive']}>
+									{formatCents(account.balance)}
+								</span>
+							</a>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/each}
+	</div>
 </nav>
-<div class="flex flex-col gap-2 border-t border-sidebar-border p-3">
-	<BankConnections />
-	<HeldAccounts />
-	<AppMenu wide />
-</div>
 
 <AccountDialog bind:open={addOpen} />

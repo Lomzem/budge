@@ -1,32 +1,70 @@
 import type { FunctionReturnType } from 'convex/server';
 import { useConvexClient, useQuery, type UseQueryReturn } from 'convex-svelte';
 import { createContext } from 'svelte';
+import { SvelteSet } from 'svelte/reactivity';
 
 import { api } from '$convex/_generated/api';
 import type { Id } from '$convex/_generated/dataModel';
-import { openPlaidLink } from '$lib/plaidLink';
 import { attempt } from '$lib/attempt';
+import { openPlaidLink } from '$lib/plaidLink';
 
 export type BankConnection = FunctionReturnType<typeof api.bankConnections.list>[number];
+export type HeldAccount = FunctionReturnType<typeof api.heldAccounts.list>[number];
+export type SyncOutcome = FunctionReturnType<typeof api.bankConnections.syncNow>;
 
 const MINUTE = 60_000;
+
+export function needsALook(connection: BankConnection) {
+	return (
+		connection.status === 'needsAttention' ||
+		connection.lastError !== null ||
+		connection.overdue ||
+		connection.consentEndsAt !== null
+	);
+}
+
+export function describeSync(outcome: SyncOutcome): string {
+	if (outcome.kind === 'busy') return 'A sync is already running.';
+	if (outcome.kind === 'noToken') {
+		return 'This Bank Connection has no bank login, so it never syncs.';
+	}
+	return `Synced. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`;
+}
 
 export class BankConnections {
 	now = $state(Date.now());
 	readonly #client = useConvexClient();
-	readonly #query: UseQueryReturn<typeof api.bankConnections.list>;
-	readonly all: BankConnection[] = $derived.by(() => this.#query.data ?? []);
+	readonly #list: UseQueryReturn<typeof api.bankConnections.list>;
+	readonly #held: UseQueryReturn<typeof api.heldAccounts.list>;
+	readonly #service: UseQueryReturn<typeof api.bankConnections.service>;
+	readonly all: BankConnection[] = $derived.by(() => this.#list.data ?? []);
+	readonly held: HeldAccount[] = $derived.by(() => this.#held.data ?? []);
+	readonly service = $derived.by(() => this.#service.data);
+	readonly loaded = $derived.by(
+		() =>
+			this.#list.data !== undefined && this.#held.data !== undefined && this.service !== undefined
+	);
+	readonly failed = $derived.by(
+		() =>
+			this.#list.error !== undefined ||
+			this.#held.error !== undefined ||
+			this.#service.error !== undefined
+	);
 	readonly needingAttention = $derived(
 		this.all.filter((connection) => connection.status === 'needsAttention')
 	);
-	reconnecting = $state<Id<'bankConnections'> | null>(null);
+	readonly needingYou = $derived(this.held.length + this.all.filter(needsALook).length);
+	linking = $state<Id<'bankConnections'> | 'connecting' | null>(null);
+	readonly syncing = new SvelteSet<Id<'bankConnections'>>();
 
 	constructor(enabled: () => boolean) {
-		this.#query = useQuery(
+		this.#list = useQuery(
 			api.bankConnections.list,
 			() => (enabled() ? { now: Math.floor(this.now / MINUTE) * MINUTE } : 'skip'),
 			{ keepPreviousData: true }
 		);
+		this.#held = useQuery(api.heldAccounts.list, () => (enabled() ? {} : 'skip'));
+		this.#service = useQuery(api.bankConnections.service, () => (enabled() ? {} : 'skip'));
 		$effect(() => {
 			const timer = setInterval(() => {
 				this.tick();
@@ -41,17 +79,43 @@ export class BankConnections {
 		this.now = Date.now();
 	}
 
+	heldFrom(connectionId: Id<'bankConnections'>) {
+		return this.held.filter((account) => account.connectionId === connectionId);
+	}
+
+	async connect(): Promise<string | null> {
+		this.linking = 'connecting';
+		const connected = await attempt(async () => {
+			const { linkToken } = await this.#client.action(api.bankConnections.connect, {});
+			const linked = await openPlaidLink(linkToken);
+			if (linked === 'exit' || linked === 'unavailable') return linked;
+			await this.#client.action(api.bankConnections.finishConnect, {
+				publicToken: linked.publicToken,
+				...(linked.institutionName === undefined ? {} : { institutionName: linked.institutionName })
+			});
+			return linked.institutionName ?? 'your bank';
+		});
+		this.linking = null;
+		this.tick();
+		if (!connected.ok) {
+			return connected.error?.message ?? "Budge couldn't connect the bank. Try again.";
+		}
+		if (connected.value === 'exit') return null;
+		if (connected.value === 'unavailable') return "Plaid Link didn't load. Try again.";
+		return `Connected ${connected.value}. Choose where each bank Account's rows go.`;
+	}
+
 	async reconnect(connectionId: Id<'bankConnections'>): Promise<string | null> {
-		this.reconnecting = connectionId;
+		this.linking = connectionId;
 		const reconnected = await attempt(async () => {
 			const { linkToken } = await this.#client.action(api.bankConnections.reconnect, {
 				connectionId
 			});
 			const linked = await openPlaidLink(linkToken);
-			if (linked !== 'success') return linked;
+			if (linked === 'exit' || linked === 'unavailable') return linked;
 			return await this.#client.action(api.bankConnections.syncAfterReconnect, { connectionId });
 		});
-		this.reconnecting = null;
+		this.linking = null;
 		this.tick();
 		if (!reconnected.ok) {
 			return reconnected.error?.message ?? "Budge couldn't reconnect. Try again.";
@@ -62,6 +126,18 @@ export class BankConnections {
 		return outcome.kind === 'synced'
 			? `Reconnected. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`
 			: 'Reconnected.';
+	}
+
+	async sync(connectionId: Id<'bankConnections'>): Promise<string> {
+		this.syncing.add(connectionId);
+		const synced = await attempt(() =>
+			this.#client.action(api.bankConnections.syncNow, { connectionId })
+		);
+		this.syncing.delete(connectionId);
+		this.tick();
+		return synced.ok
+			? describeSync(synced.value)
+			: (synced.error?.message ?? "Budge couldn't sync. Try again.");
 	}
 }
 

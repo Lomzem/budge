@@ -40,6 +40,7 @@ export const list = query({
 	returns: v.array(
 		v.object({
 			_id: v.id('connectionAccounts'),
+			connectionId: v.id('bankConnections'),
 			connectionName: v.string(),
 			name: v.union(v.string(), v.null()),
 			mask: v.union(v.string(), v.null()),
@@ -61,6 +62,7 @@ export const list = query({
 			const rows = await heldRows(ctx, account._id, MAX_COUNTED + 1);
 			held.push({
 				_id: account._id,
+				connectionId: connection._id,
 				connectionName: connection.name,
 				name: account.name ?? null,
 				mask: account.mask ?? null,

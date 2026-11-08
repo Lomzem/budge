@@ -60,7 +60,7 @@
 					<Table.Cell width="fill">
 						<button
 							type="button"
-							class="block w-full truncate rounded-sm pl-3 text-left underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+							class="block w-full rounded-sm pl-3 text-left break-words whitespace-normal underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
 							aria-expanded={selected}
 							aria-controls={selected ? 'category-inspector' : undefined}
 							data-category-id={category.id}
@@ -80,7 +80,7 @@
 							</div>
 						{/if}
 						{#if status}
-							<span class="block truncate pl-3 text-xs {status.class}">{status.text}</span>
+							<span class="block pl-3 text-xs whitespace-normal {status.class}">{status.text}</span>
 						{/if}
 						{#each paymentNotes(category) as note (note)}
 							<span class="block pl-3 text-xs whitespace-normal text-muted-foreground">{note}</span>

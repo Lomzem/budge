@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { useConvexClient, useQuery } from 'convex-svelte';
-	import type { FunctionReturnType } from 'convex/server';
+	import { useConvexClient } from 'convex-svelte';
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
+	import type { HeldAccount } from '$lib/bankConnections.svelte';
 	import StartingBalanceStep from '$lib/components/accounts/starting-balance-step.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -13,7 +13,8 @@
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 
-	type HeldAccount = FunctionReturnType<typeof api.heldAccounts.list>[number];
+	import { labelOf } from './held';
+
 	type AccountKind = 'cash' | 'creditCard';
 	interface MappedAccount {
 		_id: Id<'accounts'>;
@@ -27,9 +28,14 @@
 		kind: AccountKind;
 	}
 
+	let {
+		onsettled
+	}: {
+		onsettled: (connectionAccountId: Id<'connectionAccounts'>, outcome: string) => void;
+	} = $props();
+
 	const client = useConvexClient();
 	const accounts = getAccounts();
-	const held = useQuery(api.heldAccounts.list, () => (accounts.loaded ? {} : 'skip'));
 	const dialog = new DialogSession<{
 		bankAccount: { _id: Id<'connectionAccounts'>; label: string };
 		choice: string;
@@ -39,22 +45,18 @@
 		mapped: MappedAccount | null;
 	}>();
 
-	function labelOf(account: HeldAccount) {
-		const name = account.name ?? 'An unnamed bank Account';
-		return account.mask === null ? name : `${name} ending ${account.mask}`;
+	function sameName(account: HeldAccount) {
+		const name = account.name?.trim().toLowerCase();
+		if (name === undefined || name === '') return undefined;
+		return accounts.all.find((existing) => existing.name.trim().toLowerCase() === name);
 	}
 
-	function rowsOf(account: HeldAccount) {
-		const count = `${account.rows.toLocaleString()}${account.moreRows ? ' or more' : ''}`;
-		return account.rows === 1 && !account.moreRows ? '1 row waiting' : `${count} rows waiting`;
-	}
-
-	function open(account: HeldAccount) {
+	export function open(account: HeldAccount) {
 		dialog.open({
 			bankAccount: { _id: account._id, label: labelOf(account) },
-			choice: '',
+			choice: sameName(account)?._id ?? 'new',
 			name: account.name ?? '',
-			kind: 'cash',
+			kind: account.kind ?? 'cash',
 			error: '',
 			mapped: null
 		});
@@ -92,7 +94,7 @@
 		const request = {
 			connectionAccountId: session.bankAccount._id,
 			choice: session.choice,
-			name: session.name,
+			name: session.name.trim(),
 			kind: session.kind
 		};
 		session.error = '';
@@ -102,6 +104,7 @@
 			return;
 		}
 		if (saved.value === 'ignored') {
+			onsettled(request.connectionAccountId, 'Ignored');
 			dialog.close(session);
 			return;
 		}
@@ -109,29 +112,10 @@
 			session.error = 'That Account is gone. Choose another Account.';
 			return;
 		}
+		onsettled(request.connectionAccountId, `Into ${saved.value.name}`);
 		session.mapped = saved.value;
 	}
 </script>
-
-{#if held.data !== undefined && held.data.length > 0}
-	<section aria-labelledby="held-accounts" class="flex flex-col gap-0.5 text-xs">
-		<h2 id="held-accounts" class="px-2 font-medium">New bank Accounts</h2>
-		<ul class="flex flex-col gap-0.5 text-muted-foreground">
-			{#each held.data as account (account._id)}
-				<li>
-					<button
-						class="w-full rounded-md px-2 py-1 text-left hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-						onclick={() => {
-							open(account);
-						}}
-					>
-						{labelOf(account)}, from {account.connectionName}: {rowsOf(account)}
-					</button>
-				</li>
-			{/each}
-		</ul>
-	</section>
-{/if}
 
 <Dialog.Root
 	open={dialog.current !== null}
@@ -155,57 +139,61 @@
 					<Dialog.Header>
 						<Dialog.Title>{session.bankAccount.label}</Dialog.Title>
 						<Dialog.Description>
-							Budge doesn't know this bank Account yet, so its rows wait here and aren't imported.
+							Its rows wait here until you choose where they go.
 						</Dialog.Description>
 					</Dialog.Header>
-					<form class="flex flex-col gap-4" onsubmit={decide}>
-						<fieldset class="flex flex-col gap-2">
-							<legend class="mb-2 text-sm font-medium">Where its rows go</legend>
+					<form class="flex flex-col gap-5" onsubmit={decide}>
+						<fieldset class="flex flex-col gap-3">
+							<legend class="mb-3 font-bold">Where its rows go</legend>
 							<RadioGroup.Root bind:value={session.choice}>
+								<div class="flex min-h-9 items-center gap-2.5">
+									<RadioGroup.Item value="new" id="held-to-new" />
+									<Label for="held-to-new">Into a new Account</Label>
+								</div>
 								{#each accounts.all as account (account._id)}
-									<div class="flex items-center gap-2">
+									<div class="flex min-h-9 items-center gap-2.5">
 										<RadioGroup.Item value={account._id} id="held-to-{account._id}" />
 										<Label for="held-to-{account._id}">Into {account.name}</Label>
 									</div>
 								{/each}
-								<div class="flex items-center gap-2">
-									<RadioGroup.Item value="new" id="held-to-new" />
-									<Label for="held-to-new">Into a new Account</Label>
-								</div>
-								<div class="flex items-center gap-2">
+								<div class="flex min-h-9 items-center gap-2.5">
 									<RadioGroup.Item value="ignore" id="held-ignore" />
 									<Label for="held-ignore">Nowhere: ignore this bank Account</Label>
 								</div>
 							</RadioGroup.Root>
 						</fieldset>
 						{#if session.choice === 'new'}
-							<div class="flex flex-col gap-2">
-								<Label for="held-new-name">Name</Label>
-								<Input id="held-new-name" bind:value={session.name} required autocomplete="off" />
+							<div class="flex flex-col gap-4 rounded-md bg-muted p-4">
+								<div class="flex flex-col gap-2">
+									<Label for="held-new-name">Name</Label>
+									<Input id="held-new-name" bind:value={session.name} required autocomplete="off" />
+								</div>
+								<fieldset class="flex flex-col gap-2">
+									<legend class="mb-2 font-bold">Type</legend>
+									<RadioGroup.Root bind:value={session.kind}>
+										<div class="flex min-h-9 items-center gap-2.5">
+											<RadioGroup.Item value="cash" id="held-new-cash" />
+											<Label for="held-new-cash">Cash, such as checking or savings</Label>
+										</div>
+										<div class="flex min-h-9 items-center gap-2.5">
+											<RadioGroup.Item value="creditCard" id="held-new-credit" />
+											<Label for="held-new-credit">Credit card</Label>
+										</div>
+									</RadioGroup.Root>
+								</fieldset>
 							</div>
-							<fieldset class="flex flex-col gap-2">
-								<legend class="mb-2 text-sm font-medium">Type</legend>
-								<RadioGroup.Root bind:value={session.kind}>
-									<div class="flex items-center gap-2">
-										<RadioGroup.Item value="cash" id="held-new-cash" />
-										<Label for="held-new-cash">Cash, such as checking or savings</Label>
-									</div>
-									<div class="flex items-center gap-2">
-										<RadioGroup.Item value="creditCard" id="held-new-credit" />
-										<Label for="held-new-credit">Credit card</Label>
-									</div>
-								</RadioGroup.Root>
-							</fieldset>
 						{:else if session.choice === 'ignore'}
-							<p class="text-sm">Its rows are dropped, and Budge won't ask about it again.</p>
+							<p class="rounded-md bg-muted p-4">
+								Its rows are dropped, and Budge won't ask about it again.
+							</p>
 						{/if}
-						{#if session.error}
-							<p role="alert" class="text-sm text-destructive">{session.error}</p>
-						{/if}
+						<p role="alert" class="min-h-6 text-sm text-destructive">{session.error}</p>
 						<Dialog.Footer>
-							<Button type="submit" disabled={dialog.pending('save')}>
-								{session.choice === 'ignore' ? 'Ignore' : 'Bring in its rows'}
-							</Button>
+							<div class="grid min-w-40">
+								<Button type="submit" disabled={dialog.pending('save')}>
+									{session.choice === 'ignore' ? 'Ignore' : 'Bring in its rows'}
+								</Button>
+							</div>
 						</Dialog.Footer>
 					</form>
 				{/if}
