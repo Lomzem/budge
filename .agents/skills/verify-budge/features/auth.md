@@ -15,6 +15,8 @@ Admit the configured owner and preserve authenticated navigation while excluding
 
 ## Driving it with Playwright
 
+No journey covers Auth: every journey starts signed in (`e2e/journeys.test.ts` signs in through Clerk; `bun run app verify` loads the `login` storage state), so sign-in itself is driven by hand with the recipes below.
+
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
