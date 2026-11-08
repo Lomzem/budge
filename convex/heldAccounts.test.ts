@@ -36,8 +36,8 @@ function rowsFor(externalId: string, idPrefix = externalId): SyncPage {
 }
 
 const bankAccounts: BankAccount[] = [
-	{ externalId: checkingId, name: 'Sample Checking', mask: '0042', balance: 120_000 },
-	{ externalId: savingsId, name: 'Sample Savings', mask: '4321', balance: 300_000 }
+	{ externalId: checkingId, name: 'Sample Checking', mask: '0042', kind: 'cash', balance: 120_000 },
+	{ externalId: savingsId, name: 'Sample Savings', mask: '4321', kind: 'cash', balance: 300_000 }
 ];
 
 function gate() {
@@ -233,7 +233,7 @@ describe('a bank Account Budge does not know', () => {
 			accountsGet: () =>
 				Effect.succeed([
 					...bankAccounts,
-					{ externalId: cardId, name: 'Sample Card', mask: '7310', balance: -89_990 }
+					{ externalId: cardId, name: 'Sample Card', mask: '7310', kind: 'cash', balance: -89_990 }
 				])
 		});
 
@@ -578,7 +578,7 @@ describe('the bank changes a row it holds for an unknown Account', () => {
 
 describe('a suggested starting balance', () => {
 	const checkingReporting = (balance: number | null): BankAccount[] => [
-		{ externalId: checkingId, name: 'Sample Checking', mask: '0042', balance }
+		{ externalId: checkingId, name: 'Sample Checking', mask: '0042', kind: 'cash', balance }
 	];
 
 	test("is the bank's balance, even zero, and is withheld when the bank has no balance or no such Account", async () => {
@@ -619,7 +619,7 @@ describe('a suggested starting balance', () => {
 	});
 
 	const movedReporting = (balance: number): BankAccount[] => [
-		{ externalId: movedCheckingId, name: 'Sample Checking', mask: '0042', balance }
+		{ externalId: movedCheckingId, name: 'Sample Checking', mask: '0042', kind: 'cash', balance }
 	];
 
 	test('after the Account is mapped to a newer bank Account, comes from the newer one', async () => {

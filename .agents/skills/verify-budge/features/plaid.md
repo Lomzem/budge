@@ -49,5 +49,5 @@ Preconditions:
 
 - The `plaid/*` journeys prove none of Plaid Link or a real sync.
 - The `bank-sync` fixture is built by `convex/seedBankSync.ts` through the production sync mutations; it refuses to run on a production deployment.
-- `bankConnections.setup` is internal provisioning, not a public Connect UI. It refuses a new Item once Budge holds `MAX_BANK_CONNECTIONS` (20), the most the sidebar lists; setting up an existing Item again still replaces its token. Ticket 17's manual cloud Sandbox check is still open.
-- Sources: tickets 17, 18, 20, 23; public `bankConnections.list/syncNow/reconnect/syncAfterReconnect`.
+- `bankConnections.connect`/`finishConnect` are the in-app Connect path (create-mode Plaid Link); `bankConnections.service` reports whether this server has Plaid credentials and the token key, and which Plaid environment it uses. A local backend has none, so `connect` and Sync now on a tokened connection say `Bank sync isn't set up on this server.` `bankConnections.setup` is internal provisioning. It refuses a new Item once Budge holds `MAX_BANK_CONNECTIONS` (20), the most the sidebar lists; setting up an existing Item again still replaces its token. Ticket 17's manual cloud Sandbox check is still open.
+- Sources: tickets 17, 18, 20, 23; public `bankConnections.list/service/connect/finishConnect/syncNow/reconnect/syncAfterReconnect`.

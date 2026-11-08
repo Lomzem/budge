@@ -110,24 +110,33 @@ describe('decoding a Plaid sync page', () => {
 });
 
 describe("decoding Plaid's Accounts", () => {
-	it.effect('reads each Account and its current balance as a Budge balance in cents', () =>
-		Effect.gen(function* () {
-			expect(yield* decodeAccounts(accounts)).toEqual([
-				{
-					externalId: 'account-synthetic-checking',
-					name: 'Sample Checking',
-					mask: '0042',
-					balance: 120_417
-				},
-				{
-					externalId: 'account-synthetic-card',
-					name: 'Sample Card',
-					mask: '7310',
-					balance: -89_990
-				},
-				{ externalId: 'account-synthetic-savings', name: 'Sample Savings', balance: null }
-			]);
-		})
+	it.effect(
+		'reads each Account, its kind, and its current balance as a Budge balance in cents',
+		() =>
+			Effect.gen(function* () {
+				expect(yield* decodeAccounts(accounts)).toEqual([
+					{
+						externalId: 'account-synthetic-checking',
+						name: 'Sample Checking',
+						mask: '0042',
+						kind: 'cash',
+						balance: 120_417
+					},
+					{
+						externalId: 'account-synthetic-card',
+						name: 'Sample Card',
+						mask: '7310',
+						kind: 'creditCard',
+						balance: -89_990
+					},
+					{
+						externalId: 'account-synthetic-savings',
+						name: 'Sample Savings',
+						kind: 'cash',
+						balance: null
+					}
+				]);
+			})
 	);
 
 	it.effect('fails on a balance finer than a cent', () =>

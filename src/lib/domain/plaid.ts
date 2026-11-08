@@ -146,10 +146,14 @@ const PlaidAccount = Schema.Struct({
 
 const AccountsResponse = Schema.Struct({ accounts: Schema.Array(PlaidAccount) });
 
+export type BankAccountKind = 'cash' | 'creditCard';
+
 export interface BankAccount {
 	externalId: string;
 	name: string;
 	mask?: string;
+
+	kind: BankAccountKind;
 	balance: number | null;
 }
 
@@ -169,6 +173,7 @@ export const decodeAccounts = (body: unknown): Effect.Effect<BankAccount[], Sche
 					externalId: account.account_id,
 					name: clean(account.name) ?? 'Bank account',
 					...(mask === undefined ? {} : { mask }),
+					kind: account.type === 'credit' ? 'creditCard' : 'cash',
 					balance: current === null ? null : budgetSigned(account.type, current)
 				};
 			})

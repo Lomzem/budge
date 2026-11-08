@@ -33,6 +33,7 @@
 		"check": "bun run codegen:check && bun run format:check && bun run lint && bun run lint:ui && bun run typecheck && bun run test && bun run capacity:check"
 	},
 	"dependencies": {
+		"@fontsource-variable/atkinson-hyperlegible-next": "5.3.0",
 		"convex": "1.48.0",
 		"convex-svelte": "0.15.1",
 		"effect": "4.0.6",

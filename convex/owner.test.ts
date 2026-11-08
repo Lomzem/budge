@@ -67,6 +67,9 @@ function sampleArgs(ids: {
 		'imports:unmatch': { importId },
 		'imports:resolveBankChange': { importId, keep: 'mine' },
 		'bankConnections:list': { now: 0 },
+		'bankConnections:service': {},
+		'bankConnections:connect': {},
+		'bankConnections:finishConnect': { publicToken: 'public-token-synthetic' },
 
 		'bankConnections:syncNow': { connectionId },
 		'bankConnections:reconnect': { connectionId },

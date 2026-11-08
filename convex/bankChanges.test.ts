@@ -104,7 +104,9 @@ async function syncedBudget() {
 				transactionsSync,
 				itemGet: () => Effect.succeed({ consentExpiresAt: null }),
 				accountsGet: () =>
-					Effect.succeed([{ externalId: account, name: 'Sample Checking', balance: null }])
+					Effect.succeed([
+						{ externalId: account, name: 'Sample Checking', kind: 'cash', balance: null }
+					])
 			},
 			syncConnection(connectionId, { refresh: false })
 		);

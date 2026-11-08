@@ -14,6 +14,7 @@ import {
 	type QueryCtx
 } from './_generated/server';
 import { findConnectionAccount, liveLayer, toPublicError } from './bankConnections';
+import { accountKind } from './lib/accountKind';
 import { insertAccount } from './lib/accounts';
 import { applyBankRows, planBankRows, type IncomingRow } from './lib/imports';
 import { requireOwner } from './lib/owner';
@@ -42,6 +43,7 @@ export const list = query({
 			connectionName: v.string(),
 			name: v.union(v.string(), v.null()),
 			mask: v.union(v.string(), v.null()),
+			kind: v.union(accountKind, v.null()),
 			rows: v.number(),
 			moreRows: v.boolean()
 		})
@@ -62,6 +64,7 @@ export const list = query({
 				connectionName: connection.name,
 				name: account.name ?? null,
 				mask: account.mask ?? null,
+				kind: account.state === 'mapped' ? null : (account.kind ?? null),
 				rows: Math.min(rows.length, MAX_COUNTED),
 				moreRows: rows.length > MAX_COUNTED
 			});
@@ -86,7 +89,7 @@ export const createAccount = mutation({
 	args: {
 		connectionAccountId: v.id('connectionAccounts'),
 		name: v.string(),
-		kind: v.union(v.literal('cash'), v.literal('creditCard'))
+		kind: accountKind
 	},
 	returns: v.id('accounts'),
 	handler: async (ctx, { connectionAccountId, name, kind }) => {
@@ -104,12 +107,13 @@ export const ignore = mutation({
 	handler: async (ctx, { connectionAccountId }) => {
 		await requireOwner(ctx);
 		const held = await requireHeld(ctx, connectionAccountId);
-		const { connectionId, externalId, name, mask } = held;
+		const { connectionId, externalId, name, mask, kind } = held;
 		await ctx.db.replace('connectionAccounts', held._id, {
 			connectionId,
 			externalId,
 			...(name === undefined ? {} : { name }),
 			...(mask === undefined ? {} : { mask }),
+			...(kind === undefined ? {} : { kind }),
 			state: 'ignored'
 		});
 		await settleHeld(ctx, held._id);
@@ -183,7 +187,7 @@ export const recordAccounts = internalMutation({
 				`A Bank Connection has at most ${String(MAX_CONNECTION_ACCOUNTS)} Accounts.`
 			);
 		}
-		for (const { externalId, name, mask } of accounts) {
+		for (const { externalId, name, mask, kind } of accounts) {
 			const known = await findConnectionAccount(ctx, connectionId, externalId);
 			if (known === null) {
 				await ctx.db.insert('connectionAccounts', {
@@ -191,10 +195,13 @@ export const recordAccounts = internalMutation({
 					externalId,
 					name,
 					...(mask === undefined ? {} : { mask }),
+					kind,
 					state: 'held'
 				});
-			} else {
+			} else if (known.state === 'mapped') {
 				await ctx.db.patch('connectionAccounts', known._id, { name, mask });
+			} else {
+				await ctx.db.patch('connectionAccounts', known._id, { name, mask, kind });
 			}
 		}
 		const connection = await ctx.db.get('bankConnections', connectionId);

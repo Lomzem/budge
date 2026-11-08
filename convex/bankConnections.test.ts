@@ -1,5 +1,5 @@
 import { Effect, Exit, Layer } from 'effect';
-import { assert, describe, expect, test } from 'vitest';
+import { assert, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { decodeSyncPage, type SyncPage } from '../src/lib/domain/plaid';
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
@@ -33,6 +33,12 @@ const accessToken = 'access-token-synthetic-not-real';
 const itemId = 'item-synthetic-1';
 const externalId = 'account-synthetic-checking';
 const tokenKey = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+
+beforeEach(() => {
+	vi.stubEnv('PLAID_CLIENT_ID', 'client-id-synthetic');
+	vi.stubEnv('PLAID_SECRET', 'secret-synthetic-not-real');
+	vi.stubEnv('BUDGE_TOKEN_KEY', tokenKey);
+});
 
 const page = Effect.runSync(decodeSyncPage(syncPage));
 
@@ -667,7 +673,7 @@ describe('reconnecting a Bank Connection', () => {
 		);
 
 		expect(synced(result)).toEqual({ kind: 'linkToken', linkToken: 'link-token-synthetic-1' });
-		expect(requests).toEqual([{ accessToken, clientUserId: connectionId }]);
+		expect(requests).toEqual([{ mode: 'update', accessToken, clientUserId: connectionId }]);
 	});
 
 	test('a successful sync after Reconnect clears the needed login', async () => {

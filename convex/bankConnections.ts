@@ -3,7 +3,7 @@ import { Effect, Layer, Option } from 'effect';
 
 import { isSyncOverdue, renewalDue } from '../src/lib/domain/freshness';
 import type { PublicError } from '../src/lib/domain/publicError';
-import { internal } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import {
 	action,
@@ -39,10 +39,12 @@ import { requireCutoverDate } from './lib/settings';
 import {
 	applyArgs,
 	applyResult,
+	connectItem,
 	failArgs,
 	leaseResult,
 	LEASE_MS,
 	MAX_SYNC_ROWS,
+	OWNER_CLIENT_USER_ID,
 	reconnectLinkToken,
 	RETRY_DELAYS_MS,
 	saveArgs,
@@ -329,6 +331,64 @@ async function ownerSync(
 	return { kind: 'synced', added: outcome.added, matched: outcome.matched };
 }
 
+export const service = query({
+	args: {},
+	returns: v.object({
+		available: v.boolean(),
+		environment: v.union(v.literal('sandbox'), v.literal('production'))
+	}),
+	handler: async (ctx) => {
+		await requireOwner(ctx);
+		return bankSyncService();
+	}
+});
+
+export const connect = action({
+	args: {},
+	returns: v.object({ linkToken: v.string() }),
+	handler: async (ctx) => {
+		await requireOwner(ctx);
+		requireBankSync();
+		const { cutoverDate } = await ctx.runQuery(api.settings.get, {});
+		if (cutoverDate === null) throw publicError('INVALID_INPUT', 'Set the cutover date first.');
+		const linkToken = await runEffect(
+			PlaidClient.use((plaid) =>
+				plaid.linkTokenCreate({
+					mode: 'create',
+					webhook: plaidWebhookUrl(),
+					clientUserId: OWNER_CLIENT_USER_ID
+				})
+			).pipe(Effect.provide(livePlaid())),
+			toPublicError
+		);
+		return { linkToken };
+	}
+});
+
+function institutionNameOrBank(institutionName: string | undefined) {
+	const name = institutionName?.trim() ?? '';
+	return name === '' ? 'Bank' : name;
+}
+
+export const finishConnect = action({
+	args: { publicToken: v.string(), institutionName: v.optional(v.string()) },
+	returns: v.id('bankConnections'),
+	handler: async (ctx, { publicToken, institutionName }) => {
+		await requireOwner(ctx);
+		requireBankSync();
+		const connectionId = await runEffect(
+			connectItem({
+				name: institutionNameOrBank(institutionName),
+				publicToken,
+				webhook: plaidWebhookUrl()
+			}).pipe(Effect.provide(liveLayer(ctx))),
+			toPublicError
+		);
+		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
+		return connectionId;
+	}
+});
+
 export const setup = internalAction({
 	args: {
 		name: v.string(),
@@ -342,7 +402,7 @@ export const setup = internalAction({
 			setupConnection({
 				...input,
 				accessToken,
-				webhook: `${env.CONVEX_SITE_URL}/plaid/webhook`
+				webhook: plaidWebhookUrl()
 			}).pipe(Effect.provide(liveLayer(ctx))),
 			toPublicError
 		);
@@ -351,11 +411,39 @@ export const setup = internalAction({
 	}
 });
 
+function plaidWebhookUrl() {
+	return `${env.CONVEX_SITE_URL}/plaid/webhook`;
+}
+
+function bankSyncService() {
+	return {
+		available:
+			env.PLAID_CLIENT_ID !== undefined &&
+			env.PLAID_SECRET !== undefined &&
+			env.BUDGE_TOKEN_KEY !== undefined,
+		environment: plaidEnvironment()
+	};
+}
+
+function plaidEnvironment() {
+	return env.BUDGE_PRODUCTION === undefined ? ('sandbox' as const) : ('production' as const);
+}
+
+const syncUnavailable = {
+	code: 'BANK_SYNC_UNAVAILABLE',
+	message: "Bank sync isn't set up on this server."
+} as const satisfies PublicError;
+
+function requireBankSync() {
+	if (!bankSyncService().available)
+		throw publicError(syncUnavailable.code, syncUnavailable.message);
+}
+
 function livePlaid() {
 	return PlaidClient.layerLive({
 		clientId: env.PLAID_CLIENT_ID,
 		secret: env.PLAID_SECRET,
-		environment: env.BUDGE_PRODUCTION === undefined ? 'sandbox' : 'production'
+		environment: plaidEnvironment()
 	});
 }
 
@@ -388,6 +476,7 @@ const needsLogin = {
 
 export function toPublicError(error: SyncError): PublicError {
 	if (failureOf(error).status === 'needsAttention') return needsLogin;
+	if (!bankSyncService().available) return syncUnavailable;
 	return { code: 'BANK_UNAVAILABLE', message: "Couldn't reach the bank; try again later." };
 }
 
