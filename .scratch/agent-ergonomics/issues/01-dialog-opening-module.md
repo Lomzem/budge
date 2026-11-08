@@ -96,3 +96,9 @@ Three runs, each from a fresh read of `~/.agents/principles/README.md`, with eve
   - prove-it-works: the correction was re-verified on the running app by the full E2E suite, not by typecheck alone.
   - sequence-verifiable-units: the correction is its own commit on top of a green head, and it ends green.
   - No further changes.
+
+- Spec review (Sol, `3915087...c84a13f`): four findings, all answered without code changes. Each was checked against the code at `3915087`.
+  1. **Add Category keeps the pending opening on reopen.** `reset()` returns while saving, and `main` did the same (`if (saving) return;`). Reopening during a save shows the same form with the same save in flight, so that save's result belongs to it. It is not a newer opening.
+  2. **Export resumes its busy opening the same way.** `main` behaved identically: `busy` blocked a fresh start, and the result landed in the dialog it was started in. `downloading` is set inside the work because the beforeunload guard must cover the download even when the dialog is closed.
+  3. **Reconnect delivers its result by Bank Connection id, outside `run`.** This is intentional and unchanged from `main` (commit `dcfe57e`, "Reconnect results wait for their Bank Connection"). The reconnect flow dismisses the dialog for the bank's window, and its result belongs to the Bank Connection, not to an opening. If no dialog shows that connection, the result is queued in `unseenReconnectResults`. So the acceptance line "no async dialog applies a result without the opening module" has this one deliberate exception.
+  4. **A failed `goto` after adding an Account is no longer caught.** On `main`, the error was written to an already-closed dialog (`open = false` came before `goto`), and the `$effect` cleared it on the next open, so the user never saw it. It is still invisible to the user now; it only shows in the console as an unhandled rejection, which keeps the failure diagnosable.
