@@ -10,19 +10,28 @@ Inspect a Category, move Assigned between jobs, and cover Overspending from Read
 
 ## How to get to it (user POV)
 
-- Budget → Category-name button; Overspending section → Category or Cover action when offered.
+- Budget table → Category-name button. The Overspent list has no buttons; open the Category in the table, then use Cover in its inspector.
 
 ## Driving it with Playwright
+
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/inspector.ts`, also run by `bun run test:e2e:local`):
+
+- `inspector/move-money`: `inspect-open` and `move-money` by keyboard, and the inspector under its row at 320 px.
+
+The recipes below cover what the journeys leave out.
 
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
 
-- **Inspect:** focus `getByRole("button", { name: "Groceries", exact: true })`, press Enter; require `getByRole("region", { name: "Groceries", exact: true })` focused and Left over from last month visible. Escape/Close Groceries must restore focus. Repeat at 320 px, region must be inside the selected row.
+- **Inspect:** focus `getByRole("button", { name: "Groceries", exact: true })`, press Enter; require `getByRole("region", { name: "Groceries", exact: true })` visible and Left over from last month visible; opening auto-focuses the region only at widths ≥1024 px. Escape from inside the region or Close Groceries must restore focus. Repeat at 320 px, region must be inside the selected row; opening leaves focus on the Category-name button.
 - **Move:** record Assigned for Groceries/Coffee and Ready to Assign; in region check `Move to`, select `To Category` option beginning Coffee, fill Amount 10.00, submit `Move money`. Require Assigned −$10/+ $10 and Ready to Assign unchanged; reload and reopen. Choose Take from / From Category to reverse and verify.
 - **Cover:** create an invented outflow large enough to overspend an ordinary Cash Category using Transaction UI; select it on Budget. Click its `Cover $… from Ready to Assign` action (inspect actual amount in ARIA). Require Available exactly zero, Assigned increased by deficit and Ready to Assign decreased by deficit; reload.
 
 ## Gotchas
 
+- **Manual drive:** check the Target surface on ordinary Categories (Add/Edit Target, progress and Assign when needed) and `Card payment` on Credit Card Payment Categories.
+- **Manual drive:** To Category/From Category include Hidden Categories and exclude the current Category. Zero, negative or invalid Amount shows `Enter an amount above zero, such as 25.00.`; a positive move may make the source Assigned negative while preserving Ready to Assign.
+
 - Cover requires actual negative Available; if fixture has no negative Category create Overspending via UI or report blocked, not passed by opening an inspector.
-- Sources: ticket 07; `e2e/inspector.test.ts`; public `budget.moveMoney/cover/month`.
+- Sources: ticket 07; public `budget.moveMoney/cover/month`.

@@ -2,26 +2,24 @@
 	import { useMutation } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	let {
 		open = $bindable(false),
-		saving = $bindable(false),
 		kind,
 		groups
 	}: {
 		open?: boolean;
 
-		saving?: boolean;
-
 		kind: 'group' | 'category';
 		groups: readonly { id: Id<'categoryGroups'>; name: string }[];
 	} = $props();
 
+	const dialog = new DialogSession();
 	const createGroup = useMutation(api.categories.createGroup);
 	const createCategory = useMutation(api.categories.create);
 
@@ -30,8 +28,12 @@
 	let error = $state('');
 	const title = $derived(kind === 'group' ? 'Add Category Group' : 'Add Category');
 
+	export function saving() {
+		return dialog.pending('save');
+	}
+
 	export function reset() {
-		if (saving) return;
+		if (!dialog.openOrResume({}, 'save')) return;
 		name = '';
 		error = '';
 		groupId = groups[0]?.id ?? '';
@@ -44,12 +46,10 @@
 			error = 'Pick a Category Group.';
 			return;
 		}
-		saving = true;
-		const added = await attempt(async () => {
+		const added = await dialog.run('save', async () => {
 			if (kind === 'group') await createGroup({ name });
 			else if (group) await createCategory({ groupId: group.id, name });
 		});
-		saving = false;
 		if (added.ok) {
 			open = false;
 			return;
@@ -88,7 +88,7 @@
 				<p role="alert" class="text-sm text-destructive">{error}</p>
 			{/if}
 			<Dialog.Footer>
-				<Button type="submit" disabled={saving}>Add</Button>
+				<Button type="submit" disabled={saving()}>Add</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

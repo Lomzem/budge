@@ -2,7 +2,7 @@ import { afterEach, assert, describe, expect, test, vi } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { makeLegacyStartingBalance, newBackend, useOwnerEnv } from './test.helper';
+import { makeLegacyStartingBalance, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -11,19 +11,11 @@ afterEach(() => {
 });
 
 async function budgetWithCard() {
-	const backend = newBackend();
+	const backend = await startBudget({
+		accounts: { Checking: ['cash', 300_000], Discover: ['creditCard', -20_000] }
+	});
 	const { owner } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-	await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 300_000
-	});
-	const card = await owner.mutation(api.accounts.create, {
-		name: 'Discover',
-		kind: 'creditCard',
-		startingBalance: -20_000
-	});
+	const { Discover: card } = backend.accounts;
 	await owner.mutation(api.transactions.create, {
 		accountId: card,
 		date: '2026-08-05',
@@ -169,19 +161,11 @@ describe('backfilling Payment Categories', () => {
 
 describe('backfilling the Starting Balance kind', () => {
 	async function legacyBudget() {
-		const backend = newBackend();
+		const backend = await startBudget({
+			accounts: { Checking: ['cash', 300_000], Discover: ['creditCard', -20_000] }
+		});
 		const { owner, t } = backend;
-		await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-		const checking = await owner.mutation(api.accounts.create, {
-			name: 'Checking',
-			kind: 'cash',
-			startingBalance: 300_000
-		});
-		const card = await owner.mutation(api.accounts.create, {
-			name: 'Discover',
-			kind: 'creditCard',
-			startingBalance: -20_000
-		});
+		const { Checking: checking, Discover: card } = backend.accounts;
 		const rows = async (accountId: Id<'accounts'>) =>
 			(
 				await owner.query(api.transactions.list, {

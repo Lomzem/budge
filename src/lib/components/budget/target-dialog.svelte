@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
-	import { attempt } from '$lib/attempt';
 	import { getBudgetMonth } from '$lib/budget.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Checkbox } from '$lib/components/ui/checkbox';
@@ -8,6 +7,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { isRepeatInterval, MAX_REPEAT_MONTHS } from '$lib/domain/budget';
 	import { isIsoDate, ordinal } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
@@ -34,9 +34,10 @@
 	let repeats = $state(false);
 	let everyMonths = $state('12');
 	let error = $state('');
-	let saving = $state(false);
+	const dialog = new DialogSession();
 
 	export function reset() {
+		dialog.open({});
 		const target = category.target;
 		kind = target?.kind ?? 'monthly';
 		amount = target === null ? '' : formatCents(target.amount).replace('$', '');
@@ -66,9 +67,7 @@
 	}
 
 	async function save(target: TargetDefinition | null) {
-		saving = true;
-		const saved = await attempt(() => budget.setTarget(category.id, target));
-		saving = false;
+		const saved = await dialog.run('save', () => budget.setTarget(category.id, target));
 		if (saved.ok) open = false;
 		else error = saved.error?.message ?? "Budge couldn't save the Target. Try again.";
 	}
@@ -175,14 +174,14 @@
 					<Button
 						type="button"
 						variant="outline"
-						disabled={saving}
+						disabled={dialog.pending('save')}
 						onclick={() => {
 							error = '';
 							void save(null);
 						}}>Remove Target</Button
 					>
 				{/if}
-				<Button type="submit" disabled={saving}>Save</Button>
+				<Button type="submit" disabled={dialog.pending('save')}>Save</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

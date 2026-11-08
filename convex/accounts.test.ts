@@ -2,19 +2,19 @@ import { assert, describe, expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { makeLegacyStartingBalance, newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
+import {
+	makeLegacyStartingBalance,
+	newBackend,
+	publicErrorCode,
+	startBudget,
+	useOwnerEnv
+} from './test.helper';
 
 useOwnerEnv();
 
-async function backendWithCutover() {
-	const backend = newBackend();
-	await backend.owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-	return backend;
-}
-
 describe('creating an Account', () => {
 	test('lists it with its starting balance', async () => {
-		const { owner } = await backendWithCutover();
+		const { owner } = await startBudget();
 
 		await owner.mutation(api.accounts.create, {
 			name: 'Checking',
@@ -34,7 +34,7 @@ describe('creating an Account', () => {
 	});
 
 	test('records the starting balance as a Cleared Transaction on the cutover date', async () => {
-		const { owner } = await backendWithCutover();
+		const { owner } = await startBudget();
 
 		const accountId = await owner.mutation(api.accounts.create, {
 			name: 'Checking',
@@ -65,7 +65,7 @@ describe('creating an Account', () => {
 		['a blank name', { name: '  ', startingBalance: 0 }],
 		['a fractional starting balance', { name: 'Checking', startingBalance: 10.5 }]
 	])('rejects %s', async (_, args) => {
-		const { owner } = await backendWithCutover();
+		const { owner } = await startBudget();
 
 		expect(
 			await publicErrorCode(owner.mutation(api.accounts.create, { kind: 'cash', ...args }))
@@ -75,7 +75,7 @@ describe('creating an Account', () => {
 
 describe('renaming and reordering Accounts', () => {
 	test('changes how the sidebar reads', async () => {
-		const { owner } = await backendWithCutover();
+		const { owner } = await startBudget();
 		const create = (name: string) =>
 			owner.mutation(api.accounts.create, { name, kind: 'cash', startingBalance: 0 });
 		const checking = await create('Checking');
@@ -90,7 +90,7 @@ describe('renaming and reordering Accounts', () => {
 	});
 
 	test('reordering must name every Account once', async () => {
-		const { owner } = await backendWithCutover();
+		const { owner } = await startBudget();
 		const create = (name: string) =>
 			owner.mutation(api.accounts.create, { name, kind: 'cash', startingBalance: 0 });
 		const checking = await create('Checking');
@@ -109,19 +109,12 @@ describe('renaming and reordering Accounts', () => {
 
 describe("changing an Account's starting balance", () => {
 	async function checkingWithStartingBalance() {
-		const backend = await backendWithCutover();
-		const accountId = await backend.owner.mutation(api.accounts.create, {
-			name: 'Checking',
-			kind: 'cash',
-			startingBalance: 250_000
+		const backend = await startBudget({
+			accounts: { Checking: ['cash', 250_000] },
+			groups: { Everyday: ['Groceries'] }
 		});
-		const everyday = await backend.owner.mutation(api.categories.createGroup, {
-			name: 'Everyday'
-		});
-		const groceries = await backend.owner.mutation(api.categories.create, {
-			groupId: everyday,
-			name: 'Groceries'
-		});
+		const { Checking: accountId } = backend.accounts;
+		const { Groceries: groceries } = backend.categories;
 		const rows = async () =>
 			(
 				await backend.owner.query(api.transactions.list, {

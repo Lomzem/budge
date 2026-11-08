@@ -1,0 +1,112 @@
+# 01: One dialog opening module for every async dialog
+
+**Status:** done
+
+**Spec:** [Agent ergonomics](../spec.md), scope 1
+
+**Blocked by:** None
+
+## Problem
+
+`src/lib/dialogSession.svelte.ts` (`DialogSession`) is the documented guard: an async result lands only in the opening that started it. Only 4 dialogs use it: the Starting Balance on `src/routes/(app)/accounts/[accountId]/+page.svelte`, `shell/bank-connections.svelte`, `shell/held-accounts.svelte`, and `transactions/transaction-dialog.svelte`. About 10 async dialogs have no guard: account-dialog, reconcile-dialog, rename-account-dialog, add-category-dialog, target-dialog, delete-group-dialog, delete-category-dialog, export-dialog, and starting-balance-step. Two more roll their own:
+
+- `categories/rename-dialog.svelte` guards by target id (`openFor() !== item.id`) and clears `saving` before the check. If you dismiss and reopen the same item, the old result lands. This is a live bug.
+- `transactions/import-dialog.svelte` uses `let session = 0` counters.
+
+The mistake has been corrected at least 5 times.
+
+## What to build
+
+- Deepen `DialogSession` so the opening also owns its pending operation: start it, track pending state, and deliver its result or publicError only to the opening that started it. A dialog must not be able to write a late result into a newer opening.
+- Migrate every async dialog to it, then delete the hand-rolled counters, the id checks, and any old interface member nothing uses.
+- Fix the rename-dialog bug through the migration, and prove it with a delayed-response E2E (`e2e/heldResponse.ts`). The proof must fail before the fix.
+- Update the AGENTS.md rule wording in the ticket comments (the coordinator edits AGENTS.md).
+
+## Acceptance
+
+- [x] No async dialog applies a mutation or action result without going through the opening module (grep proof in the comments).
+- [x] The rename dialog's stale-result regression fails before the fix and passes after it.
+- [x] Existing delayed-response E2E and dialog E2E specs pass; `bun run check` passes.
+- [x] The verify-budge feature files that cite the changed dialogs still describe them correctly.
+
+## Comments
+
+Implemented in `b9de9c4` on `ergo/a-dialogs-editor`.
+
+**Decisions**
+
+- `DialogSession<Opening, Operation>` owns each opening's pending work. `open(opening)` starts an opening, `pending(operation)` reports the current opening's pending state, and `run(operation, work)` returns the `Attempt` only to the latest run of that operation in the opening that started it. Any other run never settles, so the code after `await` (close, goto, error text) cannot touch a newer opening. `current`, `close` and `dismiss` keep their meaning.
+- Each run is counted per operation, not per opening, because the import dialog can read a second file while the first is still being read. The last file chosen wins, as the old `session` counter did. Every other dialog disables its control while the run is pending.
+- Migrated: account, reconcile, rename-account, starting-balance-step (`suggest`, `confirm`), add-category, target, delete-category, delete-group, rename-category, export (`export`), import (`read`, `save`), held-accounts, bank-connections (`sync`), and transaction (`write`). Deleted: rename-dialog's `openFor()` id check, import-dialog's `session`/read counters, the `TookTheDialogOver` guards, and add-category's `bind:saving` (pages call the exported `saving()`).
+- account-dialog navigates to the new Account only after a landed result. A `goto` rejection is no longer turned into an Add error. Flagged below.
+- The remaining direct `attempt` callers are not dialogs: account reorder on the Account page, Category moves on the Categories page, Bank Connection reconnect (routed by connection), cutover date, the transaction table's Cleared/Approve, the Category inspector, and the Assigned input.
+
+**Grep proof** (every `.svelte` file with a `Dialog.Root`/`AlertDialog.Root`/`DialogSession` and a mutation or action):
+
+```
+bank-connections run=1 attempt=0     held-accounts run=1 attempt=0
+export-dialog run=1 attempt=0        rename-account-dialog run=1 attempt=0
+account-dialog run=1 attempt=0       starting-balance-step run=2 attempt=0
+reconcile-dialog run=1 attempt=0     add-category-dialog run=1 attempt=0
+import-dialog run=2 attempt=0        transaction-dialog run=1 attempt=0
+delete-group-dialog run=1 attempt=0  delete-category-dialog run=1 attempt=0
+rename-dialog run=1 attempt=0
+```
+
+`target-dialog` saves through `budget.setTarget` inside `dialog.run('save', …)`. `grep -rnE "openFor|TookTheDialogOver|bind:saving|let session = 0" src` finds nothing.
+
+**Proposed AGENTS.md row** (replaces the current DialogSession row): "An async dialog result lands only in the latest run of its operation in the opening that started it, and its pending state belongs to that opening." | `DialogSession.run`/`pending` in `src/lib/dialogSession.svelte.ts`; no dialog calls `attempt` directly; the delayed-response E2E in `e2e/categories.test.ts` and the others built on `e2e/heldResponse.ts`.
+
+**Test-audit gate:** `e2e/categories.test.ts` › "a rename that finishes after its dialog closed leaves the reopened dialog alone"
+
+1. The protected behavior: a rename result that arrives after Escape does not close, error or disable the reopened Rename dialog for the same Category.
+2. The regression it catches: rename-dialog's old id check (`openFor() !== item.id`) passes when the same Category is reopened, so the late result closed the new opening.
+3. Existing proofs miss it because the other delayed-response tests cover the transaction, starting-balance and import dialogs, and none covers rename's same-target reopen. DialogSession can't be unit-tested: the `lib` vitest project has no Svelte plugin to compile runes. The browser is the only boundary that exercises it.
+4. No test-only seam: it holds the real `categories:rename` mutation response through the existing `e2e/heldResponse.ts`.
+
+**Checks**
+
+- Fail before the fix (new test on the unfixed dialog): `timeout 590 bun run test:e2e:local e2e/categories.test.ts` gave 1 failed and 1 passed. The new test failed at `toHaveAttribute('data-state', 'open')` and received `"closed"`.
+- Pass after: the same command gave 2 passed (24.9s).
+- `bun run check` with the app up: exit 0, 50 files and 687 tests, capacity ok.
+- Full suite, `timeout 1700 bun run test:e2e:local`: 33 passed (4.0m). The Clerk "FAPI request failed … Test ended" lines are teardown noise.
+- After the import last-file-wins fix: lint and typecheck ok. `bun run test:e2e:local` on categories, import, export, bank-connections, starting-balance and held-accounts gave 12 passed (1.8m).
+- verify-budge (`budget-with-accounts`): Add Category from Budget persisted after a reload. The held `categories:rename` with Escape and a reopen left the reopened dialog open with the old Name, Save enabled and no alert, and the rename applied. A second-opening save persisted. Evidence: `test-results/verify-budge/ergo-01-dialogs-20261107-192743-retry/` (assertions.txt reads `RESULT pass`). The first attempt's driver picked the Credit Card Payments group, and that evidence is kept beside the retry.
+- verify-budge feature map: `categories.md` gained the late-rename journey and the Add Category group gotcha. The other feature files that cite the migrated dialogs (accounts, reconciliation, targets, import, export, bank-connections, starting-balance) describe unchanged user journeys.
+- Review: the `code-review` skill was not run because it spawns sub-agents, which this run's brief forbids. An inline self-review of the diff found the lost import last-file-wins behavior, fixed by per-operation run counts.
+
+**Open**
+
+- `bun run app doctor` reports `FAIL convex/_generated is fresh: stale api.d.ts`. This predates the branch: it shows on a clean tree at `62830be`.
+- account-dialog: a rejected `goto` after a successful add is now unhandled rather than shown as an Add error.
+
+
+**Principles**
+
+Three runs, each from a fresh read of `~/.agents/principles/README.md`, with every matching reference read in full.
+
+- Run 1 (against the work already done): laziness-protocol, foundational-thinking, redesign-from-first-principles, subtract-before-you-add, minimize-reader-load, outcome-oriented-execution, model-the-domain, boundary-discipline, type-system-discipline, migrate-callers-then-delete-legacy-apis, separate-before-serializing-shared-state, fix-root-causes, sequence-verifiable-units, prove-it-works, test-behavior-not-implementation, explain-the-number, encode-lessons-in-structure, build-the-lever.
+  - fix-root-causes: the rename bug was a per-dialog target-id guard, so the fix went into the shared opening rather than into rename alone. Every async dialog now runs its work through `DialogSession.run`.
+  - separate-before-serializing-shared-state: each opening owns its own Live record (`pending`, `started`), so a late result checks its opening and run rather than a shared counter. This is also why last-file-wins import is per operation.
+  - migrate-callers-then-delete-legacy-apis and subtract-before-you-add: every dialog moved over in one change, and the hand-rolled `session` counters, target-id guards and dialog-level `attempt` calls were deleted.
+  - **Correction from this run:** subtract-before-you-add and minimize-reader-load. `DialogSession.open` still returned the opening, as it did at `62830be`, but none of its 15 callers use that value. It now returns nothing, and the Live record is proxied by the `$state` field it is assigned to. After the change: `bun run check` (app up) exit 0, and the full `timeout 590 bun run test:e2e:local` passed 33 tests (4.3m).
+  - encode-lessons-in-structure: the rule lives in the API, since a stale `run` never settles. The proposed AGENTS row names `DialogSession` and the held-response E2E. A lint that bars a dialog from importing `$lib/attempt` would encode it further. That is a lint-rule change, which AGENTS.md sends to `main`, so it is proposed rather than made here.
+- Run 2 (before writing or changing tests): test-behavior-not-implementation. The correction changes no tests. The held-rename E2E asserts what a user sees (the reopened dialog keeps the old Name, shows no alert and leaves Save enabled), so it survived the `open` change to the internals unchanged.
+- Run 3 (before calling the ticket done): prove-it-works, sequence-verifiable-units, test-behavior-not-implementation, explain-the-number, encode-lessons-in-structure.
+  - prove-it-works: the correction was re-verified on the running app by the full E2E suite, not by typecheck alone.
+  - sequence-verifiable-units: the correction is its own commit on top of a green head, and it ends green.
+  - No further changes.
+
+- Spec review (Sol, `3915087...c84a13f`): four findings, all answered without code changes. Each was checked against the code at `3915087`.
+  1. **Add Category keeps the pending opening on reopen.** `reset()` returns while saving, and `main` did the same (`if (saving) return;`). Reopening during a save shows the same form with the same save in flight, so that save's result belongs to it. It is not a newer opening.
+  2. **Export resumes its busy opening the same way.** `main` behaved identically: `busy` blocked a fresh start, and the result landed in the dialog it was started in. `downloading` is set inside the work because the beforeunload guard must cover the download even when the dialog is closed.
+  3. **Reconnect delivers its result by Bank Connection id, outside `run`.** This is intentional and unchanged from `main` (commit `dcfe57e`, "Reconnect results wait for their Bank Connection"). The reconnect flow dismisses the dialog for the bank's window, and its result belongs to the Bank Connection, not to an opening. If no dialog shows that connection, the result is queued in `unseenReconnectResults`. So the acceptance line "no async dialog applies a result without the opening module" has this one deliberate exception.
+  4. **A failed `goto` after adding an Account is no longer caught.** On `main`, the error was written to an already-closed dialog (`open = false` came before `goto`), and the `$effect` cleared it on the next open, so the user never saw it. It is still invisible to the user now; it only shows in the console as an unhandled rejection, which keeps the failure diagnosable.
+- Standards review (Sol, same range): the reviewer raised Add Category, Export, and the Account `goto` as well. My call:
+  - **Resume on reopen is kept.** It is `main`'s behavior, and the spec forbids changing behavior. Both reviewers misread it as an accident, so it is now named in the interface: `DialogSession.openOrResume(opening, operation)` replaces the two hand-written `if (pending) return; open()` checks, and the AGENTS.md dialog row states the rule.
+  - **A failed `goto` now falls back** to `location.assign` of the new Account's page. The Account exists either way, so recovery opens it without creating it again.
+- Re-decided on merit after the user allowed behavior changes that improve the product:
+  - **Resume on reopen stays.** A Convex mutation can't be cancelled, so the save keeps running after a dismissal. Showing a fresh form would hide the pending save and invite a duplicate Category. Resuming shows the honest state.
+  - **Export resumes the same way.** The owner asked for the download, and it finishes either way.
+  - **The reconnect result still belongs to its Bank Connection.**
+  - The Account navigation fallback is the one deliberate improvement.

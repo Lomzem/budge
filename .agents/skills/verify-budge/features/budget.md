@@ -10,7 +10,7 @@ Give money a job by editing a Category's Assigned amount and see Ready to Assign
 - `budget-month`: next then previous month preserves the original month's Assigned; Ready to Assign is global.
 - `budget-mobile`: 320 px entry and Assigned control remain usable without page overflow.
 - `budget-negative`: assigning more than Ready to Assign shows the negative Ready to Assign warning.
-- `budget-groups`: each Category Group header row totals its Categories' Assigned, Activity and Available.
+- `budget-groups`: each Category Group header row totals its shown and Hidden Categories' Assigned, Activity and Available.
 - `budget-carry`: a Category's Available rolls forward into the next month.
 - `budget-review-links`: the Uncategorized and Unapproved counts link into All Accounts.
 
@@ -23,26 +23,25 @@ Give money a job by editing a Category's Assigned amount and see Ready to Assign
 
 ## Driving it with Playwright
 
-Preconditions:
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the sources are `e2e/journeys/budget.ts` and `e2e/journeys/shell.ts`, also run by `bun run test:e2e:local`):
 
-- Baseline fixture and authenticated `page`; start in the current month.
-- Run `.agents/skills/verify-budge/features/prove-budget.sh .local-app/storage-state.json` for this entire recipe and retained evidence.
+- `budget/assign`: `budget-assign`, `budget-persist`, `budget-month` in the current month.
+- See also `shell/navigate` in [shell.md](shell.md): `budget-entry` and phone navigation/overflow only; phone Assigned editing needs a manual drive.
 
-- **Entry:** `await page.goto('/')`; require the `Budget` H1 and `getByRole('textbox', { name: 'Assigned for Groceries' })`.
-- **Assign:** record that textbox's amount and `getByTestId('ready-to-assign')` in cents. Fill Assigned with the previous amount plus 10 dollars, capture the draft, then `press('Enter')`. Require Assigned +1000 cents and Ready to Assign −1000 cents. Capture saved state.
-- **Persist:** `await page.reload()`; require both changed amounts again.
-- **Month:** click `getByRole('button', { name: 'Next month', exact: true })`; wait for the month label to change and Ready to Assign to remain the changed amount. Click `Previous month`; require the original month and changed assignment.
-- **Sidebar:** `await page.goto('/accounts')`; choose `getByRole('navigation', { name: 'Budget and Accounts' }).getByRole('link', { name: 'Budget', exact: true })`; require the Budget heading and saved assignment.
-- **Phone:** set 320×640, navigate `/accounts`, click `getByRole('button', { name: 'View All Accounts', exact: true })`, then `getByRole('menuitem', { name: 'Budget', exact: true })`. Require Budget and the saved Assigned value; assert `document.documentElement.scrollWidth <= window.innerWidth` and capture.
-- **Restore:** fill the original Assigned amount, press Enter, and assert original Ready to Assign. Retain evidence before teardown.
+Preconditions for the manual recipes: baseline fixture and authenticated `page`; start in the current month at `/`, with the `Budget` H1 and `getByRole('textbox', { name: 'Assigned for Groceries' })`.
+
 - **Negative warning (manual):** fill Groceries Assigned with Ready to Assign plus $1 more than its current amount and press Enter. Require `getByRole('status').filter({ hasText: 'Ready to Assign is negative' })` naming $1.00 over. Restore and require the warning gone.
-- **Group totals (manual):** scope `getByRole('rowgroup').filter({ hasText: 'Credit Card Payments' })` style per group; require its header row's Assigned, Activity (desktop only) and Available to equal the sum of its Category rows. Change one Assigned and require the header total to move by the same amount.
+- **Group totals (manual):** scope `getByRole('rowgroup').filter({ hasText: 'Credit Card Payments' })` style per group; require its header row's Assigned, Activity (desktop only) and Available to equal the sum of all its Categories, including Hidden Categories outside the table. Change one Assigned and require the header total to move by the same amount.
 - **Carry-forward (manual):** record Groceries Available, click `Next month`, and require next month's Available to start from that amount plus next month's Assigned and Activity.
 - **Review links (manual):** on the seeded Budget, require the `Transaction(s) need a Category` and `… Unapproved` links when the fixture has such rows; click each and require the All Accounts heading. If the fixture has none, the link is absent by design: record the journey as blocked by fixture, not passed.
 
 ## Gotchas
 
+- **Manual drive:** at 320 px edit `Assigned for Groceries`; blur and Enter each save, Escape cancels, and invalid text shows alert `Enter an amount, such as 120.00.` without changing the saved amount. Reload to prove persistence.
+- **Manual drive:** navigate back to the cutover month and require `Previous month` disabled. With suitable Transactions and hidden Categories, verify `includes … Uncategorized`, the `Overspent` list and its `Overspent by …` amounts, and `Hidden Categories` with Available amounts. These lists have no Category-opening buttons.
+
 - The month is context state and may reset on reload; the recipe edits the current month.
 - Ready to Assign is global, including future assignments. Do not assert it equals only this month's income.
 - Wait for reactive controls and persisted values; a changed input by itself proves only a draft.
-- Targets, money moves, and Cover have separate recipes in `e2e/targets.test.ts` and `e2e/inspector.test.ts`; this file's pass does not claim those paths.
+- See also `targets/monthly` in [targets.md](targets.md) and `inspector/move-money` in [inspector.md](inspector.md); these are cross-references, not Budget journey coverage.
+- Sources: ticket 05; public `budget.month/setAssigned`.

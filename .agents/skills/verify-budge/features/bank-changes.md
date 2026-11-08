@@ -11,11 +11,16 @@ Keep approved or edited Transactions safe when the bank changes history, while a
 
 ## How to get to it (user POV)
 
-- Account page (sidebar `Budget and Accounts` → `Checking`) → Transaction row with a `Bank changed this` or `Bank removed this` line under its Payee.
+- All Accounts (`/accounts`) or Account page (sidebar `Budget and Accounts` → `Checking`) → Transaction row with a `Bank changed this` or `Bank removed this` line under its Payee.
 - Click the row's Payee button → dialog `Edit Transaction` → `Bank Text` section → `Use the bank's version` / `Delete it` / `Keep mine`.
 - `Delete it` opens alert dialog `Delete this Transaction too?` (`Delete this Transfer too?` for a Transfer) → `Delete`.
 
 ## Driving it with Playwright
+
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/bank-changes.ts`, also run by `bun run test:e2e:local`):
+
+- `bank-changes/take-the-banks`: `bank-resolve` by taking the bank's version of both flagged rows.
+- `bank-changes/keep-mine`: `bank-resolve` by keeping mine on both.
 
 Preconditions:
 
@@ -32,13 +37,16 @@ The fixture syncs Sample Credit Union twice through the production sync mutation
 | SAMPLE STREAMING 4410     | memo edited, approved | removed         | −$9.91, memo kept, `Bank removed this` |
 
 - **Quiet (`bank-quiet`):** require the pet row's amount −$19.02 and button name containing `Unapproved`, and no button `/^SAMPLE CAR WASH 0904/`. Neither row carries a flag.
-- **Take the bank's (`bank-resolve`):** open SAMPLE GARDEN CENTER 7720; require text `/^Bank changed this: .44\.75 on /`; click `Use the bank's version`; require the dialog hidden, the row −$44.75 and no flag. Open SAMPLE STREAMING 4410; require `Bank removed this.`; click `Delete it`, then `Delete` in `Delete this Transaction too?`; require the row gone. Check the Account balance moved by −$4.75 and +$9.91 and reload to prove persistence.
-- **Keep mine (`bank-resolve`, separate seed):** click `Keep mine` on both; require GARDEN still −$40.00, STREAMING still present with memo `Shared family plan`, both flags gone after reload, and the balance unchanged.
+- **Take the bank's (beyond `bank-changes/take-the-banks`):** check the Account balance moved by −$4.75 and +$9.91 and reload to prove persistence.
+- **Keep mine (beyond `bank-changes/keep-mine`):** require both flags gone after reload and the balance unchanged.
 - At 320×640 the flag stays under the Payee, with the date, Category and Account lines (the Date, Category, Memo and Approve columns drop away). Click the Payee to open the dialog at that width.
-- **Many Bank Rows (`bank-many-rows`):** no fixture has more than ten Bank Rows on one Transaction. Only held-Account mapping Matches another feed into a cleared imported Transaction, so build the precondition setup-only with a temporary internal mutation (never committed) after seeding `bank-sync`: save a manual Checking Transaction, then for each of twelve feeds on one new connection record the Account, sync one matching row, map it to Checking and run `internal.heldAccounts.settle`; finally sync a modification of the last feed. Give the last feed distinct Bank Text. Require the row flagged, the dialog listing ten Bank Text entries, the flagged row first with its `Bank changed this` line, and the statement above; `Keep mine` clears the flag after reload; searching the last feed's distinct Bank Text finds the Transaction. Delete the module and restore `convex/_generated` afterwards.
+- **Many Bank Rows (`bank-many-rows`):** no fixture has more than ten Bank Rows on one Transaction. Held-Account mapping and file imports can Match a Plaid-backed Cleared Transaction. For this many-feed recipe, build the precondition setup-only with a temporary internal mutation (never committed) after seeding `bank-sync`: save a manual Checking Transaction, then for each of twelve feeds on one new connection record the Account, sync one matching row, map it to Checking and run `internal.heldAccounts.settle`; finally sync a modification of the last feed. Give the last feed distinct Bank Text. Require the row flagged, the dialog listing ten Bank Text entries, the flagged row first with its `Bank changed this` line, and the statement above; `Keep mine` clears the flag after reload; searching the last feed's distinct Bank Text finds the Transaction. Delete the module and restore `convex/_generated` afterwards.
 
 ## Gotchas
 
-- `e2e/bank-changes.test.ts` owns both resolution journeys; `convex/bankChanges.test.ts` owns sync and resolution semantics (edited versus untouched, Transfers, reconciled rows). Drive the UI here; do not reassert backend states.
+- **Manual drive:** resolve flagged rows from All Accounts as well as a named Account. File imports can Match Plaid-backed Transactions too.
+- **Manual drive:** taking a bank amount that differs from a Split Transaction’s total is rejected with guidance to edit its lines first, then keep your version. Bank removal cannot delete a Transaction or Transfer while another Bank Row still backs either side; require the alert and unchanged balances.
+
+- `convex/bankChanges.test.ts` owns sync and resolution semantics (edited versus untouched, Transfers, reconciled rows). Drive the UI here; do not reassert backend states.
 - The fixture's bank login token never decrypts, so Sync now and Reconnect on these connections fail with `Couldn't reach the bank; try again later.` That is expected and does not block these journeys.
 - Sources: tickets 19, 21; `convex/seedBankSync.ts`; public `imports.resolveBankChange`; `bankRowsShown` in `convex/lib/transactionRows.ts`.

@@ -34,7 +34,6 @@ import type * as lib_plaidClient from "../lib/plaidClient.js";
 import type * as lib_plaidWebhook from "../lib/plaidWebhook.js";
 import type * as lib_publicError from "../lib/publicError.js";
 import type * as lib_runEffect from "../lib/runEffect.js";
-import type * as lib_search from "../lib/search.js";
 import type * as lib_settings from "../lib/settings.js";
 import type * as lib_sync from "../lib/sync.js";
 import type * as lib_syncFailure from "../lib/syncFailure.js";
@@ -82,7 +81,6 @@ declare const fullApi: ApiFromModules<{
   "lib/plaidWebhook": typeof lib_plaidWebhook;
   "lib/publicError": typeof lib_publicError;
   "lib/runEffect": typeof lib_runEffect;
-  "lib/search": typeof lib_search;
   "lib/settings": typeof lib_settings;
   "lib/sync": typeof lib_sync;
   "lib/syncFailure": typeof lib_syncFailure;

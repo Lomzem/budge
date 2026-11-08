@@ -32,12 +32,15 @@
 	let adding: 'group' | 'category' = $state('group');
 	let addingOpen = $state(false);
 
-	let addingSaving = $state(false);
-	let addDialog: { reset: () => void } | undefined = $state();
+	let addDialog: { reset: () => void; saving: () => boolean } | undefined = $state();
 
 	const view = $derived(budget.view);
 	const readyToAssign = $derived(budget.readyToAssign);
-	const groups = $derived(view?.groups.map((group) => ({ id: group.id, name: group.name })) ?? []);
+	const groupsACategoryCanJoin = $derived(
+		view?.groups
+			.filter((group) => group.kind === 'normal')
+			.map((group) => ({ id: group.id, name: group.name })) ?? []
+	);
 
 	const wide = new MediaQuery('(min-width: 1024px)');
 	let selectedId: Id<'categories'> | null = $state(null);
@@ -187,18 +190,18 @@
 				<Button
 					variant="outline"
 					size="sm"
-					disabled={addingSaving && adding !== 'group'}
+					disabled={addDialog?.saving() === true && adding !== 'group'}
 					onclick={() => {
 						add('group');
 					}}
 				>
 					Add Category Group
 				</Button>
-				{#if groups.length > 0}
+				{#if groupsACategoryCanJoin.length > 0}
 					<Button
 						variant="outline"
 						size="sm"
-						disabled={addingSaving && adding !== 'category'}
+						disabled={addDialog?.saving() === true && adding !== 'category'}
 						onclick={() => {
 							add('category');
 						}}>Add Category</Button
@@ -206,7 +209,7 @@
 				{/if}
 				<Button variant="ghost" size="sm" href={resolve('/categories')}>Manage Categories</Button>
 			</div>
-			{#if groups.length > 0}
+			{#if view.groups.length > 0}
 				<div class="lg:flex lg:items-start lg:gap-6">
 					<div class="min-w-0 lg:flex-1">
 						<BudgetTable
@@ -268,7 +271,6 @@
 <AddCategoryDialog
 	bind:this={addDialog}
 	bind:open={addingOpen}
-	bind:saving={addingSaving}
 	kind={adding}
-	{groups}
+	groups={groupsACategoryCanJoin}
 />

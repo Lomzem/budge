@@ -3,34 +3,19 @@ import { assert, describe, expect, onTestFinished, test, vi } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { PAYEE_RENAME_BATCH } from './lib/search';
-import { newBackend, publicErrorCode, useOwnerEnv } from './test.helper';
+import { PAYEE_RENAME_BATCH } from './lib/transactions';
+import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
 async function budget() {
-	const backend = newBackend();
+	const backend = await startBudget({
+		accounts: { Checking: ['cash', 100_000], Savings: ['cash', 0] },
+		groups: { Everyday: ['Groceries', 'Household'] }
+	});
 	const { owner } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 100_000
-	});
-	const savings = await owner.mutation(api.accounts.create, {
-		name: 'Savings',
-		kind: 'cash',
-		startingBalance: 0
-	});
-	const everyday = await owner.mutation(api.categories.createGroup, { name: 'Everyday' });
-	const groceries = await owner.mutation(api.categories.create, {
-		groupId: everyday,
-		name: 'Groceries'
-	});
-	const household = await owner.mutation(api.categories.create, {
-		groupId: everyday,
-		name: 'Household'
-	});
+	const { Checking: checking, Savings: savings } = backend.accounts;
+	const { Groceries: groceries, Household: household } = backend.categories;
 	const add = (fields: {
 		accountId?: Id<'accounts'>;
 		date?: string;

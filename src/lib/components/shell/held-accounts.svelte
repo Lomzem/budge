@@ -5,7 +5,6 @@
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
-	import { attempt } from '$lib/attempt';
 	import StartingBalanceStep from '$lib/components/accounts/starting-balance-step.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -37,7 +36,6 @@
 		name: string;
 		kind: AccountKind;
 		error: string;
-		saving: boolean;
 		mapped: MappedAccount | null;
 	}>();
 
@@ -58,7 +56,6 @@
 			name: account.name ?? '',
 			kind: 'cash',
 			error: '',
-			saving: false,
 			mapped: null
 		});
 	}
@@ -98,10 +95,8 @@
 			name: session.name,
 			kind: session.kind
 		};
-		session.saving = true;
 		session.error = '';
-		const saved = await attempt(() => saveChoice(request));
-		session.saving = false;
+		const saved = await dialog.run('save', () => saveChoice(request));
 		if (!saved.ok) {
 			session.error = saved.error?.message ?? "Budge couldn't save that. Try again.";
 			return;
@@ -208,7 +203,7 @@
 							<p role="alert" class="text-sm text-destructive">{session.error}</p>
 						{/if}
 						<Dialog.Footer>
-							<Button type="submit" disabled={session.saving}>
+							<Button type="submit" disabled={dialog.pending('save')}>
 								{session.choice === 'ignore' ? 'Ignore' : 'Bring in its rows'}
 							</Button>
 						</Dialog.Footer>

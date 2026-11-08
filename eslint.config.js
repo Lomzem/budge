@@ -9,6 +9,7 @@ import ts from 'typescript-eslint';
 
 import noComments from './eslint/rules/no-comments.js';
 import noEffectDefects from './eslint/rules/no-effect-defects.js';
+import ownedWrites from './eslint/rules/owned-writes.js';
 import svelteConfig from './svelte.config.ts';
 
 const browserOnlyGlobals = new Set([
@@ -20,6 +21,9 @@ const browserOnlyGlobals = new Set([
 	'navigator',
 	'location'
 ]);
+
+const journeyRunsOutsidePlaywrightTest =
+	'A journey also runs outside Playwright Test, under `bun run app verify`; report steps through its context instead.';
 
 export default defineConfig(
 	globalIgnores([
@@ -100,7 +104,13 @@ export default defineConfig(
 	},
 	{
 		plugins: {
-			local: { rules: { 'no-comments': noComments, 'no-effect-defects': noEffectDefects } }
+			local: {
+				rules: {
+					'no-comments': noComments,
+					'no-effect-defects': noEffectDefects,
+					'owned-writes': ownedWrites
+				}
+			}
 		},
 		rules: {
 			'local/no-comments': 'error',
@@ -130,6 +140,42 @@ export default defineConfig(
 		}
 	},
 	{
+		files: ['convex/**/*.ts'],
+		ignores: [
+			'convex/lib/transactions.ts',
+			'convex/lib/monthlyTotals.ts',
+			'convex/migrations.ts',
+			'convex/seed.ts',
+			'convex/**/*.test.ts',
+			'convex/test.helper.ts'
+		],
+		rules: {
+			'local/owned-writes': [
+				'error',
+				{ tables: ['transactions', 'transactionSplits', 'imports', 'monthlyTotals'] }
+			],
+			'no-restricted-imports': [
+				'error',
+				{
+					patterns: [
+						{
+							regex: '(^|/)transactions(\\.[cm]?[jt]s)?$',
+							importNames: ['refreshSearchText'],
+							message:
+								'Call an operation in convex/lib/transactions.ts; it keeps search text whole.'
+						},
+						{
+							regex: '(^|/)monthlyTotals(\\.[cm]?[jt]s)?$',
+							importNames: ['countTransaction', 'rebuildTotals'],
+							message:
+								'Call an operation in convex/lib/transactions.ts; it keeps the monthly totals whole.'
+						}
+					]
+				}
+			]
+		}
+	},
+	{
 		files: ['**/*.test.ts'],
 		rules: { 'max-nested-callbacks': 'off' }
 	},
@@ -145,6 +191,46 @@ export default defineConfig(
 							message:
 								"Import `test` from './test', which reloads a seed fixture before every test."
 						}
+					]
+				}
+			]
+		}
+	},
+	{
+		files: [
+			'src/**/*-dialog.svelte',
+			'src/lib/components/accounts/starting-balance-step.svelte',
+			'src/lib/components/shell/bank-connections.svelte',
+			'src/lib/components/shell/held-accounts.svelte'
+		],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: '$lib/attempt',
+							message:
+								'Run dialog work through DialogSession.run, so a late result never lands in a newer opening.'
+						}
+					]
+				}
+			]
+		}
+	},
+	{
+		files: ['e2e/journeys/**/*.ts'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: '@playwright/test',
+							importNames: ['test'],
+							message: journeyRunsOutsidePlaywrightTest
+						},
+						{ name: '../test', message: journeyRunsOutsidePlaywrightTest }
 					]
 				}
 			]

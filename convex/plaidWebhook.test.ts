@@ -3,7 +3,7 @@ import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vites
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
 import { api, internal } from './_generated/api';
 import { syncUpdatesBody, webhookSigner } from './lib/plaidWebhook.helper';
-import { newBackend, useOwnerEnv } from './test.helper';
+import { newBackend, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -132,14 +132,9 @@ afterEach(() => {
 });
 
 async function connectedBudget() {
-	const backend = newBackend();
+	const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 0] } });
 	const { owner, t } = backend;
-	await owner.mutation(api.settings.setCutoverDate, { cutoverDate });
-	const checking = await owner.mutation(api.accounts.create, {
-		name: 'Checking',
-		kind: 'cash',
-		startingBalance: 0
-	});
+	const { Checking: checking } = backend.accounts;
 	const connectionId = await t.action(internal.bankConnections.setup, {
 		name: 'Sample Bank',
 		itemId,
@@ -601,14 +596,9 @@ describe('a bank Account the owner adds at the bank', () => {
 
 describe('setting up a Bank Connection', () => {
 	test('syncs it at once, so an update Plaid sent before it was saved is not lost', async () => {
-		const backend = newBackend();
+		const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 0] } });
 		const { owner, t } = backend;
-		await owner.mutation(api.settings.setCutoverDate, { cutoverDate });
-		const checking = await owner.mutation(api.accounts.create, {
-			name: 'Checking',
-			kind: 'cash',
-			startingBalance: 0
-		});
+		const { Checking: checking } = backend.accounts;
 
 		await t.action(internal.bankConnections.setup, {
 			name: 'Sample Bank',

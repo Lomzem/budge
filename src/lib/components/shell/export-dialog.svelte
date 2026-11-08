@@ -1,30 +1,40 @@
 <script lang="ts">
 	import { useConvexClient } from 'convex-svelte';
+	import { untrack } from 'svelte';
 
-	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { localToday } from '$lib/domain/dates';
 	import { downloadCsv, downloadJson, fetchExport, type BudgetExport } from '$lib/export';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
 	const client = useConvexClient();
-	let busy = $state(false);
+	const dialog = new DialogSession<object, 'export'>();
+	const busy = $derived(dialog.pending('export'));
 	let error = $state('');
 
 	let downloading = $state(false);
 
+	$effect(() => {
+		if (open)
+			untrack(() => {
+				dialog.openOrResume({}, 'export');
+			});
+	});
+
 	async function exportAs(save: (data: BudgetExport, date: string) => void | Promise<void>) {
-		busy = true;
 		error = '';
-		const exported = await attempt(async () => {
+		const exported = await dialog.run('export', async () => {
 			const data = await fetchExport(client);
 			downloading = true;
-			await save(data, localToday());
+			return Promise.resolve()
+				.then(() => save(data, localToday()))
+				.finally(() => {
+					downloading = false;
+				});
 		});
-		busy = false;
-		downloading = false;
 		if (!exported.ok) error = "Budge couldn't export. Try again.";
 	}
 

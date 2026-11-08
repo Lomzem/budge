@@ -1,6 +1,5 @@
 import { v } from 'convex/values';
 
-import { monthOf } from '../src/lib/domain/dates';
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import {
@@ -10,10 +9,10 @@ import {
 	requireOwnGroup
 } from './lib/categories';
 import { requireName } from './lib/input';
-import { rebuildTotals } from './lib/monthlyTotals';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
 import { requireTarget, targetValidator } from './lib/targets';
+import { moveCategoryHistory } from './lib/transactions';
 
 export const list = query({
 	args: {},
@@ -200,26 +199,7 @@ export const remove = mutation({
 			throw publicError('INVALID_INPUT', 'Pick another Category to move its history to.');
 		}
 
-		const monthAccountKeysMoved = new Map<string, { month: string; accountId: Id<'accounts'> }>();
-		const transactions = ctx.db
-			.query('transactions')
-			.withIndex('by_category_date', (q) => q.eq('categoryId', category._id));
-		for await (const transaction of transactions) {
-			const key = { month: monthOf(transaction.date), accountId: transaction.accountId };
-			monthAccountKeysMoved.set(`${key.month}|${key.accountId}`, key);
-			await ctx.db.patch('transactions', transaction._id, { categoryId: destination._id });
-		}
-		const lines = ctx.db
-			.query('transactionSplits')
-			.withIndex('by_category_date', (q) => q.eq('categoryId', category._id));
-		for await (const line of lines) {
-			const parent = await ctx.db.get('transactions', line.transactionId);
-			if (parent === null) continue;
-			const key = { month: monthOf(line.date), accountId: parent.accountId };
-			monthAccountKeysMoved.set(`${key.month}|${key.accountId}`, key);
-			await ctx.db.patch('transactionSplits', line._id, { categoryId: destination._id });
-		}
-		await rebuildTotals(ctx, [category._id, destination._id], monthAccountKeysMoved.values());
+		await moveCategoryHistory(ctx, category._id, destination._id);
 
 		const assignments = ctx.db
 			.query('assignments')

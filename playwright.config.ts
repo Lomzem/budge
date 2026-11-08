@@ -6,6 +6,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535)
 
 export default defineConfig({
 	testDir: 'e2e',
+	outputDir: 'test-results/playwright',
 	globalSetup: './e2e/global.setup.ts',
 	forbidOnly: !!process.env.CI,
 

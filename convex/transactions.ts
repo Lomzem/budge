@@ -16,6 +16,8 @@ import { requireIsoDate } from './lib/settings';
 import { toRow } from './lib/transactionRows';
 import {
 	deleteTransaction,
+	markApproved,
+	markCleared,
 	payeeNameOf,
 	requireUnlocked,
 	saveTransaction,
@@ -349,9 +351,7 @@ export const setCleared = mutation({
 			await requireTransaction(ctx, transactionId),
 			'to change whether it is Cleared'
 		);
-		await ctx.db.patch('transactions', transactionId, {
-			cleared: cleared ? 'cleared' : 'uncleared'
-		});
+		await markCleared(ctx, transactionId, cleared ? 'cleared' : 'uncleared');
 		return null;
 	}
 });
@@ -365,7 +365,7 @@ export const unlock = mutation({
 		if (transaction.cleared !== 'reconciled') {
 			throw publicError('INVALID_INPUT', 'This Transaction is not Reconciled.');
 		}
-		await ctx.db.patch('transactions', transactionId, { cleared: 'cleared' });
+		await markCleared(ctx, transactionId, 'cleared');
 		return null;
 	}
 });
@@ -376,7 +376,7 @@ export const approve = mutation({
 	handler: async (ctx, { transactionId }) => {
 		await requireOwner(ctx);
 		await requireTransaction(ctx, transactionId);
-		await ctx.db.patch('transactions', transactionId, { approved: true });
+		await markApproved(ctx, transactionId);
 		return null;
 	}
 });
@@ -388,7 +388,7 @@ export const approveAll = mutation({
 		await requireOwner(ctx);
 		const boundedBatch = await unapproved(ctx, accountId).take(UNAPPROVED_COUNT_LIMIT);
 		for (const transaction of boundedBatch) {
-			await ctx.db.patch('transactions', transaction._id, { approved: true });
+			await markApproved(ctx, transaction._id);
 		}
 		return boundedBatch.length;
 	}
