@@ -13,15 +13,19 @@ Budget for card purchases, refunds, Overspending and payments without counting d
 
 ## Driving it with Playwright
 
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/credit-cards.ts`, also run by `bun run test:e2e:local`):
+
+- `credit-cards/debt`: the seeded Card's Payment Category shows the debt not yet covered.
+
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
 
-- **Debt:** on seeded Budget scope the rowgroup whose header cell reads Credit Card Payments (`getByRole('rowgroup').filter({ hasText: 'Credit Card Payments' })`, as in `e2e/budget.test.ts`; the rowgroup itself has no accessible name); require Card and debt-not-yet-covered text. Verify a new card’s debt through the Accounts starting-balance journey.
+- **Debt:** `credit-cards/debt` scopes the rowgroup whose header cell reads Credit Card Payments (`getByRole('rowgroup').filter({ hasText: 'Credit Card Payments' })`; the rowgroup itself has no accessible name). Verify a new card’s debt through the Accounts starting-balance recipe.
 - **Purchase/refund:** assign Groceries $30 in an isolated scenario, create $50 categorized Card outflow. Require Groceries Available −$20 and Payment Available +$50 relative to baseline, with $20 waiting on Groceries. Create $10 refund to Groceries; require the corresponding reversal. Reload Budget and Account list to confirm.
 - **Cover/payment:** cover remaining Groceries deficit via inspector, require waiting-on amount cleared. Transfer Cash to Card via Transfers, require Payment Available and debt reduce by the payment; Ready to Assign must follow Cash/card rules rather than categorizing payment as expense. Repeat with Uncategorized and split purchase paths from their maps.
 
 ## Gotchas
 
 - Assert deltas against fixture baseline; the illustrative $30/$50 case requires neutral pre-existing amounts or explicit baseline calculations.
-- Sources: ticket 10; `e2e/budget.test.ts`; public Accounts/Transactions/Budget operations.
+- Sources: ticket 10; public Accounts/Transactions/Budget operations.

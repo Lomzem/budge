@@ -15,6 +15,14 @@ Enter, edit, categorize, clear, approve, and delete movements of money in an Acc
 
 ## Driving it with Playwright
 
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/transactions.ts`, also run by `bun run test:e2e:local`):
+
+- `transactions/create`: Add Transaction lowers the Account balance (`txn-create`).
+- `transactions/late-save`: a save that finishes after the dialog closed leaves the next opening alone.
+- `transactions/approve-phone`: at 320 px an Unapproved row opens from its Payee and is approved (`txn-list`).
+
+The recipes below cover what the journeys leave out.
+
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
@@ -23,10 +31,10 @@ Preconditions:
 - **Cancel:** open Add Transaction, fill a different invented Payee, press Escape; require no saved row or balance change.
 - **Edit/clear:** open the created row by `getByRole("button", { name: /^Sample Verification Bakery/ })`; change Amount, Date, Account, Category, memo, and Direction in separate checks. Save and verify the resulting balances and budget Activity; revisit both Account pages after moving an Account. Toggle `getByRole("checkbox", { name: /^Cleared: Sample Verification Bakery/ })`, reload, require checked.
 - **Delete:** open the row, click `Delete`, then confirm `getByRole("alertdialog").getByRole("button", { name: "Delete", exact: true })`. Require absence after reload and reversal of its current balance/budget effect.
-- **List:** use `Show more` when present; require new rows without duplicates. Capture list and dialog at 320 px, verify no horizontal overflow of the page or the table container. Below a 448 px table the Date and Approve columns hide: the short date sits under the Payee, and an Unapproved row (bold) is approved from its dialog's `Approve` or `Approve all`; on `bank-sync` require the `SAMPLE BOOKSHOP 0193` Payee button visible and clickable at 320 px (`e2e/transactions.test.ts` covers it). Follow imports for approval, splits for line editing, and Reconciliation for locks.
+- **List:** use `Show more` when present; require new rows without duplicates. Capture list and dialog at 320 px, verify no horizontal overflow of the page or the table container. Below a 448 px table the Date and Approve columns hide: the short date sits under the Payee, and an Unapproved row (bold) is approved from its dialog's `Approve` or `Approve all`; on `bank-sync` require the `SAMPLE BOOKSHOP 0193` Payee button visible and clickable at 320 px (`transactions/approve-phone` covers it). Follow imports for approval, splits for line editing, and Reconciliation for locks.
 
 ## Gotchas
 
 - Amounts follow the selected Direction; changing a field without Save is not persistence.
 - Reconciled rows restrict edits until Unlock. A seeded list may not exceed a page: report pagination blocked if Show more cannot be reached with current data.
-- Sources: ticket 03, 05, 14, 16; `e2e/transactions.test.ts`; public `transactions.list/create/update/remove/setCleared/approve/approveAll/unapprovedCount`.
+- Sources: ticket 03, 05, 14, 16; public `transactions.list/create/update/remove/setCleared/approve/approveAll/unapprovedCount`.

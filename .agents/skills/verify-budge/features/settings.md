@@ -12,6 +12,8 @@ Choose the date Budge begins accounting and prevent history from being cut off b
 
 ## Driving it with Playwright
 
+No journey covers Settings yet; drive the recipes below by hand. A journey added for it goes in `e2e/journeys/settings.ts` and is listed here.
+
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.

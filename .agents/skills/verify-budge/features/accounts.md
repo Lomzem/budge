@@ -18,16 +18,22 @@ Create Cash and Credit Card Accounts, arrange them, and decide where an unknown 
 
 ## Driving it with Playwright
 
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/accounts.ts`, also run by `bun run test:e2e:local`):
+
+- `accounts/start-late-save`: the Account-action Starting balance, including a save that finishes after its dialog was dismissed.
+- `accounts/start-edit`: Starting Balance edit offers only allowed edits and saves.
+- `accounts/held-map`, `accounts/held-new-card`, `accounts/held-ignore`: the three held journeys on `bank-sync`.
+
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
 
 - **Create:** establish cutover via Settings, then click `Add Account`; dialog `Add Account`, label Name = `Sample Verification Cash`, select `Cash, such as checking or savings`, fill `Current balance` with `123.45`, submit scoped `Add Account`. Require sidebar under Cash, balance $123.45, and a Cleared Starting Balance Transaction on cutover date. Budget Ready to Assign must increase by $123.45. Reload and repeat mobile creation. For exact card balance label inspect the dialog (`Amount owed` for cards); create a card with invented debt and verify Credit grouping and linked Payment Category without changing Ready to Assign.
-- **Starting balance action:** seed `budget-with-accounts`, open Checking, button `Checking actions`, menuitem `Starting balance`; dialog heading `Starting balance for Checking` shows `Now $…` (test id `current-starting-balance`). Fill label `Starting balance` with the current amount plus $100.00, `Confirm`. Require the dialog closed, the sidebar and `account-balance` up by $100.00, and reopening shows the new amount. `Cancel` changes nothing; a card Account labels the field `Amount owed on the cutover date`.
-- **Starting Balance edit:** seed `budget-with-accounts`, open Checking, click button `/^Starting Balance/`; dialog `Edit Transaction`. Require labels Account and Payee disabled (Payee value `Starting Balance`), the hint `A starting balance stays in its Account, with no Payee and one Category.`, label `Category` (exact) listing `Groceries` but no `Split across Categories` and no `Transfer:` options. Change Memo, Save, reload, reopen: require the Memo saved and the Account balance unchanged. Capture 1280 and 320 widths.
+- **Starting balance action (beyond `accounts/start-late-save`):** `Cancel` changes nothing; a card Account labels the field `Amount owed on the cutover date`.
+- **Starting Balance edit (beyond `accounts/start-edit`):** require the hint `A starting balance stays in its Account, with no Payee and one Category.` Change Memo, Save, reload, reopen: require the Memo saved and the Account balance unchanged. Capture 1280 and 320 widths.
 - **Rename/order:** open created Account, button `<name> actions`, menuitem Rename, dialog label Name, Save. Require heading and both navigation menus retain name after reload. Exercise Move up/down within its Cash or Credit group and verify order; group-edge actions are disabled.
 - **Missing route:** navigate `/accounts/not-an-account`; require the app’s missing/invalid Account handling and no leaked data, record actual behavior.
-- **Held (`bank-sync` seed):** run `bun run app seed bank-sync`. Readiness: the `region` named `New bank Accounts` lists Sample Savings Plus ending 4417 (2 rows), Sample Rewards Card ending 9021 (2 rows) and Sample Holiday Club ending 1180 (1 row), all from Sample Credit Union. Held rows change no balance; capture Savings' balance first. Reseed before each of the three journeys.
+- **Held (`bank-sync` seed):** the three journeys below run as `accounts/held-*`; drive them by hand only for what they leave out (reload checks, Ready to Assign, Skip). Readiness: the `region` named `New bank Accounts` lists Sample Savings Plus ending 4417 (2 rows), Sample Rewards Card ending 9021 (2 rows) and Sample Holiday Club ending 1180 (1 row), all from Sample Credit Union. Held rows change no balance; capture Savings' balance first. Reseed before each of the three journeys.
   - **Map into an existing Account:** open Sample Savings Plus, check radio `Into Savings`, click `Bring in its rows`. In dialog `Starting balance` wait for `Suggest again` to be enabled (the suggestion fails with `Couldn't reach the bank; try again later.`, since the seed's token never decrypts), fill `Starting balance` = `1,000.00`, click `Confirm`. Require the held entry gone; on Savings require rows SAMPLE INTEREST PAID and SAMPLE TRANSFER IN 5512 and the Starting Balance row at $1,000.00. Reload.
   - **Create a card Account:** open Sample Rewards Card, check `Into a new Account`; Name is prefilled `Sample Rewards Card`; set it to an invented name, check `Credit card`, `Bring in its rows`. Fill `Amount owed on the cutover date` = `100.00`, `Confirm`. Require the Account under Credit with SAMPLE BISTRO 0817 and SAMPLE BOOK NOOK 3306 and balance −(100.00 + 36.29 + 21.08) = −$157.37 and a Payment Category on the Budget. Capture Ready to Assign before mapping: it falls by exactly $57.37, the two Uncategorized purchases (an Uncategorized Transaction counts against Ready to Assign); the $100.00 starting debt itself leaves it unchanged.
   - **Ignore:** open Sample Holiday Club, check `Nowhere: ignore this bank Account`; require `Its rows are dropped, and Budge won't ask about it again.`; click `Ignore`. Require the entry gone after reload while the other two remain, and no Account created.
@@ -37,6 +43,5 @@ Preconditions:
 
 ## Gotchas
 
-- `e2e/held-accounts.test.ts` owns the three held journeys. The `bank-sync` fixture builds held Accounts and rows through the production sync mutations, with no Plaid.
+- The `bank-sync` fixture builds held Accounts and rows through the production sync mutations, with no Plaid.
 - A Starting Balance is a Cleared Transaction with `kind: 'startingBalance'`; the server refuses moving it, giving it a Payee, splitting it or making it a Transfer, and the dialog hides those edits. Card debt uses the opposite sign from Cash. Sources: tickets 03, 10, 21; public `accounts.list/create/rename/reorder/setStartingBalance/startingBalance`, `heldAccounts.list/map/createAccount/ignore/suggestStartingBalance`.
-- `e2e/starting-balance.test.ts` owns the Account-action Starting balance journey (including a save that finishes after its dialog was dismissed) and the Starting Balance edit journey.

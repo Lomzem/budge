@@ -14,6 +14,12 @@ Set Monthly or By date Targets, fund the missing amount, and see the upcoming ob
 
 ## Driving it with Playwright
 
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/targets.ts`, also run by `bun run test:e2e:local`):
+
+- `targets/monthly`: the Monthly recipe through Funded and Upcoming (`target-monthly`, `target-assign`, `target-upcoming`).
+
+The recipes below cover what the journeys leave out.
+
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
@@ -25,4 +31,4 @@ Preconditions:
 ## Gotchas
 
 - Due day changes scheduling, not amount. Month-end due dates clamp; repeat interval is 1–120 months.
-- Sources: ticket 08; `e2e/targets.test.ts`; public `categories.setTarget`, `budget.assignTarget/month`.
+- Sources: ticket 08; public `categories.setTarget`, `budget.assignTarget/month`.

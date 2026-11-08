@@ -1,12 +1,12 @@
 import { test as base } from '@playwright/test';
 
-import { findFixture } from '../scripts/app/fixtures';
+import { findFixture, type FixtureName } from '../scripts/app/fixtures';
 import { loadFixture } from '../scripts/app/seed';
 import { requireLocalAnonymousDeployment } from '../scripts/local/deployment';
 
 export { expect, type Download, type Locator, type Page } from '@playwright/test';
 
-export const test = base.extend<{ fixture: string; seeded: undefined }>({
+export const test = base.extend<{ fixture: FixtureName; seeded: undefined }>({
 	fixture: ['budget-with-accounts', { option: true }],
 	seeded: [
 		async ({ fixture: name }, use, testInfo) => {

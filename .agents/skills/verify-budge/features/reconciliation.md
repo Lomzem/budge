@@ -13,6 +13,12 @@ Compare cleared balance to the bank, record a difference when needed, and lock r
 
 ## Driving it with Playwright
 
+Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/reconciliation.ts`, also run by `bun run test:e2e:local`):
+
+- `reconciliation/difference`: a $1.00 difference on the seeded Card becomes a locked Reconciliation Adjustment, and Unlock reopens it (`reconcile-adjust`, `reconcile-lock`, `reconcile-unlock`).
+
+The recipes below cover what the journeys leave out.
+
 Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
@@ -23,5 +29,5 @@ Preconditions:
 
 ## Gotchas
 
-- Use `e2e/reconciliation.test.ts` for exact dynamic bank-balance label and adjustment status; input owed balance on cards is sign-inverted.
+- Use `e2e/journeys/reconciliation.ts` for exact dynamic bank-balance label and adjustment status; input owed balance on cards is sign-inverted.
 - Sources: ticket 12; public `reconciliation.clearedBalance/reconcile`, `transactions.unlock`.
