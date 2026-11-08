@@ -28,9 +28,7 @@ jobs:
           node-version: 24
       - run: bun install --frozen-lockfile
       - name: Check generated Convex code
-        run: |
-          bun run codegen
-          git diff --exit-code convex/_generated
+        run: bun run codegen:check
       - name: Format check
         run: bun run format:check
       - name: ESLint

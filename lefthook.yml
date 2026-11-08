@@ -38,6 +38,8 @@ pre-commit:
 pre-push:
   piped: true
   jobs:
+    - name: generated Convex code
+      run: bun run codegen:check
     - name: test
       run: bun run test
     - name: typecheck
