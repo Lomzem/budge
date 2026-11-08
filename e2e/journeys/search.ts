@@ -4,7 +4,9 @@ import type { Journey } from './journey';
 
 async function openAllAccounts(page: Page) {
 	await page.goto('/accounts');
-	await expect(page.getByRole('heading', { level: 1, name: 'All Accounts' })).toBeVisible();
+	await expect(
+		page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
+	).toBeVisible();
 }
 
 async function listedPayees(page: Page) {
@@ -65,8 +67,12 @@ export const search = {
 		run: async (page, { step }) => {
 			await page.setViewportSize({ width: 320, height: 640 });
 
-			await step('every filter is labeled and visible', async () => {
+			await step('Filters opens every labeled filter under the search', async () => {
 				await openAllAccounts(page);
+				const toggle = page.getByRole('button', { name: 'Filters', exact: true });
+				await expect(page.getByLabel('Payee', { exact: true })).toBeHidden();
+				await toggle.click();
+				await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 				for (const label of ['Search', 'Account', 'Category', 'Payee', 'From', 'To']) {
 					await expect(page.getByLabel(label, { exact: true })).toBeVisible();
 				}

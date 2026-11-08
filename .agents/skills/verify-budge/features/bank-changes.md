@@ -11,7 +11,7 @@ Keep approved or edited Transactions safe when the bank changes history, while a
 
 ## How to get to it (user POV)
 
-- All Accounts (`/accounts`) or Account page (sidebar `Budget and Accounts` → `Checking`) → Transaction row with a `Bank changed this` or `Bank removed this` line under its Payee.
+- The Accounts page (`/accounts`) or an Account page (sidebar `Budget and Accounts` → `Checking`) → Transaction row with a `Bank changed this` or `Bank removed this` line under its Payee.
 - Click the row's Payee button → dialog `Edit Transaction` → `Bank Text` section → `Use the bank's version` / `Delete it` / `Keep mine`.
 - `Delete it` opens alert dialog `Delete this Transaction too?` (`Delete this Transfer too?` for a Transfer) → `Delete`.
 
@@ -44,9 +44,9 @@ The fixture syncs Sample Credit Union twice through the production sync mutation
 
 ## Gotchas
 
-- **Manual drive:** resolve flagged rows from All Accounts as well as a named Account. File imports can Match Plaid-backed Transactions too.
+- **Manual drive:** resolve flagged rows from the Accounts page as well as a named Account. File imports can Match Plaid-backed Transactions too.
 - **Manual drive:** taking a bank amount that differs from a Split Transaction’s total is rejected with guidance to edit its lines first, then keep your version. Bank removal cannot delete a Transaction or Transfer while another Bank Row still backs either side; require the alert and unchanged balances.
 
 - `convex/bankChanges.test.ts` owns sync and resolution semantics (edited versus untouched, Transfers, reconciled rows). Drive the UI here; do not reassert backend states.
-- The fixture's bank login token never decrypts, so Sync now and Reconnect on these connections fail with `Couldn't reach the bank; try again later.` That is expected and does not block these journeys.
+- The fixture's bank login token never decrypts, so Sync now and Reconnect on these connections fail with `Bank sync isn't set up on this server.` (the local app has no Plaid credentials; with credentials it would be `Bank sync isn't set up on this server.`) That is expected and does not block these journeys.
 - Sources: tickets 19, 21; `convex/seedBankSync.ts`; public `imports.resolveBankChange`; `bankRowsShown` in `convex/lib/transactionRows.ts`.

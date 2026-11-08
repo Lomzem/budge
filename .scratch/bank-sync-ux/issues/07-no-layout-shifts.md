@@ -1,6 +1,6 @@
 # 07: No layout shifts
 
-**Status:** in progress
+**Status:** done
 
 **Spec:** [Bank sync and UI/UX](../spec.md), Constraints
 
@@ -23,7 +23,23 @@ The owner hates layout shifts. A baseline run of all 37 journeys with the shift 
 
 ## Acceptance
 
-- [ ] Every journey passes with the guard, at desktop and phone widths.
-- [ ] The guard reports which elements moved, on which page, and by how much.
+- [x] Every journey passes with the guard, at desktop and phone widths.
+- [x] The guard reports which elements moved, on which page, and by how much.
 
 ## Comments
+
+- All 35 journeys pass with the guard (verify run `r5`, 2026-11-08). Phone widths are covered by `shell/phone-pages` (every Section and a register at 390 px, loaded and scrolled), `search/phone`, `transactions/approve-phone`, `shell/navigate` (320 px), and the phone steps in `categories/manage` and `inspector/move-money`.
+- Shift sources fixed in this ticket's last pass:
+  - The register's Loading and empty-state row spanned seven or eight columns inside a fixed-layout table and set phantom column widths. It now renders under the table.
+  - The Approve all icon moved when its count arrived. Its label now has a fixed minimum width and is left-aligned.
+  - Dialogs anchor to the top (`top-4`, `sm:top-16`), so a dialog whose content grows extends downward instead of re-centering.
+  - The tab bar's label now comes before its badge in the DOM, so the Accounts tab reads "Accounts, 3 Unapproved" (it read ", 3 Unapproved Accounts").
+- Guard changes:
+  - Playwright's `fill` and `selectOption` don't set `hadRecentInput`, so the guard also treats shifts within 500 ms of an `input` or `change` event as user-caused.
+  - Each report names the moved element (or its nearest labeled ancestor) with its rect before and after.
+- Journeys updated for the redesign:
+  - Dialogs keep an empty alert slot, so "no alert" checks look for non-empty text.
+  - The Plaid journeys expect `Bank sync isn't set up on this server.` on a server without credentials (ticket 01).
+  - `plaid/late-sync` holds both syncs, because a held response stalls the socket.
+  - `settings/cutover` reaches the gate from the sidebar's Add Account.
+- Deferred: rows a background sync inserts at the top of a register move the rows below. That is a data change, not a page shift, and no journey triggers it.

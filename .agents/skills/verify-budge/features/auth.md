@@ -10,7 +10,7 @@ Admit the configured owner and preserve authenticated navigation while excluding
 
 ## How to get to it (user POV)
 
-- Signed-out protected route → `/sign-in`; app Menu → Sign out.
+- Signed-out protected route → `/sign-in`; Settings → Session → Sign out.
 - Direct `/`, `/categories`, `/accounts`, and `/accounts/<id>` after authentication.
 
 ## Driving it with Playwright
@@ -21,8 +21,8 @@ Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
 
-- **Automated entry:** run app login, create a fresh context with printed storage state; navigate each protected route and require its heading and fixture data. At 320 px require the route’s menu label: `View Budget`, `View Categories`, `View All Accounts` or `View <Account name>` instead of the sidebar. A login command alone does not prove Convex owner access.
-- **Signed out:** use a fresh context without storage state, navigate protected routes, require sign-in and no budget data. In authenticated context click visible Menu then menuitem Sign out; require sign-in, then reload protected route and require no data. Re-login before other feature checks.
+- **Automated entry:** run app login, create a fresh context with printed storage state; navigate each protected route and require its heading and fixture data. At 320 px require the `Sections` tab bar, with the route's Section marked current, instead of the sidebar. A login command alone does not prove Convex owner access.
+- **Signed out:** use a fresh context without storage state, navigate protected routes, require sign-in and no budget data. In authenticated context open `/settings` and click `Sign out`; require sign-in, then reload protected route and require no data. Re-login before other feature checks.
 - **Expired/non-owner:** when a separately authorized development identity or expired state is available, navigate protected pages and require denial alert `This account can't open Budge.` with a `Sign out` button, or sign-in after session loss, without source data. For public API authorization enumerate queries/mutations/actions in the index, use the repo’s existing authorization tests; browser owner success alone is not rejection proof.
 - **Real methods:** with authorized development GitHub/email identities, use visible Clerk GitHub or email-code controls on `/sign-in`, finish the real provider/code flow, require Budget and data. Record each method independently; backend-token app login does not verify them.
 

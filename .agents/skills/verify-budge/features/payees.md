@@ -10,7 +10,7 @@ Reuse the last Category for a Payee and remember an edited imported Payee for ex
 
 ## How to get to it (user POV)
 
-- Add/Edit Transaction → Payee and Category or Transfer. All Accounts or named Account → Payee filter (`#transaction-filter-payee`, populated by `payees.list`).
+- Add/Edit Transaction → Payee and Category or Transfer. The Accounts page or a named Account → Payee filter (`#transaction-filter-payee`, populated by `payees.list`).
 - Import file → saved imported row → Edit Transaction → Payee.
 - Global Payee rename has no visible menu or route in this checkout.
 

@@ -1,110 +1,99 @@
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 import { holdResponseTo } from '../heldResponse';
 import type { Journey } from './journey';
 
-const unreachable = "Couldn't reach the bank; try again later.";
+const notSetUp = "Bank sync isn't set up on this server.";
+const noLogin = 'This Bank Connection has no bank login, so it never syncs.';
+
+function card(page: Page, name: string) {
+	return page
+		.getByRole('list', { name: 'Bank Connections' })
+		.getByRole('article', { name, exact: true });
+}
+
+async function openBank(page: Page) {
+	await page.goto('/bank');
+	await expect(page.getByRole('heading', { level: 1, name: 'Bank', exact: true })).toBeVisible();
+}
 
 export const plaid = {
 	status: {
-		title: 'the sidebar shows when each Bank Connection last synced',
+		title: 'the Bank page shows when each Bank Connection last synced, and Sync now reports back',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
-			const seededSandboxConnection = page
-				.getByRole('list', { name: 'Bank Connections' })
-				.getByRole('button', { name: /Sample Bank \(Sandbox\): Synced 2 hours ago/ });
-			const dialog = page.getByRole('dialog', { name: 'Sample Bank (Sandbox)' });
+			const sandbox = card(page, 'Sample Bank (Sandbox)');
 
-			await step('the sidebar says when the sandbox connection last synced', async () => {
-				await page.goto('/');
-				await expect(seededSandboxConnection).toBeVisible();
+			await step('the sandbox connection says when it last synced', async () => {
+				await openBank(page);
+				await expect(sandbox).toContainText('Synced 2 hours ago.');
 			});
 
-			await step(
-				'its dialog shows the last sync, and Sync now says it has no bank login',
-				async () => {
-					await seededSandboxConnection.click();
-					await expect(dialog.getByText(/^Last synced /)).toBeVisible();
-					await dialog.getByRole('button', { name: 'Sync now' }).click();
-					await expect(dialog.getByRole('status')).toHaveText(
-						'This Bank Connection has no bank login, so it never syncs.'
-					);
-				}
-			);
+			await step('Sync now says it has no bank login', async () => {
+				await sandbox.getByRole('button', { name: 'Sync now' }).click();
+				await expect(sandbox.getByRole('status')).toHaveText(noLogin);
+			});
 		}
 	},
 	'late-sync': {
-		title:
-			"a Sync now that finishes after its dialog closed leaves the next Bank Connection's dialog alone",
+		title: 'two Sync nows that finish late each report only on their own connection',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const sync = await holdResponseTo(page, 'bankConnections:syncNow');
-			const connections = page.getByRole('list', { name: 'Bank Connections' });
-			const creditUnion = page.getByRole('dialog', { name: 'Sample Credit Union' });
+			const sandbox = card(page, 'Sample Bank (Sandbox)');
+			const creditUnion = card(page, 'Sample Credit Union');
 
-			await step('Sync now on the sandbox connection, hold it, and close the dialog', async () => {
-				await page.goto('/');
-				await connections.getByRole('button', { name: /^Sample Bank \(Sandbox\): / }).click();
-				const sandbox = page.getByRole('dialog', { name: 'Sample Bank (Sandbox)' });
+			await step('Sync now on the sandbox connection, and hold it', async () => {
+				await openBank(page);
 				await sandbox.getByRole('button', { name: 'Sync now' }).click();
 				await sync.held;
-				await page.keyboard.press('Escape');
-				await expect(sandbox).toBeHidden();
+				await expect(sandbox.getByRole('button', { name: 'Syncing…' })).toBeDisabled();
 			});
 
-			await step(
-				'open Sample Credit Union, watch for the leak, and release the held sync',
-				async () => {
-					await connections.getByRole('button', { name: /^Sample Credit Union: / }).click();
-					await expect(creditUnion.getByRole('button', { name: 'Sync now' })).toBeEnabled();
-					await page.evaluate((leak) => {
-						new MutationObserver(() => {
-							if (document.body.textContent.includes(leak)) document.body.dataset.leaked = leak;
-						}).observe(document.body, { subtree: true, childList: true, characterData: true });
-					}, 'This Bank Connection has no bank login');
-					sync.release();
-				}
-			);
+			await step('Sync now on Sample Credit Union while the first is held', async () => {
+				await creditUnion.getByRole('button', { name: 'Sync now' }).click();
+				await expect(creditUnion.getByRole('button', { name: 'Syncing…' })).toBeDisabled();
+				await expect(sandbox.getByRole('status')).toHaveText('');
+				await expect(creditUnion.getByRole('status')).toHaveText('');
+			});
 
-			await step(
-				"its own Sync now reports its own result, and the sandbox's never shows",
-				async () => {
-					await creditUnion.getByRole('button', { name: 'Sync now' }).click();
-					await expect(creditUnion.getByRole('status')).toHaveText(unreachable);
-					await expect(page.locator('body')).not.toHaveAttribute('data-leaked');
-				}
-			);
+			await step('releasing both reports each result on its own card', async () => {
+				sync.release();
+				await expect(sandbox.getByRole('status')).toHaveText(noLogin);
+				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
+			});
 		}
 	},
 	attention: {
 		title:
-			'a Bank Connection that needs a reconnect says so, and a failed reconnect keeps the notice',
+			'a Bank Connection that needs a reconnect says so, the Budget points to it, and a failed reconnect leaves it asking',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
-			const notice = page.getByText('Sample Savings Bank needs you to reconnect', { exact: true });
+			const savings = card(page, 'Sample Savings Bank');
+			const needsReconnect = 'Needs you to reconnect before it can sync again.';
+
+			await step('the Budget says the Bank needs you and links there', async () => {
+				await page.goto('/');
+				await page
+					.getByRole('region', { name: 'Needs you' })
+					.getByRole('link', { name: /^Bank: \d+ things? needs? you$/ })
+					.click();
+				await expect(
+					page.getByRole('heading', { level: 1, name: 'Bank', exact: true })
+				).toBeVisible();
+			});
 
 			await step('only Sample Savings Bank asks for a reconnect', async () => {
-				await page.goto('/');
-				await expect(notice).toBeVisible();
-				await expect(page.getByText('Sample Credit Union needs you to reconnect')).toHaveCount(0);
+				await expect(savings).toContainText(needsReconnect);
+				await expect(card(page, 'Sample Credit Union')).not.toContainText(needsReconnect);
 			});
 
-			await step('a failed Reconnect keeps the notice', async () => {
-				await page.getByRole('button', { name: 'Reconnect', exact: true }).click();
-				await expect(page.getByRole('status')).toHaveText(unreachable);
-				await expect(notice).toBeVisible();
-			});
-
-			await step('its dialog says why the last sync failed', async () => {
-				await page
-					.getByRole('list', { name: 'Bank Connections' })
-					.getByRole('button', { name: /Sample Savings Bank: / })
-					.click();
-				const dialog = page.getByRole('dialog', { name: 'Sample Savings Bank' });
-				await expect(dialog.getByText('Sample Savings Bank needs you to reconnect.')).toBeVisible();
-				await expect(dialog.getByRole('alert')).toHaveText(
-					/failed: The bank needs you to reconnect \(ITEM_LOGIN_REQUIRED\)\.$/
-				);
+			await step('a failed Reconnect reports why and still offers Reconnect', async () => {
+				await savings.getByRole('button', { name: 'Reconnect', exact: true }).click();
+				await expect(savings.getByRole('status')).toHaveText(notSetUp);
+				await expect(savings.getByRole('button', { name: 'Reconnect', exact: true })).toBeEnabled();
+				await page.reload();
+				await expect(savings).toContainText(needsReconnect);
 			});
 		}
 	},
@@ -112,58 +101,48 @@ export const plaid = {
 		title: 'a Bank Connection whose consent is ending offers to renew it',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
-			const consent = page
-				.getByRole('list', { name: 'Bank Connections' })
-				.getByText(/^Consent ends .+, renew$/);
+			const creditUnion = card(page, 'Sample Credit Union');
 
-			await step('the sidebar says when consent ends', async () => {
-				await page.goto('/');
-				await expect(consent).toBeVisible();
+			await step('the card says when consent ends', async () => {
+				await openBank(page);
+				await expect(creditUnion).toContainText(
+					/Your consent at the bank ends .+\. Reconnect to renew it\./
+				);
 			});
 
-			await step(
-				'renew opens the connection, reports the failure, and keeps the consent notice',
-				async () => {
-					await consent.getByRole('button', { name: 'renew' }).click();
-					const dialog = page.getByRole('dialog', { name: 'Sample Credit Union' });
-					await expect(dialog.getByRole('status')).toHaveText(unreachable);
-					await expect(dialog.getByText('Your consent at the bank ends')).toContainText(
-						'Reconnect to renew it.'
-					);
-				}
-			);
+			await step('Reconnect reports the failure, and the consent notice returns', async () => {
+				await creditUnion.getByRole('button', { name: 'Reconnect', exact: true }).click();
+				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
+				await page.reload();
+				await expect(creditUnion).toContainText('Reconnect to renew it.');
+			});
 		}
 	},
 	'late-renew': {
 		title:
-			'a renew result that arrives while another Bank Connection is open waits for its own Bank Connection',
+			'a held renew blocks every other Reconnect but not Sync now, and reports on its own connection',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const reconnect = await holdResponseTo(page, 'bankConnections:reconnect');
-			const connections = page.getByRole('list', { name: 'Bank Connections' });
-			const savings = page.getByRole('dialog', { name: 'Sample Savings Bank' });
-			const syncNow = savings.getByRole('button', { name: 'Sync now' });
+			const creditUnion = card(page, 'Sample Credit Union');
+			const savings = card(page, 'Sample Savings Bank');
 
-			await step('renew, hold the result, and open Sample Savings Bank', async () => {
-				await page.goto('/');
-				await connections.getByRole('button', { name: 'renew' }).click();
+			await step('renew Sample Credit Union and hold the result', async () => {
+				await openBank(page);
+				await creditUnion.getByRole('button', { name: 'Reconnect', exact: true }).click();
 				await reconnect.held;
-				await connections.getByRole('button', { name: /Sample Savings Bank: / }).click();
-				await expect(syncNow).toBeDisabled();
+				await expect(creditUnion.getByRole('button', { name: 'Reconnecting…' })).toBeDisabled();
+				await expect(
+					savings.getByRole('button', { name: 'Reconnect', exact: true })
+				).toBeDisabled();
+				await expect(savings.getByRole('button', { name: 'Sync now' })).toBeEnabled();
 			});
 
-			await step('releasing it frees Sync now and shows nothing here', async () => {
+			await step('releasing it reports on Sample Credit Union only', async () => {
 				reconnect.release();
-				await expect(syncNow).toBeEnabled();
-				await expect(savings.getByRole('status')).toHaveCount(0);
-				await page.keyboard.press('Escape');
-				await expect(savings).toBeHidden();
-			});
-
-			await step('Sample Credit Union shows its own renew result', async () => {
-				await connections.getByRole('button', { name: /Sample Credit Union: / }).click();
-				const creditUnion = page.getByRole('dialog', { name: 'Sample Credit Union' });
-				await expect(creditUnion.getByRole('status')).toHaveText(unreachable);
+				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
+				await expect(savings.getByRole('status')).toHaveText('');
+				await expect(savings.getByRole('button', { name: 'Reconnect', exact: true })).toBeEnabled();
 			});
 		}
 	}

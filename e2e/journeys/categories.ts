@@ -121,7 +121,7 @@ export const categories = {
 					await expect(rename).toHaveAttribute('data-state', 'open');
 					await expect(rename.getByLabel('Name')).toHaveValue('Groceries');
 					await expect(rename.getByRole('button', { name: 'Save' })).toBeEnabled();
-					await expect(rename.getByRole('alert')).toHaveCount(0);
+					await expect(rename.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 				}
 			);
 		}

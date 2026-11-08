@@ -1,16 +1,16 @@
 # Transactions and the Transaction dialog
 
-Enter, edit, categorize, clear, approve, and delete movements of money in an Account or All Accounts.
+Enter, edit, categorize, clear, approve, and delete movements of money in an Account or across all of them.
 
 ## Sub-features
 
 - `txn-create`, `txn-cancel`: save a new Transaction or discard a draft.
 - `txn-edit`, `txn-clear`, `txn-delete`: persisted edits, bank confirmation, and removal.
-- `txn-list`: paginated Account and All Accounts views; Uncategorized and Unapproved counts.
+- `txn-list`: paginated Account and Accounts-page views; Uncategorized and Unapproved counts.
 
 ## How to get to it (user POV)
 
-- Sidebar All Accounts (`/accounts`) or any named Account (`/accounts/<id>`); phone View menu exposes the same views.
+- The Accounts Section (`/accounts`, heading `Accounts`, with All Transactions below the phone Account list) or any named Account (`/accounts/<id>`) through the sidebar, the Accounts page, or the phone tab bar.
 - Choose `Add Transaction`, or a row button named `<Payee>, edit Transaction on …`.
 
 ## Driving it with Playwright
@@ -31,7 +31,7 @@ Preconditions:
 - **Cancel:** open Add Transaction, fill a different invented Payee, press Escape; require no saved row or balance change.
 - **Edit/clear:** open the created row by `getByRole("button", { name: /^Sample Verification Bakery/ })`; change Amount, Date, Account, Category, memo, and Direction in separate checks. Save and verify the resulting balances and budget Activity; revisit both Account pages after moving an Account. Toggle `getByRole("checkbox", { name: /^Cleared: Sample Verification Bakery/ })`, reload, require checked.
 - **Delete:** open the row, click `Delete`, then confirm `getByRole("alertdialog").getByRole("button", { name: "Delete", exact: true })`. Require absence after reload and reversal of its current balance/budget effect.
-- **List:** use `Show more` when present; require new rows without duplicates. Capture list and dialog at 320 px, verify no horizontal overflow of the page or the table container. Below a 448 px table the Date and Approve columns hide: the short date sits under the Payee, and an Unapproved row (bold) is approved from its dialog's `Approve`; `Approve all N` is above the table; on `bank-sync` require the `SAMPLE BOOKSHOP 0193` Payee button visible and clickable at 320 px (`transactions/approve-phone` covers it). Follow imports for approval, splits for line editing, and Reconciliation for locks.
+- **List:** use `Show more` when present; require new rows without duplicates. Capture list and dialog at 320 px, verify no horizontal overflow of the page or the table container. Below a 448 px table the Date and Approve columns hide: the short date sits under the Payee, and an Unapproved row (bold) is approved from its dialog's `Approve`; the toolbar's Approve button (`Approve 1`, `Approve all N`, disabled at zero) is always present above the table; on `bank-sync` require the `SAMPLE BOOKSHOP 0193` Payee button visible and clickable at 320 px (`transactions/approve-phone` covers it). Follow imports for approval, splits for line editing, and Reconciliation for locks.
 
 ## Gotchas
 

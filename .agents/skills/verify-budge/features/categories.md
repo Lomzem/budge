@@ -9,7 +9,7 @@ Manage the jobs for money, their order and visibility, and the history destinati
 
 ## How to get to it (user POV)
 
-- Sidebar/phone View menu → Categories, or Budget → `Manage Categories` (`/categories`); Add Category and Add Category Group are also on Budget.
+- Sidebar or phone tab bar → Categories, or Budget → `Manage Categories` (`/categories`); Add Category and Add Category Group are also on Budget.
 
 ## Driving it with Playwright
 

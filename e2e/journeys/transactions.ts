@@ -80,7 +80,7 @@ export const transactions = {
 				await expect(editing.getByRole('button', { name: 'Save' })).toBeEnabled();
 				await expect(editing).toHaveAttribute('data-state', 'open');
 				await expect(editing.getByLabel('Payee')).toHaveValue('Sample Landlord');
-				await expect(editing.getByRole('alert')).toHaveCount(0);
+				await expect(editing.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 			});
 		}
 	},
@@ -91,19 +91,18 @@ export const transactions = {
 			await page.setViewportSize({ width: 320, height: 640 });
 			const table = page.locator('[data-slot="table-container"]');
 
-			await step(
-				'All Accounts lists the Unapproved bookshop row without sideways scroll',
-				async () => {
-					await page.goto('/accounts');
-					await expect(page.getByRole('heading', { level: 1, name: 'All Accounts' })).toBeVisible();
-					await expect(
-						table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193\s*, Unapproved/ })
-					).toBeVisible();
-					expect(
-						await table.evaluate((container) => container.scrollWidth <= container.clientWidth)
-					).toBe(true);
-				}
-			);
+			await step('Accounts lists the Unapproved bookshop row without sideways scroll', async () => {
+				await page.goto('/accounts');
+				await expect(
+					page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
+				).toBeVisible();
+				await expect(
+					table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193\s*, Unapproved/ })
+				).toBeVisible();
+				expect(
+					await table.evaluate((container) => container.scrollWidth <= container.clientWidth)
+				).toBe(true);
+			});
 
 			await step('approve it from its dialog', async () => {
 				await table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193\s*, Unapproved/ }).click();

@@ -12,21 +12,36 @@ function observeLayoutShifts(binding: string) {
 	interface Entry extends PerformanceEntry {
 		value: number;
 		hadRecentInput: boolean;
-		sources?: { node?: Node | null }[];
+		sources?: { node?: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }[];
 	}
+	const labelOf = (element: Element) =>
+		element.getAttribute('aria-label') ?? element.textContent.trim().replace(/\s+/g, ' ');
 	const describe = (node: Node | null | undefined) => {
 		if (!(node instanceof Element)) return node?.nodeName ?? 'unknown node';
-		const label = node.getAttribute('aria-label') ?? node.textContent.trim().replace(/\s+/g, ' ');
+		const named = node.closest('[aria-label], a, button, label, th, td, li, p, h1, h2, h3');
+		const label = labelOf(node) || (named ? labelOf(named) : '');
 		return `<${node.tagName.toLowerCase()}${node.id ? `#${node.id}` : ''}> ${label.slice(0, 60)}`;
 	};
+	const box = (rect: DOMRectReadOnly) =>
+		[rect.x, rect.y, rect.width, rect.height].map((n) => n.toFixed(1)).join(',');
+	const RECENT_INPUT_MS = 500;
+	let lastEdit = -Infinity;
+	const noteEdit = (event: Event) => {
+		lastEdit = event.timeStamp;
+	};
+	addEventListener('input', noteEdit, true);
+	addEventListener('change', noteEdit, true);
 	new PerformanceObserver((list) => {
 		for (const entry of list.getEntries() as Entry[]) {
-			if (entry.hadRecentInput) continue;
+			if (entry.hadRecentInput || entry.startTime - lastEdit < RECENT_INPUT_MS) continue;
 			const report = (window as unknown as Record<string, (shift: LayoutShift) => void>)[binding];
 			report?.({
 				url: location.pathname + location.search,
 				value: entry.value,
-				moved: (entry.sources ?? []).map((source) => describe(source.node))
+				moved: (entry.sources ?? []).map(
+					(source) =>
+						`${describe(source.node)} [${box(source.previousRect)} → ${box(source.currentRect)}]`
+				)
 			});
 		}
 	}).observe({ type: 'layout-shift', buffered: true });

@@ -9,7 +9,7 @@ Find Transactions by Payee, memo, split memo or Bank Text, then narrow by Accoun
 
 ## How to get to it (user POV)
 
-- All Accounts via sidebar or phone View menu, or a specific Account’s list through either navigation.
+- The Accounts page or a named Account's register, through the sidebar or the phone tab bar. Below the filter container's `3xl` width, the Category/Payee/date filters fold behind a `Filters` toggle (`aria-expanded`), which counts the active ones; `Clear search and filters` is always present and disabled when nothing is set.
 
 ## Driving it with Playwright
 
@@ -26,7 +26,7 @@ Preconditions:
 
 - **Bank Text:** on `/accounts`, `await page.getByRole("searchbox", { name: "Search", exact: true }).fill("0042")`; poll row edit buttons (`getByRole("table").getByRole("button", { name: /edit Transaction on/ })`) until only Sample Coffee Shop remains. Open it and require read-only Bank Text containing 0042.
 - **Split/memo/Payee:** fill Search with `birthday`, require Sample Warehouse Club. Open it to check the split memo. Search the displayed Payee name separately. For an ordinary memo, first save an invented Memo through Edit Transaction, then search it and require that Transaction; the baseline fixture supplies split memos only.
-- **Filters:** clear Search, select label `Payee` (exact) = Sample Landlord; require only that Payee. Reset with `Clear search and filters`; select Category = Gifts, require Sample Warehouse Club’s split. On All Accounts select Account = Checking; fill From and To with an observed row’s date, require only rows in range. Combine filters and Search, inspect all pages via Show more if available.
+- **Filters:** clear Search, select label `Payee` (exact) = Sample Landlord; require only that Payee. Reset with `Clear search and filters`; select Category = Gifts, require Sample Warehouse Club’s split. On the Accounts page select Account = Checking; fill From and To with an observed row’s date, require only rows in range. Combine filters and Search, inspect all pages via Show more if available.
 - **Empty/reset:** Search `SampleNoSuchPayee9001`; require the loaded empty list. Click `Clear search and filters`; require blank controls and original rows. Repeat on a named Account (no Account filter) and at 320 px; all labels and results must remain usable without overflow.
 
 ## Gotchas

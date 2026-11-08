@@ -34,7 +34,7 @@ export const imports = {
 				await page.goto('/');
 				const sidebar = page.getByRole('navigation', { name: 'Budget and Accounts' });
 				await expect(
-					sidebar.getByRole('link', { name: /^All Accounts \d+ Unapproved$/ })
+					sidebar.getByRole('link', { name: /^Accounts\s*,?\s*\d+ Unapproved$/ })
 				).toBeVisible();
 				await openAccount(page, 'Savings');
 			});
@@ -94,7 +94,7 @@ export const imports = {
 					).toBeVisible();
 					await expect(dialog.getByLabel('File')).toBeEnabled();
 					await expect(dialog).toHaveAttribute('data-state', 'open');
-					await expect(dialog.getByRole('alert')).toHaveCount(0);
+					await expect(dialog.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 				}
 			);
 		}

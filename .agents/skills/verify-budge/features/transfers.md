@@ -10,7 +10,7 @@ Move money between Accounts as one linked pair, and link an already imported opp
 
 ## How to get to it (user POV)
 
-- Add Transaction on Account or All Accounts → Category or Transfer → Transfer: <other Account>.
+- Add Transaction on an Account or the Accounts page → Category or Transfer → Transfer: <other Account>.
 - Edit an imported Transaction → the same selector → Other side choices.
 
 ## Driving it with Playwright

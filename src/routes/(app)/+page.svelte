@@ -31,6 +31,11 @@
 	const unapproved = useQuery(api.transactions.unapprovedCount, {});
 	const unapprovedCount = $derived(unapproved.data ?? 0);
 	let addAccountOpen = $state(false);
+	let cutoverUnsetOnArrival = $state(false);
+
+	$effect(() => {
+		if (settings.data?.cutoverDate === null) cutoverUnsetOnArrival = true;
+	});
 	let adding: 'group' | 'category' = $state('group');
 	let addingOpen = $state(false);
 
@@ -193,7 +198,7 @@
 			{/if}
 		</header>
 
-		{#if settings.data?.cutoverDate === null}
+		{#if cutoverUnsetOnArrival}
 			<div class="max-w-2xl rounded-lg border bg-card p-5 sm:p-6">
 				<CutoverDate />
 			</div>

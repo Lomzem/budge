@@ -34,8 +34,9 @@
 					aria-current={currentness(section.href)}
 					class="group flex h-16 flex-col items-center justify-center gap-1 text-xs text-muted-foreground aria-[current]:text-sidebar-accent-foreground"
 				>
+					<span class="group-aria-[current]:font-bold">{section.label}</span>
 					<span
-						class="relative flex h-7 w-14 items-center justify-center rounded-full group-aria-[current]:bg-sidebar-accent"
+						class="relative order-first flex h-7 w-14 items-center justify-center rounded-full group-aria-[current]:bg-sidebar-accent"
 					>
 						<Icon aria-hidden="true" class="size-5" />
 						{#if section.href === '/accounts' && unapprovedCount > 0}
@@ -48,7 +49,6 @@
 							</span>
 						{/if}
 					</span>
-					<span class="group-aria-[current]:font-bold">{section.label}</span>
 				</a>
 			</li>
 		{/each}

@@ -171,16 +171,14 @@
 			<UploadIcon aria-hidden="true" />
 			Import file
 		</Button>
-		<div class="grid min-w-36">
-			<Button
-				variant="outline"
-				disabled={approvingAll || (unapprovedCount.data ?? 0) === 0}
-				onclick={approveEvery}
-			>
-				<CheckCheckIcon aria-hidden="true" />
-				{approveAllLabel}
-			</Button>
-		</div>
+		<Button
+			variant="outline"
+			disabled={approvingAll || (unapprovedCount.data ?? 0) === 0}
+			onclick={approveEvery}
+		>
+			<CheckCheckIcon aria-hidden="true" />
+			<span class="min-w-30 text-left">{approveAllLabel}</span>
+		</Button>
 	</div>
 	<TransactionFilters bind:values={filterValues} showAccount={allAccounts} />
 	<p role="alert" class="-my-1 min-h-6 text-sm text-destructive">
@@ -294,25 +292,20 @@
 							{/if}
 						</Table.Cell>
 					</Table.Row>
-				{:else}
-					{#if loading || more.status === 'Exhausted'}
-						<Table.Row>
-							<Table.Cell colspan={allAccounts ? 8 : 7}>
-								<span class="text-muted-foreground">
-									{#if loading}
-										Loading…
-									{:else if filtering}
-										No Transactions match.
-									{:else}
-										No Transactions yet.
-									{/if}
-								</span>
-							</Table.Cell>
-						</Table.Row>
-					{/if}
 				{/each}
 			</Table.Body>
 		</Table.Root>
+		{#if rows.length === 0 && (loading || more.status === 'Exhausted')}
+			<p class="border-b px-2 py-2 text-muted-foreground sm:px-3">
+				{#if loading}
+					Loading…
+				{:else if filtering}
+					No Transactions match.
+				{:else}
+					No Transactions yet.
+				{/if}
+			</p>
+		{/if}
 	</div>
 	{#if more.status === 'CanLoadMore' || more.status === 'LoadingMore'}
 		<div>

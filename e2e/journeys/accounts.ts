@@ -12,10 +12,20 @@ async function openStartingBalance(page: Page, name: string) {
 	return dialog;
 }
 
-async function openHeld(page: Page, label: RegExp) {
-	await page.goto('/');
-	const held = page.getByRole('region', { name: 'New bank Accounts' }).getByRole('button', {
-		name: label
+function heldRegion(page: Page) {
+	return page.getByRole('region', { name: 'New bank Accounts' });
+}
+
+async function openHeld(page: Page, bankAccount: string, waiting?: string) {
+	await page.goto('/bank');
+	if (waiting !== undefined) {
+		await expect(
+			heldRegion(page).getByRole('listitem').filter({ hasText: bankAccount })
+		).toContainText(waiting);
+	}
+	const held = heldRegion(page).getByRole('button', {
+		name: `Set up ${bankAccount}`,
+		exact: true
 	});
 	await held.click();
 	return held;
@@ -142,10 +152,7 @@ export const accounts = {
 			await step(
 				'bring Sample Savings Plus into Savings with a $1,000.00 Starting Balance',
 				async () => {
-					const held = await openHeld(
-						page,
-						/^Sample Savings Plus ending 4417, from Sample Credit Union: 2 rows waiting$/
-					);
+					const held = await openHeld(page, 'Sample Savings Plus ending 4417', '2 rows waiting');
 					const choose = page.getByRole('dialog', { name: 'Sample Savings Plus ending 4417' });
 					await choose.getByRole('radio', { name: 'Into Savings' }).check();
 					await choose.getByRole('button', { name: 'Bring in its rows' }).click();
@@ -172,10 +179,7 @@ export const accounts = {
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			await step('bring Sample Rewards Card in as a new credit card owing $100.00', async () => {
-				const held = await openHeld(
-					page,
-					/^Sample Rewards Card ending 9021, from Sample Credit Union/
-				);
+				const held = await openHeld(page, 'Sample Rewards Card ending 9021');
 				const choose = page.getByRole('dialog', { name: 'Sample Rewards Card ending 9021' });
 				await choose.getByRole('radio', { name: 'Into a new Account' }).check();
 				await expect(choose.getByLabel('Name')).toHaveValue('Sample Rewards Card');
@@ -201,10 +205,7 @@ export const accounts = {
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const held = await step('ignore Sample Holiday Club', async () => {
-				const button = await openHeld(
-					page,
-					/^Sample Holiday Club ending 1180, from Sample Credit Union/
-				);
+				const button = await openHeld(page, 'Sample Holiday Club ending 1180');
 				const choose = page.getByRole('dialog', { name: 'Sample Holiday Club ending 1180' });
 				await choose.getByRole('radio', { name: 'Nowhere: ignore this bank Account' }).check();
 				await expect(
@@ -219,9 +220,7 @@ export const accounts = {
 			await step('after a reload, the other held Accounts remain and it stays gone', async () => {
 				await page.reload();
 				await expect(
-					page.getByRole('region', { name: 'New bank Accounts' }).getByRole('button', {
-						name: /^Sample Savings Plus ending 4417/
-					})
+					heldRegion(page).getByRole('button', { name: 'Set up Sample Savings Plus ending 4417' })
 				).toBeVisible();
 				await expect(held).toBeHidden();
 			});
