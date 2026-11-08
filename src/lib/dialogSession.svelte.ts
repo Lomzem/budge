@@ -17,10 +17,8 @@ export class DialogSession<Opening extends object = object, Operation extends st
 		return this.#live?.opening ?? null;
 	}
 
-	open(opening: Opening): Opening {
-		const live: Live<Opening, Operation> = $state({ opening, pending: {}, started: {} });
-		this.#live = live;
-		return live.opening;
+	open(opening: Opening) {
+		this.#live = { opening, pending: {}, started: {} };
 	}
 
 	close(opening: Opening) {

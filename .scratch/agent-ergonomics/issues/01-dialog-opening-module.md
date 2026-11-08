@@ -80,3 +80,19 @@ rename-dialog run=1 attempt=0
 - `bun run app doctor` reports `FAIL convex/_generated is fresh: stale api.d.ts`. This predates the branch: it shows on a clean tree at `62830be`.
 - account-dialog: a rejected `goto` after a successful add is now unhandled rather than shown as an Add error.
 
+
+**Principles**
+
+Three runs, each from a fresh read of `~/.agents/principles/README.md`, with every matching reference read in full.
+
+- Run 1 (against the work already done): laziness-protocol, foundational-thinking, redesign-from-first-principles, subtract-before-you-add, minimize-reader-load, outcome-oriented-execution, model-the-domain, boundary-discipline, type-system-discipline, migrate-callers-then-delete-legacy-apis, separate-before-serializing-shared-state, fix-root-causes, sequence-verifiable-units, prove-it-works, test-behavior-not-implementation, explain-the-number, encode-lessons-in-structure, build-the-lever.
+  - fix-root-causes: the rename bug was a per-dialog target-id guard, so the fix went into the shared opening rather than into rename alone. Every async dialog now runs its work through `DialogSession.run`.
+  - separate-before-serializing-shared-state: each opening owns its own Live record (`pending`, `started`), so a late result checks its opening and run rather than a shared counter. This is also why last-file-wins import is per operation.
+  - migrate-callers-then-delete-legacy-apis and subtract-before-you-add: every dialog moved over in one change, and the hand-rolled `session` counters, target-id guards and dialog-level `attempt` calls were deleted.
+  - **Correction from this run:** subtract-before-you-add and minimize-reader-load. `DialogSession.open` still returned the opening, as it did at `62830be`, but none of its 15 callers use that value. It now returns nothing, and the Live record is proxied by the `$state` field it is assigned to. After the change: `bun run check` (app up) exit 0, and the full `timeout 590 bun run test:e2e:local` passed 33 tests (4.3m).
+  - encode-lessons-in-structure: the rule lives in the API, since a stale `run` never settles. The proposed AGENTS row names `DialogSession` and the held-response E2E. A lint that bars a dialog from importing `$lib/attempt` would encode it further. That is a lint-rule change, which AGENTS.md sends to `main`, so it is proposed rather than made here.
+- Run 2 (before writing or changing tests): test-behavior-not-implementation. The correction changes no tests. The held-rename E2E asserts what a user sees (the reopened dialog keeps the old Name, shows no alert and leaves Save enabled), so it survived the `open` change to the internals unchanged.
+- Run 3 (before calling the ticket done): prove-it-works, sequence-verifiable-units, test-behavior-not-implementation, explain-the-number, encode-lessons-in-structure.
+  - prove-it-works: the correction was re-verified on the running app by the full E2E suite, not by typecheck alone.
+  - sequence-verifiable-units: the correction is its own commit on top of a green head, and it ends green.
+  - No further changes.

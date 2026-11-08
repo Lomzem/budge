@@ -85,3 +85,20 @@ Implemented on `ergo/a-dialogs-editor`, on top of ticket 01.
 
 - verify-budge `payees.md` and `transactions.md` could gain the held-recall journey. It needs a query-update hold, which `e2e/heldResponse.ts` does not offer.
 
+
+**Principles**
+
+Three runs, each from a fresh read of `~/.agents/principles/README.md`, with every matching reference read in full. The list of matches for run 1 is in ticket 01.
+
+- Run 1 (against the work already done):
+  - model-the-domain and type-system-discipline: the Category is a `Selection` (a `Choice`, `recalling` or `recallFailed`), and only `resolvedChoice` turns it into a Choice. A Payee recall that is still loading, stale or failed therefore yields a `waiting` or `invalid` payload, never a `ready` save.
+  - boundary-discipline: the editor is framework-free. `lookupOf` parses convex-svelte query state into `Lookup` at the adapter boundary, and the dialog only binds `shown` and calls the editor's functions.
+  - minimize-reader-load: the derived values replaced the synced flags `prefillsCategory`, `filledCategoryId` and `categoryPicked`, so no effect writes recall into the draft. The self-review renamed `v` to `shown` and `blank` to `freshDraft`.
+  - subtract-before-you-add: the dialog's inline recall, split and transfer logic was deleted, not wrapped. The dialog is 608 lines (831 after ticket 01, 837 at `62830be`). These counts are reported as sizes, not as a measured improvement (explain-the-number).
+  - build-the-lever and prove-it-works: the verify-budge journey is a scripted `drive.ts` with an assertions file, kept in the evidence directory. Its query-update hold exists only there, which is a gap. Promoting it into `e2e/heldResponse.ts` changes shared E2E infrastructure outside this ticket, so it is listed under Open.
+  - No code correction in this ticket's scope.
+- Run 2 (before writing or changing tests): test-behavior-not-implementation. The 35 editor tests drive only the public functions (`openDraft`, `choose`, `view`, …), and their expected values come from the rules: Uncategorized for null memory, the sign table, and the remainder table. The break-the-behavior edit (forcing `resolvedChoice` to Uncategorized) failed 5 recall tests. No test reads a private helper, so the change-the-internals edit is covered by construction. No test changed in this run.
+- Run 3 (before calling the ticket done): prove-it-works, sequence-verifiable-units, test-behavior-not-implementation, explain-the-number, encode-lessons-in-structure.
+  - encode-lessons-in-structure: the proposed AGENTS row points at the type encoding (`resolvedChoice`/`view`) and its tests rather than at an instruction.
+  - prove-it-works: the ticket 01 correction touched this dialog's `open` call. The full E2E suite after that change passed 33 tests, including transactions, splits and transfers.
+  - No further changes.
