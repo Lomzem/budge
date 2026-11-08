@@ -159,13 +159,13 @@ export default defineConfig(
 				{
 					patterns: [
 						{
-							regex: '(^|/)transactions$',
+							regex: '(^|/)transactions(\\.[cm]?[jt]s)?$',
 							importNames: ['refreshSearchText'],
 							message:
 								'Call an operation in convex/lib/transactions.ts; it keeps search text whole.'
 						},
 						{
-							regex: '(^|/)monthlyTotals$',
+							regex: '(^|/)monthlyTotals(\\.[cm]?[jt]s)?$',
 							importNames: ['countTransaction', 'rebuildTotals'],
 							message:
 								'Call an operation in convex/lib/transactions.ts; it keeps the monthly totals whole.'

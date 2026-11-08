@@ -50,6 +50,12 @@ test('only the owners import the search-text and totals updaters', async () => {
 		'no-restricted-imports',
 		'no-restricted-imports'
 	]);
+	expect(
+		await lint(
+			'convex/categories.ts',
+			"import { countTransaction } from './lib/monthlyTotals.ts';\nexport { countTransaction };\n"
+		)
+	).toEqual(['no-restricted-imports']);
 	expect(await lint('convex/migrations.ts', imports)).toEqual([]);
 	expect(
 		await lint(

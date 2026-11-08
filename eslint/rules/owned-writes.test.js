@@ -14,7 +14,12 @@ new RuleTester().run('owned-writes', rule, {
 		{ code: 'ctx.db.patch("accounts", id, { name });', options },
 		{ code: 'ctx.db.get("transactions", id);', options },
 		{ code: 'ctx.db.query("imports");', options },
-		{ code: 'cache.patch("transactions", id, {});', options }
+		{ code: 'cache.patch("transactions", id, {});', options },
+		{ code: 'const writer = cache; writer.patch("transactions", id, {});', options },
+		{
+			code: 'function f() { const writer = ctx.db; } const writer = cache; writer.patch("imports", id);',
+			options
+		}
 	],
 	invalid: [
 		...['insert', 'patch', 'replace', 'delete'].map((method) => ({
@@ -26,6 +31,26 @@ new RuleTester().run('owned-writes', rule, {
 			code: 'const { db } = ctx; db.insert("imports", row);',
 			options,
 			errors: [{ messageId: 'ownedTable', data: { table: 'imports' } }]
+		},
+		{
+			code: 'const writer = ctx.db; writer.patch("transactions", id, {});',
+			options,
+			errors: [{ messageId: 'ownedTable', data: { table: 'transactions' } }]
+		},
+		{
+			code: 'let writer; writer = ctx.db; writer.insert("imports", row);',
+			options,
+			errors: [{ messageId: 'ownedTable', data: { table: 'imports' } }]
+		},
+		{
+			code: 'const { db: writer } = ctx; const again = writer; again.delete("imports", id);',
+			options,
+			errors: [{ messageId: 'ownedTable', data: { table: 'imports' } }]
+		},
+		{
+			code: 'const { patch } = ctx.db; patch("transactions", id, {});',
+			options,
+			errors: [{ messageId: 'detachedWrite', data: { method: 'patch' } }]
 		},
 		{
 			code: 'ctx["db"]["delete"]("imports", id);',
