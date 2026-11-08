@@ -1,10 +1,11 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Download, type Locator, type Page } from '@playwright/test';
 
 import type { FixtureName } from '../../scripts/app/fixtures';
 import { formatCents, parseCents } from '../../src/lib/domain/money';
 
 export interface JourneyContext {
 	step: <T>(name: string, body: () => Promise<T>) => Promise<T>;
+	keepAsEvidence: (download: Download) => Promise<string>;
 }
 
 export interface Journey {

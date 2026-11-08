@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
 
-import { chromium, type Browser, type Page } from '@playwright/test';
+import { chromium, type Browser, type Download, type Page } from '@playwright/test';
 
 import { journeys, type NamedJourney } from '../../e2e/journeys';
 import { findCheckout, git } from '../local/checkout';
@@ -161,8 +161,14 @@ async function runJourney(
 		}
 	};
 
+	const keepAsEvidence = async (download: Download) => {
+		const path = join(dir, 'downloads', download.suggestedFilename());
+		await download.saveAs(path);
+		return path;
+	};
+
 	const limit = timeout(JOURNEY_TIMEOUT_MS);
-	const running = journey.run(page, { step });
+	const running = journey.run(page, { step, keepAsEvidence });
 	running.catch(() => undefined);
 	try {
 		await Promise.race([running, limit.expired]);
@@ -188,7 +194,7 @@ export const verify: Verb = {
 		'--list      name every journey and the fixture it reseeds.',
 		'--run NAME  name the evidence directory (default: the start time). Refuses one that exists.',
 		'Needs `up` and `login`. Reseeds the local backend with each journey’s fixture before it runs.',
-		'Writes a screenshot and ARIA snapshot per step, a trace.zip per journey, and summary.json to',
+		'Writes a screenshot and ARIA snapshot per step, a trace.zip and kept downloads per journey, and summary.json to',
 		'test-results/verify-budge/<run>/, which `down` keeps. Exits non-zero if any journey fails.'
 	].join('\n'),
 	run: async (args) => {
