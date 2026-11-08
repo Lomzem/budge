@@ -153,7 +153,7 @@
 	--radius-button-sm: min(var(--radius-md), 12px);
 	--text-button-sm: 0.8333rem;
 	--spacing-dialog-height: calc(100dvh - 2rem);
-	--spacing-dialog-height-sm: calc(100dvh - 8rem);
+	--spacing-dialog-height-sm: calc(100dvh - 6rem);
 	--spacing-side-panel-height: calc(100dvh - 4rem);
 	--container-dialog-width: calc(100% - 2rem);
 	--font-sans: 'Atkinson Hyperlegible Next', 'Atkinson Fallback', sans-serif;

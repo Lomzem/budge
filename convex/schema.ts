@@ -125,6 +125,7 @@ export default defineSchema({
 	})
 		.index('by_account_source_sourceId_date', ['accountId', 'source', 'sourceId', 'date'])
 		.index('by_transactionId_state', ['transactionId', 'state'])
+		.index('by_state_transactionId', ['state', 'transactionId'])
 		.index('by_connectionAccountId_state', ['connectionAccountId', 'state'])
 		.index('by_connectionAccountId_sourceId', ['connectionAccountId', 'sourceId']),
 

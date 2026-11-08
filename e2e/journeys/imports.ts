@@ -46,7 +46,7 @@ export const imports = {
 					page,
 					inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E BOOKSHOP', '23.45')
 				);
-				await dialog.getByRole('button', { name: 'Save' }).click();
+				await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
 				await expect(dialog).toBeHidden();
 			});
 
@@ -73,7 +73,7 @@ export const imports = {
 					page,
 					inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E SLOW CAFE', '9.87')
 				);
-				await dialog.getByRole('button', { name: 'Save' }).click();
+				await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
 				await commit.held;
 				await dialog.getByRole('button', { name: 'Cancel' }).click();
 				await expect(dialog).toBeHidden();

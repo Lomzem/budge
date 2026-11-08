@@ -55,6 +55,7 @@ function sampleArgs(ids: {
 		'transactions:approve': { transactionId },
 		'transactions:approveAll': {},
 		'transactions:unapprovedCount': {},
+		'transactions:bankChangeCount': {},
 		'reconciliation:clearedBalance': { accountId },
 		'reconciliation:reconcile': { accountId, balance: 0, date: '2026-08-14' },
 		'transactions:transferCandidates': {

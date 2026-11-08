@@ -2,11 +2,13 @@
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { useQuery } from 'convex-svelte';
 	import { tick } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -21,6 +23,7 @@
 	import CutoverDate from '$lib/components/settings/cutover-date.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { formatMonth } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
@@ -31,6 +34,8 @@
 	const settings = useQuery(api.settings.get, {});
 	const unapproved = useQuery(api.transactions.unapprovedCount, {});
 	const unapprovedCount = $derived(unapproved.data ?? 0);
+	const bankChanges = useQuery(api.transactions.bankChangeCount, {});
+	const bankChangeCount = $derived(bankChanges.data ?? 0);
 	let addAccountOpen = $state(false);
 	let cutoverUnsetOnArrival = $state(false);
 
@@ -45,7 +50,11 @@
 	const view = $derived(budget.shown);
 	const readyToAssign = $derived(budget.readyToAssign);
 	const ready = $derived(
-		view !== undefined && settings.data !== undefined && unapproved.data !== undefined
+		view !== undefined &&
+			settings.data !== undefined &&
+			unapproved.data !== undefined &&
+			bankChanges.data !== undefined &&
+			(bank.loaded || bank.failed)
 	);
 	const groupsACategoryCanJoin = $derived(
 		view?.groups
@@ -104,6 +113,13 @@
 				tone: 'warn'
 			});
 		}
+		if (bankChangeCount > 0) {
+			list.push({
+				text: `${String(bankChangeCount)} ${bankChangeCount === 1 ? 'bank change' : 'bank changes'} to review`,
+				link: { path: '/accounts', query: '?status=bank-changes' },
+				tone: 'warn'
+			});
+		}
 		if (bank.needingYou > 0) {
 			list.push({
 				text: `Bank: ${String(bank.needingYou)} ${bank.needingYou === 1 ? 'thing needs' : 'things need'} you`,
@@ -112,6 +128,28 @@
 			});
 		}
 		return list;
+	});
+
+	let needsList = $state<HTMLUListElement | null>(null);
+	let needsBefore = $state(false);
+	let needsAfter = $state(false);
+
+	function measureNeeds() {
+		if (needsList === null) return;
+		const { scrollLeft, scrollWidth, clientWidth } = needsList;
+		needsBefore = scrollLeft > 1;
+		needsAfter = scrollLeft + clientWidth < scrollWidth - 1;
+	}
+
+	$effect(() => {
+		const list = needsList;
+		if (!list || needs.length === 0) return;
+		const observer = new ResizeObserver(measureNeeds);
+		observer.observe(list);
+		for (const child of Array.from(list.children)) observer.observe(child);
+		return () => {
+			observer.disconnect();
+		};
 	});
 
 	async function select(id: Id<'categories'>, keepOpen = false) {
@@ -214,14 +252,25 @@
 			</div>
 		{/if}
 
-		<section aria-label="Needs you" class="-my-1 flex h-10 items-center pointer-coarse:h-13">
+		<section
+			aria-label="Needs you"
+			class="relative -my-1 flex h-10 items-center pointer-coarse:h-13"
+		>
 			{#if needs.length === 0}
 				<p class="flex items-center gap-2 text-muted-foreground">
 					<CircleCheckIcon aria-hidden="true" class="size-5 text-funded" />
 					Nothing needs you right now.
 				</p>
 			{:else}
-				<ul class="-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto p-1">
+				<ul
+					bind:this={needsList}
+					onscroll={measureNeeds}
+					class={[
+						'-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto mask-r-to-0 mask-l-to-0 p-1',
+						needsBefore ? 'mask-l-from-10' : 'mask-l-from-0',
+						needsAfter ? 'mask-r-from-10' : 'mask-r-from-0'
+					]}
+				>
 					{#each needs as need (need.text)}
 						{@const chip = [
 							'flex min-h-8 items-center rounded-full px-3 text-sm font-bold whitespace-nowrap pointer-coarse:min-h-11',
@@ -251,6 +300,13 @@
 						</li>
 					{/each}
 				</ul>
+				<ChevronRightIcon
+					aria-hidden="true"
+					class={[
+						'pointer-events-none absolute right-0 size-5 text-muted-foreground',
+						!needsAfter && 'invisible'
+					]}
+				/>
 			{/if}
 		</section>
 
@@ -273,7 +329,46 @@
 		{/if}
 
 		<section aria-label="Categories" class="flex flex-col gap-3">
-			<div class="flex flex-wrap gap-2">
+			<div class="sm:hidden">
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Button variant="outline" size="sm" {...props}>
+								<PencilIcon aria-hidden="true" />
+								Edit Categories
+							</Button>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="start">
+						<DropdownMenu.Item
+							disabled={addDialog?.saving() === true && adding !== 'group'}
+							onSelect={() => {
+								add('group');
+							}}
+						>
+							Add Category Group
+						</DropdownMenu.Item>
+						{#if groupsACategoryCanJoin.length > 0}
+							<DropdownMenu.Item
+								disabled={addDialog?.saving() === true && adding !== 'category'}
+								onSelect={() => {
+									add('category');
+								}}
+							>
+								Add Category
+							</DropdownMenu.Item>
+						{/if}
+						<DropdownMenu.Item
+							onSelect={() => {
+								void goto(resolve('/categories'));
+							}}
+						>
+							Manage Categories
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+			</div>
+			<div class="hidden flex-wrap gap-2 sm:flex">
 				<Button
 					variant="outline"
 					size="sm"
@@ -370,6 +465,7 @@
 				category={inspected}
 				{view}
 				editAssigned={!wide.current}
+				readyToAssign={wide.current ? undefined : readyToAssign?.amount}
 				onclose={closeInspector}
 			/>
 		{/key}

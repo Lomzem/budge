@@ -21,6 +21,7 @@
 		category,
 		view,
 		editAssigned = false,
+		readyToAssign,
 		onclose
 	}: {
 		category: CategoryBudget;
@@ -28,6 +29,8 @@
 		view: BudgetView;
 
 		editAssigned?: boolean;
+
+		readyToAssign?: number | undefined;
 		onclose: () => void;
 	} = $props();
 
@@ -148,11 +151,28 @@
 		</Button>
 	</div>
 
+	{#if readyToAssign !== undefined}
+		<p
+			class={[
+				'-mt-2 flex justify-between gap-4 rounded-md px-3 py-1.5 text-sm',
+				readyToAssign < 0 ? 'bg-destructive-tint' : 'bg-funded-tint'
+			]}
+		>
+			<span>Ready to Assign</span>
+			<span
+				class={[
+					'font-bold whitespace-nowrap tabular-nums',
+					readyToAssign < 0 ? 'text-destructive' : 'text-funded'
+				]}>{formatCents(readyToAssign)}</span
+			>
+		</p>
+	{/if}
+
 	<dl class="flex flex-col gap-1 text-sm">
 		{#each breakdown as row (row.label)}
 			{#if editAssigned && row.assigned}
 				<div class="flex items-center justify-between gap-4">
-					<dt class="text-muted-foreground">{row.label}</dt>
+					<dt class="min-w-0 text-muted-foreground">{row.label}</dt>
 					<dd>
 						<AssignedInput
 							amount={row.cents}
@@ -163,15 +183,15 @@
 				</div>
 			{:else}
 				<div class="flex justify-between gap-4">
-					<dt class="text-muted-foreground">{row.label}</dt>
-					<dd class="tabular-nums">{formatCents(row.cents)}</dd>
+					<dt class="min-w-0 text-muted-foreground">{row.label}</dt>
+					<dd class="whitespace-nowrap tabular-nums">{formatCents(row.cents)}</dd>
 				</div>
 			{/if}
 		{/each}
 		<div class="flex justify-between gap-4 border-t pt-1 font-medium">
 			<dt>Available</dt>
 			<dd class={['text-right tabular-nums', status?.class]}>
-				{formatCents(category.available)}
+				<span class="whitespace-nowrap">{formatCents(category.available)}</span>
 
 				{#if status && !category.target && !category.payment}
 					<span class="block text-xs">{status.text}</span>
@@ -226,11 +246,11 @@
 		</section>
 	{/if}
 
-	<form class="flex flex-col gap-3" aria-labelledby="move-heading" onsubmit={move}>
+	<form class="flex flex-col gap-3" aria-labelledby="move-heading" novalidate onsubmit={move}>
 		<h3 id="move-heading" class="text-sm font-medium">Move money</h3>
 		<fieldset>
 			<legend class="sr-only">Direction</legend>
-			<RadioGroup.Root bind:value={direction}>
+			<RadioGroup.Root bind:value={direction} orientation="horizontal">
 				<div class="flex items-center gap-2">
 					<RadioGroup.Item value="to" id="move-to" />
 					<Label for="move-to">Move to</Label>
@@ -261,17 +281,19 @@
 		</div>
 		<div class="flex flex-col gap-2">
 			<Label for="move-amount">Amount</Label>
-			<Input
-				id="move-amount"
-				bind:value={amount}
-				inputmode="decimal"
-				placeholder="0.00"
-				autocomplete="off"
-				required
-			/>
+			<div class="flex gap-2">
+				<Input
+					id="move-amount"
+					bind:value={amount}
+					inputmode="decimal"
+					placeholder="0.00"
+					autocomplete="off"
+					required
+				/>
+				<Button type="submit" variant="outline" disabled={moving}>Move</Button>
+			</div>
 		</div>
-		<p role="alert" class="min-h-6 text-sm text-destructive">{moveError}</p>
-		<Button type="submit" variant="outline" disabled={moving}>Move money</Button>
+		<p role="alert" class="-mt-1 min-h-5 text-sm text-destructive">{moveError}</p>
 	</form>
 </section>
 

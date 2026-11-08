@@ -333,6 +333,20 @@ export function removeLine(draft: Draft, key: number): Draft {
 	return { ...draft, lines: draft.lines.filter((line) => line.key !== key) };
 }
 
+export function fillRemainder(draft: Draft, key: number): Draft {
+	const left = remainderOf(draft);
+	const line = draft.lines.find((candidate) => candidate.key === key);
+	if (left === undefined || left <= 0 || line?.amount.trim() !== '') {
+		return draft;
+	}
+	return {
+		...draft,
+		lines: draft.lines.map((candidate) =>
+			candidate.key === key ? { ...candidate, amount: shownSize(left) } : candidate
+		)
+	};
+}
+
 export function chooseLink(draft: Draft, link: string): Draft {
 	return { ...draft, link };
 }

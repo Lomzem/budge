@@ -4,7 +4,7 @@ import { holdResponseTo } from '../heldResponse';
 import type { Journey } from './journey';
 
 const notSetUp = "Bank sync isn't set up on this server.";
-const noLogin = 'This Bank Connection has no bank login, so it never syncs.';
+const noLogin = 'A sample connection with no bank login, so it can’t sync or reconnect.';
 
 function card(page: Page, name: string) {
 	return page
@@ -26,12 +26,17 @@ export const plaid = {
 
 			await step('the sandbox connection says when it last synced', async () => {
 				await openBank(page);
-				await expect(sandbox).toContainText('Synced 2 hours ago.');
+				await expect(sandbox).toContainText('Last successful sync 2 hours ago.');
 			});
 
-			await step('Sync now says it has no bank login', async () => {
-				await sandbox.getByRole('button', { name: 'Sync now' }).click();
-				await expect(sandbox.getByRole('status')).toHaveText(noLogin);
+			await step('Sync now and Reconnect are unavailable, and say why', async () => {
+				for (const name of ['Sync now', 'Reconnect']) {
+					const button = sandbox.getByRole('button', { name, exact: true });
+					await expect(button).toHaveAttribute('aria-disabled', 'true');
+					await expect(button).toHaveAccessibleDescription(noLogin);
+				}
+				await sandbox.getByRole('button', { name: 'Sync now' }).click({ force: true });
+				await expect(sandbox.getByRole('status')).toHaveText('');
 			});
 		}
 	},
@@ -40,27 +45,29 @@ export const plaid = {
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const sync = await holdResponseTo(page, 'bankConnections:syncNow');
-			const sandbox = card(page, 'Sample Bank (Sandbox)');
+			const savings = card(page, 'Sample Savings Bank');
 			const creditUnion = card(page, 'Sample Credit Union');
+			const sandbox = card(page, 'Sample Bank (Sandbox)');
 
-			await step('Sync now on the sandbox connection, and hold it', async () => {
+			await step('Sync now on Sample Savings Bank, and hold it', async () => {
 				await openBank(page);
-				await sandbox.getByRole('button', { name: 'Sync now' }).click();
+				await savings.getByRole('button', { name: 'Sync now' }).click();
 				await sync.held;
-				await expect(sandbox.getByRole('button', { name: 'Syncing…' })).toBeDisabled();
+				await expect(savings.getByRole('button', { name: 'Syncing…' })).toBeDisabled();
 			});
 
 			await step('Sync now on Sample Credit Union while the first is held', async () => {
 				await creditUnion.getByRole('button', { name: 'Sync now' }).click();
 				await expect(creditUnion.getByRole('button', { name: 'Syncing…' })).toBeDisabled();
-				await expect(sandbox.getByRole('status')).toHaveText('');
+				await expect(savings.getByRole('status')).toHaveText('');
 				await expect(creditUnion.getByRole('status')).toHaveText('');
 			});
 
-			await step('releasing both reports each result on its own card', async () => {
+			await step('releasing both reports each result on its own card only', async () => {
 				sync.release();
-				await expect(sandbox.getByRole('status')).toHaveText(noLogin);
+				await expect(savings.getByRole('status')).toHaveText('The bank needs you to reconnect.');
 				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
+				await expect(sandbox.getByRole('status')).toHaveText('');
 			});
 		}
 	},

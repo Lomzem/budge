@@ -925,3 +925,34 @@ describe('a Transaction backed by more than ten Bank Rows', () => {
 		expect(await budget.search('corner market')).toEqual([grocerRow._id]);
 	});
 });
+
+describe('the Bank changes list', () => {
+	test('holds each flagged Transaction, newest first, until the owner resolves it', async () => {
+		const budget = await syncedBudget();
+		await ownerVersions.edited(budget);
+		const payrollRow = await budget.row('SAMPLE PAYROLL');
+		await budget.owner.mutation(api.transactions.approve, { transactionId: payrollRow._id });
+		await budget.sync(changes({ modified: [grocerChanged], removed: [payroll.transaction_id] }));
+		const listed = async (narrowing: { search?: string } = {}) =>
+			(
+				await budget.owner.query(api.transactions.list, {
+					bankChanges: true,
+					...narrowing,
+					paginationOpts: { numItems: 50, cursor: null }
+				})
+			).page.map((row) => row.payeeName);
+		const count = () =>
+			budget.owner.query(api.transactions.bankChangeCount, { accountId: budget.checking });
+
+		expect(await listed()).toEqual(['SAMPLE PAYROLL', 'SAMPLE GROCER 0193']);
+		expect(await listed({ search: 'grocer' })).toEqual(['SAMPLE GROCER 0193']);
+		expect(await count()).toBe(2);
+
+		const importId = (await budget.row('SAMPLE GROCER 0193')).bankRows[0]?._id;
+		assert(importId !== undefined, 'No Bank Row');
+		await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'mine' });
+
+		expect(await listed()).toEqual(['SAMPLE PAYROLL']);
+		expect(await count()).toBe(1);
+	});
+});

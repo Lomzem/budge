@@ -115,6 +115,12 @@
 		else error = committed.error?.message ?? "Budge couldn't save the import. Try again.";
 	}
 
+	const submitLabel = $derived.by(() => {
+		if (saving) return 'Importing…';
+		if (!ready) return 'Import';
+		return `Import ${plural(counts.new + counts.match, 'row', 'rows')}`;
+	});
+
 	function plural(count: number, one: string, many: string) {
 		return `${String(count)} ${count === 1 ? one : many}`;
 	}
@@ -214,9 +220,11 @@
 
 			<Dialog.Footer {error}>
 				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
-				<Button type="submit" disabled={!ready || saving}>
-					{saving ? 'Saving…' : 'Save'}
-				</Button>
+				<div class="grid min-w-36">
+					<Button type="submit" disabled={!ready || saving}>
+						{submitLabel}
+					</Button>
+				</div>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

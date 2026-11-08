@@ -1,11 +1,15 @@
 <script lang="ts">
 	import CheckCheckIcon from '@lucide/svelte/icons/check-check';
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UploadIcon from '@lucide/svelte/icons/upload';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useMutation, usePaginatedQuery, useQuery } from 'convex-svelte';
+	import { tick } from 'svelte';
 
+	import { replaceState } from '$app/navigation';
+	import type { ResolvedPathname } from '$app/types';
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -19,7 +23,13 @@
 
 	import ImportDialog from './import-dialog.svelte';
 	import TransactionDialog from './transaction-dialog.svelte';
-	import { filtersFromUrl, UNAPPROVED, UNCATEGORIZED } from './filters';
+	import {
+		BANK_CHANGES,
+		filtersFromUrl,
+		UNAPPROVED,
+		UNCATEGORIZED,
+		urlWithFilters
+	} from './filters';
 	import TransactionFilters from './transaction-filters.svelte';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
@@ -42,12 +52,18 @@
 
 	const SEARCH_PAUSE_MS = 300;
 	let filterValues = $state(filtersFromUrl(page.url));
-	let arrivedWith = page.url.search;
+	let arrivedAt = page.url;
 	$effect(() => {
-		const search = page.url.search;
-		if (search === arrivedWith) return;
-		arrivedWith = search;
-		filterValues = filtersFromUrl(page.url);
+		const url = page.url;
+		if (url === arrivedAt) return;
+		arrivedAt = url;
+		filterValues = filtersFromUrl(url);
+	});
+	$effect(() => {
+		const kept = urlWithFilters(new URL(location.href), filterValues);
+		if (kept.href === location.href) return;
+		const samePage = `${kept.pathname}${kept.search}${kept.hash}` as ResolvedPathname;
+		replaceState(samePage, page.state);
 	});
 
 	let search = $state('');
@@ -75,6 +91,7 @@
 		...(search === '' ? {} : { search }),
 		...categoryFilter(filterValues.categoryId),
 		...(filterValues.status === UNAPPROVED ? { approval: 'unapproved' as const } : {}),
+		...(filterValues.status === BANK_CHANGES ? { bankChanges: true as const } : {}),
 		...(filterValues.payeeId === '' ? {} : { payeeId: filterValues.payeeId as Id<'payees'> }),
 		...(filterValues.from === '' ? {} : { from: filterValues.from }),
 		...(filterValues.to === '' ? {} : { to: filterValues.to })
@@ -86,7 +103,9 @@
 		() => (filtering ? { ...scope, ...filters } : { ...scope, approval: 'unapproved' as const }),
 		{ initialNumItems: PAGE_SIZE }
 	);
-	const hasSecond = $derived(!filtering || filters.categoryId !== undefined);
+	const hasSecond = $derived(
+		!filtering || (filters.categoryId !== undefined && filters.bankChanges === undefined)
+	);
 	const second = usePaginatedQuery(
 		api.transactions.list,
 		() => {
@@ -127,9 +146,31 @@
 	);
 	const loading = $derived(first.isLoading || (secondShown && second.isLoading));
 	const more = $derived(secondShown ? second : first);
+	const canShowMore = $derived(more.status === 'CanLoadMore' || more.status === 'LoadingMore');
+	const result = $derived.by(() => {
+		if (rows.length === 0 && loading) return 'Loading Transactions…';
+		if (rows.length === 0 && filters.bankChanges) return 'No bank changes wait on you.';
+		if (rows.length === 0) return filtering ? 'No Transactions match.' : 'No Transactions yet.';
+		const counted = `${String(rows.length)} ${rows.length === 1 ? 'Transaction' : 'Transactions'}`;
+		return canShowMore ? `${counted} shown, more below` : counted;
+	});
+	let announcement = $state('');
+	function announce(message: string) {
+		announcement = announcement === message ? `${message}\u00a0` : message;
+	}
+	let addButton: HTMLButtonElement | HTMLAnchorElement | null = $state(null);
+	let approveAllButton: HTMLButtonElement | HTMLAnchorElement | null = $state(null);
+	function shownOf(selector: string) {
+		return [...document.querySelectorAll<HTMLElement>(selector)].find((element) =>
+			element.checkVisibility()
+		);
+	}
+	const editButtonOf = (row: Row | undefined) =>
+		row === undefined ? undefined : shownOf(`[data-edit="${row._id}"]`);
 	let dialogOpen = $state(false);
 	let importOpen = $state(false);
 	let editingSnapshot: Row | undefined = $state();
+	let editingAt = -1;
 	const editing = $derived(
 		editingSnapshot === undefined
 			? undefined
@@ -144,6 +185,17 @@
 		dialogOpen = true;
 	}
 
+	function returnFocus() {
+		if (editingSnapshot === undefined) return addButton ?? undefined;
+		return (
+			editButtonOf(editingSnapshot) ??
+			editButtonOf(rows[editingAt]) ??
+			editButtonOf(rows[editingAt - 1]) ??
+			addButton ??
+			undefined
+		);
+	}
+
 	function categoryOf(row: Row) {
 		if (row.transfer) return `${row.amount < 0 ? 'To' : 'From'} ${row.transfer.accountName}`;
 		if (row.splits) return 'Split';
@@ -152,6 +204,7 @@
 
 	function edit(row: Row) {
 		editingSnapshot = row;
+		editingAt = rows.findIndex((other) => other._id === row._id);
 		dialogOpen = true;
 	}
 
@@ -161,11 +214,36 @@
 		if (!changed.ok) rowError = "Budge couldn't change Cleared. Try again.";
 	}
 
-	async function approveRow(row: Row) {
+	async function approveRow(row: Row, payee: string) {
 		rowError = '';
+		const at = rows.findIndex((other) => other._id === row._id);
+		const waiting = rows.slice(at + 1).filter((other) => !other.approved);
 		const approved = await attempt(() => approve({ transactionId: row._id }));
-		if (!approved.ok) rowError = "Budge couldn't approve the Transaction. Try again.";
+		if (!approved.ok) {
+			rowError = "Budge couldn't approve the Transaction. Try again.";
+			return;
+		}
+		announce(`Approved ${payee}`);
+		await tick();
+		const next = waiting.find((other) => rows.some((shown) => shown._id === other._id));
+		const target =
+			(next && (shownOf(`[data-approve="${next._id}"]`) ?? editButtonOf(next))) ?? approveAllButton;
+		target?.focus();
 	}
+
+	let focusFrom: number | null = null;
+	function showMore() {
+		if (more.status !== 'CanLoadMore') return;
+		focusFrom = rows.length;
+		more.loadMore(PAGE_SIZE);
+	}
+	$effect(() => {
+		const count = rows.length;
+		if (focusFrom === null || count <= focusFrom || more.status === 'LoadingMore') return;
+		const firstNew = rows[focusFrom];
+		focusFrom = null;
+		void tick().then(() => editButtonOf(firstNew)?.focus());
+	});
 
 	async function approveEvery() {
 		if (approveAllBlocked) return;
@@ -174,6 +252,7 @@
 		const approved = await attempt(() => approveAll(scope));
 		approvingAll = false;
 		if (!approved.ok) rowError = "Budge couldn't approve the Transactions. Try again.";
+		else announce('Approved every Transaction');
 	}
 </script>
 
@@ -191,7 +270,7 @@
 
 <div class="flex flex-col gap-3">
 	<div class="flex flex-wrap items-center gap-2">
-		<Button onclick={add}>
+		<Button bind:ref={addButton} onclick={add}>
 			<PlusIcon aria-hidden="true" />
 			Add Transaction
 		</Button>
@@ -199,7 +278,12 @@
 			<UploadIcon aria-hidden="true" />
 			Import file
 		</Button>
-		<Button variant="outline" aria-disabled={approveAllBlocked} onclick={approveEvery}>
+		<Button
+			bind:ref={approveAllButton}
+			variant="outline"
+			aria-disabled={approveAllBlocked}
+			onclick={approveEvery}
+		>
 			<CheckCheckIcon aria-hidden="true" />
 			<span class="min-w-30 text-left">{approveAllLabel}</span>
 		</Button>
@@ -213,6 +297,8 @@
 	>
 		{problem}
 	</p>
+	<p role="status" class="sr-only">{announcement}</p>
+	<p aria-live="polite" class="min-h-5 truncate text-sm text-muted-foreground">{result}</p>
 
 	<div class="@container">
 		<Table.Root layout="fixed">
@@ -250,6 +336,7 @@
 						{/if}
 						<Table.Cell>
 							<button
+								data-edit={row._id}
 								class="block max-w-full rounded-sm text-left hover:underline"
 								onclick={() => {
 									edit(row);
@@ -300,8 +387,24 @@
 						</Table.Cell>
 						<Table.Cell align="end" numeric>
 							{formatCents(row.amount)}
-							<span class="mt-2 flex justify-end pr-1 @lg:hidden">
-								{@render cleared(row, payee)}
+							<span
+								class={[
+									'mt-2 flex items-center justify-end gap-3 pr-1',
+									row.approved ? '@lg:hidden' : '@2xl:hidden'
+								]}
+							>
+								{#if !row.approved}
+									<Button
+										data-approve={row._id}
+										size="icon-sm"
+										variant="outline"
+										onclick={() => approveRow(row, payee)}
+										aria-label="Approve {payee}, {formatDate(row.date)}"
+									>
+										<CheckIcon aria-hidden="true" />
+									</Button>
+								{/if}
+								<span class="flex @lg:hidden">{@render cleared(row, payee)}</span>
 							</span>
 						</Table.Cell>
 						<Table.Cell align="center" showFrom="lg">
@@ -310,9 +413,10 @@
 						<Table.Cell showFrom="2xl">
 							{#if !row.approved}
 								<Button
+									data-approve={row._id}
 									size="sm"
 									variant="outline"
-									onclick={() => approveRow(row)}
+									onclick={() => approveRow(row, payee)}
 									aria-label="Approve {payee}, {formatDate(row.date)}"
 								>
 									Approve
@@ -323,30 +427,21 @@
 				{/each}
 			</Table.Body>
 		</Table.Root>
-		{#if rows.length === 0 && (loading || more.status === 'Exhausted')}
-			<p class="border-b px-2 py-2 text-muted-foreground sm:px-3">
-				{#if loading}
-					Loading…
-				{:else if filtering}
-					No Transactions match.
-				{:else}
-					No Transactions yet.
-				{/if}
-			</p>
-		{/if}
 	</div>
-	{#if more.status === 'CanLoadMore' || more.status === 'LoadingMore'}
+	{#if canShowMore}
 		<div>
-			<Button
-				variant="outline"
-				disabled={more.status === 'LoadingMore'}
-				onclick={() => more.loadMore(PAGE_SIZE)}
-			>
+			<Button variant="outline" aria-disabled={more.status === 'LoadingMore'} onclick={showMore}>
 				{more.status === 'LoadingMore' ? 'Loading…' : 'Show more'}
 			</Button>
 		</div>
 	{/if}
 </div>
 
-<TransactionDialog bind:open={dialogOpen} transaction={editing} defaultAccountId={accountId} />
+<TransactionDialog
+	bind:open={dialogOpen}
+	transaction={editing}
+	defaultAccountId={accountId}
+	{returnFocus}
+	ondone={announce}
+/>
 <ImportDialog bind:open={importOpen} defaultAccountId={accountId} />

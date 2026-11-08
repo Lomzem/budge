@@ -72,9 +72,12 @@
 		<div class="flex max-w-prose flex-col gap-1">
 			<h1 class="text-2xl font-bold tracking-tight">Bank</h1>
 			<p class="text-muted-foreground">
-				Connected banks send Budge their new transactions as they post, and Budge checks each one
-				daily. New transactions count in your balances and budget right away and arrive Unapproved,
-				so you can review and approve them on each Account.
+				<span
+					>New transactions arrive Unapproved as they post, ready to review on each Account.</span
+				>
+				<span class="hidden sm:inline"
+					>They count in your balances and budget right away, and Budge checks each bank daily.</span
+				>
 			</p>
 		</div>
 		<div class="grid min-w-44">

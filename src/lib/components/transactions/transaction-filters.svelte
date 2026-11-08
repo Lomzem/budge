@@ -10,7 +10,13 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 
-	import { noFilters, UNAPPROVED, UNCATEGORIZED, type TransactionFilterValues } from './filters';
+	import {
+		BANK_CHANGES,
+		noFilters,
+		UNAPPROVED,
+		UNCATEGORIZED,
+		type TransactionFilterValues
+	} from './filters';
 
 	let {
 		values = $bindable({ ...noFilters }),
@@ -29,6 +35,7 @@
 		Object.entries(values).filter(([key, value]) => key !== 'search' && value !== '').length
 	);
 	let filtersOpen = $state(untrack(() => narrowed > 0));
+	let searchInput: HTMLInputElement | null = $state(null);
 
 	const selectClass =
 		'h-9 w-full min-w-0 rounded-md border border-input bg-card px-2.5 text-base pointer-coarse:h-11';
@@ -47,6 +54,7 @@
 			<Label for="transaction-search">Search</Label>
 			<Input
 				id="transaction-search"
+				bind:ref={searchInput}
 				type="search"
 				bind:value={values.search}
 				placeholder="Payee, memo, or bank description"
@@ -73,6 +81,7 @@
 				disabled={!active}
 				onclick={() => {
 					values = { ...noFilters };
+					searchInput?.focus();
 				}}
 			>
 				<XIcon aria-hidden="true" />
@@ -125,6 +134,7 @@
 			<select id="transaction-filter-status" bind:value={values.status} class={selectClass}>
 				<option value="">Any status</option>
 				<option value={UNAPPROVED}>Unapproved</option>
+				<option value={BANK_CHANGES}>Bank changes</option>
 			</select>
 		</div>
 		<div class="flex flex-col gap-1">

@@ -26,7 +26,8 @@ export const categories = {
 
 			await step("Budget's Add Category offers only groups a Category can join", async () => {
 				await openBudget(page);
-				await page.getByRole('button', { name: 'Add Category', exact: true }).click();
+				await page.getByRole('button', { name: 'Edit Categories' }).click();
+				await page.getByRole('menuitem', { name: 'Add Category', exact: true }).click();
 				const addCategory = page.getByRole('dialog', { name: 'Add Category' });
 				const groups = addCategory.getByLabel('Category Group').getByRole('option');
 				await expect(groups).not.toHaveCount(0);

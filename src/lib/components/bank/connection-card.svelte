@@ -16,7 +16,7 @@
 		type Report
 	} from '$lib/bankConnections.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { formatSynced } from '$lib/domain/freshness';
+	import { formatAgo } from '$lib/domain/freshness';
 
 	import { labelOf, rowsOf } from './held';
 
@@ -38,42 +38,48 @@
 	const exactTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 	const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
-	const problem = $derived.by((): { tone: 'warn' | 'bad'; text: string } | null => {
+	const problems = $derived.by((): { tone: 'warn' | 'bad'; text: string }[] => {
 		if (!connection.bankLogin) {
-			return { tone: 'warn', text: 'Has no bank login, so it never syncs.' };
+			return [
+				{
+					tone: 'warn',
+					text: 'A sample connection with no bank login, so it can’t sync or reconnect.'
+				}
+			];
 		}
+		const found: { tone: 'warn' | 'bad'; text: string }[] = [];
 		if (connection.status === 'needsAttention') {
-			return { tone: 'bad', text: 'Needs you to reconnect before it can sync again.' };
+			found.push({ tone: 'bad', text: 'Needs you to reconnect before it can sync again.' });
 		}
 		if (connection.lastError !== null) {
-			return {
+			found.push({
 				tone: 'bad',
 				text: `The sync at ${exactTime.format(connection.lastError.at)} failed: ${connection.lastError.message}`
-			};
+			});
 		}
 		if (connection.consentEndsAt !== null) {
-			return {
+			found.push({
 				tone: 'warn',
 				text: `Your consent at the bank ends ${day.format(connection.consentEndsAt)}. Reconnect to renew it.`
-			};
+			});
 		}
 		if (connection.overdue) {
-			return { tone: 'warn', text: 'Has missed its daily sync. Try Sync now.' };
+			found.push({ tone: 'warn', text: 'Has missed its daily sync. Try Sync now.' });
 		}
-		return null;
+		return found;
 	});
 	const synced = $derived(
 		connection.lastSyncedAt === null
 			? 'Never synced.'
-			: `${formatSynced(connection.lastSyncedAt, bank.now)}.`
+			: `Last successful sync ${formatAgo(connection.lastSyncedAt, bank.now)}.`
 	);
 	const pending = $derived.by(() => {
 		if (syncing) return 'Syncing…';
 		if (reconnecting) return 'Reconnecting…';
 		return null;
 	});
-	const reconnectBlocked = $derived(bank.linking !== null || syncing);
-	const syncBlocked = $derived(syncing || reconnecting);
+	const reconnectBlocked = $derived(!connection.bankLogin || bank.linking !== null || syncing);
+	const syncBlocked = $derived(!connection.bankLogin || syncing || reconnecting);
 	const reconnectFirst = $derived(
 		connection.status === 'needsAttention' || connection.consentEndsAt !== null
 	);
@@ -160,19 +166,23 @@
 						{/each}
 					{/if}
 				</p>
-				{#if problem !== null}
-					<p
-						class={[
-							'flex items-start gap-1.5 text-sm font-medium break-words',
-							problem.tone === 'bad' ? 'text-destructive' : 'text-warning'
-						]}
-					>
-						<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-						<span class="min-w-0">{problem.text}</span>
-					</p>
+				{#if problems.length > 0}
+					<ul id="problems-{connection._id}" class="flex flex-col gap-1">
+						{#each problems as problem (problem.text)}
+							<li
+								class={[
+									'flex items-start gap-1.5 text-sm font-medium break-words',
+									problem.tone === 'bad' ? 'text-destructive' : 'text-warning'
+								]}
+							>
+								<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+								<span class="min-w-0">{problem.text}</span>
+							</li>
+						{/each}
+					</ul>
 				{/if}
 				<p class="flex items-start gap-1.5 text-sm break-words text-muted-foreground">
-					{#if problem === null}
+					{#if problems.length === 0}
 						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
 					{:else}
 						<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
@@ -205,6 +215,7 @@
 				<Button
 					variant={reconnectFirst ? 'default' : 'outline'}
 					aria-disabled={reconnectBlocked}
+					aria-describedby={connection.bankLogin ? undefined : `problems-${connection._id}`}
 					onclick={reconnect}
 				>
 					{reconnecting ? 'Reconnecting…' : 'Reconnect'}
@@ -214,6 +225,7 @@
 				<Button
 					variant={reconnectFirst ? 'outline' : 'default'}
 					aria-disabled={syncBlocked}
+					aria-describedby={connection.bankLogin ? undefined : `problems-${connection._id}`}
 					onclick={sync}
 				>
 					<RefreshCwIcon aria-hidden="true" class={syncing ? 'animate-spin' : ''} />

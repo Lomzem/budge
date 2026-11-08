@@ -34,7 +34,9 @@ export const bankChanges = {
 					'SAMPLE GARDEN CENTER 7720',
 					'Bank changed this'
 				);
-				await expect(changed.getByText(/^Bank changed this: −\$44\.75 on /)).toBeVisible();
+				const banner = changed.getByRole('region', { name: 'Your bank changed this Transaction' });
+				await expect(banner).toBeFocused();
+				await expect(banner.getByText(/^The bank now says −\$44\.75 on /)).toBeVisible();
 				await changed.getByRole('button', { name: "Use the bank's version" }).click();
 				await expect(changed).toBeHidden();
 				await expect(garden).toContainText('$44.75');
@@ -44,7 +46,9 @@ export const bankChanges = {
 			await step('the removed streaming row is deleted', async () => {
 				const streaming = rowOf(page, 'SAMPLE STREAMING 4410');
 				const removed = await openBankChange(page, 'SAMPLE STREAMING 4410', 'Bank removed this');
-				await expect(removed.getByText('Bank removed this.')).toBeVisible();
+				const banner = removed.getByRole('region', { name: 'Your bank removed this Transaction' });
+				await expect(banner).toBeFocused();
+				await expect(banner.getByText(/^The bank removed it\./)).toBeVisible();
 				await removed.getByRole('button', { name: 'Delete it' }).click();
 				const confirm = page.getByRole('alertdialog', { name: 'Delete this Transaction too?' });
 				await confirm.getByRole('button', { name: 'Delete' }).click();

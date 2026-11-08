@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import { attempt } from '$lib/attempt';
-	import { getBankConnections } from '$lib/bankConnections.svelte';
+	import { getBankConnections, needsALook } from '$lib/bankConnections.svelte';
 	import ReconcileDialog from '$lib/components/accounts/reconcile-dialog.svelte';
 	import RenameAccountDialog from '$lib/components/accounts/rename-account-dialog.svelte';
 	import StartingBalanceStep from '$lib/components/accounts/starting-balance-step.svelte';
@@ -72,14 +72,14 @@
 				<p class="text-sm text-muted-foreground">
 					{account.kind === 'creditCard' ? 'Credit card' : 'Cash'} Account
 				</p>
-				<p class="min-h-5 truncate text-sm text-muted-foreground" data-testid="account-sync">
+				<p class="min-h-6 truncate text-sm/6 text-muted-foreground" data-testid="account-sync">
 					{#if feeder}
 						{formatSynced(feeder.lastSyncedAt, bank.now)} from
 						<a
 							href={resolve('/bank')}
 							class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
 							>{feeder.name}</a
-						>
+						>{#if needsALook(feeder)}<span class="font-medium text-warning"> · needs you</span>{/if}
 					{:else if bank.loaded}
 						Entered by hand or from bank files
 					{/if}

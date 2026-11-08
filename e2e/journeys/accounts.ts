@@ -153,10 +153,14 @@ export const accounts = {
 			await step(
 				'bring Sample Savings Plus into Savings with a $1,000.00 Starting Balance',
 				async () => {
-					const held = await openHeld(page, 'Sample Savings Plus ending 4417', '2 rows waiting');
+					const held = await openHeld(
+						page,
+						'Sample Savings Plus ending 4417',
+						'2 transactions waiting'
+					);
 					const choose = page.getByRole('dialog', { name: 'Sample Savings Plus ending 4417' });
 					await choose.getByRole('radio', { name: 'Into Savings' }).check();
-					await choose.getByRole('button', { name: 'Bring in its rows' }).click();
+					await choose.getByRole('button', { name: 'Import its transactions' }).click();
 					await confirmStartingBalance(page, 'Starting balance', '1,000.00');
 					await expect(held).toBeHidden();
 				}
@@ -186,7 +190,7 @@ export const accounts = {
 				await expect(choose.getByLabel('Name')).toHaveValue('Sample Rewards Card');
 				await choose.getByLabel('Name').fill('Rewards Card');
 				await choose.getByRole('radio', { name: 'Credit card' }).check();
-				await choose.getByRole('button', { name: 'Bring in its rows' }).click();
+				await choose.getByRole('button', { name: 'Import its transactions' }).click();
 				await confirmStartingBalance(page, 'Amount owed on the cutover date', '100.00');
 				await expect(held).toBeHidden();
 			});
@@ -210,7 +214,7 @@ export const accounts = {
 				const choose = page.getByRole('dialog', { name: 'Sample Holiday Club ending 1180' });
 				await choose.getByRole('radio', { name: 'Nowhere: ignore this bank Account' }).check();
 				await expect(
-					choose.getByText("Its rows are dropped, and Budge won't ask about it again.")
+					choose.getByText("Its transactions are dropped, and Budge won't ask about it again.")
 				).toBeVisible();
 				await choose.getByRole('button', { name: 'Ignore' }).click();
 				await expect(choose).toBeHidden();

@@ -33,7 +33,7 @@ Preconditions:
 
 - **Navigate:** require the heading, `aria-current="page"` on the Section, and no horizontal overflow at 320 px. Follow `Manage Categories` from the Budget (manual drive beyond the journey).
 - **Theme:** on `/settings`, choose `getByRole("radio", { name: "Dark" })`, capture; reload, require the choice kept and readable contrast. Repeat Light and System; change the OS color-scheme preference for System and require the app follows it. Check focus visibility.
-- **Guidance:** Settings → Add to Home Screen; require dialog title and Safari Share/Add/Open as Web App steps, dismiss and restore focus. On a real iPhone separately install, verify standalone launch, GitHub/email auth, live data after background/resume, 7-day session renewal, safe areas and light/dark status bar.
+- **Guidance:** Settings → Add to Home Screen; the dialog's steps follow the device: on iPhone/iPad Safari (title `Add to Home Screen`, Share/Add/Open as Web App), on Android Chrome (`Add to Home Screen`, menu → Add to home screen → Install), elsewhere (title `Install Budge`, Chrome/Edge install). Require the title and steps for the emulated device, dismiss and restore focus. On a real iPhone separately install, verify standalone launch, GitHub/email auth, live data after background/resume, 7-day session renewal, safe areas and light/dark status bar.
 
 ## Gotchas
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { FunctionReturnType } from 'convex/server';
 	import { useMutation, useQuery } from 'convex-svelte';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -20,6 +20,7 @@
 		addLine,
 		choose,
 		chooseLink,
+		fillRemainder,
 		type Draft,
 		followSaved,
 		linkQuery,
@@ -40,12 +41,18 @@
 	let {
 		open = $bindable(false),
 		transaction,
-		defaultAccountId
+		defaultAccountId,
+		returnFocus,
+		ondone
 	}: {
 		open?: boolean;
 
 		transaction?: Row | undefined;
 		defaultAccountId?: Id<'accounts'> | undefined;
+
+		returnFocus?: () => HTMLElement | undefined;
+
+		ondone?: (message: string) => void;
 	} = $props();
 
 	const accounts = getAccounts();
@@ -76,6 +83,8 @@
 
 	const locked = $derived(transaction?.reconciled === true && !unlocked);
 	const startingBalance = $derived(transaction?.startingBalance === true);
+	const flagged = $derived(transaction?.bankRows.filter((row) => row.state !== 'linked') ?? []);
+	let bankChange: HTMLElement | null = $state(null);
 
 	const payeeMemory = useQuery(
 		api.payees.lastCategory,
@@ -115,6 +124,7 @@
 	async function write(
 		work: () => PromiseLike<unknown>,
 		failure: string,
+		done: string,
 		succeeded = () => {
 			open = false;
 		}
@@ -122,8 +132,10 @@
 		const result = await dialog.run('write', work);
 		confirmDelete = false;
 		confirmBankRemoval = null;
-		if (result.ok) succeeded();
-		else error = result.error?.message ?? failure;
+		if (result.ok) {
+			succeeded();
+			ondone?.(done);
+		} else error = result.error?.message ?? failure;
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -138,7 +150,8 @@
 		const transactionId = transaction?._id;
 		await write(
 			() => (transactionId === undefined ? create(fields) : update({ transactionId, ...fields })),
-			"Budge couldn't save the Transaction. Try again."
+			"Budge couldn't save the Transaction. Try again.",
+			transactionId === undefined ? 'Transaction added' : 'Transaction saved'
 		);
 	}
 
@@ -147,18 +160,24 @@
 		const transactionId = transaction._id;
 		await write(
 			() => approve({ transactionId }),
-			"Budge couldn't approve the Transaction. Try again."
+			"Budge couldn't approve the Transaction. Try again.",
+			'Transaction approved'
 		);
 	}
 
 	async function unmatchRow(importId: Id<'imports'>) {
-		await write(() => unmatch({ importId }), "Budge couldn't Unmatch the row. Try again.");
+		await write(
+			() => unmatch({ importId }),
+			"Budge couldn't Unmatch the row. Try again.",
+			'Bank Row unmatched'
+		);
 	}
 
 	async function resolveBankRow(importId: Id<'imports'>, keep: 'bank' | 'mine') {
 		await write(
 			() => resolveBankChange({ importId, keep }),
-			"Budge couldn't resolve the bank's change. Try again."
+			"Budge couldn't resolve the bank's change. Try again.",
+			keep === 'bank' ? "Took the bank's version" : 'Kept your version'
 		);
 	}
 
@@ -168,6 +187,7 @@
 		await write(
 			() => unlock({ transactionId }),
 			"Budge couldn't unlock the Transaction. Try again.",
+			'Transaction unlocked',
 			() => {
 				unlocked = true;
 				error = '';
@@ -180,7 +200,8 @@
 		const transactionId = transaction._id;
 		await write(
 			() => remove({ transactionId }),
-			"Budge couldn't delete the Transaction. Try again."
+			"Budge couldn't delete the Transaction. Try again.",
+			'Transaction deleted'
 		);
 	}
 </script>
@@ -235,6 +256,12 @@
 								placeholder="0.00"
 								autocomplete="off"
 								required
+								onfocus={async (event: FocusEvent) => {
+									const target = event.currentTarget as HTMLInputElement;
+									draft = fillRemainder(draft, line.key);
+									await tick();
+									target.select();
+								}}
 							/>
 						</div>
 					</div>
@@ -293,11 +320,71 @@
 {/snippet}
 
 <Dialog.Root bind:open>
-	<Dialog.Content>
+	<Dialog.Content
+		onOpenAutoFocus={(event: Event) => {
+			if (bankChange === null) return;
+			event.preventDefault();
+			bankChange.focus();
+		}}
+		onCloseAutoFocus={(event: Event) => {
+			const target = returnFocus?.();
+			if (target === undefined) return;
+			event.preventDefault();
+			target.focus();
+		}}
+	>
 		<Dialog.Header>
 			<Dialog.Title>{transaction ? 'Edit Transaction' : 'Add Transaction'}</Dialog.Title>
 		</Dialog.Header>
-		<form class="flex flex-col gap-4" onsubmit={submit}>
+		<form class="flex flex-col gap-4" novalidate onsubmit={submit}>
+			{#if flagged.length > 0}
+				<section
+					bind:this={bankChange}
+					tabindex="-1"
+					aria-labelledby="transaction-bank-change"
+					class="flex flex-col gap-3 rounded-lg bg-warning-tint p-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+				>
+					<h3 id="transaction-bank-change" class="font-medium text-warning">
+						{flagged.every((row) => row.state === 'removed')
+							? 'Your bank removed this Transaction'
+							: 'Your bank changed this Transaction'}
+					</h3>
+					{#each flagged as bankRow (bankRow._id)}
+						<div class="flex flex-col gap-2">
+							<p>
+								{#if bankRow.state === 'changed'}
+									The bank now says {formatCents(bankRow.amount)} on {formatDate(bankRow.date)}.
+								{:else}
+									The bank removed it.
+								{/if}
+								<span class="text-muted-foreground">Bank Text: {bankRow.bankText}</span>
+							</p>
+							<div class="flex flex-wrap gap-2">
+								<Button
+									type="button"
+									size="sm"
+									disabled={saving}
+									onclick={() => {
+										if (bankRow.state === 'changed') void resolveBankRow(bankRow._id, 'bank');
+										else confirmBankRemoval = bankRow._id;
+									}}
+								>
+									{bankRow.state === 'changed' ? "Use the bank's version" : 'Delete it'}
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									disabled={saving}
+									onclick={() => resolveBankRow(bankRow._id, 'mine')}
+								>
+									Keep mine
+								</Button>
+							</div>
+						</div>
+					{/each}
+				</section>
+			{/if}
 			{#if locked}
 				<div class="flex flex-wrap items-center justify-between gap-2 text-sm">
 					<p class="text-muted-foreground">
@@ -487,42 +574,6 @@
 									>
 										Unmatch
 									</Button>
-								{/if}
-								{#if bankRow.state !== 'linked'}
-									<div class="flex w-full flex-col gap-2 rounded-md border p-3">
-										<p class="text-warning">
-											{#if bankRow.state === 'changed'}
-												Bank changed this: {formatCents(bankRow.amount)} on {formatDate(
-													bankRow.date
-												)}.
-											{:else}
-												Bank removed this.
-											{/if}
-										</p>
-										<div class="flex flex-wrap gap-2">
-											<Button
-												type="button"
-												size="sm"
-												variant="outline"
-												disabled={saving}
-												onclick={() => {
-													if (bankRow.state === 'changed') void resolveBankRow(bankRow._id, 'bank');
-													else confirmBankRemoval = bankRow._id;
-												}}
-											>
-												{bankRow.state === 'changed' ? "Use the bank's version" : 'Delete it'}
-											</Button>
-											<Button
-												type="button"
-												size="sm"
-												variant="outline"
-												disabled={saving}
-												onclick={() => resolveBankRow(bankRow._id, 'mine')}
-											>
-												Keep mine
-											</Button>
-										</div>
-									</div>
 								{/if}
 							</li>
 						{/each}

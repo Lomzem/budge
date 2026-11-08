@@ -20,7 +20,7 @@ async function importRow(page: Page, bankText: string, type: 'Debit' | 'Credit')
 		buffer: Buffer.from(csv)
 	});
 	await expect(dialog.getByRole('status')).toHaveText(/^1 new Transaction/);
-	await dialog.getByRole('button', { name: 'Save' }).click();
+	await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
 	await expect(dialog).toBeHidden();
 }
 

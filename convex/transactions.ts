@@ -80,10 +80,11 @@ export const list = query({
 		from: v.optional(v.string()),
 		to: v.optional(v.string()),
 		splitLines: v.optional(v.boolean()),
+		bankChanges: v.optional(v.literal(true)),
 		paginationOpts: paginationOptsValidator
 	},
 	returns: paginationResultValidator(transactionRow),
-	handler: async (ctx, { approval, paginationOpts, ...args }) => {
+	handler: async (ctx, { approval, bankChanges, paginationOpts, ...args }) => {
 		await requireOwner(ctx);
 		if (args.accountId !== undefined && (await ctx.db.get('accounts', args.accountId)) === null) {
 			throw publicError('NOT_FOUND');
@@ -94,7 +95,13 @@ export const list = query({
 		const searchOfOnlyPunctuation = searching && filters.search === '';
 		if (searchOfOnlyPunctuation) return { page: [], isDone: true, continueCursor: '' };
 
-		const result = await pageOf(ctx, filters, searching, approval, paginationOpts);
+		if (bankChanges === true && filters.splitLines) {
+			throw publicError('INVALID_INPUT', 'Bank changes list whole Transactions, not split lines.');
+		}
+		const result =
+			bankChanges === true
+				? await withBankChanges(ctx, filters, approval)
+				: await pageOf(ctx, filters, searching, approval, paginationOpts);
 		return {
 			...result,
 			page: await Promise.all(result.page.map((transaction) => toRow(ctx, transaction)))
@@ -291,6 +298,57 @@ async function filtered(
 		)
 		.paginate(paginationOpts);
 }
+
+const BANK_CHANGES_READ = 100;
+
+async function bankChanged(ctx: QueryCtx, accountId: Id<'accounts'> | undefined) {
+	const found = new Map<Id<'transactions'>, Doc<'transactions'>>();
+	for (const state of ['changed', 'removed'] as const) {
+		const flagged = await ctx.db
+			.query('imports')
+			.withIndex('by_state_transactionId', (q) => q.eq('state', state))
+			.order('desc')
+			.take(BANK_CHANGES_READ);
+		for (const { transactionId } of flagged) {
+			if (transactionId === undefined || found.has(transactionId)) continue;
+			const transaction = await ctx.db.get('transactions', transactionId);
+			if (transaction === null) continue;
+			if (accountId !== undefined && transaction.accountId !== accountId) continue;
+			found.set(transactionId, transaction);
+		}
+	}
+	return [...found.values()].sort(
+		(a, b) => b.date.localeCompare(a.date) || b._creationTime - a._creationTime
+	);
+}
+
+async function withBankChanges(
+	ctx: QueryCtx,
+	filters: Filters,
+	approval: Approval | undefined
+): Promise<PaginationResult<Doc<'transactions'>>> {
+	const { categoryId, uncategorized, payeeId, from, to, search } = filters;
+	const page = (await bankChanged(ctx, filters.accountId)).filter(
+		(transaction) =>
+			hasApproval(transaction, approval) &&
+			(categoryId === undefined || transaction.categoryId === categoryId) &&
+			(uncategorized !== true || isUncategorized(transaction)) &&
+			(payeeId === undefined || transaction.payeeId === payeeId) &&
+			transaction.date >= (from ?? FIRST_DATE) &&
+			transaction.date <= (to ?? LAST_DATE) &&
+			(search === '' || hasEveryTerm(transaction.searchText, search))
+	);
+	return { page, isDone: true, continueCursor: '' };
+}
+
+export const bankChangeCount = query({
+	args: { accountId: v.optional(v.id('accounts')) },
+	returns: v.number(),
+	handler: async (ctx, { accountId }) => {
+		await requireOwner(ctx);
+		return (await bankChanged(ctx, accountId)).length;
+	}
+});
 
 function narrowestIndex(
 	ctx: QueryCtx,

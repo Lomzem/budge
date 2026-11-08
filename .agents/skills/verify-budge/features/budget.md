@@ -12,7 +12,7 @@ Give money a job by editing a Category's Assigned amount and see Ready to Assign
 - `budget-negative`: assigning more than Ready to Assign shows the negative Ready to Assign warning.
 - `budget-groups`: each Category Group header row totals its shown and Hidden Categories' Assigned, Activity and Available.
 - `budget-carry`: a Category's Available rolls forward into the next month.
-- `budget-review-links`: the `Needs you` chips: Uncategorized and Unapproved counts link into the Accounts page already filtered; `N Categories overspent` opens the first overspent Category's inspector.
+- `budget-review-links`: the `Needs you` chips: Uncategorized, Unapproved and `N bank change(s) to review` link into the Accounts page already filtered (the last to Status `Bank changes`); `N Categories overspent` opens the first overspent Category's inspector. The Budget waits for every count before it paints, so chips never arrive one at a time; a strip that overflows fades at the clipped edge.
 
 ## How to get to it (user POV)
 
@@ -37,7 +37,7 @@ Preconditions for the manual recipes: baseline fixture and authenticated `page`;
 
 ## Gotchas
 
-- **Manual drive:** at 320 px open Groceries and edit `Assigned this month` in its inspector dialog (at `sm` and up, `Assigned for Groceries` in the table); blur and Enter each save, Escape cancels, and invalid text shows alert `Enter an amount, such as 120.00.` without changing the saved amount. Reload to prove persistence.
+- **Manual drive:** at 320 px open Groceries and edit `Assigned this month` in its inspector dialog (at `sm` and up, `Assigned for Groceries` in the table); blur and Enter each save, Escape puts back the saved amount, sums such as `100+20` save their total, and invalid text keeps the draft and shows alert `Enter an amount, such as 120.00 or 100+20. Escape puts back the saved amount.` in a popover below the field without changing the saved amount. On a phone, `Edit Categories` is a menu of Add Group, Add Category and Manage Categories. Reload to prove persistence.
 - **Manual drive:** navigate back to the cutover month and require `Previous month` disabled. With suitable Transactions and hidden Categories, verify `includes … Uncategorized`, the `Overspent` list and its `Overspent by …` amounts, and `Hidden Categories` with Available amounts. These lists have no Category-opening buttons.
 
 - The month is context state and may reset on reload; the recipe edits the current month.

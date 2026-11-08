@@ -88,7 +88,7 @@
 		const session = dialog.current;
 		if (session === null) return;
 		if (session.choice === '') {
-			session.error = 'Choose where these rows go.';
+			session.error = 'Choose where these transactions go.';
 			return;
 		}
 		const request = {
@@ -139,12 +139,12 @@
 					<Dialog.Header>
 						<Dialog.Title>{session.bankAccount.label}</Dialog.Title>
 						<Dialog.Description>
-							Its rows wait here until you choose where they go.
+							Its transactions wait here until you choose where they go.
 						</Dialog.Description>
 					</Dialog.Header>
 					<form class="flex flex-col gap-5" onsubmit={decide}>
 						<fieldset class="flex flex-col gap-3">
-							<legend class="mb-3 font-bold">Where its rows go</legend>
+							<legend class="mb-3 font-bold">Where its transactions go</legend>
 							<RadioGroup.Root bind:value={session.choice}>
 								<div class="flex min-h-9 items-center gap-2.5">
 									<RadioGroup.Item value="new" id="held-to-new" />
@@ -184,13 +184,13 @@
 							</div>
 						{:else if session.choice === 'ignore'}
 							<p class="rounded-md bg-muted p-4">
-								Its rows are dropped, and Budge won't ask about it again.
+								Its transactions are dropped, and Budge won't ask about it again.
 							</p>
 						{/if}
 						<Dialog.Footer error={session.error}>
 							<div class="grid min-w-40">
 								<Button type="submit" disabled={dialog.pending('save')}>
-									{session.choice === 'ignore' ? 'Ignore' : 'Bring in its rows'}
+									{session.choice === 'ignore' ? 'Ignore' : 'Import its transactions'}
 								</Button>
 							</div>
 						</Dialog.Footer>

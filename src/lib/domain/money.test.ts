@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { formatCents, parseCents } from './money';
+import { formatCents, parseCents, parseCentsSum } from './money';
 
 describe('parseCents', () => {
 	test.each([
@@ -25,6 +25,22 @@ describe('parseCents', () => {
 			expect(parseCents(text)).toBeUndefined();
 		}
 	);
+});
+
+describe('parseCentsSum', () => {
+	test.each([
+		['100+5', 10500],
+		['120.00 - 20.50', 9950],
+		['-10+2.5', -750],
+		['$1,000+$1', 100100],
+		['42', 4200]
+	])('adds up %j as %i cents', (text, cents) => {
+		expect(parseCentsSum(text)).toBe(cents);
+	});
+
+	test.each(['', '100+', '+', '5++5', '5+abc', '1.2.3+1'])('rejects %j', (text) => {
+		expect(parseCentsSum(text)).toBeUndefined();
+	});
 });
 
 describe('formatCents', () => {

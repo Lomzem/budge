@@ -5,6 +5,7 @@ import type { Id } from '$convex/_generated/dataModel';
 import { SPLIT_LINE_LIMIT } from './domain/splits';
 import {
 	addLine,
+	fillRemainder,
 	choose,
 	chooseLink,
 	type AccountChoice,
@@ -283,6 +284,22 @@ describe('splitting across Categories', () => {
 				remainder,
 				blankLine
 			});
+		}
+	);
+
+	test.each([
+		{ amounts: ['10.00', ''], line: 1, filled: ['10.00', '2.50'] },
+		{ amounts: ['', ''], line: 0, filled: ['12.50', ''] },
+		{ amounts: ['10.00', '1.00'], line: 1, filled: ['10.00', '1.00'] },
+		{ amounts: ['15.00', ''], line: 1, filled: ['15.00', ''] },
+		{ amounts: ['lots', ''], line: 1, filled: ['lots', ''] }
+	] satisfies { amounts: [string, string]; line: number; filled: [string, string] }[])(
+		'filling line $line of $amounts gives $filled',
+		({ amounts, line, filled: expected }) => {
+			const draft = filled('outflow', amounts);
+			const key = draft.lines[line]?.key ?? -1;
+
+			expect(fillRemainder(draft, key).lines.map((each) => each.amount)).toEqual(expected);
 		}
 	);
 
