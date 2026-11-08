@@ -20,6 +20,12 @@ const SAVINGS_BANK = {
 	itemId: 'sample-item-savings-bank'
 } as const;
 
+const COMMUNITY_BANK = {
+	name: 'Sample Community Bank',
+	itemId: 'sample-item-community-bank',
+	savings: 'cb-savings'
+} as const;
+
 const NOT_A_REAL_TOKEN = 'sample-token-that-never-decrypts';
 
 const HELD_ACCOUNTS = [
@@ -30,6 +36,8 @@ const HELD_ACCOUNTS = [
 
 const DAYS_FROM_NOW_UNTIL_CONSENT_ENDS = 5;
 const DAYS_SINCE_SAVINGS_BANK_LAST_SYNCED = 1;
+const HOURS_SINCE_COMMUNITY_BANK_LAST_SYNCED = 3;
+const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
 type SyncRow = Infer<typeof syncRow>;
@@ -40,6 +48,7 @@ export const run = internalMutation({
 	returns: v.null(),
 	handler: async (ctx) => {
 		const checking = await requireSeededAccount(ctx, 'Checking');
+		const savings = await requireSeededAccount(ctx, 'Savings');
 		const today = localIsoDate(new Date(Date.now()));
 		const daysAgo = (days: number) => addDays(today, -days);
 
@@ -127,6 +136,17 @@ export const run = internalMutation({
 		await ctx.runMutation(internal.bankConnections.flagItem, {
 			itemId: SAVINGS_BANK.itemId,
 			code: 'ITEM_LOGIN_REQUIRED'
+		});
+
+		const communityBank = await ctx.runMutation(internal.bankConnections.save, {
+			name: COMMUNITY_BANK.name,
+			itemId: COMMUNITY_BANK.itemId,
+			encryptedToken: NOT_A_REAL_TOKEN,
+			accounts: [{ externalId: COMMUNITY_BANK.savings, accountId: savings }]
+		});
+		await sync(ctx, communityBank, { discover: false });
+		await ctx.db.patch('bankConnections', communityBank, {
+			lastSyncedAt: Date.now() - HOURS_SINCE_COMMUNITY_BANK_LAST_SYNCED * HOUR_MS
 		});
 		return null;
 	}

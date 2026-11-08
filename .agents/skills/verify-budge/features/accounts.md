@@ -23,7 +23,7 @@ Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, 
 
 - `accounts/start-late-save`: the Account-action Starting balance, including a save that finishes after its dialog was dismissed.
 - `accounts/start-edit`: Starting Balance edit offers only allowed edits and saves.
-- `accounts/held-map`, `accounts/held-new-card`, `accounts/held-ignore`: the three held journeys on `bank-sync`.
+- `accounts/held-map`, `accounts/held-new-card`, `accounts/held-ignore`: the three held journeys on `bank-sync`. The dialog's description starts with `<n> transactions waiting.`; an Account already fed by a connection is described `already fed by <connection>` (Savings by Sample Community Bank); choosing an Account of the other type warns `The bank says this is a credit card, but Checking is a cash Account.`
 
 Preconditions:
 

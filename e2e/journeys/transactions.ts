@@ -16,11 +16,36 @@ export const transactions = {
 				return balance();
 			});
 
-			await step('type a new Payee and a $12.34 outflow, and the balance drops by it', async () => {
-				await page.getByRole('button', { name: 'Add Transaction' }).click();
-				const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
-				await dialog.getByLabel('Payee').pressSequentially('Smoke Test Bakery');
-				await dialog.getByLabel('Amount').fill('12.34');
+			const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
+
+			await step(
+				'Enter in Payee moves to Amount, and Save without an amount says why until one is typed',
+				async () => {
+					await page.getByRole('button', { name: 'Add Transaction' }).click();
+					await dialog.getByLabel('Payee').pressSequentially('Smoke Test Bakery');
+					await page.keyboard.press('Enter');
+					await expect(dialog.getByLabel('Amount')).toBeFocused();
+					await dialog.getByRole('button', { name: 'Save' }).click();
+					const error = dialog.getByRole('alert').filter({ hasText: /\S/ });
+					await expect(error).toHaveCount(1);
+					await dialog.getByLabel('Amount').fill('12.34');
+					await expect(error).toHaveCount(0);
+				}
+			);
+
+			await step(
+				'Escape asks before throwing the typing away, and Keep editing keeps it',
+				async () => {
+					await page.keyboard.press('Escape');
+					const discard = page.getByRole('alertdialog', { name: 'Discard your changes?' });
+					await discard.getByRole('button', { name: 'Keep editing' }).click();
+					await expect(discard).toBeHidden();
+					await expect(dialog.getByLabel('Amount')).toHaveValue('12.34');
+					await expect(dialog.getByLabel('Payee')).toHaveValue('Smoke Test Bakery');
+				}
+			);
+
+			await step('save the $12.34 outflow, and the balance drops by it', async () => {
 				await dialog.getByRole('button', { name: 'Save' }).click();
 				await expect(dialog).toBeHidden();
 				await expect(
@@ -81,6 +106,43 @@ export const transactions = {
 				await expect(editing).toHaveAttribute('data-state', 'open');
 				await expect(editing.getByLabel('Payee')).toHaveValue('Sample Landlord');
 				await expect(editing.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
+			});
+		}
+	},
+	'approve-all-undo': {
+		title:
+			'Unapproved Transactions come first under their own heading, and Approve all can be undone',
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const approveAll = page.getByRole('button', { name: /^Approve (all )?\d/ });
+			const waitingHeading = page.getByRole('rowheader', { name: 'Unapproved', exact: true });
+
+			const label = await step(
+				'Accounts heads the Unapproved rows apart from the Approved ones',
+				async () => {
+					await page.goto('/accounts');
+					await expect(waitingHeading).toBeVisible();
+					await expect(
+						page.getByRole('rowheader', { name: 'Approved', exact: true })
+					).toBeVisible();
+					return approveAll.textContent();
+				}
+			);
+
+			await step('Approve all approves them and offers Undo', async () => {
+				const counted = Number(/\d+/.exec(label ?? '')?.[0]);
+				await approveAll.click();
+				await expect(
+					page.getByText(`Approved ${String(counted)} Transaction${counted === 1 ? '' : 's'}.`)
+				).toBeVisible();
+				await expect(waitingHeading).toHaveCount(0);
+			});
+
+			await step('Undo puts exactly those back to Unapproved', async () => {
+				await page.getByRole('button', { name: 'Undo', exact: true }).click();
+				await expect(approveAll).toHaveText(label ?? '');
+				await expect(waitingHeading).toBeVisible();
+				await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0);
 			});
 		}
 	},

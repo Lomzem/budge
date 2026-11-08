@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import { holdResponseTo } from '../heldResponse';
-import type { Journey } from './journey';
+import { openAccount, type Journey } from './journey';
 
 const notSetUp = "Bank sync isn't set up on this server.";
 const noLogin = 'A sample connection with no bank login, so it can’t sync or reconnect.';
@@ -45,29 +45,29 @@ export const plaid = {
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const sync = await holdResponseTo(page, 'bankConnections:syncNow');
-			const savings = card(page, 'Sample Savings Bank');
+			const communityBank = card(page, 'Sample Community Bank');
 			const creditUnion = card(page, 'Sample Credit Union');
-			const sandbox = card(page, 'Sample Bank (Sandbox)');
+			const savings = card(page, 'Sample Savings Bank');
 
-			await step('Sync now on Sample Savings Bank, and hold it', async () => {
+			await step('Sync now on Sample Community Bank, and hold it', async () => {
 				await openBank(page);
-				await savings.getByRole('button', { name: 'Sync now' }).click();
+				await communityBank.getByRole('button', { name: 'Sync now' }).click();
 				await sync.held;
-				await expect(savings.getByRole('button', { name: 'Syncing…' })).toBeDisabled();
+				await expect(communityBank.getByRole('button', { name: 'Syncing…' })).toBeDisabled();
 			});
 
 			await step('Sync now on Sample Credit Union while the first is held', async () => {
 				await creditUnion.getByRole('button', { name: 'Sync now' }).click();
 				await expect(creditUnion.getByRole('button', { name: 'Syncing…' })).toBeDisabled();
-				await expect(savings.getByRole('status')).toHaveText('');
+				await expect(communityBank.getByRole('status')).toHaveText('');
 				await expect(creditUnion.getByRole('status')).toHaveText('');
 			});
 
 			await step('releasing both reports each result on its own card only', async () => {
 				sync.release();
-				await expect(savings.getByRole('status')).toHaveText('Reconnect this bank first.');
+				await expect(communityBank.getByRole('status')).toHaveText(notSetUp);
 				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
-				await expect(sandbox.getByRole('status')).toHaveText('');
+				await expect(savings.getByRole('status')).toHaveText('');
 			});
 		}
 	},
@@ -95,6 +95,14 @@ export const plaid = {
 				await expect(card(page, 'Sample Credit Union')).not.toContainText(needsReconnect);
 			});
 
+			await step('its Sync now is unavailable until it reconnects, and says why', async () => {
+				const syncNow = savings.getByRole('button', { name: 'Sync now' });
+				await expect(syncNow).toHaveAttribute('aria-disabled', 'true');
+				await expect(syncNow).toHaveAccessibleDescription(new RegExp(`^${needsReconnect}`));
+				await syncNow.click({ force: true });
+				await expect(savings.getByRole('status')).toHaveText('');
+			});
+
 			await step('a failed Reconnect reports why and still offers Reconnect', async () => {
 				await savings.getByRole('button', { name: 'Reconnect', exact: true }).click();
 				await expect(savings.getByRole('status')).toHaveText(notSetUp);
@@ -105,13 +113,27 @@ export const plaid = {
 		}
 	},
 	consent: {
-		title: 'a Bank Connection whose consent is ending offers to renew it',
+		title:
+			'a Bank Connection whose consent is ending offers to renew it, and its Account links to it',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const creditUnion = card(page, 'Sample Credit Union');
 
+			await step('Checking says why its bank needs you, and that link opens the card', async () => {
+				await page.goto('/');
+				await openAccount(page, 'Checking');
+				await page
+					.getByTestId('account-sync')
+					.getByRole('link', { name: /^Consent ends .+: Sample Credit Union$/ })
+					.click();
+				await expect(
+					page.getByRole('heading', { level: 1, name: 'Bank', exact: true })
+				).toBeVisible();
+				await expect(creditUnion).toBeFocused();
+				await expect(creditUnion).toBeInViewport();
+			});
+
 			await step('the card says when consent ends', async () => {
-				await openBank(page);
 				await expect(creditUnion).toContainText(
 					/Your consent at the bank ends .+\. Reconnect to renew it\./
 				);
@@ -133,6 +155,7 @@ export const plaid = {
 			const reconnect = await holdResponseTo(page, 'bankConnections:reconnect');
 			const creditUnion = card(page, 'Sample Credit Union');
 			const savings = card(page, 'Sample Savings Bank');
+			const communityBank = card(page, 'Sample Community Bank');
 
 			await step('renew Sample Credit Union and hold the result', async () => {
 				await openBank(page);
@@ -142,7 +165,7 @@ export const plaid = {
 				await expect(
 					savings.getByRole('button', { name: 'Reconnect', exact: true })
 				).toBeDisabled();
-				await expect(savings.getByRole('button', { name: 'Sync now' })).toBeEnabled();
+				await expect(communityBank.getByRole('button', { name: 'Sync now' })).toBeEnabled();
 			});
 
 			await step('releasing it reports on Sample Credit Union only', async () => {

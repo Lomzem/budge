@@ -18,6 +18,7 @@ import {
 	deleteTransaction,
 	markApproved,
 	markCleared,
+	markUnapproved,
 	payeeNameOf,
 	requireUnlocked,
 	saveTransaction,
@@ -500,14 +501,34 @@ export const approve = mutation({
 
 export const approveAll = mutation({
 	args: { accountId: v.optional(v.id('accounts')) },
-	returns: v.number(),
+	returns: v.array(v.id('transactions')),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
 		const boundedBatch = await unapproved(ctx, accountId).take(UNAPPROVED_COUNT_LIMIT);
 		for (const transaction of boundedBatch) {
 			await markApproved(ctx, transaction._id);
 		}
-		return boundedBatch.length;
+		return boundedBatch.map((transaction) => transaction._id);
+	}
+});
+
+export const unapprove = mutation({
+	args: { transactionIds: v.array(v.id('transactions')) },
+	returns: v.number(),
+	handler: async (ctx, { transactionIds }) => {
+		await requireOwner(ctx);
+		if (transactionIds.length > UNAPPROVED_COUNT_LIMIT) {
+			throw publicError('INVALID_INPUT', 'Too many Transactions to unapprove at once.');
+		}
+		let restored = 0;
+		for (const transactionId of transactionIds) {
+			const transaction = await ctx.db.get('transactions', transactionId);
+			if (transaction === null || transaction.approved === false) continue;
+			if (transaction.cleared === 'reconciled') continue;
+			await markUnapproved(ctx, transactionId);
+			restored += 1;
+		}
+		return restored;
 	}
 });
 

@@ -145,7 +145,7 @@
 	onkeydown={keydown}
 >
 	<div class="flex items-start justify-between gap-2">
-		<h2 id="inspector-heading" class="min-w-0 font-semibold break-words">{category.name}</h2>
+		<h2 id="inspector-heading" class="min-w-0 text-lg font-bold break-words">{category.name}</h2>
 		<Button variant="ghost" size="icon-sm" aria-label="Close {category.name}" onclick={onclose}>
 			<XIcon />
 		</Button>

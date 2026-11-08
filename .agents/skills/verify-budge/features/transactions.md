@@ -19,7 +19,9 @@ Enter, edit, categorize, clear, approve, and delete movements of money in an Acc
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/transactions.ts`, also run by `bun run test:e2e:local`):
 
 - `transactions/create`: typing a new Payee one key at a time leaves Save enabled (Category settles on Uncategorized, never stuck on `Looking up the last Category…`), and Add Transaction lowers the Account balance (`txn-create`). The Payee lookup returns `null` for each prefix; `patches/convex-svelte@0.15.1.patch` makes `useQuery` take a repeated `null` answer for new arguments.
+- `transactions/create` also covers the editor's keyboard and safety: Enter in Payee moves to Amount; Save with no amount shows the footer error, which clears as soon as an amount is typed; Escape on a changed form opens `Discard your changes?` (`Keep editing` keeps the typing, `Discard` closes). An unchanged form, or one mid-save, closes on Escape without asking.
 - `transactions/late-save`: a save that finishes after the dialog closed leaves the next opening alone.
+- `transactions/approve-all-undo`: on `bank-sync`, the unfiltered register heads its rows `Unapproved` then `Approved` (row headers); `Approve all N` approves them and the count line reads `Approved N Transactions. Undo`; Undo puts exactly those back to Unapproved. Undo lasts until the scope or filters change or a single row is approved.
 - `transactions/approve-phone`: at 320 px an Unapproved row opens from its Payee and is approved (`txn-list`).
 
 The recipes below cover what the journeys leave out.
@@ -43,4 +45,4 @@ Preconditions:
 
 - Amounts follow the selected Direction; changing a field without Save is not persistence.
 - Reconciled rows restrict edits until Unlock. A seeded list may not exceed a page: report pagination blocked if Show more cannot be reached with current data.
-- Sources: ticket 03, 05, 14, 16; public `transactions.list/create/update/remove/setCleared/approve/approveAll/unapprovedCount/bankChangeCount`.
+- Sources: ticket 03, 05, 14, 16; public `transactions.list/create/update/remove/setCleared/approve/approveAll/unapprove/unapprovedCount/bankChangeCount`.

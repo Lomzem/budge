@@ -70,6 +70,19 @@
 			if (cents !== undefined) draft = shown(cents);
 			void reselect(target);
 		}
+		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+			const all = [...document.querySelectorAll<HTMLInputElement>('input[data-assigned]')].filter(
+				(other) => other.checkVisibility()
+			);
+			const next = all[all.indexOf(target) + (event.key === 'ArrowDown' ? 1 : -1)];
+			if (next === undefined) return;
+			event.preventDefault();
+			if (draft !== null) {
+				if (settle() === undefined) return;
+				draft = null;
+			}
+			next.focus();
+		}
 		if (event.key === 'Escape' && (error !== '' || draft !== shown(amount))) {
 			event.stopPropagation();
 			error = '';
@@ -91,6 +104,7 @@
 		aria-describedby={error ? errorId : undefined}
 		inputmode="decimal"
 		autocomplete="off"
+		data-assigned
 	/>
 	<Popover.Root open={error !== ''}>
 		<Popover.Portal>

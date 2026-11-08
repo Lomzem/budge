@@ -528,6 +528,10 @@ export async function markApproved(ctx: MutationCtx, transactionId: Id<'transact
 	await ctx.db.patch('transactions', transactionId, { approved: true });
 }
 
+export async function markUnapproved(ctx: MutationCtx, transactionId: Id<'transactions'>) {
+	await ctx.db.patch('transactions', transactionId, { approved: false });
+}
+
 export async function moveCategoryHistory(
 	ctx: MutationCtx,
 	from: Id<'categories'>,

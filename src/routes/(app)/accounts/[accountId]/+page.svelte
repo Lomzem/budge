@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import { attempt } from '$lib/attempt';
-	import { getBankConnections, needsALook } from '$lib/bankConnections.svelte';
+	import { attentionOf, getBankConnections } from '$lib/bankConnections.svelte';
 	import ReconcileDialog from '$lib/components/accounts/reconcile-dialog.svelte';
 	import RenameAccountDialog from '$lib/components/accounts/rename-account-dialog.svelte';
 	import StartingBalanceStep from '$lib/components/accounts/starting-balance-step.svelte';
@@ -72,12 +72,17 @@
 				<p class="text-sm text-muted-foreground">
 					{account.kind === 'creditCard' ? 'Credit card' : 'Cash'} Account
 				</p>
-				<p class="min-h-6 truncate text-sm/6 text-muted-foreground" data-testid="account-sync">
+				<p
+					class="line-clamp-2 min-h-12 text-sm/6 break-words text-muted-foreground sm:line-clamp-1 sm:min-h-6"
+					data-testid="account-sync"
+				>
 					{#if feeder}
-						{#if needsALook(feeder)}
-							<span
-								class="mr-1 rounded-full bg-warning-tint px-2 py-0.5 text-xs font-bold text-warning"
-								>Needs you</span
+						{@const attention = attentionOf(feeder)}
+						{#if attention !== null}
+							<a
+								href="{resolve('/bank')}#connection-{feeder._id}"
+								class="mr-1 rounded-full bg-warning-tint px-2 py-0.5 text-xs font-bold text-warning underline-offset-4 hover:underline"
+								>{attention}<span class="sr-only">: {feeder.name}</span></a
 							>
 						{/if}
 						{formatSynced(feeder.lastSyncedAt, bank.now)} from

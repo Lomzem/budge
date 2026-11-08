@@ -2,10 +2,11 @@
 	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { useQuery } from 'convex-svelte';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import {
@@ -56,8 +57,21 @@
 		bank.all.toSorted((a, b) => order.indexOf(a._id) - order.indexOf(b._id))
 	);
 
+	let shownHash = '';
+	$effect(() => {
+		const { hash } = page.url;
+		if (!ready || connections.length === 0 || hash === shownHash) return;
+		shownHash = hash;
+		if (hash === '') return;
+		void tick().then(() => {
+			const card = document.getElementById(hash.slice(1))?.closest('article');
+			card?.scrollIntoView({ block: 'start' });
+			card?.focus({ preventScroll: true });
+		});
+	});
+
 	async function connect() {
-		if (connectBlocked) return;
+		if (!ready || blocker !== null || connectBlocked) return;
 		result = '';
 		result = (await bank.connect()) ?? '';
 	}
@@ -83,8 +97,8 @@
 		<div class="grid min-w-44">
 			<Button
 				bind:ref={connectButton}
-				disabled={!ready || blocker !== null}
-				aria-disabled={connectBlocked}
+				aria-disabled={!ready || blocker !== null || connectBlocked}
+				aria-describedby={blocker === null ? undefined : 'bank-blocker'}
 				onclick={connect}
 			>
 				<PlusIcon aria-hidden="true" />
@@ -101,12 +115,12 @@
 		<p role="status" class="text-muted-foreground">Loading…</p>
 	{:else}
 		{#if blocker === 'unavailable'}
-			<p class="rounded-lg bg-warning-tint p-4">
+			<p id="bank-blocker" class="rounded-lg bg-warning-tint p-4">
 				Bank sync isn't set up on this server: it needs Plaid credentials. You can still import a
 				bank file from an Account's page.
 			</p>
 		{:else if blocker === 'cutover'}
-			<p class="rounded-lg bg-warning-tint p-4">
+			<p id="bank-blocker" class="rounded-lg bg-warning-tint p-4">
 				Set the cutover date in <a
 					href={resolve('/settings')}
 					class="font-bold underline underline-offset-4 hover:no-underline">Settings</a

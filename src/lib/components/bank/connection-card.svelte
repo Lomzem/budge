@@ -88,7 +88,11 @@
 		return null;
 	});
 	const reconnectBlocked = $derived(!connection.bankLogin || bank.linking !== null || syncing);
-	const syncBlocked = $derived(!connection.bankLogin || syncing || reconnecting);
+	const paused = $derived(connection.bankLogin && connection.status === 'needsAttention');
+	const syncBlocked = $derived(!connection.bankLogin || paused || syncing || reconnecting);
+	const syncReason = $derived(
+		!connection.bankLogin || paused ? `problems-${connection._id}` : undefined
+	);
 	const reconnectFirst = $derived(
 		connection.status === 'needsAttention' || connection.consentEndsAt !== null
 	);
@@ -149,97 +153,105 @@
 	}
 </script>
 
-<article aria-labelledby="connection-{connection._id}" class="rounded-lg border bg-card">
-	<div class="flex flex-wrap items-start gap-x-4 gap-y-3 p-4 sm:p-5">
-		<div class="flex min-w-0 flex-1 basis-64 items-start gap-3">
+<article
+	aria-labelledby="connection-{connection._id}"
+	tabindex="-1"
+	class="scroll-mt-4 rounded-lg border bg-card outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+>
+	<div class="flex flex-col gap-3 p-4 sm:p-5">
+		<div class="flex min-w-0 items-center gap-3">
 			<span
 				class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
 			>
 				<LandmarkIcon aria-hidden="true" class="size-5" />
 			</span>
-			<div class="flex min-w-0 flex-1 flex-col gap-1">
-				<h3 id="connection-{connection._id}" class="text-lg font-bold break-words">
-					{connection.name}
-				</h3>
-				<p class="text-sm break-words text-muted-foreground">
-					{#if connection.feeds.length === 0}
-						Feeds no Budge Account yet.
-					{:else}
-						Feeds
-						{#each connection.feeds as feed, index (feed.accountId)}
-							<a
-								href={resolve('/(app)/accounts/[accountId]', { accountId: feed.accountId })}
-								class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
-								>{feed.name}</a
-							>{index < connection.feeds.length - 1 ? ', ' : '.'}
-						{/each}
-					{/if}
-				</p>
-				{#if problems.length > 0}
-					<ul id="problems-{connection._id}" class="flex flex-col gap-1">
-						{#each problems as problem (problem.text)}
-							<li
-								class={[
-									'flex items-start gap-1.5 text-sm font-medium break-words',
-									problem.tone === 'bad' ? 'text-destructive' : 'text-warning'
-								]}
-							>
-								<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-								<span class="min-w-0">{problem.text}</span>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-				<p class="flex items-start gap-1.5 text-sm break-words text-muted-foreground">
-					{#if problems.length === 0}
-						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
-					{:else}
-						<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-					{/if}
-					<span class="min-w-0">{synced}</span>
-				</p>
-				<p
-					class={[
-						'flex min-h-5 items-start gap-1.5 text-sm break-words',
-						pending === null && result?.failed ? 'text-destructive' : 'text-muted-foreground'
-					]}
-				>
-					{#if pending !== null}
-						<RefreshCwIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 animate-spin" />
-						<span class="min-w-0">{pending}</span>
-					{:else if result !== null}
-						{#if result.failed}
-							<TriangleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-						{:else}
-							<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
-						{/if}
-						<span class="min-w-0">{result.text}</span>
-					{/if}
-				</p>
-				<span role="status" class="sr-only">{result?.text ?? ''}</span>
-			</div>
+			<h3 id="connection-{connection._id}" class="min-w-0 text-lg font-bold break-words">
+				{connection.name}
+			</h3>
 		</div>
-		<div class="grid grid-cols-2 gap-2 sm:flex">
-			<div class="grid sm:w-36">
-				<Button
-					variant={reconnectFirst && connection.bankLogin ? 'default' : 'outline'}
-					aria-disabled={reconnectBlocked}
-					aria-describedby={connection.bankLogin ? undefined : `problems-${connection._id}`}
-					onclick={reconnect}
-				>
-					{reconnecting ? 'Reconnecting…' : 'Reconnect'}
-				</Button>
-			</div>
-			<div class="grid sm:w-36">
-				<Button
-					variant={reconnectFirst || !connection.bankLogin ? 'outline' : 'default'}
-					aria-disabled={syncBlocked}
-					aria-describedby={connection.bankLogin ? undefined : `problems-${connection._id}`}
-					onclick={sync}
-				>
-					<RefreshCwIcon aria-hidden="true" class={syncing ? 'animate-spin' : ''} />
-					{syncing ? 'Syncing…' : 'Sync now'}
-				</Button>
+		<div class="flex flex-col gap-1 sm:pl-13">
+			<p class="text-sm break-words text-muted-foreground">
+				{#if connection.feeds.length === 0}
+					Feeds no Budge Account yet.
+				{:else}
+					Feeds
+					{#each connection.feeds as feed, index (feed.accountId)}
+						<a
+							href={resolve('/(app)/accounts/[accountId]', { accountId: feed.accountId })}
+							class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
+							>{feed.name}</a
+						>{index < connection.feeds.length - 1 ? ', ' : '.'}
+					{/each}
+				{/if}
+			</p>
+			{#if problems.length > 0}
+				<ul id="problems-{connection._id}" class="flex flex-col gap-1">
+					{#each problems as problem (problem.text)}
+						<li
+							class={[
+								'flex items-start gap-1.5 text-sm font-medium break-words',
+								problem.tone === 'bad' ? 'text-destructive' : 'text-warning'
+							]}
+						>
+							<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+							<span class="min-w-0">{problem.text}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			<p class="flex items-start gap-1.5 text-sm break-words text-muted-foreground">
+				{#if problems.length === 0}
+					<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
+				{:else}
+					<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+				{/if}
+				<span class="min-w-0">{synced}</span>
+			</p>
+		</div>
+		<div
+			class="flex flex-col-reverse gap-x-4 gap-y-2 sm:flex-row sm:items-center sm:justify-between sm:pl-13"
+		>
+			<p
+				class={[
+					'flex min-h-5 min-w-0 flex-1 items-start gap-1.5 text-sm break-words',
+					pending === null && result?.failed ? 'text-destructive' : 'text-muted-foreground'
+				]}
+			>
+				{#if pending !== null}
+					<RefreshCwIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 animate-spin" />
+					<span class="min-w-0">{pending}</span>
+				{:else if result !== null}
+					{#if result.failed}
+						<TriangleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+					{:else}
+						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
+					{/if}
+					<span class="min-w-0">{result.text}</span>
+				{/if}
+			</p>
+			<span role="status" class="sr-only">{result?.text ?? ''}</span>
+			<div class="grid grid-cols-2 gap-2 sm:flex">
+				<div class="grid sm:w-36">
+					<Button
+						variant={reconnectFirst && connection.bankLogin ? 'default' : 'outline'}
+						aria-disabled={reconnectBlocked}
+						aria-describedby={connection.bankLogin ? undefined : `problems-${connection._id}`}
+						onclick={reconnect}
+					>
+						{reconnecting ? 'Reconnecting…' : 'Reconnect'}
+					</Button>
+				</div>
+				<div class="grid sm:w-36">
+					<Button
+						variant={reconnectFirst || !connection.bankLogin ? 'outline' : 'default'}
+						aria-disabled={syncBlocked}
+						aria-describedby={syncReason}
+						onclick={sync}
+					>
+						<RefreshCwIcon aria-hidden="true" class={syncing ? 'animate-spin' : ''} />
+						{syncing ? 'Syncing…' : 'Sync now'}
+					</Button>
+				</div>
 			</div>
 		</div>
 	</div>

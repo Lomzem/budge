@@ -114,11 +114,26 @@
 		}
 		if (view.overspent.length > 0) {
 			const count = view.overspent.length;
-			const first = view.overspent.find((over) => shownCategories.some((c) => c.id === over.id));
+			const shownOverspent = view.overspent.filter((over) =>
+				shownCategories.some((c) => c.id === over.id)
+			);
 			list.push({
 				text: `${String(count)} ${count === 1 ? 'Category' : 'Categories'} overspent`,
-				...(first === undefined ? {} : { action: () => void select(first.id, true) }),
+				...(shownOverspent.length === 0
+					? {}
+					: { action: () => void stepOverspent(shownOverspent.map((over) => over.id)) }),
 				tone: 'bad'
+			});
+		}
+		if (bank.needingYou > 0) {
+			list.push({
+				text: `Bank: ${String(bank.needingYou)} ${bank.needingYou === 1 ? 'thing needs' : 'things need'} you`,
+				link: { path: '/bank', query: '' },
+				tone: bank.all.some(
+					(connection) => connection.status === 'needsAttention' || connection.lastError !== null
+				)
+					? 'bad'
+					: 'warn'
 			});
 		}
 		if (view.uncategorizedCount > 0) {
@@ -140,13 +155,6 @@
 			list.push({
 				text: `${String(bankChangeCount)} ${bankChangeCount === 1 ? 'bank change' : 'bank changes'} to review`,
 				link: { path: '/accounts', query: '?status=bank-changes' },
-				tone: 'warn'
-			});
-		}
-		if (bank.needingYou > 0) {
-			list.push({
-				text: `Bank: ${String(bank.needingYou)} ${bank.needingYou === 1 ? 'thing needs' : 'things need'} you`,
-				link: { path: '/bank', query: '' },
 				tone: 'warn'
 			});
 		}
@@ -190,6 +198,16 @@
 			await tick();
 			document.getElementById('category-inspector')?.focus({ preventScroll: true });
 		}
+	}
+
+	async function stepOverspent(ids: Id<'categories'>[]) {
+		const at = selectedId === null ? -1 : ids.indexOf(selectedId);
+		const target = ids[(at + 1) % ids.length];
+		if (target === undefined) return;
+		await select(target, true);
+		[...document.querySelectorAll<HTMLElement>(`[data-category-id="${target}"]`)]
+			.find((button) => button.checkVisibility())
+			?.scrollIntoView({ block: 'nearest' });
 	}
 
 	async function closeInspector() {
@@ -255,26 +273,24 @@
 			{#if readyToAssign}
 				<div
 					class={[
-						'flex w-full items-center justify-between gap-x-6 rounded-lg px-4 py-2 sm:w-auto sm:min-w-56 sm:px-5 sm:py-3',
+						'flex w-full flex-wrap items-center justify-between gap-x-6 rounded-lg px-4 py-2 sm:w-auto sm:min-w-56 sm:px-5 sm:py-3',
 						readyToAssign.amount < 0 ? 'bg-destructive-tint' : 'bg-funded-tint'
 					]}
 				>
-					<div class="flex flex-col">
-						<p class="text-sm font-bold">Ready to Assign</p>
-						<p class="min-h-4 text-xs">
-							{#if readyToAssign.uncategorized !== 0}
-								includes {formatCents(readyToAssign.uncategorized)} Uncategorized
-							{/if}
-						</p>
-					</div>
+					<p class="text-sm font-bold">Ready to Assign</p>
 					<p
 						data-testid="ready-to-assign"
 						class={[
-							'border-b-4 border-double border-current text-2xl font-bold sm:text-3xl',
+							'shrink-0 border-b-4 border-double border-current text-2xl font-bold whitespace-nowrap tabular-nums sm:text-3xl',
 							readyToAssign.amount < 0 ? 'text-destructive' : 'text-funded'
 						]}
 					>
 						{formatCents(readyToAssign.amount)}
+					</p>
+					<p class="min-h-4 basis-full text-xs">
+						{#if readyToAssign.uncategorized !== 0}
+							includes {formatCents(readyToAssign.uncategorized)} Uncategorized
+						{/if}
 					</p>
 				</div>
 			{/if}

@@ -80,6 +80,10 @@
 	let confirmDelete = $state(false);
 	let confirmBankRemoval = $state<Id<'imports'> | null>(null);
 	let unlocked = $state(false);
+	let confirmUnlock = $state(false);
+	let confirmDiscard = $state(false);
+	let pristine = '';
+	let errorChecksDraft = false;
 
 	const locked = $derived(transaction?.reconciled === true && !unlocked);
 	const startingBalance = $derived(transaction?.startingBalance === true);
@@ -110,15 +114,50 @@
 		if (!open || transaction === undefined) return;
 		const live = { date: transaction.date, amount: transaction.amount };
 		untrack(() => {
+			const untouched = !changed();
 			draft = followSaved(draft, live);
+			if (untouched) pristine = JSON.stringify(draft);
 		});
 	});
 
 	function fill() {
 		dialog.open({});
 		error = '';
+		errorChecksDraft = false;
 		unlocked = false;
 		draft = freshDraft();
+		pristine = JSON.stringify(draft);
+	}
+
+	function changed() {
+		return JSON.stringify(draft) !== pristine;
+	}
+
+	function requestOpen(next: boolean) {
+		if (!next && open && !saving && changed()) {
+			confirmDiscard = true;
+			return;
+		}
+		open = next;
+	}
+
+	function discard() {
+		confirmDiscard = false;
+		open = false;
+	}
+
+	$effect(() => {
+		const { payload } = shown;
+		untrack(() => {
+			if (!errorChecksDraft || payload.kind === 'waiting') return;
+			error = payload.kind === 'invalid' ? payload.message : '';
+		});
+	});
+
+	function moveToAmount(event: KeyboardEvent) {
+		if (event.key !== 'Enter') return;
+		event.preventDefault();
+		document.getElementById('transaction-amount')?.focus();
 	}
 
 	async function write(
@@ -130,7 +169,9 @@
 		}
 	) {
 		const result = await dialog.run('write', work);
+		errorChecksDraft = false;
 		confirmDelete = false;
+		confirmUnlock = false;
 		confirmBankRemoval = null;
 		if (result.ok) {
 			succeeded();
@@ -144,6 +185,7 @@
 		if (payload.kind === 'waiting') return;
 		if (payload.kind === 'invalid') {
 			error = payload.message;
+			errorChecksDraft = true;
 			return;
 		}
 		const { fields } = payload;
@@ -323,7 +365,7 @@
 	</fieldset>
 {/snippet}
 
-<Dialog.Root bind:open>
+<Dialog.Root bind:open={() => open, requestOpen}>
 	<Dialog.Content
 		onOpenAutoFocus={(event: Event) => {
 			if (bankChange === null) return;
@@ -355,14 +397,27 @@
 					</h3>
 					{#each flagged as bankRow (bankRow._id)}
 						<div class="flex flex-col gap-2">
-							<p>
-								{#if bankRow.state === 'changed'}
-									The bank now says {formatCents(bankRow.amount)} on {formatDate(bankRow.date)}.
-								{:else}
-									The bank removed it.
-								{/if}
-								<span class="text-muted-foreground">Bank Text: {bankRow.bankText}</span>
-							</p>
+							{#if bankRow.state === 'changed'}
+								<div class="flex flex-col gap-0.5">
+									<p>
+										The bank now says <strong class="tabular-nums"
+											>{formatCents(bankRow.amount)}</strong
+										>
+										on {formatDate(bankRow.date)}.
+									</p>
+									{#if transaction}
+										<p>
+											You have <strong class="tabular-nums"
+												>{formatCents(transaction.amount)}</strong
+											>
+											on {formatDate(transaction.date)}.
+										</p>
+									{/if}
+								</div>
+							{:else}
+								<p>The bank removed it.</p>
+							{/if}
+							<p class="text-muted-foreground">Bank Text: {bankRow.bankText}</p>
 							<div class="flex flex-wrap gap-2">
 								<Button
 									type="button"
@@ -399,11 +454,15 @@
 						size="sm"
 						variant="outline"
 						disabled={saving}
-						onclick={unlockTransaction}
+						onclick={() => (confirmUnlock = true)}
 					>
 						Unlock
 					</Button>
 				</div>
+			{:else if unlocked}
+				<p role="status" class="text-sm text-muted-foreground">
+					Unlocked: it's no longer Reconciled. Reconcile the Account again to lock it.
+				</p>
 			{/if}
 			<div class="flex flex-col gap-2">
 				<Label for="transaction-account">Account</Label>
@@ -438,6 +497,7 @@
 						autocomplete="off"
 						list="transaction-payees"
 						disabled={startingBalance}
+						onkeydown={moveToAmount}
 					/>
 					<datalist id="transaction-payees">
 						{#each payees.data ?? [] as payee (payee._id)}
@@ -665,6 +725,37 @@
 					if (confirmBankRemoval !== null) void resolveBankRow(confirmBankRemoval, 'bank');
 				}}>Delete</AlertDialog.Action
 			>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root bind:open={confirmUnlock}>
+	<AlertDialog.Content onCloseAutoFocus={keepEditorFocus}>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Unlock this Transaction?</AlertDialog.Title>
+			<AlertDialog.Description>
+				It stops being Reconciled right away, so its Account, date and amount can change and it can
+				be deleted. Reconcile the Account again to lock it.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Keep it locked</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={unlockTransaction} disabled={saving}>Unlock</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root bind:open={confirmDiscard}>
+	<AlertDialog.Content onCloseAutoFocus={keepEditorFocus}>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Discard your changes?</AlertDialog.Title>
+			<AlertDialog.Description>
+				{transaction ? 'Your edits to this Transaction' : 'This new Transaction'} won't be saved.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Keep editing</AlertDialog.Cancel>
+			<AlertDialog.Action variant="destructive" onclick={discard}>Discard</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

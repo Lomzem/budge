@@ -62,13 +62,19 @@ export const reconciliation = {
 			);
 
 			await step(
-				"opening it shows the lock; its amount can't be edited until it's unlocked",
+				"opening it shows the lock; its amount can't be edited until an Unlock is confirmed",
 				async () => {
 					await adjustment.getByRole('button', { name: /^Reconciliation Adjustment/ }).click();
 					await expect(dialog.getByLabel('Amount')).toBeDisabled();
 					await expect(dialog.getByRole('button', { name: 'Delete' })).toHaveCount(0);
 					await dialog.getByRole('button', { name: 'Unlock' }).click();
+					const confirm = page.getByRole('alertdialog', { name: 'Unlock this Transaction?' });
+					await confirm.getByRole('button', { name: 'Keep it locked' }).click();
+					await expect(dialog.getByLabel('Amount')).toBeDisabled();
+					await dialog.getByRole('button', { name: 'Unlock' }).click();
+					await confirm.getByRole('button', { name: 'Unlock' }).click();
 					await expect(dialog.getByLabel('Amount')).toBeEnabled();
+					await expect(dialog.getByRole('status').filter({ hasText: /^Unlocked/ })).toBeVisible();
 					await page.keyboard.press('Escape');
 					await expect(dialog).toBeHidden();
 					await expect(adjustment.getByRole('checkbox', { name: /^Cleared/ })).toBeChecked();

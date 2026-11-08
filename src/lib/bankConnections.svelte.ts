@@ -23,6 +23,18 @@ export function needsALook(connection: BankConnection) {
 	);
 }
 
+const shortDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+
+export function attentionOf(connection: BankConnection): string | null {
+	if (connection.status === 'needsAttention') return 'Reconnect needed';
+	if (connection.lastError !== null) return 'Last sync failed';
+	if (connection.consentEndsAt !== null) {
+		return `Consent ends ${shortDay.format(connection.consentEndsAt)}`;
+	}
+	if (connection.overdue) return 'Missed its daily sync';
+	return null;
+}
+
 export interface Report {
 	text: string;
 	failed: boolean;

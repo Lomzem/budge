@@ -4,7 +4,7 @@
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
-	import type { HeldAccount } from '$lib/bankConnections.svelte';
+	import { getBankConnections, type HeldAccount } from '$lib/bankConnections.svelte';
 	import StartingBalanceStep from '$lib/components/accounts/starting-balance-step.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -13,7 +13,7 @@
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 
-	import { labelOf } from './held';
+	import { labelOf, rowsOf } from './held';
 
 	type AccountKind = 'cash' | 'creditCard';
 	interface MappedAccount {
@@ -36,8 +36,23 @@
 
 	const client = useConvexClient();
 	const accounts = getAccounts();
+	const bank = getBankConnections();
+	const fedBy = $derived(
+		new Map(
+			bank.all.flatMap((connection) =>
+				connection.feeds.map((feed) => [feed.accountId, connection.name] as const)
+			)
+		)
+	);
+	const kindName = (kind: AccountKind) =>
+		kind === 'creditCard' ? 'a credit card' : 'a cash Account';
 	const dialog = new DialogSession<{
-		bankAccount: { _id: Id<'connectionAccounts'>; label: string };
+		bankAccount: {
+			_id: Id<'connectionAccounts'>;
+			label: string;
+			waiting: string;
+			kind: AccountKind | null;
+		};
 		choice: string;
 		name: string;
 		kind: AccountKind;
@@ -53,7 +68,12 @@
 
 	export function open(account: HeldAccount) {
 		dialog.open({
-			bankAccount: { _id: account._id, label: labelOf(account) },
+			bankAccount: {
+				_id: account._id,
+				label: labelOf(account),
+				waiting: rowsOf(account),
+				kind: account.kind
+			},
 			choice: sameName(account)?._id ?? 'new',
 			name: account.name ?? '',
 			kind: account.kind ?? 'cash',
@@ -139,7 +159,7 @@
 					<Dialog.Header>
 						<Dialog.Title>{session.bankAccount.label}</Dialog.Title>
 						<Dialog.Description>
-							Its transactions wait here until you choose where they go.
+							{session.bankAccount.waiting}. They wait here until you choose where they go.
 						</Dialog.Description>
 					</Dialog.Header>
 					<form class="flex flex-col gap-5" onsubmit={decide}>
@@ -151,9 +171,21 @@
 									<Label for="held-to-new">Into a new Account</Label>
 								</div>
 								{#each accounts.all as account (account._id)}
+									{@const feeder = fedBy.get(account._id)}
 									<div class="flex min-h-9 items-center gap-2.5">
-										<RadioGroup.Item value={account._id} id="held-to-{account._id}" />
+										<RadioGroup.Item
+											value={account._id}
+											id="held-to-{account._id}"
+											aria-describedby={feeder === undefined
+												? undefined
+												: `held-fed-${account._id}`}
+										/>
 										<Label for="held-to-{account._id}">Into {account.name}</Label>
+										{#if feeder !== undefined}
+											<span id="held-fed-{account._id}" class="text-sm text-muted-foreground"
+												>already fed by {feeder}</span
+											>
+										{/if}
 									</div>
 								{/each}
 								<div class="flex min-h-9 items-center gap-2.5">
@@ -182,7 +214,16 @@
 									</RadioGroup.Root>
 								</fieldset>
 							</div>
-						{:else if session.choice === 'ignore'}
+						{:else if session.choice !== 'ignore'}
+							{@const target = accounts.find(session.choice)}
+							{#if target !== undefined && session.bankAccount.kind !== null && target.kind !== session.bankAccount.kind}
+								<p class="rounded-md bg-warning-tint p-4 text-warning">
+									The bank says this is {kindName(session.bankAccount.kind)}, but {target.name} is {kindName(
+										target.kind
+									)}. Choose a matching Account or a new one, so its balance counts the right way.
+								</p>
+							{/if}
+						{:else}
 							<p class="rounded-md bg-muted p-4">
 								Its transactions are dropped, and Budge won't ask about it again.
 							</p>

@@ -8,7 +8,7 @@ Give money a job by editing a Category's Assigned amount and see Ready to Assign
 - `budget-assign`: adding $10 to Groceries lowers Ready to Assign by $10.
 - `budget-persist`: reload retains Assigned and Ready to Assign.
 - `budget-month`: next then previous month preserves the original month's Assigned; Ready to Assign is global.
-- `budget-mobile`: below `sm` the table shows Category and Available only (one row per Category with its status, Target bar and card notes under the name); Assigned is edited in the Category's inspector dialog (`Assigned this month`), and nothing overflows at 320 px. Ready to Assign is a full-width row with its label (and any Uncategorized note) on the left and the amount on the right, and `Needs you` is a fixed-height strip of chips that scrolls sideways instead of wrapping.
+- `budget-mobile`: below `sm` the table shows Category and Available only (one row per Category with its status, Target bar and card notes under the name); Assigned is edited in the Category's inspector dialog (`Assigned this month`), and nothing overflows at 320 px. Ready to Assign is a full-width row with its label on the left and the amount (never wrapped) on the right, and any Uncategorized note on its own reserved line beneath, and `Needs you` is a fixed-height strip of chips that scrolls sideways instead of wrapping.
 - `budget-negative`: assigning more than Ready to Assign shows the negative Ready to Assign warning.
 - `budget-groups`: each Category Group header row totals its shown and Hidden Categories' Assigned, Activity and Available.
 - `budget-carry`: a Category's Available rolls forward into the next month.
@@ -24,8 +24,8 @@ Give money a job by editing a Category's Assigned amount and see Ready to Assign
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the sources are `e2e/journeys/budget.ts` and `e2e/journeys/shell.ts`, also run by `bun run test:e2e:local`):
 
-- `budget/assign`: `budget-assign`, `budget-persist`, `budget-month` in the current month.
-- `budget/needs-you`: `budget-review-links`: the Uncategorized and Unapproved chips land on a filtered register, and the overspent chip opens the first overspent Category.
+- `budget/assign`: `budget-assign`, `budget-persist`, `budget-month` in the current month, and ArrowDown/ArrowUp move between Assigned fields (saving a changed amount first; an invalid one keeps focus).
+- `budget/needs-you`: `budget-review-links`: the Uncategorized and Unapproved chips land on a filtered register, and the overspent chip opens the first overspent Category; each further click steps to the next one, scrolling its row into view. `Needs you` lists the over-assigned and overspent chips first, then the Bank chip (red when a connection needs a reconnect or failed), then the register chips.
 - See also `shell/navigate` in [shell.md](shell.md): `budget-entry` and phone navigation/overflow only; phone Assigned editing needs a manual drive.
 
 Preconditions for the manual recipes: baseline fixture and authenticated `page`; start in the current month at `/`, with the `Budget` H1 and `getByRole('textbox', { name: 'Assigned for Groceries' })`.

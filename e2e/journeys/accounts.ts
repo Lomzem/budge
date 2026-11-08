@@ -159,7 +159,9 @@ export const accounts = {
 						'2 transactions waiting'
 					);
 					const choose = page.getByRole('dialog', { name: 'Sample Savings Plus ending 4417' });
-					await choose.getByRole('radio', { name: 'Into Savings' }).check();
+					const savings = choose.getByRole('radio', { name: 'Into Savings' });
+					await expect(savings).toHaveAccessibleDescription('already fed by Sample Community Bank');
+					await savings.check();
 					await choose.getByRole('button', { name: 'Import its transactions' }).click();
 					await confirmStartingBalance(page, 'Starting balance', '1,000.00');
 					await expect(held).toBeHidden();
@@ -183,17 +185,25 @@ export const accounts = {
 			'a held card becomes a new credit-card Account whose Starting Balance is the amount owed',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
-			await step('bring Sample Rewards Card in as a new credit card owing $100.00', async () => {
-				const held = await openHeld(page, 'Sample Rewards Card ending 9021');
-				const choose = page.getByRole('dialog', { name: 'Sample Rewards Card ending 9021' });
-				await choose.getByRole('radio', { name: 'Into a new Account' }).check();
-				await expect(choose.getByLabel('Name')).toHaveValue('Sample Rewards Card');
-				await choose.getByLabel('Name').fill('Rewards Card');
-				await choose.getByRole('radio', { name: 'Credit card' }).check();
-				await choose.getByRole('button', { name: 'Import its transactions' }).click();
-				await confirmStartingBalance(page, 'Amount owed on the cutover date', '100.00');
-				await expect(held).toBeHidden();
-			});
+			await step(
+				'Sample Rewards Card warns against a cash Account, then comes in as a new credit card owing $100.00',
+				async () => {
+					const held = await openHeld(page, 'Sample Rewards Card ending 9021');
+					const choose = page.getByRole('dialog', { name: 'Sample Rewards Card ending 9021' });
+					await expect(choose).toContainText('2 transactions waiting.');
+					await choose.getByRole('radio', { name: 'Into Checking' }).check();
+					await expect(choose).toContainText(
+						'The bank says this is a credit card, but Checking is a cash Account.'
+					);
+					await choose.getByRole('radio', { name: 'Into a new Account' }).check();
+					await expect(choose.getByLabel('Name')).toHaveValue('Sample Rewards Card');
+					await choose.getByLabel('Name').fill('Rewards Card');
+					await choose.getByRole('radio', { name: 'Credit card' }).check();
+					await choose.getByRole('button', { name: 'Import its transactions' }).click();
+					await confirmStartingBalance(page, 'Amount owed on the cutover date', '100.00');
+					await expect(held).toBeHidden();
+				}
+			);
 
 			await step('Rewards Card lists its rows and owes the amount plus their charges', async () => {
 				await openAccount(page, 'Rewards Card');

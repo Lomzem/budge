@@ -54,6 +54,7 @@ function sampleArgs(ids: {
 		'transactions:unlock': { transactionId },
 		'transactions:approve': { transactionId },
 		'transactions:approveAll': {},
+		'transactions:unapprove': { transactionIds: [transactionId] },
 		'transactions:unapprovedCount': {},
 		'transactions:bankChangeCount': {},
 		'reconciliation:clearedBalance': { accountId },

@@ -481,7 +481,7 @@ describe('approving', () => {
 		expect(await dates({ uncategorized: true })).toEqual([]);
 	});
 
-	test('editing approves, and Approve all approves the rest; Unapproved list first', async () => {
+	test('editing approves, Approve all approves the rest and Undo restores only those; Unapproved list first', async () => {
 		const { owner, checking } = await budgetWithChecking();
 		await owner.mutation(api.transactions.create, {
 			accountId: checking,
@@ -526,9 +526,17 @@ describe('approving', () => {
 		await owner.mutation(api.transactions.approve, { transactionId: second._id });
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(2);
 
-		expect(await owner.mutation(api.transactions.approveAll, { accountId: checking })).toBe(2);
+		const approvedAll = await owner.mutation(api.transactions.approveAll, { accountId: checking });
+		expect(approvedAll).toHaveLength(2);
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(0);
 		expect(await list('unapproved')).toEqual([]);
+
+		expect(await owner.mutation(api.transactions.unapprove, { transactionIds: approvedAll })).toBe(
+			2
+		);
+		expect((await list('unapproved')).map((row) => row._id)).toEqual(
+			unapproved.slice(2).map((row) => row._id)
+		);
 	});
 
 	test('counts Unapproved Transactions to one past the limit, so the count reads as at least', async () => {

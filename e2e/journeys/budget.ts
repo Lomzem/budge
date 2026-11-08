@@ -37,6 +37,15 @@ export const budget = {
 				await expect.poll(readyToAssign).toBe(before.readyToAssign - 1_000);
 			});
 
+			await step('ArrowDown and ArrowUp move between Assigned fields', async () => {
+				await assigned.press('ArrowDown');
+				const below = page.locator('input[data-assigned]:focus');
+				await expect(below).toHaveCount(1);
+				await expect(assigned).not.toBeFocused();
+				await below.press('ArrowUp');
+				await expect(assigned).toBeFocused();
+			});
+
 			await step('a reload keeps Assigned and Ready to Assign', async () => {
 				await page.reload();
 				await expect(assigned).toHaveValue(tenDollarsMore);
@@ -101,11 +110,25 @@ export const budget = {
 				});
 			}
 
-			await step('the overspent item opens the first overspent Category', async () => {
-				await openBudget(page);
-				await needsYou.getByRole('button', { name: /^\d+ Categories? overspent$/ }).click();
+			const first = await step(
+				'the overspent item opens the first overspent Category',
+				async () => {
+					await openBudget(page);
+					await needsYou.getByRole('button', { name: /^\d+ Categories? overspent$/ }).click();
+					const opened = page.getByRole('table').getByRole('button', { expanded: true });
+					await expect(opened).toHaveCount(1);
+					const name = (await opened.textContent())?.trim() ?? '';
+					await expect(page.getByRole('region', { name, exact: true })).toContainText(
+						'Overspent by'
+					);
+					return name;
+				}
+			);
+
+			await step('clicking it again steps to the next overspent Category', async () => {
+				await needsYou.getByRole('button', { name: /^\d+ Categories overspent$/ }).click();
 				const opened = page.getByRole('table').getByRole('button', { expanded: true });
-				await expect(opened).toHaveCount(1);
+				await expect(opened).not.toHaveText(first);
 				const name = (await opened.textContent())?.trim() ?? '';
 				await expect(page.getByRole('region', { name, exact: true })).toContainText('Overspent by');
 			});

@@ -119,6 +119,10 @@
 	const setCleared = useMutation(api.transactions.setCleared);
 	const approve = useMutation(api.transactions.approve);
 	const approveAll = useMutation(api.transactions.approveAll);
+	const unapprove = useMutation(api.transactions.unapprove);
+	let undoable = $state<{ scopeKey: string; transactionIds: Id<'transactions'>[] } | null>(null);
+	const scopeKey = $derived(JSON.stringify([scope, filters]));
+	const undo = $derived(undoable?.scopeKey === scopeKey ? undoable : null);
 
 	const approveAllLabel = $derived.by(() => {
 		const count = unapprovedCount.data ?? 0;
@@ -143,6 +147,14 @@
 			(row, index, all) => all.findIndex((other) => other._id === row._id) === index
 		)
 	);
+	const groups = $derived.by(() => {
+		const waiting = rows.filter((row) => !row.approved);
+		if (filtering || waiting.length === 0) return [{ label: '', rows }];
+		return [
+			{ label: 'Unapproved', rows: waiting },
+			{ label: 'Approved', rows: rows.filter((row) => row.approved) }
+		];
+	});
 	const loading = $derived(first.isLoading || (secondShown && second.isLoading));
 	const more = $derived(secondShown ? second : first);
 	const canShowMore = $derived(more.status === 'CanLoadMore' || more.status === 'LoadingMore');
@@ -215,6 +227,7 @@
 
 	async function approveRow(row: Row, payee: string) {
 		rowError = '';
+		undoable = null;
 		const at = rows.findIndex((other) => other._id === row._id);
 		const waiting = rows.slice(at + 1).filter((other) => !other.approved);
 		const approved = await attempt(() => approve({ transactionId: row._id }));
@@ -248,12 +261,137 @@
 		if (approveAllBlocked) return;
 		rowError = '';
 		approvingAll = true;
+		const approvedIn = scopeKey;
 		const approved = await attempt(() => approveAll(scope));
 		approvingAll = false;
-		if (!approved.ok) rowError = "Budge couldn't approve the Transactions. Try again.";
-		else announce('Approved every Transaction');
+		if (!approved.ok) {
+			rowError = "Budge couldn't approve the Transactions. Try again.";
+			return;
+		}
+		undoable = { scopeKey: approvedIn, transactionIds: approved.value };
+	}
+
+	function approvedText(count: number) {
+		return `Approved ${String(count)} ${count === 1 ? 'Transaction' : 'Transactions'}.`;
+	}
+
+	async function undoApproveAll() {
+		if (undo === null) return;
+		const { transactionIds } = undo;
+		undoable = null;
+		rowError = '';
+		const restored = await attempt(() => unapprove({ transactionIds }));
+		if (!restored.ok) rowError = "Budge couldn't undo the approvals. Try again.";
+		else announce(`${String(restored.value)} back to Unapproved`);
 	}
 </script>
+
+{#snippet transactionRow(row: (typeof rows)[number])}
+	{@const payee = row.payeeName ?? (row.transfer ? 'Transfer' : 'No Payee')}
+	{@const category = categoryOf(row)}
+	{@const flag = bankFlag(row)}
+	{@const categoryClass =
+		row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
+	<Table.Row weight={row.approved ? 'normal' : 'strong'}>
+		<Table.Cell numeric showFrom="2xl">
+			<time datetime={row.date} class="block truncate">{formatDate(row.date)}</time>
+		</Table.Cell>
+		{#if allAccounts}
+			<Table.Cell showFrom="5xl">
+				<span class="block truncate">{row.accountName}</span>
+			</Table.Cell>
+		{/if}
+		<Table.Cell>
+			<button
+				data-edit={row._id}
+				class="block max-w-full rounded-sm text-left hover:underline"
+				onclick={() => {
+					edit(row);
+				}}
+			>
+				<span
+					class={[
+						'line-clamp-2 break-words whitespace-normal @4xl:line-clamp-1',
+						row.payeeName === null && !row.transfer && 'text-muted-foreground'
+					]}
+				>
+					{payee}
+				</span>
+				<span class="sr-only">
+					, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(row.date)}
+				</span>
+			</button>
+			{#if flag}
+				<span class="block truncate text-xs font-normal text-warning">{flag}</span>
+			{/if}
+			<span class="flex min-w-0 gap-x-2 text-xs font-normal text-muted-foreground">
+				<time datetime={row.date} class="shrink-0 tabular-nums @2xl:hidden">
+					{formatDate(row.date, 'short')}
+				</time>
+				<span class={['min-w-0 truncate @4xl:hidden', categoryClass]}>{category}</span>
+			</span>
+			{#if allAccounts}
+				<span class="block truncate text-xs font-normal text-muted-foreground @5xl:hidden">
+					{row.accountName}
+				</span>
+			{/if}
+			{#if row.memo}
+				<span
+					class={[
+						'block truncate text-xs font-normal text-muted-foreground',
+						allAccounts ? '@8xl:hidden' : '@6xl:hidden'
+					]}
+				>
+					{row.memo}
+				</span>
+			{/if}
+		</Table.Cell>
+		<Table.Cell showFrom="4xl">
+			<span class={['block truncate', categoryClass]}>{category}</span>
+		</Table.Cell>
+		<Table.Cell showFrom={memoFrom}>
+			<span class="block truncate">{row.memo ?? ''}</span>
+		</Table.Cell>
+		<Table.Cell align="end" numeric>
+			{formatCents(row.amount)}
+			<span
+				class={[
+					'mt-2 flex items-center justify-end gap-3 pr-1',
+					row.approved ? '@lg:hidden' : '@2xl:hidden'
+				]}
+			>
+				{#if !row.approved}
+					<Button
+						data-approve={row._id}
+						size="sm"
+						variant="outline"
+						onclick={() => approveRow(row, payee)}
+						aria-label="Approve {payee}, {formatDate(row.date)}"
+					>
+						Approve
+					</Button>
+				{/if}
+				<span class="flex @lg:hidden">{@render cleared(row, payee)}</span>
+			</span>
+		</Table.Cell>
+		<Table.Cell align="center" showFrom="lg">
+			<span class="flex justify-center">{@render cleared(row, payee)}</span>
+		</Table.Cell>
+		<Table.Cell showFrom="2xl">
+			{#if !row.approved}
+				<Button
+					data-approve={row._id}
+					size="sm"
+					variant="outline"
+					onclick={() => approveRow(row, payee)}
+					aria-label="Approve {payee}, {formatDate(row.date)}"
+				>
+					Approve
+				</Button>
+			{/if}
+		</Table.Cell>
+	</Table.Row>
+{/snippet}
 
 {#snippet cleared(row: (typeof rows)[number], payee: string)}
 	{#if row.reconciled}
@@ -297,7 +435,18 @@
 		{problem}
 	</p>
 	<p role="status" class="sr-only">{announcement}</p>
-	<p aria-live="polite" class="min-h-5 truncate text-sm text-muted-foreground">{result}</p>
+	<p aria-live="polite" class="flex min-h-5 items-center gap-2 text-sm text-muted-foreground">
+		{#if undo}
+			<span class="truncate">{approvedText(undo.transactionIds.length)}</span>
+			<button
+				type="button"
+				class="-my-0.5 min-h-6 shrink-0 rounded-sm px-1 font-medium text-foreground underline underline-offset-4 hover:no-underline"
+				onclick={undoApproveAll}>Undo</button
+			>
+		{:else}
+			<span class="truncate">{result}</span>
+		{/if}
+	</p>
 
 	<div class="@container">
 		<Table.Root layout="fixed">
@@ -317,114 +466,27 @@
 					>
 				</Table.Row>
 			</Table.Header>
-			<Table.Body>
-				{#each rows as row (row._id)}
-					{@const payee = row.payeeName ?? (row.transfer ? 'Transfer' : 'No Payee')}
-					{@const category = categoryOf(row)}
-					{@const flag = bankFlag(row)}
-					{@const categoryClass =
-						row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
-					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
-						<Table.Cell numeric showFrom="2xl">
-							<time datetime={row.date} class="block truncate">{formatDate(row.date)}</time>
-						</Table.Cell>
-						{#if allAccounts}
-							<Table.Cell showFrom="5xl">
-								<span class="block truncate">{row.accountName}</span>
-							</Table.Cell>
-						{/if}
-						<Table.Cell>
-							<button
-								data-edit={row._id}
-								class="block max-w-full rounded-sm text-left hover:underline"
-								onclick={() => {
-									edit(row);
-								}}
-							>
-								<span
-									class={[
-										'line-clamp-2 break-words whitespace-normal @4xl:line-clamp-1',
-										row.payeeName === null && !row.transfer && 'text-muted-foreground'
-									]}
-								>
-									{payee}
-								</span>
-								<span class="sr-only">
-									, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(row.date)}
-								</span>
-							</button>
-							{#if flag}
-								<span class="block truncate text-xs font-normal text-warning">{flag}</span>
-							{/if}
-							<span class="flex min-w-0 gap-x-2 text-xs font-normal text-muted-foreground">
-								<time datetime={row.date} class="shrink-0 tabular-nums @2xl:hidden">
-									{formatDate(row.date, 'short')}
-								</time>
-								<span class={['min-w-0 truncate @4xl:hidden', categoryClass]}>{category}</span>
-							</span>
+			{#each groups as group (group.label)}
+				<Table.Body>
+					{#if group.label !== ''}
+						<Table.Row>
+							<Table.Cell showFrom="2xl"></Table.Cell>
 							{#if allAccounts}
-								<span class="block truncate text-xs font-normal text-muted-foreground @5xl:hidden">
-									{row.accountName}
-								</span>
+								<Table.Cell showFrom="5xl"></Table.Cell>
 							{/if}
-							{#if row.memo}
-								<span
-									class={[
-										'block truncate text-xs font-normal text-muted-foreground',
-										allAccounts ? '@8xl:hidden' : '@6xl:hidden'
-									]}
-								>
-									{row.memo}
-								</span>
-							{/if}
-						</Table.Cell>
-						<Table.Cell showFrom="4xl">
-							<span class={['block truncate', categoryClass]}>{category}</span>
-						</Table.Cell>
-						<Table.Cell showFrom={memoFrom}>
-							<span class="block truncate">{row.memo ?? ''}</span>
-						</Table.Cell>
-						<Table.Cell align="end" numeric>
-							{formatCents(row.amount)}
-							<span
-								class={[
-									'mt-2 flex items-center justify-end gap-3 pr-1',
-									row.approved ? '@lg:hidden' : '@2xl:hidden'
-								]}
-							>
-								{#if !row.approved}
-									<Button
-										data-approve={row._id}
-										size="sm"
-										variant="outline"
-										onclick={() => approveRow(row, payee)}
-										aria-label="Approve {payee}, {formatDate(row.date)}"
-									>
-										Approve
-									</Button>
-								{/if}
-								<span class="flex @lg:hidden">{@render cleared(row, payee)}</span>
-							</span>
-						</Table.Cell>
-						<Table.Cell align="center" showFrom="lg">
-							<span class="flex justify-center">{@render cleared(row, payee)}</span>
-						</Table.Cell>
-						<Table.Cell showFrom="2xl">
-							{#if !row.approved}
-								<Button
-									data-approve={row._id}
-									size="sm"
-									variant="outline"
-									onclick={() => approveRow(row, payee)}
-									aria-label="Approve {payee}, {formatDate(row.date)}"
-								>
-									Approve
-								</Button>
-							{/if}
-						</Table.Cell>
-					</Table.Row>
-				{/each}
-			</Table.Body>
+							<Table.Head scope="rowgroup">{group.label}</Table.Head>
+							<Table.Cell showFrom="4xl"></Table.Cell>
+							<Table.Cell showFrom={memoFrom}></Table.Cell>
+							<Table.Cell></Table.Cell>
+							<Table.Cell showFrom="lg"></Table.Cell>
+							<Table.Cell showFrom="2xl"></Table.Cell>
+						</Table.Row>
+					{/if}
+					{#each group.rows as row (row._id)}
+						{@render transactionRow(row)}
+					{/each}
+				</Table.Body>
+			{/each}
 		</Table.Root>
 	</div>
 	{#if canShowMore}
