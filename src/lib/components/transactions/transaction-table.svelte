@@ -23,6 +23,13 @@
 	let { accountId }: { accountId?: Id<'accounts'> | undefined } = $props();
 
 	const PAGE_SIZE = 50;
+
+	function bankFlag(row: Row) {
+		if (row.bankRows.some((bankRow) => bankRow.state === 'removed')) return 'Bank removed this';
+		if (row.bankRows.some((bankRow) => bankRow.state === 'changed')) return 'Bank changed this';
+		return undefined;
+	}
+
 	const SEARCH_PAUSE_MS = 300;
 	let filterValues = $state({ ...noFilters });
 
@@ -89,12 +96,17 @@
 	const more = $derived(secondShown ? second : first);
 	let dialogOpen = $state(false);
 	let importOpen = $state(false);
-	let editing: Row | undefined = $state();
+	let editingSnapshot: Row | undefined = $state();
+	const editing = $derived(
+		editingSnapshot === undefined
+			? undefined
+			: (rows.find((row) => row._id === editingSnapshot?._id) ?? editingSnapshot)
+	);
 	let rowError = $state('');
 	let approvingAll = $state(false);
 
 	function add() {
-		editing = undefined;
+		editingSnapshot = undefined;
 		dialogOpen = true;
 	}
 
@@ -105,7 +117,7 @@
 	}
 
 	function edit(row: Row) {
-		editing = row;
+		editingSnapshot = row;
 		dialogOpen = true;
 	}
 
@@ -151,7 +163,7 @@
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>
-					<Table.Head width="fit">Date</Table.Head>
+					<Table.Head width="fit" showFrom="md">Date</Table.Head>
 					{#if allAccounts}
 						<Table.Head showFrom="2xl">Account</Table.Head>
 					{/if}
@@ -160,21 +172,19 @@
 					<Table.Head showFrom="xl">Memo</Table.Head>
 					<Table.Head width="fit" align="end">Amount</Table.Head>
 					<Table.Head width="fit" align="center">Cleared</Table.Head>
-					<Table.Head width="fit"><span class="sr-only">Approval</span></Table.Head>
+					<Table.Head width="fit" showFrom="md"><span class="sr-only">Approval</span></Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
 				{#each rows as row (row._id)}
 					{@const payee = row.payeeName ?? (row.transfer ? 'Transfer' : 'No Payee')}
 					{@const category = categoryOf(row)}
+					{@const flag = bankFlag(row)}
 					{@const categoryClass =
 						row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
 					<Table.Row weight={row.approved ? 'normal' : 'strong'}>
-						<Table.Cell numeric>
-							<time datetime={row.date}>
-								<span class="@md:hidden">{formatDate(row.date, 'short')}</span>
-								<span class="hidden @md:inline">{formatDate(row.date)}</span>
-							</time>
+						<Table.Cell numeric showFrom="md">
+							<time datetime={row.date}>{formatDate(row.date)}</time>
 						</Table.Cell>
 						{#if allAccounts}
 							<Table.Cell showFrom="2xl">{row.accountName}</Table.Cell>
@@ -197,6 +207,15 @@
 									, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(row.date)}
 								</span>
 							</button>
+							{#if flag}
+								<span class="block truncate text-xs font-normal text-warning">{flag}</span>
+							{/if}
+							<time
+								datetime={row.date}
+								class="block truncate text-xs font-normal text-muted-foreground tabular-nums @md:hidden"
+							>
+								{formatDate(row.date, 'short')}
+							</time>
 							<span class="block truncate text-xs font-normal text-muted-foreground @lg:hidden">
 								<span class={categoryClass}>{category}</span>
 							</span>
@@ -231,7 +250,7 @@
 								/>
 							{/if}
 						</Table.Cell>
-						<Table.Cell>
+						<Table.Cell showFrom="md">
 							{#if !row.approved}
 								<Button
 									size="sm"

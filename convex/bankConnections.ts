@@ -323,7 +323,7 @@ async function ownerSync(
 		toPublicError
 	);
 	if (outcome.kind === 'missing') throw publicError('NOT_FOUND');
-	if (outcome.kind === 'paused') throw publicError('BANK_CONNECTION_NEEDS_LOGIN');
+	if (outcome.kind === 'paused') throw publicError(needsLogin.code, needsLogin.message);
 	if (outcome.kind !== 'synced') return outcome;
 	return { kind: 'synced', added: outcome.added, matched: outcome.matched };
 }
@@ -380,10 +380,13 @@ export function liveLayer(ctx: ActionCtx) {
 	return Layer.mergeAll(livePlaid(), TokenCipher.layer(env.BUDGE_TOKEN_KEY), SyncStore.layer(ctx));
 }
 
+const needsLogin = {
+	code: 'BANK_CONNECTION_NEEDS_LOGIN',
+	message: 'The bank needs you to reconnect.'
+} as const satisfies PublicError;
+
 export function toPublicError(error: SyncError): PublicError {
-	if (failureOf(error).status === 'needsAttention') {
-		return { code: 'BANK_CONNECTION_NEEDS_LOGIN', message: 'The bank needs you to reconnect.' };
-	}
+	if (failureOf(error).status === 'needsAttention') return needsLogin;
 	return { code: 'BANK_UNAVAILABLE', message: "Couldn't reach the bank; try again later." };
 }
 

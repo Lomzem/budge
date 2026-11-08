@@ -25,7 +25,7 @@ Use the installed `@playwright/test` library and `browser.newContext({ baseURL: 
 
 The [feature map](features/README.md) is the maintained verification source. Read matching files; account for every selected sub-feature and listed entry point. A missing precondition is a failed/blocked journey, never a pass through an easier entry. Desktop sidebar navigation changes to the `View …` menu on phones. Check 1280×800 and 320×640 when layout or interaction changes.
 
-Existing `e2e/*.test.ts` provide additional selectors for Transfers, splits, Targets, Reconciliation, and export alongside the feature maps. Read the relevant spec when those behaviors change, drive the real path, and extend the map. The standard Playwright config starts a separate build/preview server on 4173 and its global setup signs in independently: do not run `bun run test:e2e` against the owner's configured backend. For the complete isolated suite use the documented `bun run test:e2e:local`; for this skill use the running app and `login` storage state, as the helper does.
+Existing `e2e/*.test.ts` provide additional selectors for Transfers, splits, Targets, Reconciliation, and export alongside the feature maps. Read the relevant spec when those behaviors change, drive the real path, and extend the map. The standard Playwright config starts a separate build/preview server on the runner's `E2E_PREVIEW_PORT` (4173 only for direct CI invocation) and its global setup signs in independently: do not run `bun run test:e2e` against the owner's configured backend. For the complete isolated suite use the documented `bun run test:e2e:local`; for this skill use the running app and `login` storage state, as the helper does.
 
 ## Evidence
 

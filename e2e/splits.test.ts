@@ -85,3 +85,43 @@ test('a split shows "Split" in the list, and its lines can be added, edited, and
 		});
 	}
 });
+
+test('leaving Split and choosing it again starts fresh from the current amount and Category', async ({
+	page
+}) => {
+	if (!ownerEmail) throw new Error('E2E_CLERK_USER_EMAIL is not set.');
+
+	await page.goto('/sign-in');
+	await clerk.signIn({ page, emailAddress: ownerEmail });
+	await page.goto('/');
+	await page
+		.getByRole('navigation', { name: 'Budget and Accounts' })
+		.getByRole('link', { name: /^Card/ })
+		.click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Card' })).toBeVisible();
+
+	await page.getByRole('button', { name: 'Add Transaction' }).click();
+	const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
+	const category = dialog.getByLabel('Category or Transfer');
+	await dialog.getByLabel('Amount').fill('50.00');
+	await category.selectOption({ label: 'Split across Categories' });
+	await dialog.getByLabel('Line 1 Category').selectOption({ label: 'Gifts' });
+	await dialog.getByLabel('Line 1 amount').fill('30.00');
+	await dialog.getByLabel('Line 1 memo').fill('Sample line note');
+	await dialog.getByLabel('Line 2 amount').fill('20.00');
+	await dialog.getByRole('button', { name: 'Add line' }).click();
+
+	await category.selectOption({ label: 'Groceries' });
+	await dialog.getByLabel('Amount').fill('80.00');
+	await category.selectOption({ label: 'Split across Categories' });
+
+	await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('80.00');
+	await expect(dialog.getByLabel('Line 1 memo')).toHaveValue('');
+	await expect(dialog.getByLabel('Line 1 Category').locator('option:checked')).toHaveText(
+		'Groceries'
+	);
+	await expect(dialog.getByLabel('Line 2 amount')).toHaveValue('');
+	await expect(dialog.getByLabel('Line 3 amount')).toHaveCount(0);
+	await page.keyboard.press('Escape');
+	await expect(dialog).toBeHidden();
+});

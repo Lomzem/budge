@@ -2,15 +2,18 @@
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 
 	import { resolve } from '$app/paths';
-	import { getAccounts } from '$lib/accounts.svelte';
+	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import { attempt } from '$lib/attempt';
 	import ReconcileDialog from '$lib/components/accounts/reconcile-dialog.svelte';
 	import RenameAccountDialog from '$lib/components/accounts/rename-account-dialog.svelte';
+	import StartingBalanceStep from '$lib/components/accounts/starting-balance-step.svelte';
 	import TransactionTable from '$lib/components/transactions/transaction-table.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { formatDate } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	import type { PageProps } from './$types';
 
@@ -21,6 +24,9 @@
 	let renameOpen = $state(false);
 	let reconcileOpen = $state(false);
 	let moveError = $state('');
+	const startingBalance = new DialogSession<{
+		account: { _id: Account['_id']; kind: Account['kind']; name: string };
+	}>();
 
 	let reconciled: { accountId: string; message: string } | undefined = $state();
 
@@ -40,6 +46,10 @@
 		const accountId = account._id;
 		const moved = await attempt(() => accounts.move(accountId, direction));
 		if (!moved.ok) moveError = "Budge couldn't move the Account. Try again.";
+	}
+
+	function editStartingBalance(chosen: Account) {
+		startingBalance.open({ account: { _id: chosen._id, kind: chosen.kind, name: chosen.name } });
 	}
 </script>
 
@@ -74,6 +84,13 @@
 						>
 							Move down
 						</DropdownMenu.Item>
+						<DropdownMenu.Item
+							onSelect={() => {
+								editStartingBalance(account);
+							}}
+						>
+							Starting balance
+						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</div>
@@ -106,6 +123,26 @@
 	</div>
 	<RenameAccountDialog bind:open={renameOpen} accountId={account._id} currentName={account.name} />
 	<ReconcileDialog bind:open={reconcileOpen} {account} {onReconciled} />
+	<Dialog.Root
+		open={startingBalance.current !== null}
+		onOpenChange={(isOpen) => {
+			if (!isOpen) startingBalance.dismiss();
+		}}
+	>
+		<Dialog.Content>
+			{#if startingBalance.current !== null}
+				{@const session = startingBalance.current}
+				{#key session}
+					<StartingBalanceStep
+						account={session.account}
+						onDone={() => {
+							startingBalance.close(session);
+						}}
+					/>
+				{/key}
+			{/if}
+		</Dialog.Content>
+	</Dialog.Root>
 {:else if accounts.loaded}
 	<h1 class="text-xl font-semibold">No such Account</h1>
 	<p class="mt-2 text-muted-foreground">

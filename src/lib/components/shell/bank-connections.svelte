@@ -2,12 +2,14 @@
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import type { FunctionReturnType } from 'convex/server';
-	import { useConvexClient, useQuery } from 'convex-svelte';
+	import { useConvexClient } from 'convex-svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { getAccounts } from '$lib/accounts.svelte';
 	import { attempt } from '$lib/attempt';
+	import { getBankConnections, type BankConnection } from '$lib/bankConnections.svelte';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { formatSynced } from '$lib/domain/freshness';
@@ -15,34 +17,34 @@
 	type SyncOutcome = FunctionReturnType<typeof api.bankConnections.syncNow>;
 
 	const client = useConvexClient();
-	const accounts = getAccounts();
+	const connections = getBankConnections();
 
-	const listedAt = Date.now();
-	const connections = useQuery(api.bankConnections.list, () =>
-		accounts.loaded ? { now: listedAt } : 'skip'
+	const dialog = new DialogSession<{
+		connectionId: Id<'bankConnections'>;
+		syncing: boolean;
+		result: string;
+	}>();
+	const opened = $derived(
+		connections.all.find((connection) => connection._id === dialog.current?.connectionId)
 	);
 
-	let now = $state(Date.now());
-	$effect(() => {
-		const timer = setInterval(() => {
-			now = Date.now();
-		}, 60_000);
-		return () => {
-			clearInterval(timer);
-		};
-	});
-
-	let openId = $state<Id<'bankConnections'> | null>(null);
-	const opened = $derived(connections.data?.find((connection) => connection._id === openId));
-	let syncing = $state(false);
-	let result = $state('');
-
 	const exactTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+	const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+
+	function freshness(connection: BankConnection) {
+		if (connection.overdue && connection.lastSyncedAt !== null) {
+			return `Not synced since ${day.format(connection.lastSyncedAt)}`;
+		}
+		return formatSynced(connection.lastSyncedAt, connections.now);
+	}
+
+	const unseenReconnectResults = new SvelteMap<Id<'bankConnections'>, string>();
 
 	function open(connectionId: Id<'bankConnections'>) {
-		openId = connectionId;
-		now = Date.now();
-		result = '';
+		const result = unseenReconnectResults.get(connectionId) ?? '';
+		unseenReconnectResults.delete(connectionId);
+		dialog.open({ connectionId, syncing: false, result });
+		connections.tick();
 	}
 
 	function describeSync(outcome: SyncOutcome): string {
@@ -53,23 +55,38 @@
 		return `Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`;
 	}
 
-	async function syncNow(connectionId: Id<'bankConnections'>) {
-		syncing = true;
-		result = '';
+	async function syncNow() {
+		const session = dialog.current;
+		if (session === null) return;
+		session.syncing = true;
+		session.result = '';
 		const synced = await attempt(() =>
-			client.action(api.bankConnections.syncNow, { connectionId })
+			client.action(api.bankConnections.syncNow, { connectionId: session.connectionId })
 		);
-		syncing = false;
-		now = Date.now();
-		result = synced.ok
+		session.syncing = false;
+		connections.tick();
+		session.result = synced.ok
 			? describeSync(synced.value)
 			: (synced.error?.message ?? "Budge couldn't sync. Try again.");
 	}
+
+	async function reconnect(connectionId: Id<'bankConnections'>) {
+		dialog.dismiss();
+		const message = await connections.reconnect(connectionId);
+		if (message === null) return;
+		const showing = dialog.current;
+		if (showing?.connectionId === connectionId) {
+			showing.result = message;
+			return;
+		}
+		unseenReconnectResults.set(connectionId, message);
+		if (showing === null) open(connectionId);
+	}
 </script>
 
-{#if connections.data !== undefined && connections.data.length > 0}
+{#if connections.all.length > 0}
 	<ul aria-label="Bank Connections" class="flex flex-col gap-0.5 text-xs text-muted-foreground">
-		{#each connections.data as connection (connection._id)}
+		{#each connections.all as connection (connection._id)}
 			<li>
 				<button
 					class="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
@@ -77,13 +94,23 @@
 						open(connection._id);
 					}}
 				>
-					{#if connection.status === 'needsAttention' || connection.lastError !== null}
-						<TriangleAlertIcon aria-label="Last sync failed" class="size-3.5 shrink-0" />
+					{#if connection.status === 'needsAttention' || connection.lastError !== null || connection.overdue}
+						<TriangleAlertIcon aria-label="Needs a look" class="size-3.5 shrink-0" />
 					{/if}
 					<span class="truncate">
-						{connection.name}: {formatSynced(connection.lastSyncedAt, now)}
+						{connection.name}: {freshness(connection)}
 					</span>
 				</button>
+				{#if connection.consentEndsAt !== null}
+					<p class="px-2">
+						Consent ends {day.format(connection.consentEndsAt)},
+						<button
+							class="underline underline-offset-4 hover:no-underline focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none disabled:opacity-50"
+							disabled={connections.reconnecting !== null}
+							onclick={() => reconnect(connection._id)}>renew</button
+						>
+					</p>
+				{/if}
 			</li>
 		{/each}
 	</ul>
@@ -92,7 +119,7 @@
 <Dialog.Root
 	open={opened !== undefined}
 	onOpenChange={(isOpen) => {
-		if (!isOpen) openId = null;
+		if (!isOpen) dialog.dismiss();
 	}}
 >
 	<Dialog.Content>
@@ -107,18 +134,39 @@
 					{/if}
 				</Dialog.Description>
 			</Dialog.Header>
+			{#if opened.status === 'needsAttention'}
+				<p class="text-sm">{opened.name} needs you to reconnect.</p>
+			{/if}
+			{#if opened.consentEndsAt !== null}
+				<p class="text-sm">
+					Your consent at the bank ends {exactTime.format(opened.consentEndsAt)}. Reconnect to renew
+					it.
+				</p>
+			{/if}
 			{#if opened.lastError !== null}
 				<p role="alert" class="text-sm text-destructive">
 					The sync at {exactTime.format(opened.lastError.at)} failed: {opened.lastError.message}
 				</p>
 			{/if}
-			{#if result}
-				<p role="status" class="text-sm">{result}</p>
+			{#if dialog.current?.result}
+				<p role="status" class="text-sm">{dialog.current.result}</p>
 			{/if}
 			<Dialog.Footer>
-				<Button disabled={syncing} onclick={() => syncNow(opened._id)}>
-					<RefreshCwIcon aria-hidden="true" class={syncing ? 'animate-spin' : ''} />
-					{syncing ? 'Syncing…' : 'Sync now'}
+				{#if opened.status === 'needsAttention' || opened.consentEndsAt !== null}
+					<Button
+						variant="outline"
+						disabled={connections.reconnecting !== null || (dialog.current?.syncing ?? false)}
+						onclick={() => reconnect(opened._id)}
+					>
+						{connections.reconnecting === opened._id ? 'Reconnecting…' : 'Reconnect'}
+					</Button>
+				{/if}
+				<Button
+					disabled={(dialog.current?.syncing ?? false) || connections.reconnecting !== null}
+					onclick={syncNow}
+				>
+					<RefreshCwIcon aria-hidden="true" class={dialog.current?.syncing ? 'animate-spin' : ''} />
+					{dialog.current?.syncing ? 'Syncing…' : 'Sync now'}
 				</Button>
 			</Dialog.Footer>
 		{/if}
