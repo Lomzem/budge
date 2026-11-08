@@ -63,15 +63,19 @@ export const transfers = {
 				await expect(row.getByText('From Checking').filter({ visible: true })).toBeVisible();
 			});
 
-			await step('deleting from the Savings side takes both sides out', async () => {
-				await row.getByRole('button', { name: /^Transfer/ }).click();
-				await dialog.getByRole('button', { name: 'Delete' }).click();
-				await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
-				await expect(row).toHaveCount(0);
-				await expect.poll(balance(page)).toBe(before.savings);
-				await openAccount(page, 'Checking');
-				await expect(row).toHaveCount(0);
-			});
+			await step(
+				'deleting from the Savings side takes both sides out and leaves focus on a neighboring row',
+				async () => {
+					await row.getByRole('button', { name: /^Transfer/ }).click();
+					await dialog.getByRole('button', { name: 'Delete' }).click();
+					await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+					await expect(row).toHaveCount(0);
+					await expect(page.locator('[data-edit]:focus')).toBeVisible();
+					await expect.poll(balance(page)).toBe(before.savings);
+					await openAccount(page, 'Checking');
+					await expect(row).toHaveCount(0);
+				}
+			);
 		}
 	},
 	'import-link': {

@@ -210,6 +210,21 @@
 			?.scrollIntoView({ block: 'nearest' });
 	}
 
+	function stepsAround(id: Id<'categories'>) {
+		const at = shownCategories.findIndex((c) => c.id === id);
+		const near = (offset: number) => {
+			const category = at === -1 ? undefined : shownCategories[at + offset];
+			return category === undefined ? undefined : { id: category.id, name: category.name };
+		};
+		return { previous: near(-1), next: near(1) };
+	}
+
+	async function stepTo(id: Id<'categories'>) {
+		selectedId = id;
+		await tick();
+		document.querySelector<HTMLInputElement>('#category-inspector input[data-assigned]')?.focus();
+	}
+
 	async function closeInspector() {
 		const id = selectedId;
 		selectedId = null;
@@ -325,7 +340,7 @@
 		{/snippet}
 		<section
 			aria-label="Needs you"
-			class="relative -my-1 flex h-10 items-center pointer-coarse:h-13"
+			class="relative -my-1 flex h-10 items-center sm:h-auto sm:min-h-10 pointer-coarse:h-13 sm:pointer-coarse:h-auto sm:pointer-coarse:min-h-13"
 		>
 			{#if needs.length === 0}
 				<p class="flex items-center gap-2 text-muted-foreground">
@@ -337,7 +352,7 @@
 					bind:this={needsList}
 					onscroll={measureNeeds}
 					class={[
-						'-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto fade-edges p-1',
+						'-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto fade-edges p-1 sm:flex-wrap sm:overflow-visible',
 						needsBefore && 'fade-start',
 						needsAfter && 'fade-end'
 					]}
@@ -476,8 +491,8 @@
 								<p class="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
 									Select a Category to see its Target, move money or cover overspending here.
 								</p>
+								<UpcomingList upcoming={view.upcoming} />
 							{/if}
-							<UpcomingList upcoming={view.upcoming} />
 						</aside>
 					{/if}
 				</div>
@@ -520,6 +535,8 @@
 				{view}
 				editAssigned={!wide.current}
 				readyToAssign={wide.current ? undefined : readyToAssign?.amount}
+				steps={wide.current ? undefined : stepsAround(inspected.id)}
+				onstep={stepTo}
 				onclose={closeInspector}
 			/>
 		{/key}

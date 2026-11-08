@@ -13,7 +13,7 @@ Create Cash and Credit Card Accounts, arrange them, and decide where an unknown 
 ## How to get to it (user POV)
 
 - Desktop sidebar `Add Account` beside the Accounts heading; on every width, the Accounts page's `Add Account`.
-- Named Account page → `<name> actions` → Rename, Move up, Move down. Under the balance, `getByTestId("account-sync")` names the Bank Connection that feeds it (see [plaid.md](plaid.md)).
+- Named Account page → `<name> actions` → Rename, Move up, Move down. The header reads the Account name (h1) first, then its type, then `getByTestId("account-sync")`, which names the Bank Connection that feeds it (see [plaid.md](plaid.md)).
 - Below `lg`, the Accounts page folds the Account list into a `Your Accounts <count>` disclosure. It starts closed, so the register is in view, and a plain visit opens it only if the owner left it open last time (remembered in this browser); arriving with a filter in the URL keeps it closed.
 - Bank page → the connection's card → `New bank Accounts` region → `Set up <name> ending <mask>` (the row shows the name, `Ending <mask>` on its own line, then `<n> transactions waiting`) → dialog `<name> ending <mask>` → radio `Into <Account>` / `Into a new Account` / `Nowhere: ignore this bank Account` → `Import its transactions` or `Ignore` → dialog `Starting balance for <Account name>` → `Confirm`, `Skip` or `Suggest again`.
 
@@ -23,7 +23,7 @@ Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, 
 
 - `accounts/start-late-save`: the Account-action Starting balance, including a save that finishes after its dialog was dismissed.
 - `accounts/start-edit`: Starting Balance edit offers only allowed edits and saves.
-- `accounts/held-map`, `accounts/held-new-card`, `accounts/held-ignore`: the three held journeys on `bank-sync`. The dialog's description starts with `<n> transactions waiting.`; an Account already fed by a connection is described `already fed by <connection>` (Savings by Sample Community Bank); choosing an Account of the other type warns `The bank says this is a credit card, but Checking is a cash Account.`
+- `accounts/held-map`, `accounts/held-new-card`, `accounts/held-ignore`: the three held journeys on `bank-sync`. The dialog's description starts with `<n> transactions waiting.`; an Account already fed by a connection is described `Already fed by <connection>` (Savings by Sample Community Bank); choosing an Account of the other type blocks `Import its transactions` (`aria-disabled`, described by `The bank says this is a credit card, but Checking is a cash Account, …`) until a matching or new Account is chosen. The area under the choices keeps one height: the new-Account fields, the mismatch block, `Its transactions join <Account>…` and the Ignore note share one grid cell.
 
 Preconditions:
 

@@ -4,7 +4,8 @@ import { cents, centsIn, openBudget, typed, type Journey } from './journey';
 
 export const inspector = {
 	'move-money': {
-		title: 'the inspector moves money by keyboard, and opens as a dialog on a phone',
+		title:
+			'the inspector moves money by keyboard, and opens as a dialog on a phone that steps between Categories',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			await page.setViewportSize({ width: 1280, height: 800 });
@@ -73,6 +74,24 @@ export const inspector = {
 				await expect(region).toBeHidden();
 				await expect(groceries).toBeFocused();
 			});
+
+			await step(
+				'the phone inspector steps to the next Category and focuses its Assigned field',
+				async () => {
+					await groceries.click();
+					const next = page.getByRole('dialog').getByRole('button', { name: /^Next Category: / });
+					const nextName = ((await next.getAttribute('aria-label')) ?? '').replace(
+						'Next Category: ',
+						''
+					);
+					await next.click();
+					const stepped = page.getByRole('dialog', { name: nextName });
+					await expect(stepped.getByLabel('Assigned this month')).toBeFocused();
+					await expect(
+						stepped.getByRole('button', { name: 'Previous Category: Groceries' })
+					).toBeVisible();
+				}
+			);
 		}
 	}
 } satisfies Record<string, Journey>;

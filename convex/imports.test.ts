@@ -481,7 +481,7 @@ describe('approving', () => {
 		expect(await dates({ uncategorized: true })).toEqual([]);
 	});
 
-	test('editing approves, Approve all approves the rest and Undo restores only those; Unapproved list first', async () => {
+	test('editing approves, Approve all approves the rest, Undo restores only those and Approve shown approves only the chosen; Unapproved list first', async () => {
 		const { owner, checking } = await budgetWithChecking();
 		await owner.mutation(api.transactions.create, {
 			accountId: checking,
@@ -537,6 +537,20 @@ describe('approving', () => {
 		expect((await list('unapproved')).map((row) => row._id)).toEqual(
 			unapproved.slice(2).map((row) => row._id)
 		);
+
+		const [, , third, fourth] = unapproved;
+		assert(third !== undefined && fourth !== undefined, 'expected rows');
+		expect(
+			await owner.mutation(api.transactions.approveMany, {
+				transactionIds: [third._id, third._id, first._id]
+			})
+		).toEqual([third._id]);
+		expect((await list('unapproved')).map((row) => row._id)).toEqual([fourth._id]);
+		await expect(
+			owner.mutation(api.transactions.approveMany, {
+				transactionIds: Array.from({ length: UNAPPROVED_COUNT_LIMIT + 1 }, () => fourth._id)
+			})
+		).rejects.toThrow('Too many Transactions');
 	});
 
 	test('counts Unapproved Transactions to one past the limit, so the count reads as at least', async () => {

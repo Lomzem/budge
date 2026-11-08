@@ -43,7 +43,8 @@
 		transaction,
 		defaultAccountId,
 		returnFocus,
-		ondone
+		ondone,
+		ondeleted
 	}: {
 		open?: boolean;
 
@@ -53,6 +54,8 @@
 		returnFocus?: () => HTMLElement | undefined;
 
 		ondone?: (message: string) => void;
+
+		ondeleted?: (transactionId: Id<'transactions'>) => void;
 	} = $props();
 
 	const accounts = getAccounts();
@@ -237,8 +240,10 @@
 		);
 	}
 
-	function keepEditorFocus(event: Event) {
-		if (!open) event.preventDefault();
+	function focusAfterConfirm(event: Event) {
+		if (open) return;
+		event.preventDefault();
+		returnFocus?.()?.focus();
 	}
 
 	async function deleteTransaction() {
@@ -247,7 +252,11 @@
 		await write(
 			() => remove({ transactionId }),
 			"Budge couldn't delete the Transaction. Try again.",
-			'Transaction deleted'
+			'Transaction deleted',
+			() => {
+				ondeleted?.(transactionId);
+				open = false;
+			}
 		);
 	}
 </script>
@@ -673,7 +682,7 @@
 </Dialog.Root>
 
 <AlertDialog.Root bind:open={confirmDelete}>
-	<AlertDialog.Content onCloseAutoFocus={keepEditorFocus}>
+	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>
 				{transaction?.transfer ? 'Delete this Transfer?' : 'Delete this Transaction?'}
@@ -702,7 +711,7 @@
 		if (!next) confirmBankRemoval = null;
 	}}
 >
-	<AlertDialog.Content onCloseAutoFocus={keepEditorFocus}>
+	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>
 				{transaction?.transfer ? 'Delete this Transfer too?' : 'Delete this Transaction too?'}
@@ -730,7 +739,7 @@
 </AlertDialog.Root>
 
 <AlertDialog.Root bind:open={confirmUnlock}>
-	<AlertDialog.Content onCloseAutoFocus={keepEditorFocus}>
+	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>Unlock this Transaction?</AlertDialog.Title>
 			<AlertDialog.Description>
@@ -746,7 +755,7 @@
 </AlertDialog.Root>
 
 <AlertDialog.Root bind:open={confirmDiscard}>
-	<AlertDialog.Content onCloseAutoFocus={keepEditorFocus}>
+	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>Discard your changes?</AlertDialog.Title>
 			<AlertDialog.Description>

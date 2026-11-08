@@ -17,13 +17,14 @@ export const targets = {
 			const bar = page.getByRole('progressbar', { name: `${name} Target` }).first();
 			const upcoming = page.getByRole('region', { name: 'Upcoming' });
 			const row = upcoming.getByRole('row').filter({ hasText: name });
+			const nameButton = page.getByRole('button', { name, exact: true });
 
 			const twentyFiveDollarsMoreThanAssigned = await step(
 				'open the Emergency Fund inspector',
 				async () => {
 					await openBudget(page);
 					const before = await assigned();
-					await page.getByRole('button', { name, exact: true }).click();
+					await nameButton.click();
 					return before + 2_500;
 				}
 			);
@@ -43,7 +44,10 @@ export const targets = {
 					await expect(dialog).toBeHidden();
 					await expect(bar).toHaveAttribute('aria-valuetext', '$25.00 more needed');
 					await expect(region.getByText('$25.00 more needed')).toBeVisible();
+					await expect(upcoming).toHaveCount(0);
+					await nameButton.click();
 					await expect(row).toContainText('No');
+					await nameButton.click();
 				}
 			);
 
@@ -51,6 +55,7 @@ export const targets = {
 				await region.getByRole('button', { name: 'Assign $25.00' }).click();
 				await expect(region.getByText('Funded', { exact: true })).toBeVisible();
 				await expect(bar).toHaveAttribute('aria-valuetext', 'Funded');
+				await nameButton.click();
 				await expect(row).toContainText('Yes');
 				await expect.poll(assigned).toBe(twentyFiveDollarsMoreThanAssigned);
 			});

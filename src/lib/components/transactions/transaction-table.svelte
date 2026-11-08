@@ -119,12 +119,17 @@
 	const setCleared = useMutation(api.transactions.setCleared);
 	const approve = useMutation(api.transactions.approve);
 	const approveAll = useMutation(api.transactions.approveAll);
+	const approveMany = useMutation(api.transactions.approveMany);
 	const unapprove = useMutation(api.transactions.unapprove);
 	let undoable = $state<{ scopeKey: string; transactionIds: Id<'transactions'>[] } | null>(null);
 	const scopeKey = $derived(JSON.stringify([scope, filters]));
 	const undo = $derived(undoable?.scopeKey === scopeKey ? undoable : null);
 
 	const approveAllLabel = $derived.by(() => {
+		if (shownUnapproved !== null) {
+			const shown = shownUnapproved.length;
+			return shown === 0 ? 'Approve shown' : `Approve ${String(shown)} shown`;
+		}
 		const count = unapprovedCount.data ?? 0;
 		if (count === 0) return 'Approve all';
 		if (count > UNAPPROVED_COUNT_LIMIT)
@@ -146,6 +151,14 @@
 		[...first.results, ...(secondShown ? second.results : [])].filter(
 			(row, index, all) => all.findIndex((other) => other._id === row._id) === index
 		)
+	);
+	const shownUnapproved = $derived(
+		filtering
+			? rows
+					.filter((row) => !row.approved)
+					.slice(0, UNAPPROVED_COUNT_LIMIT)
+					.map((row) => row._id)
+			: null
 	);
 	const groups = $derived.by(() => {
 		const waiting = rows.filter((row) => !row.approved);
@@ -182,6 +195,7 @@
 	let importOpen = $state(false);
 	let editingSnapshot: Row | undefined = $state();
 	let editingAt = -1;
+	let deletedId: Id<'transactions'> | null = null;
 	const editing = $derived(
 		editingSnapshot === undefined
 			? undefined
@@ -189,7 +203,9 @@
 	);
 	let rowError = $state('');
 	let approvingAll = $state(false);
-	const approveAllBlocked = $derived(approvingAll || (unapprovedCount.data ?? 0) === 0);
+	const approveAllBlocked = $derived(
+		approvingAll || (shownUnapproved?.length ?? unapprovedCount.data ?? 0) === 0
+	);
 
 	function add() {
 		editingSnapshot = undefined;
@@ -198,13 +214,16 @@
 
 	function returnFocus() {
 		if (editingSnapshot === undefined) return addButton ?? undefined;
-		return (
-			editButtonOf(editingSnapshot) ??
-			editButtonOf(rows[editingAt]) ??
-			editButtonOf(rows[editingAt - 1]) ??
-			addButton ??
-			undefined
-		);
+		const remaining = rows.filter((row) => row._id !== deletedId);
+		const candidates =
+			deletedId === editingSnapshot._id
+				? [remaining[editingAt], remaining[editingAt - 1]]
+				: [editingSnapshot, rows[editingAt], rows[editingAt - 1]];
+		for (const candidate of candidates) {
+			const button = editButtonOf(candidate);
+			if (button !== undefined) return button;
+		}
+		return addButton ?? undefined;
 	}
 
 	function categoryOf(row: Row) {
@@ -214,6 +233,7 @@
 	}
 
 	function edit(row: Row) {
+		deletedId = null;
 		editingSnapshot = row;
 		editingAt = rows.findIndex((other) => other._id === row._id);
 		dialogOpen = true;
@@ -262,7 +282,10 @@
 		rowError = '';
 		approvingAll = true;
 		const approvedIn = scopeKey;
-		const approved = await attempt(() => approveAll(scope));
+		const transactionIds = shownUnapproved;
+		const approved = await attempt(() =>
+			transactionIds === null ? approveAll(scope) : approveMany({ transactionIds })
+		);
 		approvingAll = false;
 		if (!approved.ok) {
 			rowError = "Budge couldn't approve the Transactions. Try again.";
@@ -315,11 +338,10 @@
 						row.payeeName === null && !row.transfer && 'text-muted-foreground'
 					]}
 				>
-					{payee}
-				</span>
-				<span class="sr-only">
-					, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(row.date)}
-				</span>
+					{payee}</span
+				><span class="sr-only"
+					>, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(row.date)}</span
+				>
 			</button>
 			{#if flag}
 				<span class="block truncate text-xs font-normal text-warning">{flag}</span>
@@ -413,16 +435,7 @@
 		</Button>
 		<Button variant="outline" onclick={() => (importOpen = true)}>
 			<UploadIcon aria-hidden="true" />
-			Import file
-		</Button>
-		<Button
-			bind:ref={approveAllButton}
-			variant="outline"
-			aria-disabled={approveAllBlocked}
-			onclick={approveEvery}
-		>
-			<CheckCheckIcon aria-hidden="true" />
-			<span class="min-w-30 text-left">{approveAllLabel}</span>
+			<span>Import <span class="max-sm:sr-only">file</span></span>
 		</Button>
 	</div>
 	<TransactionFilters bind:values={filterValues} showAccount={allAccounts} />
@@ -435,18 +448,36 @@
 		{problem}
 	</p>
 	<p role="status" class="sr-only">{announcement}</p>
-	<p aria-live="polite" class="flex min-h-5 items-center gap-2 text-sm text-muted-foreground">
-		{#if undo}
-			<span class="truncate">{approvedText(undo.transactionIds.length)}</span>
-			<button
-				type="button"
-				class="-my-0.5 min-h-6 shrink-0 rounded-sm px-1 font-medium text-foreground underline underline-offset-4 hover:no-underline"
-				onclick={undoApproveAll}>Undo</button
+	<div class="@container">
+		<div
+			class="flex flex-col items-start gap-2 @md:flex-row @md:items-center @md:justify-between @md:gap-3"
+		>
+			<p
+				aria-live="polite"
+				class="flex min-h-6 max-w-full min-w-0 items-center gap-2 text-sm text-muted-foreground pointer-coarse:min-h-11"
 			>
-		{:else}
-			<span class="truncate">{result}</span>
-		{/if}
-	</p>
+				{#if undo}
+					<span class="truncate">{approvedText(undo.transactionIds.length)}</span>
+					<button
+						type="button"
+						class="-my-0.5 min-h-6 shrink-0 rounded-sm px-1 font-medium text-foreground underline underline-offset-4 hover:no-underline pointer-coarse:min-h-11"
+						onclick={undoApproveAll}>Undo</button
+					>
+				{:else}
+					<span class="truncate">{result}</span>
+				{/if}
+			</p>
+			<Button
+				bind:ref={approveAllButton}
+				variant="outline"
+				aria-disabled={approveAllBlocked}
+				onclick={approveEvery}
+			>
+				<CheckCheckIcon aria-hidden="true" />
+				<span class="min-w-36 text-left">{approveAllLabel}</span>
+			</Button>
+		</div>
+	</div>
 
 	<div class="@container">
 		<Table.Root layout="fixed">
@@ -504,5 +535,8 @@
 	defaultAccountId={accountId}
 	{returnFocus}
 	ondone={announce}
+	ondeleted={(transactionId: Id<'transactions'>) => {
+		deletedId = transactionId;
+	}}
 />
 <ImportDialog bind:open={importOpen} defaultAccountId={accountId} />

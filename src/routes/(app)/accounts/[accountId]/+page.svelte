@@ -69,32 +69,6 @@
 	<div class="flex flex-col gap-4">
 		<header class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
 			<div class="flex min-w-0 flex-col gap-1">
-				<p class="text-sm text-muted-foreground">
-					{account.kind === 'creditCard' ? 'Credit card' : 'Cash'} Account
-				</p>
-				<p
-					class="line-clamp-2 min-h-12 text-sm/6 break-words text-muted-foreground sm:line-clamp-1 sm:min-h-6"
-					data-testid="account-sync"
-				>
-					{#if feeder}
-						{@const attention = attentionOf(feeder)}
-						{#if attention !== null}
-							<a
-								href="{resolve('/bank')}#connection-{feeder._id}"
-								class="mr-1 rounded-full bg-warning-tint px-2 py-0.5 text-xs font-bold text-warning underline-offset-4 hover:underline"
-								>{attention}<span class="sr-only">: {feeder.name}</span></a
-							>
-						{/if}
-						{formatSynced(feeder.lastSyncedAt, bank.now)} from
-						<a
-							href={resolve('/bank')}
-							class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
-							>{feeder.name}</a
-						>
-					{:else if bank.loaded}
-						Entered by hand or from bank files
-					{/if}
-				</p>
 				<div class="-mr-2 flex min-w-0 items-center gap-1">
 					<h1 class="truncate text-2xl font-bold tracking-tight">{account.name}</h1>
 					<DropdownMenu.Root>
@@ -129,6 +103,32 @@
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
 				</div>
+				<p class="text-sm text-muted-foreground">
+					{account.kind === 'creditCard' ? 'Credit card' : 'Cash'} Account
+				</p>
+				<p
+					class="line-clamp-2 min-h-12 text-sm/6 break-words text-muted-foreground sm:line-clamp-1 sm:min-h-6"
+					data-testid="account-sync"
+				>
+					{#if feeder}
+						{@const attention = attentionOf(feeder)}
+						{#if attention !== null}
+							<a
+								href="{resolve('/bank')}#connection-{feeder._id}"
+								class="mr-1 rounded-full bg-warning-tint px-2 py-0.5 text-xs font-bold text-warning underline-offset-4 hover:underline"
+								>{attention}<span class="sr-only">: {feeder.name}</span></a
+							>
+						{/if}
+						{formatSynced(feeder.lastSyncedAt, bank.now)} from
+						<a
+							href={resolve('/bank')}
+							class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
+							>{feeder.name}</a
+						>
+					{:else if bank.loaded}
+						Entered by hand or from bank files
+					{/if}
+				</p>
 			</div>
 			<div class="flex flex-wrap items-end gap-x-6 gap-y-3">
 				<div class="flex flex-col items-start sm:items-end">

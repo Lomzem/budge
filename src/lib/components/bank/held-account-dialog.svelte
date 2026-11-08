@@ -103,6 +103,11 @@
 		return target;
 	}
 
+	function mismatchOf(choice: string, bankKind: AccountKind | null) {
+		const target = accounts.find(choice);
+		return target !== undefined && bankKind !== null && target.kind !== bankKind;
+	}
+
 	async function decide(event: SubmitEvent) {
 		event.preventDefault();
 		const session = dialog.current;
@@ -111,6 +116,7 @@
 			session.error = 'Choose where these transactions go.';
 			return;
 		}
+		if (mismatchOf(session.choice, session.bankAccount.kind)) return;
 		const request = {
 			connectionAccountId: session.bankAccount._id,
 			choice: session.choice,
@@ -156,6 +162,8 @@
 						}}
 					/>
 				{:else}
+					{@const target = accounts.find(session.choice)}
+					{@const mismatch = mismatchOf(session.choice, session.bankAccount.kind)}
 					<Dialog.Header>
 						<Dialog.Title>{session.bankAccount.label}</Dialog.Title>
 						<Dialog.Description>
@@ -180,12 +188,14 @@
 												? undefined
 												: `held-fed-${account._id}`}
 										/>
-										<Label for="held-to-{account._id}">Into {account.name}</Label>
-										{#if feeder !== undefined}
-											<span id="held-fed-{account._id}" class="text-sm text-muted-foreground"
-												>already fed by {feeder}</span
-											>
-										{/if}
+										<div class="flex min-w-0 flex-col">
+											<Label for="held-to-{account._id}">Into {account.name}</Label>
+											{#if feeder !== undefined}
+												<span id="held-fed-{account._id}" class="text-sm text-muted-foreground"
+													>Already fed by {feeder}</span
+												>
+											{/if}
+										</div>
 									</div>
 								{/each}
 								<div class="flex min-h-9 items-center gap-2.5">
@@ -194,8 +204,15 @@
 								</div>
 							</RadioGroup.Root>
 						</fieldset>
-						{#if session.choice === 'new'}
-							<div class="flex flex-col gap-4 rounded-md bg-muted p-4">
+						<div class="grid items-start">
+							<fieldset
+								disabled={session.choice !== 'new'}
+								inert={session.choice !== 'new'}
+								class={[
+									'col-start-1 row-start-1 flex flex-col gap-4 rounded-md bg-muted p-4',
+									session.choice !== 'new' && 'invisible'
+								]}
+							>
 								<div class="flex flex-col gap-2">
 									<Label for="held-new-name">Name</Label>
 									<Input id="held-new-name" bind:value={session.name} required autocomplete="off" />
@@ -213,24 +230,36 @@
 										</div>
 									</RadioGroup.Root>
 								</fieldset>
-							</div>
-						{:else if session.choice !== 'ignore'}
-							{@const target = accounts.find(session.choice)}
-							{#if target !== undefined && session.bankAccount.kind !== null && target.kind !== session.bankAccount.kind}
-								<p class="rounded-md bg-warning-tint p-4 text-warning">
+							</fieldset>
+							{#if target !== undefined && session.bankAccount.kind !== null && mismatch}
+								<p
+									id="held-mismatch"
+									class="col-start-1 row-start-1 rounded-md bg-warning-tint p-4 text-warning"
+								>
 									The bank says this is {kindName(session.bankAccount.kind)}, but {target.name} is {kindName(
 										target.kind
-									)}. Choose a matching Account or a new one, so its balance counts the right way.
+									)}, so its balance would count the wrong way. Choose a matching Account or a new
+									one.
+								</p>
+							{:else if target !== undefined}
+								<p class="col-start-1 row-start-1 rounded-md bg-muted p-4">
+									Its transactions join {target.name}. Next, you check {target.name}'s Starting
+									Balance.
+								</p>
+							{:else if session.choice === 'ignore'}
+								<p class="col-start-1 row-start-1 rounded-md bg-muted p-4">
+									Its transactions are dropped, and Budge won't ask about it again.
 								</p>
 							{/if}
-						{:else}
-							<p class="rounded-md bg-muted p-4">
-								Its transactions are dropped, and Budge won't ask about it again.
-							</p>
-						{/if}
+						</div>
 						<Dialog.Footer error={session.error}>
 							<div class="grid min-w-40">
-								<Button type="submit" disabled={dialog.pending('save')}>
+								<Button
+									type="submit"
+									disabled={dialog.pending('save')}
+									aria-disabled={mismatch}
+									aria-describedby={mismatch ? 'held-mismatch' : undefined}
+								>
 									{session.choice === 'ignore' ? 'Ignore' : 'Import its transactions'}
 								</Button>
 							</div>

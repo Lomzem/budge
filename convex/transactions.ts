@@ -512,6 +512,25 @@ export const approveAll = mutation({
 	}
 });
 
+export const approveMany = mutation({
+	args: { transactionIds: v.array(v.id('transactions')) },
+	returns: v.array(v.id('transactions')),
+	handler: async (ctx, { transactionIds }) => {
+		await requireOwner(ctx);
+		if (transactionIds.length > UNAPPROVED_COUNT_LIMIT) {
+			throw publicError('INVALID_INPUT', 'Too many Transactions to approve at once.');
+		}
+		const approved: Id<'transactions'>[] = [];
+		for (const transactionId of new Set(transactionIds)) {
+			const transaction = await ctx.db.get('transactions', transactionId);
+			if (transaction === null || transaction.approved) continue;
+			await markApproved(ctx, transactionId);
+			approved.push(transactionId);
+		}
+		return approved;
+	}
+});
+
 export const unapprove = mutation({
 	args: { transactionIds: v.array(v.id('transactions')) },
 	returns: v.number(),

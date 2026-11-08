@@ -111,7 +111,7 @@ export const transactions = {
 	},
 	'approve-all-undo': {
 		title:
-			'Unapproved Transactions come first under their own heading, and Approve all can be undone',
+			'Unapproved Transactions come first under their own heading, and Approve all or Approve shown can be undone',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const approveAll = page.getByRole('button', { name: /^Approve (all )?\d/ });
@@ -126,6 +126,29 @@ export const transactions = {
 						page.getByRole('rowheader', { name: 'Approved', exact: true })
 					).toBeVisible();
 					return approveAll.textContent();
+				}
+			);
+
+			await step(
+				'a search approves only the Unapproved rows it shows, and Undo puts them back',
+				async () => {
+					await page.getByRole('searchbox', { name: 'Search' }).fill('BOOKSHOP');
+					const shown = page.getByRole('button', { name: /^Approve \d+ shown$/ });
+					const counted = Number(/\d+/.exec((await shown.textContent()) ?? '')?.[0]);
+					await expect(
+						page.getByRole('button', { name: /^SAMPLE BOOKSHOP.*, Unapproved/ })
+					).toHaveCount(counted);
+					await shown.click();
+					await expect(
+						page.getByText(`Approved ${String(counted)} Transaction${counted === 1 ? '' : 's'}.`)
+					).toBeVisible();
+					await expect(
+						page.getByRole('button', { name: 'Approve shown', exact: true })
+					).toHaveAttribute('aria-disabled', 'true');
+					await page.getByRole('button', { name: 'Undo', exact: true }).click();
+					await expect(shown).toHaveText(`Approve ${String(counted)} shown`);
+					await page.getByRole('button', { name: 'Clear search and filters' }).click();
+					await expect(approveAll).toHaveText(label ?? '');
 				}
 			);
 

@@ -104,6 +104,7 @@
 		aria-describedby={error ? errorId : undefined}
 		inputmode="decimal"
 		autocomplete="off"
+		aria-keyshortcuts="ArrowUp ArrowDown"
 		data-assigned
 	/>
 	<Popover.Root open={error !== ''}>

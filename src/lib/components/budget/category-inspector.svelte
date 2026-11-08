@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import XIcon from '@lucide/svelte/icons/x';
 
 	import type { Id } from '$convex/_generated/dataModel';
@@ -16,12 +18,15 @@
 	import TargetDialog from './target-dialog.svelte';
 
 	type CategoryBudget = BudgetView['groups'][number]['categories'][number];
+	type Step = { id: Id<'categories'>; name: string } | undefined;
 
 	let {
 		category,
 		view,
 		editAssigned = false,
 		readyToAssign,
+		steps,
+		onstep,
 		onclose
 	}: {
 		category: CategoryBudget;
@@ -31,6 +36,9 @@
 		editAssigned?: boolean;
 
 		readyToAssign?: number | undefined;
+
+		steps?: { previous: Step; next: Step } | undefined;
+		onstep?: (id: Id<'categories'>) => void;
 		onclose: () => void;
 	} = $props();
 
@@ -199,6 +207,27 @@
 			</dd>
 		</div>
 	</dl>
+
+	{#if steps}
+		<nav aria-label="Other Categories" class="-mt-1 grid grid-cols-2 gap-2">
+			{#each [steps.previous, steps.next] as step, index (index)}
+				{#if step}
+					<Button
+						variant="outline"
+						size="wrap"
+						aria-label="{index === 0 ? 'Previous' : 'Next'} Category: {step.name}"
+						onclick={() => onstep?.(step.id)}
+					>
+						{#if index === 0}<ChevronLeftIcon aria-hidden="true" />{/if}
+						<span class="min-w-0 truncate">{step.name}</span>
+						{#if index === 1}<ChevronRightIcon aria-hidden="true" />{/if}
+					</Button>
+				{:else}
+					<span></span>
+				{/if}
+			{/each}
+		</nav>
+	{/if}
 
 	{#if category.available < 0}
 		<div class="flex flex-col gap-1">

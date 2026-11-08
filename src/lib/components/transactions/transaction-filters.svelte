@@ -49,8 +49,8 @@
 		event.preventDefault();
 	}}
 >
-	<div class="flex flex-wrap items-end gap-2">
-		<div class="flex w-full min-w-0 flex-col gap-1 @lg:w-auto @lg:flex-1">
+	<div class="flex items-end gap-2">
+		<div class="flex min-w-0 flex-1 flex-col gap-1">
 			<Label for="transaction-search">Search</Label>
 			<Input
 				id="transaction-search"
@@ -70,11 +70,13 @@
 				onclick={() => (filtersOpen = !filtersOpen)}
 			>
 				<SlidersHorizontalIcon aria-hidden="true" />
-				Filters
-				<span class="min-w-4 text-left">{narrowed > 0 ? narrowed : ''}</span>
+				<span class="@max-md:sr-only">Filters</span>
+				<span class={['text-left', narrowed > 0 ? 'min-w-4' : '@max-md:hidden @md:min-w-4']}
+					>{narrowed > 0 ? narrowed : ''}</span
+				>
 			</Button>
 		</div>
-		<div class="grid min-w-24">
+		<div class="grid @md:min-w-24">
 			<Button
 				type="button"
 				variant="ghost"
@@ -85,7 +87,7 @@
 				}}
 			>
 				<XIcon aria-hidden="true" />
-				Clear<span class="sr-only"> search and filters</span>
+				<span class="@max-md:sr-only">Clear<span class="sr-only"> search and filters</span></span>
 			</Button>
 		</div>
 	</div>
