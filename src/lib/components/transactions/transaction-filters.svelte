@@ -2,6 +2,7 @@
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { useQuery } from 'convex-svelte';
+	import { MediaQuery } from 'svelte/reactivity';
 
 	import { api } from '$convex/_generated/api';
 	import { getAccounts } from '$lib/accounts.svelte';
@@ -38,6 +39,8 @@
 
 	const selectClass =
 		'h-9 w-full min-w-0 rounded-md border border-input bg-card px-2.5 text-base pointer-coarse:h-11';
+
+	const roomy = new MediaQuery('(min-width: 480px)', true);
 </script>
 
 <form
@@ -50,13 +53,15 @@
 >
 	<div class="flex items-end gap-2">
 		<div class="flex min-w-0 flex-1 flex-col gap-1">
-			<Label for="transaction-search">Search</Label>
+			<div class="@max-md:sr-only">
+				<Label for="transaction-search">Search</Label>
+			</div>
 			<Input
 				id="transaction-search"
 				bind:ref={searchInput}
 				type="search"
 				bind:value={values.search}
-				placeholder="Payee or memo"
+				placeholder={roomy.current ? 'Payee or memo' : 'Search'}
 				autocomplete="off"
 			/>
 		</div>

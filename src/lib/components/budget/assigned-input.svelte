@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Popover } from 'bits-ui';
 	import { tick } from 'svelte';
 
 	import { attempt } from '$lib/attempt';
@@ -24,9 +23,6 @@
 	let error = $state('');
 	let hint = $state('');
 	let sent: number | null = $state(null);
-	let input: HTMLInputElement | null = $state(null);
-	let focused = $state(false);
-	let hovered = $state(false);
 	const errorId = $props.id();
 
 	const read = () => draft ?? shown(sent ?? amount);
@@ -35,7 +31,6 @@
 	};
 
 	function start(event: FocusEvent) {
-		focused = true;
 		if (error === '') draft = shown(amount);
 		(event.currentTarget as HTMLInputElement).select();
 	}
@@ -67,7 +62,6 @@
 	}
 
 	function commit() {
-		focused = false;
 		if (settle() !== undefined) draft = null;
 	}
 
@@ -123,14 +117,8 @@
 	}
 </script>
 
-<div
-	class="ml-auto w-24 *:text-right *:tabular-nums sm:w-28"
-	role="presentation"
-	onpointerenter={() => (hovered = true)}
-	onpointerleave={() => (hovered = false)}
->
+<div class="ml-auto w-24 *:text-right *:tabular-nums sm:w-28">
 	<Input
-		bind:ref={input}
 		bind:value={read, write}
 		onfocus={start}
 		onblur={commit}
@@ -144,27 +132,9 @@
 		data-assigned
 	/>
 	{#if error}<span id={errorId} role="alert" class="sr-only">{error}</span>{/if}
-	<Popover.Root open={error !== '' && (focused || hovered)}>
-		<Popover.Portal>
-			<Popover.Content
-				customAnchor={input}
-				side="bottom"
-				align="end"
-				sideOffset={4}
-				collisionPadding={8}
-				trapFocus={false}
-				interactOutsideBehavior="ignore"
-				escapeKeydownBehavior="ignore"
-				onOpenAutoFocus={(event: Event) => {
-					event.preventDefault();
-				}}
-				onCloseAutoFocus={(event: Event) => {
-					event.preventDefault();
-				}}
-				class="z-50 w-44 rounded-md border border-destructive bg-popover px-2.5 py-1.5 text-xs text-destructive shadow-md"
-			>
-				<span aria-hidden="true">{hint}</span>
-			</Popover.Content>
-		</Popover.Portal>
-	</Popover.Root>
+	{#if hint}
+		<span aria-hidden="true" class="mt-1 block text-xs whitespace-normal text-destructive"
+			>{hint}</span
+		>
+	{/if}
 </div>

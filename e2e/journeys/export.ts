@@ -53,6 +53,7 @@ export const exportJourneys = {
 					for (const connection of exported.bankConnections ?? []) {
 						expect(connection).not.toHaveProperty('provider');
 					}
+					await expect(dialog.getByRole('status')).toHaveText(`Downloaded budge-${date}.json.`);
 					return date;
 				}
 			);

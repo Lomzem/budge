@@ -48,17 +48,25 @@ export const settings = {
 				await expectCutover(page, cutover);
 			});
 
-			await step('a cancelled change keeps the date; a saved one moves it', async () => {
-				await region.getByRole('button', { name: 'Change' }).click();
-				await region.getByLabel('Cutover date').fill(dayEarlier);
-				await region.getByRole('button', { name: 'Cancel' }).click();
-				await expectCutover(page, cutover);
-				await region.getByRole('button', { name: 'Change' }).click();
-				await saveCutover(page, dayEarlier);
-				await expectCutover(page, dayEarlier);
-				await page.reload();
-				await expectCutover(page, dayEarlier);
-			});
+			await step(
+				'a change cancelled by button or Escape keeps the date; a saved one moves it',
+				async () => {
+					await region.getByRole('button', { name: 'Change' }).click();
+					await region.getByLabel('Cutover date').fill(dayEarlier);
+					await region.getByRole('button', { name: 'Cancel' }).click();
+					await expectCutover(page, cutover);
+					await region.getByRole('button', { name: 'Change' }).click();
+					await region.getByLabel('Cutover date').fill(dayEarlier);
+					await page.keyboard.press('Escape');
+					await expectCutover(page, cutover);
+					await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
+					await region.getByRole('button', { name: 'Change' }).click();
+					await saveCutover(page, dayEarlier);
+					await expectCutover(page, dayEarlier);
+					await page.reload();
+					await expectCutover(page, dayEarlier);
+				}
+			);
 
 			await step('Previous month stops at the cutover month', async () => {
 				await openBudget(page);

@@ -36,8 +36,8 @@
 	<title>Accounts · Budge</title>
 </svelte:head>
 
-<div class="flex flex-col gap-6">
-	<header class="flex flex-wrap items-end justify-between gap-4">
+<div class="flex flex-col gap-4 sm:gap-6">
+	<header class="flex items-end justify-between gap-4">
 		<div class="flex flex-col gap-1">
 			<h1 class="text-2xl font-bold tracking-tight">Accounts</h1>
 			<p class="text-muted-foreground">
@@ -49,7 +49,7 @@
 		</div>
 		<Button variant="outline" onclick={() => (addOpen = true)}>
 			<PlusIcon aria-hidden="true" />
-			Add Account
+			<span class="max-sm:sr-only">Add Account</span>
 		</Button>
 	</header>
 

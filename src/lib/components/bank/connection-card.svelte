@@ -101,9 +101,7 @@
 	const reconnectFirst = $derived(
 		connection.status === 'needsAttention' || connection.consentEndsAt !== null
 	);
-	const hinted = $derived(
-		connection.bankLogin && !reconnectFirst && pending === null && result === null
-	);
+	const hinted = $derived(connection.bankLogin && !reconnectFirst);
 	const reconnectReason = $derived.by(() => {
 		if (!connection.bankLogin) return `problems-${connection._id}`;
 		return hinted ? `reconnect-hint-${connection._id}` : undefined;
@@ -185,6 +183,10 @@
 	}
 
 	async function sync() {
+		if (paused && !reconnecting) {
+			result = { failed: true, text: 'Reconnect first. The bank paused syncing until you do.' };
+			return;
+		}
 		if (syncBlocked) return;
 		result = null;
 		result = await bank.sync(connection._id);
@@ -271,17 +273,14 @@
 					{/each}
 				</ul>
 			{/if}
-			<p class="flex items-start gap-1.5 text-sm break-words text-muted-foreground">
-				{#if problems.length === 0}
-					<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
-				{:else}
-					<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-				{/if}
-				<span class="min-w-0">{synced}</span>
-			</p>
+			{#if hinted}
+				<p id="reconnect-hint-{connection._id}" class="text-sm break-words text-muted-foreground">
+					Reconnect if the bank asks you to sign in again.
+				</p>
+			{/if}
 		</div>
 		<div
-			class="flex flex-col-reverse gap-x-4 gap-y-2 sm:flex-row sm:items-center sm:justify-between sm:pl-13"
+			class="flex flex-col gap-x-4 gap-y-3 sm:flex-row sm:items-center sm:justify-between sm:pl-13"
 		>
 			<p
 				class={[
@@ -299,10 +298,13 @@
 						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
 					{/if}
 					<span class="min-w-0">{result.text}</span>
-				{:else if hinted}
-					<span id="reconnect-hint-{connection._id}" class="min-w-0"
-						>Reconnect if the bank asks you to sign in again.</span
-					>
+				{:else}
+					{#if problems.length === 0}
+						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
+					{:else}
+						<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+					{/if}
+					<span class="min-w-0">{synced}</span>
 				{/if}
 			</p>
 			<span role="status" class="sr-only">{result?.text ?? ''}</span>
@@ -317,7 +319,13 @@
 						{reconnecting ? 'Reconnecting…' : 'Reconnect'}
 					</Button>
 				</div>
-				<div class="grid sm:w-36">
+				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+				<div
+					class="grid sm:w-36"
+					onclick={(event) => {
+						if (event.target === event.currentTarget) void sync();
+					}}
+				>
 					<Button
 						variant={reconnectFirst || !connection.bankLogin ? 'outline' : 'default'}
 						aria-disabled={syncBlocked}

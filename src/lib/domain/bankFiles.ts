@@ -146,11 +146,13 @@ const csvProfiles = [
 ];
 
 const unknownLayout = (columns: readonly string[]) => {
-	const named = columns.filter((name) => name !== '').slice(0, 6);
+	const named = columns.filter((name) => name !== '');
+	const listed = named.slice(0, 6).map((name) => `“${name}”`);
+	const more = named.length - listed.length;
 	const found =
 		named.length === 0
 			? ' It has no column names.'
-			: ` Its columns are ${named.map((name) => `“${name}”`).join(', ')}${columns.length > named.length ? ', …' : ''}.`;
+			: ` Its columns are ${listed.join(', ')}${more > 0 ? ` and ${String(more)} more` : ''}.`;
 	return new BankFileError({
 		message: `This file is not a Capital One or Discover CSV, or a QFX file.${found} Download the CSV from your bank's transactions page.`
 	});

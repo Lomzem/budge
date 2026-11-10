@@ -24,7 +24,7 @@ Preconditions:
 - Authenticated baseline from the index; reseed before independent mutations.
 
 - **First use:** seed empty-budget, navigate `/`; scope `page.getByRole("region", { name: "Cutover date", exact: true })`; the input is `getByLabel("Cutover date")`. Fill Date with an invented current ISO date, Save; require Budge starts on date and ability to create an Account. Reload and verify saved date. Before setup, Add Account directs to the Budget screen to set the cutover date. Cancel appears only when a cutover date already exists.
-- **Change/cancel:** on `/settings`, Change, Date = earlier valid date, Cancel; require original date. Repeat and Save; require new date after reload. Change moves focus into the date field; Cancel and a successful Save return it to Change.
+- **Change/cancel:** on `/settings`, Change, Date = earlier valid date, Cancel; require original date. Repeat and Save; require new date after reload. Change moves focus into the date field; Cancel, Escape and a successful Save return it to Change (`settings/cutover`).
 - **Constraint:** with a Starting Balance Transaction on cutover, try moving cutover after its date. Require visible error and saved date unchanged; manually save a Transaction before cutover and require refusal. Import a file with earlier rows and require them filtered before preview; an all-earlier file says `Nothing in this file is dated on or after the cutover date.` (manual drive).
 
 ## Gotchas

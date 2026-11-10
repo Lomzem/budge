@@ -5,7 +5,7 @@
 	import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
 	import * as Dialog from './index.js';
 	import DialogPortal from './dialog-portal.svelte';
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import type { ComponentProps } from 'svelte';
 
 	let {
@@ -28,11 +28,22 @@
 	let scrolled = $state(false);
 	let heading = $state('');
 
-	function onscroll() {
-		scrolled = (body?.scrollTop ?? 0) > 8;
+	function measure(element: HTMLElement | null) {
+		scrolled = (element?.scrollTop ?? 0) > 8;
 		if (scrolled)
-			heading = body?.querySelector('[data-slot="dialog-title"]')?.textContent.trim() ?? '';
+			heading = element?.querySelector('[data-slot="dialog-title"]')?.textContent.trim() ?? '';
 	}
+
+	function onscroll() {
+		measure(body);
+	}
+
+	$effect(() => {
+		const element = body;
+		untrack(() => {
+			measure(element);
+		});
+	});
 </script>
 
 <DialogPortal {...portalProps}>
@@ -53,7 +64,7 @@
 			data-slot="dialog-body"
 			class={[
 				'grid min-h-0 scroll-pb-40 gap-5 overflow-y-auto overscroll-contain p-5 sm:scroll-pb-24 sm:p-6',
-				showCloseButton && 'scroll-pt-16 pointer-coarse:scroll-pt-20'
+				showCloseButton && 'scroll-pt-20 pointer-coarse:scroll-pt-24'
 			]}
 		>
 			{@render children()}
@@ -68,7 +79,7 @@
 			>
 				<p
 					aria-hidden="true"
-					class={['min-w-0 flex-1 truncate text-base font-bold', !scrolled && 'invisible']}
+					class={['line-clamp-2 min-w-0 flex-1 text-base font-bold', !scrolled && 'invisible']}
 				>
 					{heading}
 				</p>

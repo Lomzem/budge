@@ -143,6 +143,11 @@ describe('decoding a bank file', () => {
 			'not a Capital One or Discover CSV, or a QFX file. Its columns are “Date”, “Thing”.'
 		],
 		[
+			'an unknown layout with many columns, naming six and counting the rest',
+			'A,B,C,D,E,F,G,H\n1,2,3,4,5,6,7,8\n',
+			'Its columns are “A”, “B”, “C”, “D”, “E”, “F” and 2 more. Download'
+		],
+		[
 			'a date that does not exist',
 			'Trans. Date,Post Date,Description,Amount,Category\n02/30/2026,03/01/2026,SAMPLE,1.00,X\n',
 			'Row 2'

@@ -95,13 +95,18 @@ export const plaid = {
 				await expect(card(page, 'Sample Credit Union')).not.toContainText(needsReconnect);
 			});
 
-			await step('its Sync now is unavailable until it reconnects, and says why', async () => {
-				const syncNow = savings.getByRole('button', { name: 'Sync now' });
-				await expect(syncNow).toHaveAttribute('aria-disabled', 'true');
-				await expect(syncNow).toHaveAccessibleDescription(new RegExp(`^${needsReconnect}`));
-				await syncNow.click({ force: true });
-				await expect(savings.getByRole('status')).toHaveText('');
-			});
+			await step(
+				'its Sync now is unavailable until it reconnects, and says why, also when pressed',
+				async () => {
+					const syncNow = savings.getByRole('button', { name: 'Sync now' });
+					await expect(syncNow).toHaveAttribute('aria-disabled', 'true');
+					await expect(syncNow).toHaveAccessibleDescription(new RegExp(`^${needsReconnect}`));
+					await syncNow.click({ force: true });
+					await expect(savings.getByRole('status')).toHaveText(
+						'Reconnect first. The bank paused syncing until you do.'
+					);
+				}
+			);
 
 			await step('a failed Reconnect reports why and still offers Reconnect', async () => {
 				await savings.getByRole('button', { name: 'Reconnect', exact: true }).click();

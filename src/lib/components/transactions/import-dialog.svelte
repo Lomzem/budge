@@ -136,7 +136,14 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content size="wide">
+	<Dialog.Content
+		size="wide"
+		onOpenAutoFocus={(event: Event) => {
+			if (defaultAccountId === undefined) return;
+			event.preventDefault();
+			document.getElementById('import-file')?.focus();
+		}}
+	>
 		<Dialog.Header>
 			<Dialog.Title>Import a bank file</Dialog.Title>
 			<Dialog.Description>

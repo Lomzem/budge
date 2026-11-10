@@ -20,7 +20,7 @@ Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
 
-- **JSON (manual checks beyond `export/files`, which checks its table inventory, provider omission, filename and Checking):** `/settings`, button `Export…`, scope dialog Export. Register `page.waitForEvent("download")` before clicking Download JSON; `download.saveAs()` into evidence directory. Parse the actual file, require Checking in Accounts, every source table, no `monthlyTotals`, `webhookKeys`, `webhookKeyLookups`, or `bankConnections.provider`. Avoid printing exported contents.
+- **JSON (manual checks beyond `export/files`, which checks its table inventory, provider omission, filename and Checking):** `/settings`, button `Export…`, scope dialog Export. Register `page.waitForEvent("download")` before clicking Download JSON; `download.saveAs()` into evidence directory. Parse the actual file, require Checking in Accounts, every source table, no `monthlyTotals`, `webhookKeys`, `webhookKeyLookups`, or `bankConnections.provider`. After the download the dialog's status reads `Downloaded budge-<date>.json.`; after CSV it reads `Downloaded <N> CSV files, named budge-<date>-<table>.csv.` Avoid printing exported contents.
 - **CSV (manual content checks beyond the journey):** collect download events before Download CSV; require filenames for every table in JSON, not just Chromium’s first ten. Save all files under evidence and inspect headers, invented names, row counts. Compare table coverage against JSON; wait up to 15 seconds for paced downloads. Capture action and completed dialog on desktop and 320 px.
 
 ## Gotchas

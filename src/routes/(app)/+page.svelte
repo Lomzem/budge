@@ -380,7 +380,7 @@
 					bind:this={needsList}
 					onscroll={measureNeeds}
 					class={[
-						'-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto fade-edges p-1',
+						'-mx-1 flex min-w-0 flex-1 snap-x snap-proximity scroll-px-1 gap-2 overflow-x-auto fade-edges p-1',
 						needsBefore && 'fade-start',
 						needsAfter && 'fade-end'
 					]}
@@ -392,7 +392,7 @@
 								? 'bg-destructive-tint text-destructive'
 								: 'bg-warning-tint text-warning'
 						]}
-						<li class="shrink-0">
+						<li class="shrink-0 snap-start">
 							{#if need.link}
 								<a
 									href="{resolve(need.link.path)}{need.link.query}"

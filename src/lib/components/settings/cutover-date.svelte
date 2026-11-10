@@ -54,7 +54,17 @@
 	{#if settings.data === undefined}
 		<p role="status" class="h-9 text-muted-foreground">Loading…</p>
 	{:else if changing || cutoverDate === null}
-		<form class="flex flex-wrap items-center gap-2" onsubmit={submit}>
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<form
+			class="flex flex-wrap items-center gap-2"
+			onsubmit={submit}
+			onkeydown={(event) => {
+				if (event.key !== 'Escape' || cutoverDate === null) return;
+				event.preventDefault();
+				error = '';
+				void stopChange();
+			}}
+		>
 			<div class="w-44">
 				<Input
 					id="cutover-date"

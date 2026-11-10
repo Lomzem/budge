@@ -412,14 +412,14 @@
 				aria-label="{payee}, {row.approved ? '' : 'Unapproved, '}edit Transaction on {formatDate(
 					row.date
 				)}"
-				class="block max-w-full rounded-sm text-left hover:underline"
+				class="relative block max-w-full rounded-sm text-left hover:underline pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-2.5"
 				onclick={() => {
 					edit(row);
 				}}
 			>
 				<span
 					class={[
-						'line-clamp-2 break-words whitespace-normal @4xl:line-clamp-1',
+						'break-words whitespace-normal @4xl:line-clamp-1',
 						row.payeeName === null && !row.transfer && 'text-muted-foreground'
 					]}
 				>

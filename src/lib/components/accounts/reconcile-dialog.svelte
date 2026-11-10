@@ -97,7 +97,8 @@
 	<Dialog.Content
 		onOpenAutoFocus={(event: Event) => {
 			event.preventDefault();
-			document.getElementById('reconcile-balance')?.focus();
+			const touch = matchMedia('(pointer: coarse)').matches;
+			document.getElementById(touch ? 'reconcile-same' : 'reconcile-balance')?.focus();
 		}}
 	>
 		<Dialog.Header>
@@ -119,9 +120,9 @@
 					</span>
 				</p>
 				<Button
+					id="reconcile-same"
 					type="button"
 					variant={balance.trim() === '' ? 'default' : 'outline'}
-					size="sm"
 					aria-disabled={clearedShown === undefined || dialog.pending('save')}
 					aria-label="The bank shows the same: reconcile at {clearedShown === undefined
 						? '…'
