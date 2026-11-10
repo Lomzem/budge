@@ -68,6 +68,7 @@ export const plaid = {
 				await expect(communityBank.getByRole('status')).toHaveText(notSetUp);
 				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
 				await expect(savings.getByRole('status')).toHaveText('');
+				await expect(communityBank).toContainText(`${notSetUp} Last successful sync`);
 			});
 		}
 	},
@@ -92,6 +93,9 @@ export const plaid = {
 
 			await step('only Sample Savings Bank asks for a reconnect', async () => {
 				await expect(savings).toContainText(needsReconnect);
+				await expect(savings).toContainText(
+					'Feeds no Budge Account yet. Reconnect to see its accounts and choose where they go.'
+				);
 				await expect(card(page, 'Sample Credit Union')).not.toContainText(needsReconnect);
 			});
 

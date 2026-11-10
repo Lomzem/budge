@@ -246,7 +246,9 @@
 		<div class="flex flex-col gap-1 sm:pl-13">
 			<p class="text-sm break-words text-muted-foreground">
 				{#if connection.feeds.length === 0}
-					Feeds no Budge Account yet.
+					Feeds no Budge Account yet.{paused && held.length === 0
+						? ' Reconnect to see its accounts and choose where they go.'
+						: ''}
 				{:else}
 					Feeds
 					{#each connection.feeds as feed, index (feed.accountId)}
@@ -297,7 +299,10 @@
 					{:else}
 						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
 					{/if}
-					<span class="min-w-0">{result.text}</span>
+					<span class="min-w-0"
+						>{result.text}
+						{#if result.failed}<span class="text-muted-foreground">{synced}</span>{/if}</span
+					>
 				{:else}
 					{#if problems.length === 0}
 						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
