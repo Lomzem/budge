@@ -120,7 +120,7 @@
 				</p>
 				<Button
 					type="button"
-					variant="outline"
+					variant={balance.trim() === '' ? 'default' : 'outline'}
 					size="sm"
 					aria-disabled={clearedShown === undefined || dialog.pending('save')}
 					aria-label="The bank shows the same: reconcile at {clearedShown === undefined
@@ -160,7 +160,11 @@
 				{/if}
 			</p>
 			<Dialog.Footer {error}>
-				<Button type="submit" disabled={dialog.pending('save')}>{submitLabel}</Button>
+				<Button
+					type="submit"
+					variant={balance.trim() === '' ? 'outline' : 'default'}
+					disabled={dialog.pending('save')}>{submitLabel}</Button
+				>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

@@ -299,7 +299,6 @@ export function choose(draft: Draft, option: string, world: World): Draft {
 	const previous = selectionOf(draft, world);
 	let chosen: Draft = { ...draft, choice, picked: true };
 	if (choice.kind === 'split') {
-		const total = parseCents(draft.amount);
 		const key = draft.nextLineKey;
 		chosen = {
 			...chosen,
@@ -307,7 +306,7 @@ export function choose(draft: Draft, option: string, world: World): Draft {
 				{
 					key,
 					categoryId: previous.kind === 'category' ? previous.categoryId : '',
-					amount: total === undefined ? draft.amount : shownSize(total),
+					amount: '',
 					memo: ''
 				},
 				{ key: key + 1, categoryId: '', amount: '', memo: '' }
@@ -399,33 +398,39 @@ function invalid(message: string, field: Field): Payload {
 	return { kind: 'invalid', message, field };
 }
 
+function lineProblem(
+	line: Draft['lines'][number],
+	number: string,
+	removable: boolean,
+	world: World
+): Payload | undefined {
+	const categoryId = categoryIn(world, line.categoryId);
+	const blank = line.amount.trim() === '';
+	if (categoryId === undefined && line.categoryId === '' && blank) {
+		const fix = removable ? 'Fill it in, or remove the line.' : 'Pick its Category and amount.';
+		return invalid(`Line ${number} is empty. ${fix}`, { kind: 'lineCategory', key: line.key });
+	}
+	if (categoryId === undefined) {
+		return invalid(`Pick a Category for line ${number}.`, { kind: 'lineCategory', key: line.key });
+	}
+	if (parseCents(line.amount) !== undefined) return undefined;
+	return invalid(
+		blank
+			? `Enter line ${number}'s amount${removable ? ', or remove the line' : ''}.`
+			: `Enter line ${number}'s amount, such as 12.50.`,
+		{ kind: 'lineAmount', key: line.key }
+	);
+}
+
 function splitsOf(draft: Draft, world: World) {
 	const splits = [];
+	const removable = draft.lines.length > 2;
 	for (const [index, line] of draft.lines.entries()) {
-		const number = index + 1;
+		const problem = lineProblem(line, String(index + 1), removable, world);
+		if (problem !== undefined) return problem;
 		const categoryId = categoryIn(world, line.categoryId);
 		const cents = parseCents(line.amount);
-		if (categoryId === undefined && line.categoryId === '' && line.amount.trim() === '') {
-			return invalid(`Line ${String(number)} is empty. Fill it in, or remove the line.`, {
-				kind: 'lineCategory',
-				key: line.key
-			});
-		}
-		if (categoryId === undefined) {
-			return invalid(`Pick a Category for line ${String(number)}.`, {
-				kind: 'lineCategory',
-				key: line.key
-			});
-		}
-		if (cents === undefined) {
-			const blank = line.amount.trim() === '';
-			return invalid(
-				blank
-					? `Enter line ${String(number)}'s amount, or remove the line.`
-					: `Enter line ${String(number)}'s amount, such as 12.50.`,
-				{ kind: 'lineAmount', key: line.key }
-			);
-		}
+		if (categoryId === undefined || cents === undefined) continue;
 		const amount = draft.direction === 'outflow' ? -cents : cents;
 		splits.push({ categoryId, amount, memo: line.memo });
 	}

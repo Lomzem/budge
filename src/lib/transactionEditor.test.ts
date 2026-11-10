@@ -195,13 +195,14 @@ describe('splitting across Categories', () => {
 	const typed = newDraft({ payee: 'Corner Market', amount: '12.50' });
 	const split = optionOf({ kind: 'split' });
 
-	test('starts with the whole amount on a line in the Category it had', () => {
-		const lines = choose(typed, split, remembering).lines;
+	test('starts with the Category it had and no amounts, so the whole amount is left to split', () => {
+		const draft = choose(typed, split, remembering);
 
-		expect(lines.map(({ categoryId, amount }) => ({ categoryId, amount }))).toEqual([
-			{ categoryId: groceries, amount: '12.50' },
+		expect(draft.lines.map(({ categoryId, amount }) => ({ categoryId, amount }))).toEqual([
+			{ categoryId: groceries, amount: '' },
 			{ categoryId: '', amount: '' }
 		]);
+		expect(view(draft, remembering, noCandidates).remainder).toBe(1250);
 	});
 
 	test.each([
@@ -223,6 +224,14 @@ describe('splitting across Categories', () => {
 				categoryId: index === 0 ? groceries : rent,
 				amount: amounts[index] ?? ''
 			}))
+		};
+	}
+
+	function emptySecondLine() {
+		const draft = filled('outflow', ['12.50', '']);
+		return {
+			...draft,
+			lines: draft.lines.map((line, index) => (index === 1 ? { ...line, categoryId: '' } : line))
 		};
 	}
 
@@ -260,10 +269,16 @@ describe('splitting across Categories', () => {
 
 	test.each([
 		{
-			problem: 'a line is left empty',
-			draft: choose(typed, split, remembering),
-			message: 'Line 2 is empty. Fill it in, or remove the line.',
+			problem: 'one of two lines is left empty',
+			draft: emptySecondLine(),
+			message: 'Line 2 is empty. Pick its Category and amount.',
 			blamed: { line: 2, part: 'lineCategory' }
+		},
+		{
+			problem: 'a line that can be removed is left empty',
+			draft: addLine(filled('outflow', ['10.00', '2.50'])),
+			message: 'Line 3 is empty. Fill it in, or remove the line.',
+			blamed: { line: 3, part: 'lineCategory' }
 		},
 		{
 			problem: 'a line has no Category',
@@ -280,7 +295,7 @@ describe('splitting across Categories', () => {
 		{
 			problem: 'a line has no amount',
 			draft: filled('outflow', ['12.50', '']),
-			message: "Enter line 2's amount, or remove the line.",
+			message: "Enter line 2's amount.",
 			blamed: { line: 2, part: 'lineAmount' }
 		},
 		{

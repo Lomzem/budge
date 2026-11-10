@@ -27,33 +27,42 @@ export const splits = {
 			});
 
 			await step(
-				'the first line starts with the whole amount, Save points at the first unfinished line, and moving some to the second keeps the total',
+				'the lines start empty with the whole amount left, Save points at the first unfinished line, and each fix moves the alert on',
 				async () => {
-					await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('50.00');
-					await expect(remainder).toHaveText('$0.00 left to split');
+					await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('');
+					await expect(remainder).toHaveText('$50.00 left to split');
 					await dialog.getByRole('button', { name: 'Save' }).click();
-					await expect(dialog.getByRole('alert')).toHaveText('Pick a Category for line 1.');
+					await expect(dialog.getByRole('alert')).toHaveText(
+						'Line 1 is empty. Pick its Category and amount.'
+					);
 					const lineOneCategory = dialog.getByLabel('Line 1 Category');
 					await expect(lineOneCategory).toBeFocused();
 					await expect(lineOneCategory).toHaveAttribute('aria-invalid', 'true');
-					await expect(lineOneCategory).toHaveAccessibleDescription('Pick a Category for line 1.');
-					await lineOneCategory.selectOption({ label: 'Groceries' });
-					await expect(dialog.getByRole('alert')).toHaveText(
-						'Line 2 is empty. Fill it in, or remove the line.'
+					await expect(lineOneCategory).toHaveAccessibleDescription(
+						'Line 1 is empty. Pick its Category and amount.'
 					);
+					await lineOneCategory.selectOption({ label: 'Groceries' });
+					await expect(dialog.getByRole('alert')).toHaveText("Enter line 1's amount.");
 					await expect(lineOneCategory).not.toHaveAttribute('aria-invalid');
 					await dialog.getByLabel('Line 1 amount').fill('30.00');
+					await expect(dialog.getByRole('alert')).toHaveText(
+						'Line 2 is empty. Pick its Category and amount.'
+					);
 					await expect(remainder).toHaveText('$20.00 left to split');
 				}
 			);
 
 			await step(
-				'lines over the amount refuse to save; once they add up, the row reads Split',
+				'Add line focuses the new line without blaming it yet; lines over the amount refuse to save; once they add up, the row reads Split',
 				async () => {
 					await dialog.getByLabel('Line 2 Category').selectOption({ label: 'Gifts' });
 					await dialog.getByLabel('Line 2 amount').fill('12.00');
 					await dialog.getByRole('button', { name: 'Add line' }).click();
-					await dialog.getByLabel('Line 3 Category').selectOption({ label: 'Coffee' });
+					const lineThreeCategory = dialog.getByLabel('Line 3 Category');
+					await expect(lineThreeCategory).toBeFocused();
+					await expect(lineThreeCategory).not.toHaveAttribute('aria-invalid');
+					await expect(dialog.getByRole('alert')).toHaveText('');
+					await lineThreeCategory.selectOption({ label: 'Coffee' });
 					await dialog.getByLabel('Line 3 amount').fill('9.00');
 					await expect(remainder).toHaveText('$1.00 over the amount');
 					await dialog.getByRole('button', { name: 'Save' }).click();
@@ -115,7 +124,8 @@ export const splits = {
 			});
 
 			await step('the split starts fresh from $80.00 and Groceries', async () => {
-				await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('80.00');
+				await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('');
+				await expect(dialog.getByText('$80.00 left to split')).toBeVisible();
 				await expect(dialog.getByLabel('Line 1 memo')).toHaveValue('');
 				await expect(dialog.getByLabel('Line 1 Category').locator('option:checked')).toHaveText(
 					'Groceries'

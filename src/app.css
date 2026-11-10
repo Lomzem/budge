@@ -151,6 +151,7 @@
 	--text-4xl: 2.4883rem;
 	--text-4xl--line-height: 3rem;
 	--container-8xl: 88rem;
+	--breakpoint-xs: 22rem;
 }
 
 @theme inline {

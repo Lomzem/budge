@@ -13,7 +13,7 @@ function monthName(monthsFromNow: number) {
 export const budget = {
 	assign: {
 		title:
-			'editing Assigned inline keeps focus, changes Ready to Assign, and reloads and other months keep it',
+			'editing Assigned inline moves on to the next Category, changes Ready to Assign, and reloads and other months keep it',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			const assigned = page.getByRole('textbox', { name: 'Assigned for Groceries', exact: true });
@@ -29,21 +29,25 @@ export const budget = {
 			});
 			const tenDollarsMore = typed(before.assigned + 1_000);
 
-			await step('assign $10 more to Groceries', async () => {
-				await assigned.fill(tenDollarsMore);
-				await assigned.press('Enter');
-				await expect(assigned).toBeFocused();
-				await expect(assigned).toHaveValue(tenDollarsMore);
-				await expect.poll(readyToAssign).toBe(before.readyToAssign - 1_000);
-			});
+			await step(
+				'assign $10 more to Groceries; Enter moves to the next Assigned field',
+				async () => {
+					await assigned.fill(tenDollarsMore);
+					await assigned.press('Enter');
+					await expect(page.locator('input[data-assigned]:focus')).toHaveCount(1);
+					await expect(assigned).not.toBeFocused();
+					await expect(assigned).toHaveValue(tenDollarsMore);
+					await expect.poll(readyToAssign).toBe(before.readyToAssign - 1_000);
+				}
+			);
 
-			await step('ArrowDown and ArrowUp move between Assigned fields', async () => {
-				await assigned.press('ArrowDown');
+			await step('ArrowUp and ArrowDown move between Assigned fields', async () => {
 				const below = page.locator('input[data-assigned]:focus');
-				await expect(below).toHaveCount(1);
-				await expect(assigned).not.toBeFocused();
 				await below.press('ArrowUp');
 				await expect(assigned).toBeFocused();
+				await assigned.press('ArrowDown');
+				await expect(assigned).not.toBeFocused();
+				await expect(below).toHaveCount(1);
 			});
 
 			await step('a reload keeps Assigned and Ready to Assign', async () => {
@@ -95,13 +99,16 @@ export const budget = {
 				expect(painted.equals(blank)).toBe(false);
 			});
 
-			for (const [link, filter, option, count] of [
-				[/^6 Uncategorized$/, 'Category', 'Uncategorized', 6],
-				[/^3 Unapproved$/, 'Status', 'Unapproved', 3]
+			for (const [filter, option] of [
+				['Category', 'Uncategorized'],
+				['Status', 'Unapproved']
 			] as const) {
 				await step(`${option} opens the register already narrowed to ${option}`, async () => {
 					await openBudget(page);
-					await needsYou.getByRole('link', { name: link }).click();
+					const chip = needsYou.getByRole('link', { name: new RegExp(`^\\d+ ${option}$`) });
+					const count = Number.parseInt((await chip.textContent()) ?? '', 10);
+					expect(count).toBeGreaterThan(0);
+					await chip.click();
 					await expect(
 						page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
 					).toBeVisible();

@@ -10,6 +10,7 @@ export const tableColumnVariants = tv({
 			action: 'w-28',
 			check: 'w-16 sm:w-20',
 			amount: 'w-28 sm:w-32',
+			'amount-compact': 'w-24 sm:w-32',
 			date: 'w-32',
 			name: 'w-44',
 			note: 'w-48'
@@ -22,6 +23,7 @@ export const tableColumnVariants = tv({
 			'5xl': 'hidden @5xl:table-cell',
 			'6xl': 'hidden @6xl:table-cell',
 			'8xl': 'hidden @8xl:table-cell',
+			'screen-xs': 'hidden xs:table-cell',
 			'screen-sm': 'hidden sm:table-cell'
 		},
 		numeric: { true: 'tabular-nums', false: '' }

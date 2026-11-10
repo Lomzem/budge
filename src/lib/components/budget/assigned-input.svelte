@@ -22,12 +22,14 @@
 
 	let draft: string | null = $state(null);
 	let error = $state('');
+	let hint = $state('');
+	let sent: number | null = $state(null);
 	let input: HTMLInputElement | null = $state(null);
 	let focused = $state(false);
 	let hovered = $state(false);
 	const errorId = $props.id();
 
-	const read = () => draft ?? shown(amount);
+	const read = () => draft ?? shown(sent ?? amount);
 	const write = (typed: string) => {
 		draft = typed;
 	};
@@ -40,8 +42,13 @@
 
 	async function save(cents: number) {
 		if (cents === amount) return;
+		sent = cents;
 		const saved = await attempt(() => onsave(cents));
-		if (!saved.ok) error = "Budge couldn't save Assigned. Try again.";
+		sent = null;
+		if (!saved.ok) {
+			error = "Budge couldn't save Assigned. Try again.";
+			hint = "Couldn't save. Try again.";
+		}
 	}
 
 	function settle(): number | undefined {
@@ -50,9 +57,11 @@
 		if (cents === undefined) {
 			error =
 				'Enter an amount, such as 120.00, 100+20, or +5 to add. Escape puts back the saved amount.';
+			hint = 'Try 120.00, 100+20 or +5. Esc restores.';
 			return undefined;
 		}
 		error = '';
+		hint = '';
 		void save(cents);
 		return cents;
 	}
@@ -67,19 +76,35 @@
 		target.select();
 	}
 
+	function following(target: HTMLInputElement, step: 1 | -1, scope: ParentNode | null) {
+		if (scope === null) return undefined;
+		const all = [...scope.querySelectorAll<HTMLInputElement>('input[data-assigned]')].filter(
+			(other) => other.checkVisibility()
+		);
+		const index = all.indexOf(target) + step;
+		return index < 0 ? undefined : all[index];
+	}
+
 	function keydown(event: KeyboardEvent) {
 		const target = event.currentTarget as HTMLInputElement;
 		if (event.key === 'Enter') {
 			event.preventDefault();
 			const cents = settle();
-			if (cents !== undefined) draft = shown(cents);
-			void reselect(target);
+			if (cents === undefined) {
+				void reselect(target);
+				return;
+			}
+			const next = following(target, 1, target.closest('table'));
+			if (next === undefined) {
+				draft = shown(cents);
+				void reselect(target);
+				return;
+			}
+			draft = null;
+			next.focus();
 		}
 		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-			const all = [...document.querySelectorAll<HTMLInputElement>('input[data-assigned]')].filter(
-				(other) => other.checkVisibility()
-			);
-			const next = all[all.indexOf(target) + (event.key === 'ArrowDown' ? 1 : -1)];
+			const next = following(target, event.key === 'ArrowDown' ? 1 : -1, document);
 			if (next === undefined) return;
 			event.preventDefault();
 			if (draft !== null) {
@@ -91,6 +116,7 @@
 		if (event.key === 'Escape' && (error !== '' || draft !== shown(amount))) {
 			event.stopPropagation();
 			error = '';
+			hint = '';
 			draft = shown(amount);
 			void reselect(target);
 		}
@@ -98,7 +124,7 @@
 </script>
 
 <div
-	class="ml-auto w-24 sm:w-28"
+	class="ml-auto w-24 *:text-right *:tabular-nums sm:w-28"
 	role="presentation"
 	onpointerenter={() => (hovered = true)}
 	onpointerleave={() => (hovered = false)}
@@ -122,9 +148,9 @@
 		<Popover.Portal>
 			<Popover.Content
 				customAnchor={input}
-				side="bottom"
-				align="end"
-				sideOffset={6}
+				side="right"
+				align="center"
+				sideOffset={8}
 				collisionPadding={8}
 				trapFocus={false}
 				interactOutsideBehavior="ignore"
@@ -135,9 +161,9 @@
 				onCloseAutoFocus={(event: Event) => {
 					event.preventDefault();
 				}}
-				class="z-50 w-60 rounded-md border border-destructive bg-popover px-3 py-2 text-xs text-destructive shadow-md"
+				class="z-50 rounded-md border border-destructive bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-destructive shadow-md"
 			>
-				<span aria-hidden="true">{error}</span>
+				<span aria-hidden="true">{hint}</span>
 			</Popover.Content>
 		</Popover.Portal>
 	</Popover.Root>

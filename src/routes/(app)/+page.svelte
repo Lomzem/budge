@@ -98,6 +98,7 @@
 
 	interface Need {
 		text: string;
+		short?: string;
 		link?: { path: '/accounts' | '/bank'; query: string };
 		action?: () => void;
 		tone: 'bad' | 'warn';
@@ -119,6 +120,7 @@
 			);
 			list.push({
 				text: `${String(count)} ${count === 1 ? 'Category' : 'Categories'} overspent`,
+				short: `${String(count)} overspent`,
 				...(shownOverspent.length === 0
 					? {}
 					: { action: () => void stepOverspent(shownOverspent.map((over) => over.id)) }),
@@ -128,6 +130,7 @@
 		if (bank.needingYou > 0) {
 			list.push({
 				text: `Bank: ${String(bank.needingYou)} ${bank.needingYou === 1 ? 'thing needs' : 'things need'} you`,
+				short: `Bank: ${String(bank.needingYou)} to do`,
 				link: { path: '/bank', query: '' },
 				tone: bank.all.some(
 					(connection) => connection.status === 'needsAttention' || connection.lastError !== null
@@ -289,7 +292,7 @@
 			{#if readyToAssign}
 				<div
 					class={[
-						'flex w-full flex-wrap items-center justify-between gap-x-6 rounded-lg px-4 py-2 sm:w-auto sm:min-w-56 sm:px-5 sm:py-3',
+						'flex w-full flex-wrap items-center justify-between gap-x-3 rounded-lg px-4 py-2 xs:gap-x-6 sm:w-auto sm:min-w-56 sm:px-5 sm:py-3',
 						readyToAssign.amount < 0 ? 'bg-destructive-tint' : 'bg-funded-tint'
 					]}
 				>
@@ -297,7 +300,7 @@
 					<p
 						data-testid="ready-to-assign"
 						class={[
-							'shrink-0 text-2xl font-bold whitespace-nowrap tabular-nums sm:text-3xl',
+							'shrink-0 text-lg font-bold whitespace-nowrap tabular-nums xs:text-2xl sm:text-3xl',
 							readyToAssign.amount < 0 ? 'text-destructive' : 'text-funded'
 						]}
 					>
@@ -320,6 +323,13 @@
 			</div>
 		{/if}
 
+		{#snippet needText(need: Need)}
+			{#if need.short === undefined}
+				{need.text}
+			{:else}
+				<span class="sm:hidden">{need.short}</span><span class="hidden sm:inline">{need.text}</span>
+			{/if}
+		{/snippet}
 		{#snippet needsScroller(direction: -1 | 1, shown: boolean)}
 			<button
 				type="button"
@@ -373,7 +383,7 @@
 									href="{resolve(need.link.path)}{need.link.query}"
 									class={[chip, 'underline-offset-4 hover:underline']}
 								>
-									{need.text}
+									{@render needText(need)}
 								</a>
 							{:else if need.action}
 								<button
@@ -381,10 +391,10 @@
 									class={[chip, 'underline-offset-4 hover:underline']}
 									onclick={need.action}
 								>
-									{need.text}
+									{@render needText(need)}
 								</button>
 							{:else}
-								<span class={chip}>{need.text}</span>
+								<span class={chip}>{@render needText(need)}</span>
 							{/if}
 						</li>
 					{/each}

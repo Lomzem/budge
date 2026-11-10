@@ -183,6 +183,16 @@
 			: {};
 	}
 
+	async function addSplitLine() {
+		draft = addLine(draft);
+		errorChecksDraft = false;
+		error = '';
+		invalidField = undefined;
+		await tick();
+		const added = draft.lines.at(-1);
+		if (added) document.getElementById(`split-category-${String(added.key)}`)?.focus();
+	}
+
 	function moveToAmount(event: KeyboardEvent) {
 		if (event.key !== 'Enter') return;
 		event.preventDefault();
@@ -383,9 +393,7 @@
 				variant="outline"
 				size="sm"
 				disabled={draft.lines.length >= SPLIT_LINE_LIMIT}
-				onclick={() => {
-					draft = addLine(draft);
-				}}>Add line</Button
+				onclick={addSplitLine}>Add line</Button
 			>
 			<p aria-live="polite" class="min-w-0 text-right text-sm font-medium">
 				{#if shown.remainder === undefined}
@@ -461,7 +469,7 @@
 										</p>
 									{/if}
 								</div>
-							{:else}
+							{:else if flagged.length > 1}
 								<p>The bank removed it.</p>
 							{/if}
 							<p class="text-muted-foreground">Bank Text: {bankRow.bankText}</p>

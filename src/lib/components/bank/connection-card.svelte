@@ -338,7 +338,7 @@
 		>
 			<h4 id="held-{connection._id}" class="font-bold">New bank Accounts</h4>
 			<p class="pb-1 text-sm text-muted-foreground">
-				Budge holds their rows until you choose where each one goes.
+				Their transactions wait here until you choose where they go.
 			</p>
 			<ul class="flex flex-col divide-y">
 				{#each rows as row (row._id)}
@@ -384,8 +384,8 @@
 		>
 			<h4 id="ignored-{connection._id}" class="font-bold">Ignored bank Accounts</h4>
 			<p class="pb-1 text-sm text-muted-foreground">
-				Budge drops their rows. Bring one back to set it up; it picks up new transactions from the
-				next sync.
+				Budge skips their transactions. Bring one back to set it up; it picks up new transactions
+				from the next sync.
 			</p>
 			<ul class="flex flex-col divide-y">
 				{#each connection.ignored as ignored (ignored.connectionAccountId)}
@@ -426,7 +426,7 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>Remove {connection.name}?</AlertDialog.Title>
 			<AlertDialog.Description>
-				Budge stops syncing it and forgets its bank Accounts and any rows waiting for setup.
+				Budge stops syncing it and forgets its bank Accounts and any transactions waiting for setup.
 				Transactions it already brought in stay in your Accounts. To sync this bank again, connect
 				it again.
 			</AlertDialog.Description>

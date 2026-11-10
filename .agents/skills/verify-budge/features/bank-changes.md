@@ -13,15 +13,16 @@ Keep approved or edited Transactions safe when the bank changes history, while a
 
 - The Accounts page (`/accounts`) or an Account page (sidebar `Sections and Accounts` → `Checking`) → Transaction row with a `Bank changed this` or `Bank removed this` line under its Payee.
 - Or the Budget's `N bank changes` chip, which opens `/accounts?status=bank-changes` (Status `Bank changes`), listing every flagged Transaction.
-- Click the row's Payee button → dialog `Edit Transaction`, which opens focused on a region at the top named `Your bank changed this Transaction` (or `Your bank removed this Transaction`) that says `The bank now says <amount> on <date>.` or `The bank removed it.` with its Bank Text → `Use the bank's version` / `Delete it` / `Keep mine`.
-- `Delete it` opens alert dialog `Delete this Transaction too?` (`Delete this Transfer too?` for a Transfer) → `Delete`.
+- In the row itself, when one Bank Row is flagged: the flag reads `Bank changed this to <amount>` (or `Bank removed this`), then `Use the bank's` (named `Use the bank's <amount>: <Payee>, <date>`) or `Delete it`, and `Keep mine`. Each action's name ends `: <Payee>, <date>`. Resolving focuses the row's Payee button, or the next row's first action (or Payee) when the row leaves the list.
+- Or click the row's Payee button → dialog `Edit Transaction`, which opens focused on a region at the top named `Your bank changed this Transaction` (or `Your bank removed this Transaction`) that says `The bank now says <amount> on <date>.` (a removed row shows only its Bank Text; `The bank removed it.` appears only when several Bank Rows are flagged) → `Use the bank's version` / `Delete it` / `Keep mine`.
+- `Delete it` opens alert dialog `Delete this Transaction too?` (`Delete this Transfer too?` for a Transfer) → `Delete`. From the row it names the Payee: `The bank removed <Payee>. …`.
 
 ## Driving it with Playwright
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/bank-changes.ts`, also run by `bun run test:e2e:local`):
 
-- `bank-changes/take-the-banks`: `bank-resolve` by taking the bank's version of both flagged rows.
-- `bank-changes/keep-mine`: `bank-resolve` by keeping mine on both.
+- `bank-changes/take-the-banks`: `bank-resolve` by taking the bank's version of both flagged rows: the changed one in its editor, the removed one from its row.
+- `bank-changes/keep-mine`: `bank-resolve` by keeping mine on both: the changed one from its row, the removed one in its editor.
 
 Preconditions:
 

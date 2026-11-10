@@ -13,6 +13,7 @@
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { attempt } from '$lib/attempt';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import * as Table from '$lib/components/ui/table';
@@ -40,8 +41,16 @@
 
 	function bankFlag(row: Row) {
 		if (row.bankRows.some((bankRow) => bankRow.state === 'removed')) return 'Bank removed this';
-		if (row.bankRows.some((bankRow) => bankRow.state === 'changed')) return 'Bank changed this';
+		const changed = row.bankRows.filter((bankRow) => bankRow.state === 'changed');
+		if (changed.length === 1 && changed[0])
+			return `Bank changed this to ${formatCents(changed[0].amount)}`;
+		if (changed.length > 0) return 'Bank changed this';
 		return undefined;
+	}
+
+	function bankChangeOf(row: Row) {
+		const flagged = row.bankRows.filter((bankRow) => bankRow.state !== 'linked');
+		return flagged.length === 1 ? flagged[0] : undefined;
 	}
 
 	function categoryFilter(value: string) {
@@ -122,6 +131,10 @@
 	const approveAll = useMutation(api.transactions.approveAll);
 	const approveMany = useMutation(api.transactions.approveMany);
 	const unapprove = useMutation(api.transactions.unapprove);
+	const resolveBankChange = useMutation(api.imports.resolveBankChange);
+	let resolving = $state(false);
+	let confirmRemoval = $state<{ row: Row; importId: Id<'imports'>; payee: string } | null>(null);
+	let afterRemoval: HTMLElement | undefined;
 	let undoable = $state<{
 		scopeKey: string;
 		transactionIds: Id<'transactions'>[];
@@ -281,6 +294,38 @@
 		target?.focus();
 	}
 
+	async function resolveRow(
+		row: Row,
+		importId: Id<'imports'>,
+		keep: 'bank' | 'mine',
+		payee: string
+	) {
+		if (resolving) return undefined;
+		rowError = '';
+		resolving = true;
+		const at = rows.findIndex((other) => other._id === row._id);
+		const resolved = await attempt(() => resolveBankChange({ importId, keep }));
+		resolving = false;
+		if (!resolved.ok) {
+			rowError = resolved.error?.message ?? "Budge couldn't resolve the bank's change. Try again.";
+			return undefined;
+		}
+		announce(keep === 'bank' ? `Took the bank's version of ${payee}` : `Kept your ${payee}`);
+		await tick();
+		return focusAfterResolve(row, at);
+	}
+
+	function focusAfterResolve(row: Row, at: number) {
+		const candidates = [rows[at], rows[at - 1]].filter((candidate) => candidate !== undefined);
+		const same = candidates.find((candidate) => candidate._id === row._id);
+		if (same) return editButtonOf(same);
+		for (const candidate of candidates) {
+			const target = shownOf(`[data-bank-action="${candidate._id}"]`) ?? editButtonOf(candidate);
+			if (target !== undefined) return target;
+		}
+		return addButton ?? undefined;
+	}
+
 	let focusFrom: number | null = null;
 	function showMore() {
 		if (more.status !== 'CanLoadMore') return;
@@ -343,6 +388,7 @@
 	{@const payee = row.payeeName ?? (row.transfer ? 'Transfer' : 'No Payee')}
 	{@const category = categoryOf(row)}
 	{@const flag = bankFlag(row)}
+	{@const bankChange = bankChangeOf(row)}
 	{@const categoryClass =
 		row.categoryName === null && !row.transfer && !row.splits ? 'text-warning' : undefined}
 	<Table.Row
@@ -402,6 +448,44 @@
 					]}
 				>
 					{row.memo}
+				</span>
+			{/if}
+			{#if bankChange}
+				<span class="mt-2 mb-1 flex flex-wrap gap-2 font-normal">
+					{#if bankChange.state === 'changed'}
+						<Button
+							data-bank-action={row._id}
+							size="sm"
+							variant="outline"
+							aria-disabled={resolving}
+							aria-label="Use the bank's {formatCents(bankChange.amount)}: {payee}, {formatDate(
+								row.date
+							)}"
+							onclick={async () => (await resolveRow(row, bankChange._id, 'bank', payee))?.focus()}
+						>
+							Use the bank's
+						</Button>
+					{:else}
+						<Button
+							data-bank-action={row._id}
+							size="sm"
+							variant="outline"
+							aria-disabled={resolving}
+							aria-label="Delete it: {payee}, {formatDate(row.date)}"
+							onclick={() => (confirmRemoval = { row, importId: bankChange._id, payee })}
+						>
+							Delete it
+						</Button>
+					{/if}
+					<Button
+						size="sm"
+						variant="outline"
+						aria-disabled={resolving}
+						aria-label="Keep mine: {payee}, {formatDate(row.date)}"
+						onclick={async () => (await resolveRow(row, bankChange._id, 'mine', payee))?.focus()}
+					>
+						Keep mine
+					</Button>
 				</span>
 			{/if}
 		</Table.Cell>
@@ -577,3 +661,50 @@
 	}}
 />
 <ImportDialog bind:open={importOpen} defaultAccountId={accountId} />
+
+<AlertDialog.Root
+	open={confirmRemoval !== null}
+	onOpenChange={(next) => {
+		if (!next) confirmRemoval = null;
+	}}
+>
+	<AlertDialog.Content
+		onCloseAutoFocus={(event: Event) => {
+			const target = afterRemoval;
+			afterRemoval = undefined;
+			if (target === undefined) return;
+			event.preventDefault();
+			target.focus();
+		}}
+	>
+		<AlertDialog.Header>
+			<AlertDialog.Title>
+				{confirmRemoval?.row.transfer
+					? 'Delete this Transfer too?'
+					: 'Delete this Transaction too?'}
+			</AlertDialog.Title>
+			<AlertDialog.Description>
+				{#if confirmRemoval?.row.transfer}
+					The bank removed {confirmRemoval.payee}. Both sides are deleted, here and in {confirmRemoval
+						.row.transfer.accountName}. This can't be undone.
+				{:else}
+					The bank removed {confirmRemoval?.payee}. Its amount comes out of the Account balance.
+					This can't be undone.
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Keep it</AlertDialog.Cancel>
+			<AlertDialog.Action
+				variant="destructive"
+				disabled={resolving}
+				onclick={async () => {
+					if (confirmRemoval === null) return;
+					const { row, importId, payee } = confirmRemoval;
+					afterRemoval = await resolveRow(row, importId, 'bank', payee);
+					confirmRemoval = null;
+				}}>Delete</AlertDialog.Action
+			>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

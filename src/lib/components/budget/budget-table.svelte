@@ -59,9 +59,9 @@
 	<Table.Header>
 		<Table.Row>
 			<Table.Head>Category</Table.Head>
-			<Table.Head width="amount" align="end" showFrom="screen-sm">Assigned</Table.Head>
+			<Table.Head width="amount" align="end" showFrom="screen-xs">Assigned</Table.Head>
 			<Table.Head width="amount" align="end" showFrom="screen-sm">Activity</Table.Head>
-			<Table.Head width="amount" align="end">Available</Table.Head>
+			<Table.Head width="amount-compact" align="end">Available</Table.Head>
 		</Table.Row>
 	</Table.Header>
 	{#each groups as group (group.id)}
@@ -70,7 +70,7 @@
 				<Table.Head scope="rowgroup">
 					<span class="block font-semibold break-words whitespace-normal">{group.name}</span>
 				</Table.Head>
-				<Table.Cell align="end" numeric showFrom="screen-sm">
+				<Table.Cell align="end" numeric showFrom="screen-xs">
 					<span class="font-medium">{formatCents(group.assigned)}</span>
 				</Table.Cell>
 				<Table.Cell align="end" numeric showFrom="screen-sm">
@@ -85,7 +85,7 @@
 				{@const selected = category.id === selectedId}
 				<Table.Row data-state={selected ? 'selected' : undefined}>
 					<Table.Cell>{@render name(category)}</Table.Cell>
-					<Table.Cell align="end" showFrom="screen-sm">
+					<Table.Cell align="end" showFrom="screen-xs">
 						<AssignedInput
 							amount={category.assigned}
 							label="Assigned for {category.name}"

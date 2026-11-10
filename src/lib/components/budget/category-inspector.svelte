@@ -152,7 +152,13 @@
 	class="flex flex-col gap-4 outline-none"
 	onkeydown={keydown}
 >
-	<div class="flex items-start justify-between gap-2">
+	<div
+		class={[
+			'flex items-start justify-between gap-2',
+			editAssigned &&
+				'sticky -top-5 z-10 -mx-5 -mt-5 border-b bg-popover px-5 pt-5 pb-3 sm:-top-6 sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6'
+		]}
+	>
 		<h2 id="inspector-heading" class="min-w-0 text-lg font-bold break-words">{category.name}</h2>
 		<Button variant="ghost" size="icon-sm" aria-label="Close {category.name}" onclick={onclose}>
 			<XIcon />

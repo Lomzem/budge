@@ -29,11 +29,7 @@
 	{...restProps}
 >
 	{#if error !== undefined}
-		<p
-			id={errorId}
-			role="alert"
-			class="min-h-5 text-sm text-destructive sm:min-h-10 sm:min-w-0 sm:flex-1"
-		>
+		<p id={errorId} role="alert" class="text-sm text-destructive sm:min-h-10 sm:min-w-0 sm:flex-1">
 			{error}
 		</p>
 	{/if}
