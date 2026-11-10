@@ -56,7 +56,7 @@
 				bind:ref={searchInput}
 				type="search"
 				bind:value={values.search}
-				placeholder="Payee, memo, or bank description"
+				placeholder="Payee or memo"
 				autocomplete="off"
 			/>
 		</div>

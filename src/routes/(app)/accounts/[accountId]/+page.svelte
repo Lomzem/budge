@@ -151,8 +151,9 @@
 						{#if attention !== null}
 							<a
 								href="{resolve('/bank')}#connection-{feeder._id}"
+								aria-label="{attention}: {feeder.name}"
 								class="mr-1 rounded-full bg-warning-tint px-2 py-0.5 text-xs font-bold text-warning underline-offset-4 hover:underline"
-								>{attention}<span class="sr-only">: {feeder.name}</span></a
+								>{attention}</a
 							>
 						{/if}
 						{formatSynced(feeder.lastSyncedAt, bank.now)} from
@@ -174,7 +175,7 @@
 					<p
 						data-testid="account-balance"
 						class={[
-							'col-start-1 w-fit border-b-4 border-double border-current text-2xl font-bold',
+							'col-start-1 w-fit text-2xl font-bold',
 							account.balance < 0 && 'text-destructive'
 						]}
 					>

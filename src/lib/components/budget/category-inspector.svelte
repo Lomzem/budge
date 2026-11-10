@@ -168,11 +168,11 @@
 	{#if readyToAssign !== undefined}
 		<p
 			class={[
-				'-mt-2 flex justify-between gap-4 rounded-md px-3 py-1.5 text-sm',
+				'-mt-2 flex flex-wrap justify-between gap-x-2 rounded-md px-3 py-1.5 text-sm',
 				readyToAssign < 0 ? 'bg-destructive-tint' : 'bg-funded-tint'
 			]}
 		>
-			<span>Ready to Assign</span>
+			<span class="whitespace-nowrap">Ready to Assign</span>
 			<span
 				class={[
 					'font-bold whitespace-nowrap tabular-nums',
@@ -207,7 +207,7 @@
 			<dd class={['text-right tabular-nums', status?.class]}>
 				<span class="whitespace-nowrap">{formatCents(category.available)}</span>
 
-				{#if status && !category.target && !category.payment}
+				{#if status?.text && !category.target && !category.payment}
 					<span class="block text-xs">{status.text}</span>
 				{/if}
 			</dd>
@@ -225,7 +225,7 @@
 						onclick={() => onstep?.(step.id)}
 					>
 						{#if index === 0}<ChevronLeftIcon aria-hidden="true" />{/if}
-						<span class="line-clamp-2 min-w-0 break-words">{step.name}</span>
+						<span class="min-w-0 truncate">{step.name}</span>
 						{#if index === 1}<ChevronRightIcon aria-hidden="true" />{/if}
 					</Button>
 				{:else}
@@ -240,7 +240,9 @@
 			<Button size="wrap" disabled={covering} onclick={cover}>
 				Cover {formatCents(-category.available)} from Ready to Assign
 			</Button>
-			<p role="alert" class="min-h-6 text-sm text-destructive">{coverError}</p>
+			<p class="min-h-6 text-sm text-destructive">
+				{#if coverError}<span role="alert">{coverError}</span>{/if}
+			</p>
 		</div>
 	{/if}
 
@@ -271,7 +273,9 @@
 						Assign {formatCents(category.target.needed)}
 					</Button>
 				{/if}
-				<p role="alert" class="min-h-6 text-sm text-destructive">{assignError}</p>
+				<p class="min-h-6 text-sm text-destructive">
+					{#if assignError}<span role="alert">{assignError}</span>{/if}
+				</p>
 			{:else}
 				<p class="text-sm text-muted-foreground">No Target yet.</p>
 			{/if}
@@ -328,7 +332,9 @@
 				<Button type="submit" variant="outline" disabled={moving}>Move</Button>
 			</div>
 		</div>
-		<p role="alert" class="-mt-1 min-h-5 text-sm text-destructive">{moveError}</p>
+		<p class="-mt-1 min-h-5 text-sm text-destructive">
+			{#if moveError}<span role="alert">{moveError}</span>{/if}
+		</p>
 	</form>
 </section>
 

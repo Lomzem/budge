@@ -18,7 +18,9 @@
 
 	const accounts = getAccounts();
 	const bank = getBankConnections();
-	const unapproved = useQuery(api.transactions.unapprovedCount, {});
+	let { ready }: { ready: boolean } = $props();
+
+	const unapproved = useQuery(api.transactions.unapprovedCount, () => (ready ? {} : 'skip'));
 	const unapprovedCount = $derived(unapproved.data ?? 0);
 	let addOpen = $state(false);
 
@@ -52,56 +54,64 @@
 					{#if section.href === '/accounts' && unapprovedCount > 0}
 						<SectionBadge count={formatUnapprovedCount(unapprovedCount)} label="Unapproved" />
 					{:else if section.href === '/bank' && bank.needingYou > 0}
-						<SectionBadge count={String(bank.needingYou)} label="need you" />
+						<SectionBadge
+							count={String(bank.needingYou)}
+							label="need you"
+							tone={bank.broken ? 'bad' : 'warn'}
+						/>
 					{/if}
 				</a>
 			</li>
 		{/each}
 	</ul>
-	<div class="flex flex-col gap-3">
-		<div class="flex items-center justify-between gap-2 pl-2.5">
-			<h2 class="text-xs font-bold text-muted-foreground">Accounts</h2>
-			<Button
-				variant="ghost"
-				size="icon-sm"
-				aria-label="Add Account"
-				onclick={() => (addOpen = true)}
-			>
-				<PlusIcon aria-hidden="true" />
-			</Button>
-		</div>
-		{#if accounts.all.length === 0}
-			<p class="px-2.5 text-xs text-muted-foreground">No Accounts yet.</p>
-		{/if}
-		{#each accounts.groups as group (group.label)}
-			<section aria-labelledby="sidebar-{group.label}" class="flex flex-col gap-0.5">
-				<h3
-					id="sidebar-{group.label}"
-					class="flex items-baseline justify-between gap-2 px-2.5 pb-1 text-xs text-muted-foreground"
+	{#if ready}
+		<div class="flex flex-col gap-3">
+			<div class="flex items-center justify-between gap-2 pl-2.5">
+				<h2 class="text-xs font-bold text-muted-foreground">Accounts</h2>
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					aria-label="Add Account"
+					onclick={() => (addOpen = true)}
 				>
-					{group.label}
-					<span>{formatCents(total(group.accounts))}</span>
-				</h3>
-				<ul class="flex flex-col gap-0.5">
-					{#each group.accounts as account (account._id)}
-						{@const href = resolve('/(app)/accounts/[accountId]', { accountId: account._id })}
-						<li>
-							<a
-								{href}
-								aria-current={href === page.url.pathname ? 'page' : undefined}
-								class={[linkClass, 'justify-between']}
-							>
-								<span class="truncate">{account.name}</span>
-								<span class={['shrink-0 font-normal', account.balance < 0 && 'text-destructive']}>
-									{formatCents(account.balance)}
-								</span>
-							</a>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/each}
-	</div>
+					<PlusIcon aria-hidden="true" />
+				</Button>
+			</div>
+			{#if accounts.all.length === 0}
+				<p class="px-2.5 text-xs text-muted-foreground">No Accounts yet.</p>
+			{/if}
+			{#each accounts.groups as group (group.label)}
+				<section aria-labelledby="sidebar-{group.label}" class="flex flex-col gap-0.5">
+					<h3
+						id="sidebar-{group.label}"
+						class="flex items-baseline justify-between gap-2 px-2.5 pb-1 text-xs text-muted-foreground"
+					>
+						{group.label}
+						<span>{formatCents(total(group.accounts))}</span>
+					</h3>
+					<ul class="flex flex-col gap-0.5">
+						{#each group.accounts as account (account._id)}
+							{@const href = resolve('/(app)/accounts/[accountId]', { accountId: account._id })}
+							<li>
+								<a
+									{href}
+									aria-current={href === page.url.pathname ? 'page' : undefined}
+									class={[linkClass, 'justify-between']}
+								>
+									<span class="truncate">{account.name}</span>
+									<span class={['shrink-0 font-normal', account.balance < 0 && 'text-destructive']}>
+										{formatCents(account.balance)}
+									</span>
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/each}
+		</div>
+	{/if}
 </nav>
 
-<AccountDialog bind:open={addOpen} />
+{#if ready}
+	<AccountDialog bind:open={addOpen} />
+{/if}

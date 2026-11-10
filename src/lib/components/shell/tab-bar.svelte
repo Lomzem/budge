@@ -11,7 +11,9 @@
 	import SectionBadge from './section-badge.svelte';
 
 	const bank = getBankConnections();
-	const unapproved = useQuery(api.transactions.unapprovedCount, {});
+	let { ready }: { ready: boolean } = $props();
+
+	const unapproved = useQuery(api.transactions.unapprovedCount, () => (ready ? {} : 'skip'));
 	const unapprovedCount = $derived(unapproved.data ?? 0);
 	const current = $derived(sectionOf(page.url.pathname));
 
@@ -52,7 +54,11 @@
 							</span>
 						{:else if section.href === '/bank' && bank.needingYou > 0}
 							<span class="absolute -top-1.5 left-8">
-								<SectionBadge count={String(bank.needingYou)} label="need you" />
+								<SectionBadge
+									count={String(bank.needingYou)}
+									label="need you"
+									tone={bank.broken ? 'bad' : 'warn'}
+								/>
 							</span>
 						{/if}
 					</span>

@@ -47,11 +47,11 @@
 			/>
 		</div>
 	{/if}
-	{#if status}
+	{#if status?.text}
 		<span class="block pl-3 text-xs whitespace-normal {status.class}">{status.text}</span>
 	{/if}
 	{#each waitingNotes(category) as note (note)}
-		<span class="block pl-3 text-xs whitespace-normal text-muted-foreground">{note}</span>
+		<span class="hidden pl-3 text-xs whitespace-normal text-muted-foreground sm:block">{note}</span>
 	{/each}
 {/snippet}
 

@@ -326,6 +326,24 @@ describe('splitting across Categories', () => {
 	});
 
 	test.each([
+		{ blank: 'second', amounts: ['10.00', ''], signed: [-1000, -250] },
+		{ blank: 'first', amounts: ['', '2.50'], signed: [-1000, -250] }
+	] satisfies { blank: string; amounts: [string, string]; signed: [number, number] }[])(
+		'saves the $blank line left blank as what is still left to split',
+		({ amounts, signed }) => {
+			expect(payloadOf(filled('outflow', amounts), remembering)).toMatchObject({
+				kind: 'ready',
+				fields: {
+					splits: [
+						{ categoryId: groceries, amount: signed[0] },
+						{ categoryId: rent, amount: signed[1] }
+					]
+				}
+			});
+		}
+	);
+
+	test.each([
 		{ amounts: ['12.50', ''], remainder: 0 },
 		{ amounts: ['10.00', '1.00'], remainder: 150 },
 		{ amounts: ['10.00', '5.00'], remainder: -250 },

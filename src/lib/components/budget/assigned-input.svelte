@@ -143,14 +143,14 @@
 		aria-keyshortcuts="ArrowUp ArrowDown"
 		data-assigned
 	/>
-	<span id={errorId} role="alert" class="sr-only">{error}</span>
+	{#if error}<span id={errorId} role="alert" class="sr-only">{error}</span>{/if}
 	<Popover.Root open={error !== '' && (focused || hovered)}>
 		<Popover.Portal>
 			<Popover.Content
 				customAnchor={input}
-				side="right"
-				align="center"
-				sideOffset={8}
+				side="bottom"
+				align="end"
+				sideOffset={4}
 				collisionPadding={8}
 				trapFocus={false}
 				interactOutsideBehavior="ignore"
@@ -161,7 +161,7 @@
 				onCloseAutoFocus={(event: Event) => {
 					event.preventDefault();
 				}}
-				class="z-50 rounded-md border border-destructive bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-destructive shadow-md"
+				class="z-50 w-44 rounded-md border border-destructive bg-popover px-2.5 py-1.5 text-xs text-destructive shadow-md"
 			>
 				<span aria-hidden="true">{hint}</span>
 			</Popover.Content>

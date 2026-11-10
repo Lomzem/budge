@@ -74,6 +74,11 @@ export class BankConnections {
 		this.all.filter((connection) => connection.status === 'needsAttention')
 	);
 	readonly needingYou = $derived(this.held.length + this.all.filter(needsALook).length);
+	readonly broken = $derived(
+		this.all.some(
+			(connection) => connection.status === 'needsAttention' || connection.lastError !== null
+		)
+	);
 	linking = $state<Id<'bankConnections'> | 'connecting' | null>(null);
 	readonly syncing = new SvelteSet<Id<'bankConnections'>>();
 

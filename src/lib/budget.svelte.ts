@@ -60,6 +60,12 @@ export class BudgetMonth {
 		this.month = addMonths(this.month, 1);
 	}
 
+	readonly onThisMonth = $derived.by(() => this.month === monthOf(this.today));
+
+	thisMonth() {
+		this.month = monthOf(this.today);
+	}
+
 	refreshToday() {
 		this.today = localToday();
 	}

@@ -422,7 +422,16 @@ function lineProblem(
 	);
 }
 
-function splitsOf(draft: Draft, world: World) {
+function withLastBlankFilled(draft: Draft, world: World): Draft {
+	const blanks = draft.lines.filter((line) => line.amount.trim() === '');
+	const [blank] = blanks;
+	if (blanks.length !== 1 || blank === undefined) return draft;
+	if (categoryIn(world, blank.categoryId) === undefined) return draft;
+	return fillRemainder(draft, blank.key);
+}
+
+function splitsOf(typed: Draft, world: World) {
+	const draft = withLastBlankFilled(typed, world);
 	const splits = [];
 	const removable = draft.lines.length > 2;
 	for (const [index, line] of draft.lines.entries()) {

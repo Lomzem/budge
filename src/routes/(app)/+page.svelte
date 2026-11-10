@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
@@ -132,11 +133,7 @@
 				text: `Bank: ${String(bank.needingYou)} ${bank.needingYou === 1 ? 'thing needs' : 'things need'} you`,
 				short: `Bank: ${String(bank.needingYou)} to do`,
 				link: { path: '/bank', query: '' },
-				tone: bank.all.some(
-					(connection) => connection.status === 'needsAttention' || connection.lastError !== null
-				)
-					? 'bad'
-					: 'warn'
+				tone: bank.broken ? 'bad' : 'warn'
 			});
 		}
 		if (view.uncategorizedCount > 0) {
@@ -210,7 +207,7 @@
 		await select(target, true);
 		[...document.querySelectorAll<HTMLElement>(`[data-category-id="${target}"]`)]
 			.find((button) => button.checkVisibility())
-			?.scrollIntoView({ block: 'nearest' });
+			?.scrollIntoView({ block: 'center' });
 	}
 
 	function stepsAround(id: Id<'categories'>) {
@@ -225,7 +222,13 @@
 	async function stepTo(id: Id<'categories'>) {
 		selectedId = id;
 		await tick();
-		document.querySelector<HTMLInputElement>('#category-inspector input[data-assigned]')?.focus();
+		document
+			.getElementById('category-inspector')
+			?.closest('[data-slot="dialog-body"]')
+			?.scrollTo({ top: 0 });
+		document
+			.querySelector<HTMLInputElement>('#category-inspector input[data-assigned]')
+			?.focus({ preventScroll: true });
 	}
 
 	async function closeInspector() {
@@ -286,6 +289,18 @@
 					>
 						<ChevronRightIcon />
 					</Button>
+					<div class={['max-xs:hidden', budget.onThisMonth && 'invisible']}>
+						<Button
+							variant="ghost"
+							size="sm"
+							onclick={() => {
+								budget.thisMonth();
+							}}
+						>
+							<CalendarCheckIcon aria-hidden="true" />
+							<span class="max-sm:sr-only">This month</span>
+						</Button>
+					</div>
 					<div class="ml-auto sm:hidden">{@render editCategoriesMenu()}</div>
 				</div>
 			</div>
@@ -568,7 +583,7 @@
 			aria-labelledby="inspector-heading"
 			onOpenAutoFocus={(event: Event) => {
 				event.preventDefault();
-				document.getElementById('category-inspector')?.focus();
+				document.getElementById('category-inspector')?.focus({ preventScroll: true });
 			}}
 			onCloseAutoFocus={(event: Event) => {
 				event.preventDefault();

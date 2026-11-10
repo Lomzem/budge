@@ -25,7 +25,7 @@ Preconditions:
 
 ## Gotchas
 
-- **Manual drive:** while fetching, download buttons are disabled; dismissing and reopening resumes the pending export. During `Downloading… Keep this page open until every file has started.`, dismissal is blocked. Failure shows `Budge couldn't export. Try again.`; retry and inspect the completed downloads.
+- **Manual drive:** while fetching, download buttons are disabled; dismissing and reopening resumes the pending export. During `Downloading… Keep this page open until every file has started.` (it replaces the JSON/CSV note in the same spot), dismissal is blocked. Failure shows `Budge couldn't export. Try again.`; retry and inspect the completed downloads.
 - **Manual drive:** an empty table still downloads a CSV, whose contents are empty (no header).
 
 - Downloads are paced to avoid Chromium’s ten-file burst limit; the first download is insufficient proof. Export is real data access even on a test path; use only invented seed.

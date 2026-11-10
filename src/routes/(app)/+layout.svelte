@@ -42,7 +42,7 @@
 	}}
 />
 
-{#if access === 'owner'}
+{#if access === 'owner' || access === 'loading'}
 	<a
 		href="#main"
 		class="sr-only rounded-md bg-background px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50"
@@ -52,7 +52,7 @@
 	<div class="flex flex-1">
 		<aside class="hidden w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground lg:block">
 			<div class="sticky top-0 flex h-svh flex-col">
-				<AccountSidebar />
+				<AccountSidebar ready={access === 'owner'} />
 			</div>
 		</aside>
 		<main
@@ -60,18 +60,20 @@
 			tabindex="-1"
 			class="mx-auto w-full max-w-screen-2xl min-w-0 flex-1 px-4 pt-5 pb-24 outline-none sm:px-6 lg:px-8 lg:pt-8 lg:pb-10"
 		>
-			{@render children()}
+			{#if access === 'owner'}
+				{@render children()}
+			{:else}
+				<p role="status" class="text-muted-foreground">Loading…</p>
+			{/if}
 		</main>
 	</div>
-	<TabBar />
+	<TabBar ready={access === 'owner'} />
 {:else}
 	<main class="flex flex-1 flex-col items-center justify-center gap-4 p-4 text-center">
 		<BrandMark class="size-12" />
 		<h1 class="text-2xl font-bold tracking-tight">Budge</h1>
 		<div class="flex min-h-24 flex-col items-center gap-3">
-			{#if access === 'loading'}
-				<p role="status" class="text-muted-foreground">Loading your budget…</p>
-			{:else if access === 'forbidden'}
+			{#if access === 'forbidden'}
 				<p role="alert">This account can't open Budge.</p>
 				<SignOutButton />
 			{:else}

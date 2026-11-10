@@ -57,17 +57,12 @@
 				Download everything in Budge as a backup. Bank Connection tokens are left out.
 			</Dialog.Description>
 		</Dialog.Header>
-		<p class="text-sm text-muted-foreground">
-			JSON is one file. CSV is one file per table, so your browser may ask to allow several
-			downloads.
+		<p role="status" class="min-h-10 text-sm text-muted-foreground">
+			{downloading
+				? 'Downloading… Keep this page open until every file has started.'
+				: 'JSON is one file. CSV is one file per table, so your browser may ask to allow several downloads.'}
 		</p>
-		<div class="min-h-12 text-sm">
-			<p role="status" class="text-muted-foreground">
-				{downloading ? 'Downloading… Keep this page open until every file has started.' : ''}
-			</p>
-			<p role="alert" class="text-destructive">{error}</p>
-		</div>
-		<Dialog.Footer>
+		<Dialog.Footer {error}>
 			<Button variant="outline" disabled={busy} onclick={() => exportAs(downloadCsv)}>
 				Download CSV
 			</Button>

@@ -427,16 +427,16 @@
 				</span>
 			</button>
 			{#if flag}
-				<span class="block truncate text-xs font-normal text-warning">{flag}</span>
+				<span class="block text-xs font-normal break-words text-warning">{flag}</span>
 			{/if}
-			<span class="flex min-w-0 gap-x-2 text-xs font-normal text-muted-foreground">
+			<span class="flex min-w-0 flex-wrap gap-x-2 text-xs font-normal text-muted-foreground">
 				<time datetime={row.date} class="shrink-0 tabular-nums @2xl:hidden">
 					{formatDate(row.date, 'short')}
 				</time>
-				<span class={['min-w-0 truncate @4xl:hidden', categoryClass]}>{category}</span>
+				<span class={['min-w-0 break-words @4xl:hidden', categoryClass]}>{category}</span>
 			</span>
 			{#if allAccounts}
-				<span class="block truncate text-xs font-normal text-muted-foreground @5xl:hidden">
+				<span class="block text-xs font-normal break-words text-muted-foreground @5xl:hidden">
 					{row.accountName}
 				</span>
 			{/if}
@@ -571,7 +571,7 @@
 	<p role="status" class="sr-only">{announcement}</p>
 	<div class="@container">
 		<div
-			class="flex flex-col items-start gap-2 @md:flex-row @md:items-center @md:justify-between @md:gap-3"
+			class="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
 		>
 			<p
 				aria-live="polite"
@@ -600,7 +600,7 @@
 		</div>
 	</div>
 
-	<div class="@container">
+	<div class={['@container', rows.length === 0 && !loading && 'hidden']}>
 		<Table.Root layout="fixed">
 			<Table.Header labels="lg">
 				<Table.Row>
