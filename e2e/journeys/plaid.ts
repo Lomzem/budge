@@ -63,13 +63,23 @@ export const plaid = {
 				await expect(creditUnion.getByRole('status')).toHaveText('');
 			});
 
-			await step('releasing both reports each result on its own card only', async () => {
-				sync.release();
-				await expect(communityBank.getByRole('status')).toHaveText(notSetUp);
-				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
-				await expect(savings.getByRole('status')).toHaveText('');
-				await expect(communityBank).toContainText(`${notSetUp} Last successful sync`);
-			});
+			await step(
+				'each released result reports on its own card while the other keeps syncing',
+				async () => {
+					const pressed = [communityBank, creditUnion];
+					const answered = pressed[sync.releaseEarliest()];
+					const waiting = pressed.find((candidate) => candidate !== answered);
+					if (answered === undefined || waiting === undefined) throw new Error('Unknown call');
+					await expect(answered.getByRole('status')).toHaveText(notSetUp);
+					await expect(waiting.getByRole('button', { name: 'Syncing…' })).toBeDisabled();
+					await expect(waiting.getByRole('status')).toHaveText('');
+
+					sync.release();
+					await expect(waiting.getByRole('status')).toHaveText(notSetUp);
+					await expect(savings.getByRole('status')).toHaveText('');
+					await expect(communityBank).toContainText(`${notSetUp} Last successful sync`);
+				}
+			);
 		}
 	},
 	attention: {

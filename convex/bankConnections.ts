@@ -61,6 +61,19 @@ import { failureOf, failureOfPlaidCode } from './lib/syncFailure';
 import { TokenCipher } from './lib/tokenCipher';
 
 export const MAX_BANK_CONNECTIONS = 20;
+
+async function atConnectionLimit(ctx: QueryCtx) {
+	const held = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
+	return held.length >= MAX_BANK_CONNECTIONS;
+}
+
+const CONNECTION_LIMIT_REACHED = `Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections. Remove one first.`;
+
+export const atLimit = internalQuery({
+	args: {},
+	returns: v.boolean(),
+	handler: async (ctx) => await atConnectionLimit(ctx)
+});
 const MAX_FED_ACCOUNTS = 50;
 
 export const list = query({
@@ -454,6 +467,8 @@ export const connect = action({
 		requireBankSync();
 		const { cutoverDate } = await ctx.runQuery(api.settings.get, {});
 		if (cutoverDate === null) throw publicError('INVALID_INPUT', 'Set the cutover date first.');
+		if (await ctx.runQuery(internal.bankConnections.atLimit, {}))
+			throw publicError('INVALID_INPUT', CONNECTION_LIMIT_REACHED);
 		const linkToken = await runEffect(
 			PlaidClient.use((plaid) =>
 				plaid.linkTokenCreate({
@@ -941,13 +956,8 @@ export const save = internalMutation({
 				provider: { ...existing.provider, encryptedToken }
 			});
 		} else {
-			const held = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
-			if (held.length >= MAX_BANK_CONNECTIONS) {
-				throw publicError(
-					'INVALID_INPUT',
-					`Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections.`
-				);
-			}
+			if (await atConnectionLimit(ctx))
+				throw publicError('INVALID_INPUT', CONNECTION_LIMIT_REACHED);
 			connectionId = await ctx.db.insert('bankConnections', {
 				name,
 				status: 'ok',

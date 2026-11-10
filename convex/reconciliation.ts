@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
 
+import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { ensureReadyToAssign } from './lib/categories';
@@ -11,15 +12,28 @@ import { insertTransaction, markCleared, transactionFields } from './lib/transac
 
 export const clearedBalance = query({
 	args: { accountId: v.id('accounts') },
-	returns: v.object({ balance: v.number(), unapproved: v.number() }),
+	returns: v.object({
+		balance: v.number(),
+		unapproved: v.object({ count: v.number(), complete: v.boolean() })
+	}),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
 		await requireAccount(ctx, accountId);
-		let unapproved = 0;
-		for await (const transaction of byCleared(ctx, accountId, 'cleared')) {
-			if (transaction.approved === false) unapproved += 1;
-		}
-		return { balance: await clearedBalanceOf(ctx, accountId), unapproved };
+		const unapproved = await ctx.db
+			.query('transactions')
+			.withIndex('by_account_approved_date', (q) =>
+				q.eq('accountId', accountId).eq('approved', false)
+			)
+			.take(UNAPPROVED_COUNT_LIMIT + 1);
+		return {
+			balance: await clearedBalanceOf(ctx, accountId),
+			unapproved: {
+				count: unapproved
+					.slice(0, UNAPPROVED_COUNT_LIMIT)
+					.filter((transaction) => transaction.cleared === 'cleared').length,
+				complete: unapproved.length <= UNAPPROVED_COUNT_LIMIT
+			}
+		};
 	}
 });
 

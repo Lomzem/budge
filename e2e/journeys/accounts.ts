@@ -234,6 +234,22 @@ export const accounts = {
 				return button;
 			});
 
+			await step(
+				'brought back on the same page, it offers Set up again, and ignoring it again hides it',
+				async () => {
+					await page
+						.getByRole('button', { name: 'Bring back Sample Holiday Club ending 1180' })
+						.click();
+					await expect(held).toBeFocused();
+					await held.click();
+					const choose = page.getByRole('dialog', { name: 'Sample Holiday Club ending 1180' });
+					await choose.getByRole('radio', { name: 'Nowhere: ignore this bank Account' }).check();
+					await choose.getByRole('button', { name: 'Ignore' }).click();
+					await expect(choose).toBeHidden();
+					await expect(held).toBeHidden();
+				}
+			);
+
 			await step('after a reload, the other held Accounts remain and it stays gone', async () => {
 				await page.reload();
 				await expect(

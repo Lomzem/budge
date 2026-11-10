@@ -6,6 +6,7 @@ import {
 } from 'convex/server';
 import { v, type Infer } from 'convex/values';
 
+import { BANK_CHANGE_LIMIT } from '../src/lib/domain/bankChanges';
 import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
 
 import type { Doc, Id } from './_generated/dataModel';
@@ -300,17 +301,17 @@ async function filtered(
 		.paginate(paginationOpts);
 }
 
-const BANK_CHANGES_READ = 100;
-
 async function bankChanged(ctx: QueryCtx, accountId: Id<'accounts'> | undefined) {
 	const found = new Map<Id<'transactions'>, Doc<'transactions'>>();
+	let complete = true;
 	for (const state of ['changed', 'removed'] as const) {
 		const flagged = await ctx.db
 			.query('imports')
 			.withIndex('by_state_transactionId', (q) => q.eq('state', state))
 			.order('desc')
-			.take(BANK_CHANGES_READ);
-		for (const { transactionId } of flagged) {
+			.take(BANK_CHANGE_LIMIT + 1);
+		if (flagged.length > BANK_CHANGE_LIMIT) complete = false;
+		for (const { transactionId } of flagged.slice(0, BANK_CHANGE_LIMIT)) {
 			if (transactionId === undefined || found.has(transactionId)) continue;
 			const transaction = await ctx.db.get('transactions', transactionId);
 			if (transaction === null) continue;
@@ -318,9 +319,13 @@ async function bankChanged(ctx: QueryCtx, accountId: Id<'accounts'> | undefined)
 			found.set(transactionId, transaction);
 		}
 	}
-	return [...found.values()].sort(
+	const transactions = [...found.values()].sort(
 		(a, b) => b.date.localeCompare(a.date) || b._creationTime - a._creationTime
 	);
+	return {
+		transactions: transactions.slice(0, BANK_CHANGE_LIMIT),
+		complete: complete && transactions.length <= BANK_CHANGE_LIMIT
+	};
 }
 
 async function withBankChanges(
@@ -329,7 +334,7 @@ async function withBankChanges(
 	approval: Approval | undefined
 ): Promise<PaginationResult<Doc<'transactions'>>> {
 	const { categoryId, uncategorized, payeeId, from, to, search } = filters;
-	const page = (await bankChanged(ctx, filters.accountId)).filter(
+	const page = (await bankChanged(ctx, filters.accountId)).transactions.filter(
 		(transaction) =>
 			hasApproval(transaction, approval) &&
 			(categoryId === undefined || transaction.categoryId === categoryId) &&
@@ -344,10 +349,11 @@ async function withBankChanges(
 
 export const bankChangeCount = query({
 	args: { accountId: v.optional(v.id('accounts')) },
-	returns: v.number(),
+	returns: v.object({ count: v.number(), complete: v.boolean() }),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
-		return (await bankChanged(ctx, accountId)).length;
+		const { transactions, complete } = await bankChanged(ctx, accountId);
+		return { count: transactions.length, complete };
 	}
 });
 

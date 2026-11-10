@@ -67,6 +67,25 @@ export const budget = {
 				await expect(page.getByText(monthName(0), { exact: true })).toBeVisible();
 				await expect(assigned).toHaveValue(tenDollarsMore);
 			});
+
+			await step(
+				'a negative Assigned stays put when the field is only focused, left, or Escaped',
+				async () => {
+					await assigned.fill('0-20');
+					await assigned.press('Enter');
+					await expect(assigned).toHaveValue(typed(-2_000));
+					const settled = await readyToAssign();
+					await assigned.focus();
+					await assigned.blur();
+					await assigned.focus();
+					await assigned.press('Escape');
+					await assigned.blur();
+					await expect(assigned).toHaveValue(typed(-2_000));
+					await page.reload();
+					await expect(assigned).toHaveValue(typed(-2_000));
+					await expect.poll(readyToAssign).toBe(settled);
+				}
+			);
 		}
 	},
 	'needs-you': {

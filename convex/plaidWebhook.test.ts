@@ -2,6 +2,7 @@ import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vites
 
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
 import { api, internal } from './_generated/api';
+import { MAX_BANK_CONNECTIONS } from './bankConnections';
 import { syncUpdatesBody, webhookSigner } from './lib/plaidWebhook.helper';
 import { newBackend, publicErrorOf, startBudget, useOwnerEnv } from './test.helper';
 
@@ -47,6 +48,11 @@ function fakePlaid(signer: Signer) {
 				return requestBody(init).then((body) => {
 					bodies[url.pathname] = body;
 					return answer({ access_token: accessToken, item_id: itemId });
+				});
+			case '/item/remove':
+				return requestBody(init).then((body) => {
+					bodies[url.pathname] = body;
+					return answer({});
 				});
 			case '/item/webhook/update':
 				return answer({ item: { item_id: itemId } });
@@ -738,6 +744,49 @@ describe('connecting a bank from the app', () => {
 			{ name: 'Sample Savings', mask: '1111', kind: 'cash' },
 			{ name: 'Sample Rewards Card', mask: '2222', kind: 'creditCard' }
 		]);
+	});
+
+	async function fillConnections(t: Awaited<ReturnType<typeof startBudget>>['t'], count: number) {
+		await t.run(async (ctx) => {
+			for (let i = 0; i < count; i++) {
+				await ctx.db.insert('bankConnections', {
+					name: `Other Bank ${String(i)}`,
+					status: 'ok',
+					provider: {
+						kind: 'plaid',
+						itemId: `item-synthetic-other-${String(i)}`,
+						encryptedToken: 'x'
+					}
+				});
+			}
+		});
+	}
+	const full = {
+		code: 'INVALID_INPUT',
+		message: `Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections. Remove one first.`
+	};
+
+	test('at the Bank Connection limit, Connect a bank refuses before opening the bank', async () => {
+		const { owner, t } = await startBudget({ cutoverDate });
+		await fillConnections(t, MAX_BANK_CONNECTIONS);
+
+		expect(await publicErrorOf(owner.action(api.bankConnections.connect, {}))).toEqual(full);
+		expect(plaid.paths).toEqual([]);
+	});
+
+	test('a connect that finishes after the limit filled removes the Item it exchanged', async () => {
+		const { owner, t } = await startBudget({ cutoverDate });
+		await fillConnections(t, MAX_BANK_CONNECTIONS - 1);
+		await owner.action(api.bankConnections.connect, {});
+		await fillConnections(t, 1);
+
+		expect(await publicErrorOf(owner.action(api.bankConnections.finishConnect, linked))).toEqual(
+			full
+		);
+		expect(plaid.bodies['/item/remove']).toEqual({ access_token: accessToken });
+		expect(
+			await t.run(async (ctx) => (await ctx.db.query('bankConnections').collect()).length)
+		).toBe(MAX_BANK_CONNECTIONS);
 	});
 
 	test('a bank with no institution name is saved as "Bank"', async () => {

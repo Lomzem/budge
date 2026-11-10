@@ -1,6 +1,7 @@
 import { Cause, Effect, Exit, Layer } from 'effect';
 import { assert, describe, expect, test } from 'vitest';
 
+import { BANK_CHANGE_LIMIT } from '../src/lib/domain/bankChanges';
 import { decodeSyncPage } from '../src/lib/domain/plaid';
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -946,13 +947,45 @@ describe('the Bank changes list', () => {
 
 		expect(await listed()).toEqual(['SAMPLE PAYROLL', 'SAMPLE GROCER 0193']);
 		expect(await listed({ search: 'grocer' })).toEqual(['SAMPLE GROCER 0193']);
-		expect(await count()).toBe(2);
+		expect(await count()).toEqual({ count: 2, complete: true });
 
 		const importId = (await budget.row('SAMPLE GROCER 0193')).bankRows[0]?._id;
 		assert(importId !== undefined, 'No Bank Row');
 		await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'mine' });
 
 		expect(await listed()).toEqual(['SAMPLE PAYROLL']);
-		expect(await count()).toBe(1);
+		expect(await count()).toEqual({ count: 1, complete: true });
+	});
+
+	test('past the newest bank changes it reads, the count and every Account say the list is incomplete', async () => {
+		const { owner, t, accounts } = await startBudget({
+			accounts: { Checking: ['cash', 0], Savings: ['cash', 0] }
+		});
+		await t.run(async (ctx) => {
+			for (let n = 0; n <= BANK_CHANGE_LIMIT; n++) {
+				const transactionId = await ctx.db.insert('transactions', {
+					accountId: accounts.Savings,
+					date: '2026-08-12',
+					amount: -100,
+					cleared: 'cleared',
+					approved: true
+				});
+				await ctx.db.insert('imports', {
+					source: 'plaid',
+					accountId: accounts.Savings,
+					date: '2026-08-12',
+					amount: -150,
+					bankText: `SAMPLE SHOP ${String(n)}`,
+					transactionId,
+					matched: true,
+					state: 'changed'
+				});
+			}
+		});
+		const count = (accountId?: Id<'accounts'>) =>
+			owner.query(api.transactions.bankChangeCount, accountId === undefined ? {} : { accountId });
+
+		expect(await count()).toEqual({ count: BANK_CHANGE_LIMIT, complete: false });
+		expect(await count(accounts.Checking)).toEqual({ count: 0, complete: false });
 	});
 });

@@ -144,7 +144,7 @@
 	const rows: Row[] = $derived(
 		seen.flatMap((row) => {
 			const account = held.find((candidate) => candidate._id === row._id) ?? null;
-			const outcome = outcomes.get(row._id) ?? null;
+			const outcome = account === null ? (outcomes.get(row._id) ?? null) : null;
 			if (account === null && outcome === null) return [];
 			return [{ ...row, held: account, outcome }];
 		})

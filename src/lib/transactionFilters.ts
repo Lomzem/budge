@@ -36,23 +36,48 @@ const PARAMS: Record<keyof TransactionFilterValues, string> = {
 	to: 'to'
 };
 
-const ID = /^[a-z0-9]+$/;
-
 function accepted(key: keyof TransactionFilterValues, value: string) {
 	switch (key) {
-		case 'search':
-			return true;
 		case 'status':
 			return STATUSES.has(value);
 		case 'from':
 		case 'to':
 			return isIsoDate(value);
-		case 'categoryId':
-			return value === UNCATEGORIZED || ID.test(value);
+		case 'search':
 		case 'accountId':
+		case 'categoryId':
 		case 'payeeId':
-			return ID.test(value);
+			return true;
 	}
+}
+
+export interface FilterChoices {
+	accountIds: readonly string[] | undefined;
+	categoryIds: readonly string[] | undefined;
+	payeeIds: readonly string[] | undefined;
+}
+
+type Chosen = 'accountId' | 'categoryId' | 'payeeId';
+
+const CHOICES: Record<Chosen, keyof FilterChoices> = {
+	accountId: 'accountIds',
+	categoryId: 'categoryIds',
+	payeeId: 'payeeIds'
+};
+
+export function offeredFilters(
+	values: TransactionFilterValues,
+	choices: FilterChoices
+): TransactionFilterValues | undefined {
+	const offered = { ...values };
+	for (const key of Object.keys(CHOICES) as Chosen[]) {
+		const value = values[key];
+		if (value === '' || (key === 'categoryId' && value === UNCATEGORIZED)) continue;
+		const ids = choices[CHOICES[key]];
+		if (ids === undefined) return undefined;
+		if (!ids.includes(value)) offered[key] = '';
+	}
+	return offered;
 }
 
 export function filtersFromUrl(url: URL): TransactionFilterValues {

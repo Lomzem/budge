@@ -435,7 +435,7 @@ export const connectItem = Effect.fnUntraced(function* (input: {
 		accessToken,
 		webhook: input.webhook,
 		accounts: []
-	});
+	}).pipe(Effect.onError(() => Effect.ignore(plaid.itemRemove(accessToken))));
 	yield* Effect.ignore(
 		plaid.accountsGet(accessToken).pipe(
 			Effect.flatMap((accounts) =>

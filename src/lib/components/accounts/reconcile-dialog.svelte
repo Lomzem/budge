@@ -10,6 +10,7 @@
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { localToday } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
+	import { formatUnapprovedCount, UNAPPROVED_COUNT_LIMIT } from '$lib/domain/unapproved';
 
 	let {
 		open = $bindable(false),
@@ -39,18 +40,20 @@
 	const bankBalance = $derived(entered === undefined ? undefined : owed(entered));
 
 	const clearedBalance = $derived(cleared.data?.balance);
-	const unapproved = $derived(cleared.data?.unapproved ?? 0);
+	const unapproved = $derived(cleared.data?.unapproved ?? { count: 0, complete: true });
 	const clearedShown = $derived(clearedBalance === undefined ? undefined : owed(clearedBalance));
 	const difference = $derived(
 		bankBalance === undefined || clearedBalance === undefined
 			? undefined
 			: bankBalance - clearedBalance
 	);
-	const unapprovedWarning = $derived(
-		unapproved === 1
+	const unapprovedWarning = $derived.by(() => {
+		if (!unapproved.complete)
+			return `More than ${formatUnapprovedCount(UNAPPROVED_COUNT_LIMIT)} Transactions here are still Unapproved. Reconciling locks the Cleared ones as they are, so review them first.`;
+		return unapproved.count === 1
 			? '1 Cleared Transaction is still Unapproved. Reconciling locks it as it is, so review it first if anything looks wrong.'
-			: `${String(unapproved)} Cleared Transactions are still Unapproved. Reconciling locks them as they are, so review them first if anything looks wrong.`
-	);
+			: `${String(unapproved.count)} Cleared Transactions are still Unapproved. Reconciling locks them as they are, so review them first if anything looks wrong.`;
+	});
 	const submitLabel = $derived(
 		difference === undefined || difference === 0
 			? 'Reconcile'
@@ -149,7 +152,7 @@
 				<Label for="reconcile-date">Date</Label>
 				<Input id="reconcile-date" type="date" bind:value={date} required />
 			</div>
-			{#if unapproved > 0}
+			{#if unapproved.count > 0 || !unapproved.complete}
 				<p class="text-sm text-warning">{unapprovedWarning}</p>
 			{/if}
 			<p role="status" class="text-sm text-muted-foreground">

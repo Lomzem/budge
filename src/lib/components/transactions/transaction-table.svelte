@@ -12,6 +12,7 @@
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { getAccounts } from '$lib/accounts.svelte';
 	import { attempt } from '$lib/attempt';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
@@ -19,6 +20,7 @@
 	import * as Table from '$lib/components/ui/table';
 	import { formatDate } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
+	import { BANK_CHANGE_LIMIT } from '$lib/domain/bankChanges';
 	import { formatUnapprovedCount, UNAPPROVED_COUNT_LIMIT } from '$lib/domain/unapproved';
 
 	import ImportDialog from './import-dialog.svelte';
@@ -27,10 +29,12 @@
 		BANK_CHANGES,
 		countedTransactions,
 		filtersFromUrl,
+		noFilters,
+		offeredFilters,
 		UNAPPROVED,
 		UNCATEGORIZED,
 		urlWithFilters
-	} from './filters';
+	} from '$lib/transactionFilters';
 	import TransactionFilters from './transaction-filters.svelte';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
@@ -75,6 +79,32 @@
 		replaceState(samePage, page.state);
 	});
 
+	const accounts = getAccounts();
+	const categoryChoices = useQuery(api.categories.list, {});
+	const payeeChoices = useQuery(api.payees.list, {});
+	function idsOf<T>(query: { data: T | undefined; error: unknown }, ids: (data: T) => string[]) {
+		if (query.error) return [];
+		return query.data === undefined ? undefined : ids(query.data);
+	}
+	const offered = $derived(
+		offeredFilters(filterValues, {
+			accountIds: accounts.loaded ? accounts.all.map((account) => account._id) : undefined,
+			categoryIds: idsOf(categoryChoices, (data) => [
+				...(data.readyToAssignId === null ? [] : [data.readyToAssignId]),
+				...data.groups.flatMap((group) => group.categories.map((category) => category._id))
+			]),
+			payeeIds: idsOf(payeeChoices, (data) => data.map((payee) => payee._id))
+		})
+	);
+	const applied = $derived(offered ?? noFilters);
+	$effect(() => {
+		if (offered === undefined) return;
+		const dropped = (['accountId', 'categoryId', 'payeeId'] as const).some(
+			(key) => offered[key] !== filterValues[key]
+		);
+		if (dropped) filterValues = offered;
+	});
+
 	let search = $state('');
 	$effect(() => {
 		const typed = filterValues.search.trim();
@@ -92,24 +122,26 @@
 	const memoFrom = $derived(allAccounts ? '8xl' : '6xl');
 
 	const scopeAccountId = $derived(
-		accountId ??
-			(filterValues.accountId === '' ? undefined : (filterValues.accountId as Id<'accounts'>))
+		accountId ?? (applied.accountId === '' ? undefined : (applied.accountId as Id<'accounts'>))
 	);
 	const scope = $derived(scopeAccountId === undefined ? {} : { accountId: scopeAccountId });
 	const filters = $derived({
 		...(search === '' ? {} : { search }),
-		...categoryFilter(filterValues.categoryId),
-		...(filterValues.status === UNAPPROVED ? { approval: 'unapproved' as const } : {}),
-		...(filterValues.status === BANK_CHANGES ? { bankChanges: true as const } : {}),
-		...(filterValues.payeeId === '' ? {} : { payeeId: filterValues.payeeId as Id<'payees'> }),
-		...(filterValues.from === '' ? {} : { from: filterValues.from }),
-		...(filterValues.to === '' ? {} : { to: filterValues.to })
+		...categoryFilter(applied.categoryId),
+		...(applied.status === UNAPPROVED ? { approval: 'unapproved' as const } : {}),
+		...(applied.status === BANK_CHANGES ? { bankChanges: true as const } : {}),
+		...(applied.payeeId === '' ? {} : { payeeId: applied.payeeId as Id<'payees'> }),
+		...(applied.from === '' ? {} : { from: applied.from }),
+		...(applied.to === '' ? {} : { to: applied.to })
 	});
 	const filtering = $derived(Object.keys(filters).length > 0);
 
 	const first = usePaginatedQuery(
 		api.transactions.list,
-		() => (filtering ? { ...scope, ...filters } : { ...scope, approval: 'unapproved' as const }),
+		() => {
+			if (offered === undefined) return 'skip';
+			return filtering ? { ...scope, ...filters } : { ...scope, approval: 'unapproved' as const };
+		},
 		{ initialNumItems: PAGE_SIZE }
 	);
 	const hasSecond = $derived(
@@ -125,7 +157,13 @@
 		},
 		{ initialNumItems: PAGE_SIZE }
 	);
-	const unapprovedCount = useQuery(api.transactions.unapprovedCount, () => scope);
+	const unapprovedCount = useQuery(api.transactions.unapprovedCount, () =>
+		offered === undefined ? 'skip' : scope
+	);
+	const bankChangeCount = useQuery(api.transactions.bankChangeCount, () =>
+		offered !== undefined && filters.bankChanges ? scope : 'skip'
+	);
+	const bankChangesCut = $derived(bankChangeCount.data?.complete === false);
 	const setCleared = useMutation(api.transactions.setCleared);
 	const approve = useMutation(api.transactions.approve);
 	const approveAll = useMutation(api.transactions.approveAll);
@@ -186,11 +224,19 @@
 			{ label: 'Approved', rows: rows.filter((row) => row.approved) }
 		];
 	});
-	const loading = $derived(first.isLoading || (secondShown && second.isLoading));
+	const loading = $derived(
+		offered === undefined || first.isLoading || (secondShown && second.isLoading)
+	);
 	const more = $derived(secondShown ? second : first);
 	const canShowMore = $derived(more.status === 'CanLoadMore' || more.status === 'LoadingMore');
 	const result = $derived.by(() => {
 		if (rows.length === 0 && loading) return 'Loading Transactions…';
+		if (bankChangesCut) {
+			const newest = `the newest ${String(BANK_CHANGE_LIMIT)} bank changes`;
+			const rest = 'Resolve them to see the rest.';
+			if (rows.length === 0) return `None of ${newest} is here. ${rest}`;
+			return `${countedTransactions(rows.length, filterValues)}, from ${newest}. ${rest}`;
+		}
 		if (rows.length === 0 && filters.bankChanges) return 'No bank changes wait on you.';
 		if (rows.length === 0) return filtering ? 'No Transactions match.' : 'No Transactions yet.';
 		const counted = countedTransactions(rows.length, filterValues);

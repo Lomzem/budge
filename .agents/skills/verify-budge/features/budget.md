@@ -13,7 +13,7 @@ Give money a job by editing a Category's Assigned amount and see Ready to Assign
 - `budget-groups`: each Category Group header row totals its shown and Hidden Categories' Assigned, Activity and Available.
 - `budget-carry`: a Category's Available rolls forward into the next month.
 - `budget-status`: `Funded` names a Target that is met; a Category without a Target shows no status for a positive Available (only its green amount).
-- `budget-review-links`: the `Needs you` chips: `N Uncategorized`, `N Unapproved` and `N bank changes` link into the Accounts page already filtered (the last to Status `Bank changes`); `N Categories overspent` opens the first overspent Category's inspector. The Budget waits for every count before it paints, so chips never arrive one at a time; a strip that overflows fades at the clipped edge.
+- `budget-review-links`: the `Needs you` chips: `N Uncategorized`, `N Unapproved` and `N bank changes` (`500+ bank changes` past the newest 500) link into the Accounts page already filtered (the last to Status `Bank changes`); `N Categories overspent` opens the first overspent Category's inspector. The Budget waits for every count before it paints, so chips never arrive one at a time; a strip that overflows fades at the clipped edge.
 
 ## How to get to it (user POV)
 

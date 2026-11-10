@@ -20,6 +20,7 @@
 	const shown = (cents: number) => formatCents(cents).replace('$', '');
 
 	let draft: string | null = $state(null);
+	let edited = $state(false);
 	let error = $state('');
 	let hint = $state('');
 	let sent: number | null = $state(null);
@@ -28,10 +29,15 @@
 	const read = () => draft ?? shown(sent ?? amount);
 	const write = (typed: string) => {
 		draft = typed;
+		edited = true;
+	};
+	const display = (cents: number) => {
+		draft = shown(cents);
+		edited = false;
 	};
 
 	function start(event: FocusEvent) {
-		if (error === '') draft = shown(amount);
+		if (error === '') display(amount);
 		(event.currentTarget as HTMLInputElement).select();
 	}
 
@@ -48,6 +54,7 @@
 
 	function settle(): number | undefined {
 		if (draft === null) return undefined;
+		if (!edited) return sent ?? amount;
 		const cents = parseAssigned(draft, amount);
 		if (cents === undefined) {
 			error =
@@ -90,7 +97,7 @@
 			}
 			const next = following(target, 1, target.closest('table'));
 			if (next === undefined) {
-				draft = shown(cents);
+				display(cents);
 				void reselect(target);
 				return;
 			}
@@ -107,11 +114,11 @@
 			}
 			next.focus();
 		}
-		if (event.key === 'Escape' && (error !== '' || draft !== shown(amount))) {
+		if (event.key === 'Escape' && (error !== '' || edited)) {
 			event.stopPropagation();
 			error = '';
 			hint = '';
-			draft = shown(amount);
+			display(amount);
 			void reselect(target);
 		}
 	}

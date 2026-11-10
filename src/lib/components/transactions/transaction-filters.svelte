@@ -16,7 +16,7 @@
 		UNAPPROVED,
 		UNCATEGORIZED,
 		type TransactionFilterValues
-	} from './filters';
+	} from '$lib/transactionFilters';
 
 	let {
 		values = $bindable({ ...noFilters }),

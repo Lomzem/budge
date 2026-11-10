@@ -30,6 +30,7 @@
 	import { formatMonth, isIsoMonth, monthOf } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
+	import { formatBankChangeCount } from '$lib/domain/bankChanges';
 
 	const accounts = getAccounts();
 	const bank = getBankConnections();
@@ -59,7 +60,7 @@
 	const unapproved = useQuery(api.transactions.unapprovedCount, {});
 	const unapprovedCount = $derived(unapproved.data ?? 0);
 	const bankChanges = useQuery(api.transactions.bankChangeCount, {});
-	const bankChangeCount = $derived(bankChanges.data ?? 0);
+	const bankChangeCount = $derived(bankChanges.data ?? { count: 0, complete: true });
 	let addAccountOpen = $state(false);
 	let cutoverUnsetOnArrival = $state(false);
 
@@ -151,9 +152,9 @@
 				tone: 'warn'
 			});
 		}
-		if (bankChangeCount > 0) {
+		if (bankChangeCount.count > 0 || !bankChangeCount.complete) {
 			list.push({
-				text: `${String(bankChangeCount)} ${bankChangeCount === 1 ? 'bank change' : 'bank changes'}`,
+				text: formatBankChangeCount(bankChangeCount),
 				link: { path: '/accounts', query: '?status=bank-changes' },
 				tone: 'warn'
 			});

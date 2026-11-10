@@ -59,6 +59,22 @@ export const search = {
 				await page.getByRole('button', { name: 'Clear search and filters' }).click();
 				await expect(page.getByLabel('Category', { exact: true })).toHaveValue('');
 			});
+
+			await step(
+				'a link whose filters name nothing Budge offers drops them and lists every Transaction',
+				async () => {
+					const landlordId = await page
+						.getByLabel('Payee', { exact: true })
+						.locator('option', { hasText: 'Sample Landlord' })
+						.getAttribute('value');
+					expect(landlordId).toBeTruthy();
+					await page.goto(`/accounts?account=${String(landlordId)}&category=123&payee=xyz&q=`);
+					await expect(page.getByLabel('Payee', { exact: true })).toHaveValue('');
+					await expect.poll(async () => (await listedPayees(page)).length).toBeGreaterThan(3);
+					await expect(page).toHaveURL(/\/accounts$/);
+					await expect(page.getByText("Budge couldn't load Transactions")).toHaveCount(0);
+				}
+			);
 		}
 	},
 	phone: {

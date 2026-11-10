@@ -208,7 +208,7 @@ describe('setting up a Bank Connection', () => {
 			await publicErrorOf(save('sealed-token-synthetic-3', 'item-synthetic-one-too-many'))
 		).toEqual({
 			code: 'INVALID_INPUT',
-			message: `Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections.`
+			message: `Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections. Remove one first.`
 		});
 		expect(
 			await t.run(async (ctx) => (await ctx.db.query('bankConnections').collect()).length)

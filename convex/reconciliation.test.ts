@@ -1,5 +1,6 @@
 import { assert, describe, expect, test } from 'vitest';
 
+import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { publicErrorCode, publicErrorMessage, startBudget, useOwnerEnv } from './test.helper';
@@ -139,11 +140,38 @@ describe('reconciling a Cash Account', () => {
 		});
 		const cleared = () =>
 			b.owner.query(api.reconciliation.clearedBalance, { accountId: b.checking });
-		expect(await cleared()).toEqual({ balance: 294_250, unapproved: 1 });
+		expect(await cleared()).toEqual({
+			balance: 294_250,
+			unapproved: { count: 1, complete: true }
+		});
 
 		await b.reconcile(b.checking, 294_250);
 
-		expect(await cleared()).toEqual({ balance: 294_250, unapproved: 0 });
+		expect(await cleared()).toEqual({
+			balance: 294_250,
+			unapproved: { count: 0, complete: true }
+		});
+	});
+
+	test('past the Unapproved Transactions it reads, the count says it is incomplete', async () => {
+		const b = await budgetToReconcile();
+		await b.t.run(async (ctx) => {
+			for (let n = 0; n <= UNAPPROVED_COUNT_LIMIT; n++) {
+				await ctx.db.insert('transactions', {
+					accountId: b.checking,
+					date: '2026-08-12',
+					amount: -100,
+					cleared: 'uncleared',
+					approved: false
+				});
+			}
+		});
+
+		const { unapproved } = await b.owner.query(api.reconciliation.clearedBalance, {
+			accountId: b.checking
+		});
+
+		expect(unapproved).toEqual({ count: 0, complete: false });
 	});
 
 	test("the adjustment's Category can be changed afterwards", async () => {
