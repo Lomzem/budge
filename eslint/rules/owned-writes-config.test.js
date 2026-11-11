@@ -40,9 +40,9 @@ test.each([
 
 test('only the owners import the search-text and totals updaters', async () => {
 	const imports = [
-		"import { refreshSearchText } from './lib/transactions';",
+		"import { refreshDerivedFields } from './lib/transactions';",
 		"import { countTransaction, rebuildTotals } from './lib/monthlyTotals';",
-		'export { refreshSearchText, countTransaction, rebuildTotals };\n'
+		'export { refreshDerivedFields, countTransaction, rebuildTotals };\n'
 	].join('\n');
 
 	expect(await lint('convex/categories.ts', imports)).toEqual([

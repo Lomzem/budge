@@ -30,7 +30,36 @@ The Docstring Coverage pre-merge note doesn't apply: the repo forbids comments i
 
 CodeRabbit accepted the fixes and raised one more point: the Bank list read a connection's first 50 bank Accounts, held rows included, so held rows could push synced or ignored ones off the list. A new `by_connectionId_state` index on `connectionAccounts` lets `bankAccountsOf` read mapped and ignored rows on their own, up to 50 each, the most one bank list holds. The test "shows the bank Accounts a connection syncs or ignores while 50 others wait for setup" failed before the fix.
 
+## #28, the Bank changes list
+
+CodeRabbit raised two more points about the Bank changes list:
+
+- **4542184098:** the scan read up to 1,000 flagged Bank Rows per state, ordered by Transaction id, and then filtered by Account. An Account whose change sat behind 1,000 rows from another Account got an empty page with `isDone: true`. Choosing rows by id before sorting by date could also leave out a newer Transaction.
+- **4542184110:** the hand-built keyset pages ignored `maximumRowsRead` and `maximumBytesRead`.
+
+The fix stores the answer on the Transaction instead of scanning:
+
+- A Transaction carries `bankChange: true` while one of its Bank Rows is `changed` or `removed`.
+- `refreshDerivedFields` (formerly `refreshSearchText`) keeps the marker, the same way it keeps `searchText`. It already runs after every owned write that touches a Transaction or its Bank Rows, and `updateBankRow` now runs it when a Bank Row's state changes.
+- Two indexes, `by_bankChange_date` and `by_account_bankChange_date`, serve the list and the count. The list uses native `paginate`, newest date first. The count reads at most 501 rows of the index.
+
+The test "a bank change in one Account stays reachable behind a thousand in another, and the list runs newest date first" failed on `e5b2838` at both points: the Checking count was 0, and the first row was the older Savings date.
+
+**After deploy:** existing flagged Transactions have no marker. Run the backfill once on each deployment. It was renamed `backfillSearchText` → `backfillDerivedFields`, and it fills both fields:
+
+```sh
+npx convex run migrations:backfillDerivedFields '{"cursor": null}' --prod
+```
+
+"the backfill lists a bank change flagged before the list read its marker" covers it.
+
+Verification:
+
+- typecheck, lint, lint:ui, format:check and codegen:check pass, and so do all 855 tests.
+- Journeys `bank-changes/take-the-banks`, `bank-changes/keep-mine`, `search/filters`, `plaid/attention` and `plaid/status` pass (`test-results/verify-budge/marker`).
+- By hand on `bank-sync`: the Budget's `2 bank changes` chip opens `?status=bank-changes`, which reads `2 Transactions the bank changed` and lists both rows, newest first.
+
 ## Remaining
 
-- #28: an incremental review of `d2b91b7`.
+- #28: an incremental review of the marker commit.
 - #29 and #30: first reviews. Both were rate limited at 18:57 UTC.

@@ -39,12 +39,13 @@ the matching backend URL:
 npx convex deploy --cmd 'bun run build' --cmd-url-env-var-name PUBLIC_CONVEX_URL --preview-run seed:run
 ```
 
-Text search reads each Transaction's `searchText`. On a deployment that already
-has Transactions from before search, run the backfill once after deploying; it
-schedules its own remaining batches, and running it again changes nothing:
+Text search reads each Transaction's `searchText`, and the Bank changes list reads
+its `bankChange` marker. On a deployment that already has Transactions from before
+either, run the backfill once after deploying; it schedules its own remaining
+batches, and running it again changes nothing:
 
 ```sh
-npx convex run migrations:backfillSearchText '{"cursor": null}' --prod
+npx convex run migrations:backfillDerivedFields '{"cursor": null}' --prod
 ```
 
 Leave out `--prod` to backfill the development deployment.

@@ -5,7 +5,6 @@ import {
 	type PaginationResult
 } from 'convex/server';
 import { v, type Infer } from 'convex/values';
-import { Option, Schema } from 'effect';
 
 import { BANK_CHANGE_LIMIT } from '../src/lib/domain/bankChanges';
 import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
@@ -302,37 +301,20 @@ async function filtered(
 		.paginate(paginationOpts);
 }
 
-const BANK_CHANGES_SCANNED_PER_STATE = 2 * BANK_CHANGE_LIMIT;
-
-async function bankChanged(ctx: QueryCtx, accountId: Id<'accounts'> | undefined) {
-	const found = new Map<Id<'transactions'>, Doc<'transactions'>>();
-	let complete = true;
-	for (const state of ['changed', 'removed'] as const) {
-		const flagged = ctx.db
-			.query('imports')
-			.withIndex('by_state_transactionId', (q) => q.eq('state', state))
-			.order('desc');
-		let scanned = 0;
-		for await (const { transactionId } of flagged) {
-			if (found.size > BANK_CHANGE_LIMIT || scanned === BANK_CHANGES_SCANNED_PER_STATE) {
-				complete = false;
-				break;
-			}
-			scanned++;
-			if (transactionId === undefined || found.has(transactionId)) continue;
-			const transaction = await ctx.db.get('transactions', transactionId);
-			if (transaction === null) continue;
-			if (accountId !== undefined && transaction.accountId !== accountId) continue;
-			found.set(transactionId, transaction);
-		}
-	}
-	const transactions = [...found.values()].sort(
-		(a, b) => b.date.localeCompare(a.date) || b._creationTime - a._creationTime
-	);
-	return {
-		transactions: transactions.slice(0, BANK_CHANGE_LIMIT),
-		complete: complete && transactions.length <= BANK_CHANGE_LIMIT
-	};
+function bankChanges(
+	ctx: QueryCtx,
+	accountId: Id<'accounts'> | undefined,
+	from = FIRST_DATE,
+	to = LAST_DATE
+) {
+	const transactions = ctx.db.query('transactions');
+	return accountId === undefined
+		? transactions.withIndex('by_bankChange_date', (q) =>
+				q.eq('bankChange', true).gte('date', from).lte('date', to)
+			)
+		: transactions.withIndex('by_account_bankChange_date', (q) =>
+				q.eq('accountId', accountId).eq('bankChange', true).gte('date', from).lte('date', to)
+			);
 }
 
 async function withBankChanges(
@@ -341,56 +323,19 @@ async function withBankChanges(
 	approval: Approval | undefined,
 	paginationOpts: PaginationOptions
 ): Promise<PaginationResult<Doc<'transactions'>>> {
-	const { categoryId, uncategorized, payeeId, from, to, search } = filters;
-	const listed = (await bankChanged(ctx, filters.accountId)).transactions.filter(
-		(transaction) =>
-			hasApproval(transaction, approval) &&
-			(categoryId === undefined || transaction.categoryId === categoryId) &&
-			(uncategorized !== true || isUncategorized(transaction)) &&
-			(payeeId === undefined || transaction.payeeId === payeeId) &&
-			transaction.date >= (from ?? FIRST_DATE) &&
-			transaction.date <= (to ?? LAST_DATE) &&
-			(search === '' || hasEveryTerm(transaction.searchText, search))
-	);
-	const start = bankChangeKey(paginationOpts.cursor ?? LIST_START);
-	const remaining = listed.filter((transaction) => listedAfter(transaction, start));
-	const end = paginationOpts.endCursor;
-	const page =
-		end === undefined || end === null
-			? remaining.slice(0, paginationOpts.numItems)
-			: remaining.filter((transaction) => !listedAfter(transaction, bankChangeKey(end)));
-	const last = page.at(-1);
+	const { accountId, categoryId, uncategorized, payeeId, from, to, search } = filters;
+	const result = await bankChanges(ctx, accountId, from, to).order('desc').paginate(paginationOpts);
 	return {
-		page,
-		isDone: page.length === remaining.length,
-		continueCursor:
-			last === undefined
-				? (paginationOpts.cursor ?? LIST_START)
-				: JSON.stringify([last.date, last._creationTime])
+		...result,
+		page: result.page.filter(
+			(transaction) =>
+				hasApproval(transaction, approval) &&
+				(categoryId === undefined || transaction.categoryId === categoryId) &&
+				(uncategorized !== true || isUncategorized(transaction)) &&
+				(payeeId === undefined || transaction.payeeId === payeeId) &&
+				(search === '' || hasEveryTerm(transaction.searchText, search))
+		)
 	};
-}
-
-const LIST_START = JSON.stringify(['~', 0]);
-
-const bankChangeCursor = Schema.Tuple([Schema.String, Schema.Finite]);
-
-function bankChangeKey(cursor: string): readonly [string, number] {
-	const key = Option.getOrUndefined(
-		Schema.decodeOption(Schema.fromJsonString(bankChangeCursor))(cursor)
-	);
-	if (key === undefined)
-		throw publicError('INVALID_INPUT', 'This page of bank changes is out of date.');
-	return key;
-}
-
-function listedAfter(
-	transaction: Doc<'transactions'>,
-	[date, creationTime]: readonly [string, number]
-) {
-	return (
-		transaction.date < date ||
-		(transaction.date === date && transaction._creationTime < creationTime)
-	);
 }
 
 export const bankChangeCount = query({
@@ -398,8 +343,11 @@ export const bankChangeCount = query({
 	returns: v.object({ count: v.number(), complete: v.boolean() }),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
-		const { transactions, complete } = await bankChanged(ctx, accountId);
-		return { count: transactions.length, complete };
+		const counted = (await bankChanges(ctx, accountId).take(BANK_CHANGE_LIMIT + 1)).length;
+		return {
+			count: Math.min(counted, BANK_CHANGE_LIMIT),
+			complete: counted <= BANK_CHANGE_LIMIT
+		};
 	}
 });
 
