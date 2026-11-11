@@ -15,7 +15,7 @@
 - `PlaidClient.linkTokenCreate` takes a create mode (transactions product, Budge's webhook) and the existing update mode. `PlaidClient.publicTokenExchange` returns the Item's access token and id.
 - A public `bankConnections.connect` action returns a create-mode link token. It refuses before the cutover date is set, and it refuses with `BANK_SYNC_UNAVAILABLE` when Plaid credentials or the token key are missing.
 - A public `bankConnections.finishConnect` action exchanges the public token, saves the Bank Connection under the institution's name, records the Item's bank accounts as held right away, and schedules the first sync.
-- Held bank accounts carry a suggested `kind` (Plaid `credit` → Credit Card Account, otherwise Cash Account), and `heldAccounts.list` returns it.
+- Held bank accounts carry a suggested `kind` (Plaid `credit` or `loan` → Credit Card Account, otherwise Cash Account; `loan` was added after review, see ticket 23), and `heldAccounts.list` returns it.
 - A public `bankConnections.service` query reports whether bank sync is configured and which Plaid environment it uses.
 
 ## Acceptance

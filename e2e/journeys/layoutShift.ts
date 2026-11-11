@@ -31,11 +31,14 @@ function observeLayoutShifts(binding: string) {
 	};
 	addEventListener('input', noteEdit, true);
 	addEventListener('change', noteEdit, true);
-	new PerformanceObserver((list) => {
-		for (const entry of list.getEntries() as Entry[]) {
+	const pending = new Set<Promise<void>>();
+	const reportAll = (entries: Entry[]) => {
+		const report = (window as unknown as Record<string, (shift: LayoutShift) => Promise<void>>)[
+			binding
+		];
+		for (const entry of entries) {
 			if (entry.hadRecentInput || entry.startTime - lastEdit < RECENT_INPUT_MS) continue;
-			const report = (window as unknown as Record<string, (shift: LayoutShift) => void>)[binding];
-			report?.({
+			const sent = report?.({
 				url: location.pathname + location.search,
 				value: entry.value,
 				moved: (entry.sources ?? []).map(
@@ -43,8 +46,20 @@ function observeLayoutShifts(binding: string) {
 						`${describe(source.node)} [${box(source.previousRect)} → ${box(source.currentRect)}]`
 				)
 			});
+			if (sent === undefined) continue;
+			pending.add(sent);
+			void sent.finally(() => pending.delete(sent));
 		}
-	}).observe({ type: 'layout-shift', buffered: true });
+	};
+	const observer = new PerformanceObserver((list) => {
+		reportAll(list.getEntries() as Entry[]);
+	});
+	observer.observe({ type: 'layout-shift', buffered: true });
+	(window as unknown as Record<string, () => Promise<void>>)[`${binding}Drain`] = async () => {
+		await new Promise((painted) => requestAnimationFrame(() => requestAnimationFrame(painted)));
+		reportAll(observer.takeRecords() as Entry[]);
+		await Promise.all(pending);
+	};
 }
 
 export async function watchUnpromptedLayoutShifts(page: Page) {
@@ -55,7 +70,14 @@ export async function watchUnpromptedLayoutShifts(page: Page) {
 	await page.addInitScript(observeLayoutShifts, BINDING);
 	return {
 		shifts,
-		assertNone() {
+		async assertNone() {
+			if (!page.isClosed()) {
+				await page.evaluate(
+					(drain) =>
+						(window as unknown as Record<string, (() => Promise<void>) | undefined>)[drain]?.(),
+					`${BINDING}Drain`
+				);
+			}
 			if (shifts.length === 0) return;
 			const lines = shifts.map(
 				(shift) => `  ${shift.url} moved by ${shift.value.toFixed(4)}: ${shift.moved.join('; ')}`

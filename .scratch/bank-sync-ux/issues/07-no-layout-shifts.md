@@ -42,4 +42,4 @@ The owner hates layout shifts. A baseline run of all 37 journeys with the shift 
   - The Plaid journeys expect `Bank sync isn't set up on this server.` on a server without credentials (ticket 01).
   - `plaid/late-sync` holds both syncs, because a held response stalls the socket.
   - `settings/cutover` reaches the gate from the sidebar's Add Account.
-- Deferred: rows a background sync inserts at the top of a register move the rows below. That is a data change, not a page shift, and no journey triggers it.
+- Accepted exception (named in the spec's no-layout-shift constraint): rows a background sync inserts into an open register move the rows below. That is new data arriving, not a page shift, and no journey triggers it.
