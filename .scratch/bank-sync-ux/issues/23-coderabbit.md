@@ -80,7 +80,17 @@ Declined, with a reply:
 - **419:** a Budget URL without a month means the month the owner was on, so the Budget link returns to it; `This month` goes back to today.
 - **Design (269, 330, 356, 429, 437, 446, 459, 472, 480, 488, 497, 502):** these cite the v1 UI rules, which the Design plan in `spec.md` supersedes. `.coderabbit.yaml` now points the Svelte path instructions at that plan, and the plan names each allowed case: sheets for bounded groups, counts and status words beside their item, rounded `Needs you` links, icon-only controls below md and for "more actions", and a one-sentence sign-in line.
 
+## #30, first review: 6 comments, all fixed
+
+- **Layout-shift check (`e2e/journeys/index.ts`):** `assertNone` drains before it checks. It waits two frames, takes the observer's pending records, and awaits every pending report. On a throwaway page that shifts 700 ms after a click, the old check caught 0 of 10 late shifts and the new one caught 10 of 10. All 44 journeys pass.
+- **Approve-shown Undo (`transactions/approve-all-undo`):** Undo is kept with the scope and filters where the approval happened, so it hides while they differ and returns with them. The step now checks it is hidden after Clear. The guide's "Undo lasts until the scope or filters change" was wrong and now describes this.
+- **Docs:**
+  - The `search.md` manual recipe expects the folded Filters panel on a Budget link.
+  - Ticket 01's kind rule includes `loan`.
+  - The spec no longer names production's bank.
+  - The spec accepts background-sync row insertion as a layout-shift exception, and ticket 07 matches.
+
 ## Remaining
 
 - #28 and #29: incremental reviews of the fixes.
-- #30: first review (rate limited at 20:03 UTC).
+- #30: incremental review of the fixes.

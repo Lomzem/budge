@@ -153,7 +153,7 @@ export const transactions = {
 			);
 
 			await step(
-				'a search approves only the Unapproved rows it shows, leaves the rest Unapproved, and Undo puts them back',
+				'a search approves only the Unapproved rows it shows and leaves the rest Unapproved; its Undo hides while the filters differ and puts them back once the search returns',
 				async () => {
 					const outside = (await allUnapproved()).find((name) => !name.includes('BOOKSHOP'));
 					if (outside === undefined) throw new Error('every Unapproved row is a bookshop');
@@ -170,10 +170,12 @@ export const transactions = {
 					await expect(
 						page.getByRole('button', { name: 'Approve shown', exact: true })
 					).toHaveAttribute('aria-disabled', 'true');
+					const undo = page.getByRole('button', { name: 'Undo', exact: true });
 					await page.getByRole('button', { name: 'Clear search and filters' }).click();
 					await expect(page.getByRole('button', { name: outside, exact: true })).toBeVisible();
+					await expect(undo).toHaveCount(0);
 					await page.getByRole('searchbox', { name: 'Search' }).fill('BOOKSHOP');
-					await page.getByRole('button', { name: 'Undo', exact: true }).click();
+					await undo.click();
 					await expect(shown).toHaveText(`Approve ${String(counted)} shown`);
 					await page.getByRole('button', { name: 'Clear search and filters' }).click();
 					await expect(approveAll).toHaveText(label ?? '');

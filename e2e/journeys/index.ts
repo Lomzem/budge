@@ -56,7 +56,7 @@ export const journeys: readonly NamedJourney[] = Object.entries(byFeature).flatM
 			run: async (page, context) => {
 				const layoutShifts = await watchUnpromptedLayoutShifts(page);
 				await journey.run(page, context);
-				layoutShifts.assertNone();
+				await layoutShifts.assertNone();
 			}
 		}))
 );
