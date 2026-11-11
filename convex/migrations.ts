@@ -5,7 +5,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, type MutationCtx } from './_generated/server';
 import { createPaymentCategory, readPaymentCategory } from './lib/categories';
 import { requireCutoverDate } from './lib/settings';
-import { allBankRowsOf, refreshSearchText, replaceTransaction } from './lib/transactions';
+import { allBankRowsOf, refreshDerivedFields, replaceTransaction } from './lib/transactions';
 
 export const backfillPaymentCategories = internalMutation({
 	args: {},
@@ -43,18 +43,18 @@ export const backfillPaymentCategories = internalMutation({
 	}
 });
 
-const SEARCH_BACKFILL_BATCH = 50;
+const DERIVED_BACKFILL_BATCH = 50;
 
-export const backfillSearchText = internalMutation({
+export const backfillDerivedFields = internalMutation({
 	args: { cursor: v.union(v.string(), v.null()) },
 	returns: v.null(),
 	handler: async (ctx, { cursor }) => {
 		const { page, isDone, continueCursor } = await ctx.db
 			.query('transactions')
-			.paginate({ numItems: SEARCH_BACKFILL_BATCH, cursor });
-		for (const transaction of page) await refreshSearchText(ctx, transaction._id);
+			.paginate({ numItems: DERIVED_BACKFILL_BATCH, cursor });
+		for (const transaction of page) await refreshDerivedFields(ctx, transaction._id);
 		if (!isDone) {
-			await ctx.scheduler.runAfter(0, internal.migrations.backfillSearchText, {
+			await ctx.scheduler.runAfter(0, internal.migrations.backfillDerivedFields, {
 				cursor: continueCursor
 			});
 		}
@@ -79,7 +79,7 @@ export const backfillStartingBalanceKind = internalMutation({
 				kind: 'startingBalance',
 				payeeId: undefined
 			});
-			await refreshSearchText(ctx, genuine._id);
+			await refreshDerivedFields(ctx, genuine._id);
 			converted++;
 		}
 		return { converted, unresolved };

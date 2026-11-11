@@ -7,7 +7,7 @@ import { saveStartingBalance } from './lib/accounts';
 import { ensureReadyToAssign } from './lib/categories';
 import { rebuildMonthlyTotals } from './lib/monthlyTotals';
 import { publicError } from './lib/publicError';
-import { refreshSearchText } from './lib/transactions';
+import { refreshDerivedFields } from './lib/transactions';
 
 const PAYEES = {
 	paycheck: 'Sample Employer Payroll',
@@ -241,7 +241,7 @@ export const run = internalMutation({
 
 		const written: Id<'transactions'>[] = [];
 		for await (const transaction of ctx.db.query('transactions')) written.push(transaction._id);
-		for (const transactionId of written) await refreshSearchText(ctx, transactionId);
+		for (const transactionId of written) await refreshDerivedFields(ctx, transactionId);
 		await rebuildMonthlyTotals(ctx);
 		return null;
 	}

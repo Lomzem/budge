@@ -225,7 +225,7 @@ describe('text search', () => {
 		});
 		expect(await find({ search: 'lantern' })).toEqual([]);
 
-		await t.mutation(internal.migrations.backfillSearchText, { cursor: null });
+		await t.mutation(internal.migrations.backfillDerivedFields, { cursor: null });
 		await t.finishAllScheduledFunctions(() => vi.runAllTimers());
 
 		for (const word of ['lantern', 'basket', 'grocer']) {

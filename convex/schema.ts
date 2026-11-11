@@ -75,7 +75,9 @@ export default defineSchema({
 
 		kind: v.optional(v.literal('startingBalance')),
 
-		searchText: v.optional(v.string())
+		searchText: v.optional(v.string()),
+
+		bankChange: v.optional(v.literal(true))
 	})
 		.index('by_account_date', ['accountId', 'date'])
 		.index('by_accountId_and_kind', ['accountId', 'kind'])
@@ -87,6 +89,8 @@ export default defineSchema({
 
 		.index('by_approved_date', ['approved', 'date'])
 		.index('by_account_approved_date', ['accountId', 'approved', 'date'])
+		.index('by_bankChange_date', ['bankChange', 'date'])
+		.index('by_account_bankChange_date', ['accountId', 'bankChange', 'date'])
 
 		.searchIndex('search_text', {
 			searchField: 'searchText',
