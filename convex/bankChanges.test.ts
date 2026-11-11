@@ -1,6 +1,7 @@
 import { Cause, Effect, Exit, Layer } from 'effect';
 import { assert, describe, expect, test } from 'vitest';
 
+import { BANK_CHANGE_LIMIT } from '../src/lib/domain/bankChanges';
 import { decodeSyncPage } from '../src/lib/domain/plaid';
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -104,7 +105,9 @@ async function syncedBudget() {
 				transactionsSync,
 				itemGet: () => Effect.succeed({ consentExpiresAt: null }),
 				accountsGet: () =>
-					Effect.succeed([{ externalId: account, name: 'Sample Checking', balance: null }])
+					Effect.succeed([
+						{ externalId: account, name: 'Sample Checking', kind: 'cash', balance: null }
+					])
 			},
 			syncConnection(connectionId, { refresh: false })
 		);
@@ -921,5 +924,68 @@ describe('a Transaction backed by more than ten Bank Rows', () => {
 		const grocerRow = await budget.row('SAMPLE GROCER 0193');
 
 		expect(await budget.search('corner market')).toEqual([grocerRow._id]);
+	});
+});
+
+describe('the Bank changes list', () => {
+	test('holds each flagged Transaction, newest first, until the owner resolves it', async () => {
+		const budget = await syncedBudget();
+		await ownerVersions.edited(budget);
+		const payrollRow = await budget.row('SAMPLE PAYROLL');
+		await budget.owner.mutation(api.transactions.approve, { transactionId: payrollRow._id });
+		await budget.sync(changes({ modified: [grocerChanged], removed: [payroll.transaction_id] }));
+		const listed = async (narrowing: { search?: string } = {}) =>
+			(
+				await budget.owner.query(api.transactions.list, {
+					bankChanges: true,
+					...narrowing,
+					paginationOpts: { numItems: 50, cursor: null }
+				})
+			).page.map((row) => row.payeeName);
+		const count = () =>
+			budget.owner.query(api.transactions.bankChangeCount, { accountId: budget.checking });
+
+		expect(await listed()).toEqual(['SAMPLE PAYROLL', 'SAMPLE GROCER 0193']);
+		expect(await listed({ search: 'grocer' })).toEqual(['SAMPLE GROCER 0193']);
+		expect(await count()).toEqual({ count: 2, complete: true });
+
+		const importId = (await budget.row('SAMPLE GROCER 0193')).bankRows[0]?._id;
+		assert(importId !== undefined, 'No Bank Row');
+		await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'mine' });
+
+		expect(await listed()).toEqual(['SAMPLE PAYROLL']);
+		expect(await count()).toEqual({ count: 1, complete: true });
+	});
+
+	test('past the newest bank changes it reads, the count and every Account say the list is incomplete', async () => {
+		const { owner, t, accounts } = await startBudget({
+			accounts: { Checking: ['cash', 0], Savings: ['cash', 0] }
+		});
+		await t.run(async (ctx) => {
+			for (let n = 0; n <= BANK_CHANGE_LIMIT; n++) {
+				const transactionId = await ctx.db.insert('transactions', {
+					accountId: accounts.Savings,
+					date: '2026-08-12',
+					amount: -100,
+					cleared: 'cleared',
+					approved: true
+				});
+				await ctx.db.insert('imports', {
+					source: 'plaid',
+					accountId: accounts.Savings,
+					date: '2026-08-12',
+					amount: -150,
+					bankText: `SAMPLE SHOP ${String(n)}`,
+					transactionId,
+					matched: true,
+					state: 'changed'
+				});
+			}
+		});
+		const count = (accountId?: Id<'accounts'>) =>
+			owner.query(api.transactions.bankChangeCount, accountId === undefined ? {} : { accountId });
+
+		expect(await count()).toEqual({ count: BANK_CHANGE_LIMIT, complete: false });
+		expect(await count(accounts.Checking)).toEqual({ count: 0, complete: false });
 	});
 });

@@ -3,7 +3,7 @@ import { Effect, Layer, Option } from 'effect';
 
 import { isSyncOverdue, renewalDue } from '../src/lib/domain/freshness';
 import type { PublicError } from '../src/lib/domain/publicError';
-import { internal } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import {
 	action,
@@ -14,7 +14,8 @@ import {
 	internalQuery,
 	query,
 	type ActionCtx,
-	type MutationCtx
+	type MutationCtx,
+	type QueryCtx
 } from './_generated/server';
 import { applyBankChange, applyBankRemoval, syncedBankRow } from './lib/bankChanges';
 import { applyBankRows, planBankRows, requireBankRow, type IncomingRow } from './lib/imports';
@@ -39,11 +40,14 @@ import { requireCutoverDate } from './lib/settings';
 import {
 	applyArgs,
 	applyResult,
+	connectItem,
 	failArgs,
 	leaseResult,
 	LEASE_MS,
 	MAX_SYNC_ROWS,
+	OWNER_CLIENT_USER_ID,
 	reconnectLinkToken,
+	removeItem,
 	RETRY_DELAYS_MS,
 	saveArgs,
 	setupConnection,
@@ -58,6 +62,20 @@ import { TokenCipher } from './lib/tokenCipher';
 
 export const MAX_BANK_CONNECTIONS = 20;
 
+async function atConnectionLimit(ctx: QueryCtx) {
+	const held = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
+	return held.length >= MAX_BANK_CONNECTIONS;
+}
+
+const CONNECTION_LIMIT_REACHED = `Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections. Remove one first.`;
+
+export const atLimit = internalQuery({
+	args: {},
+	returns: v.boolean(),
+	handler: async (ctx) => await atConnectionLimit(ctx)
+});
+const MAX_FED_ACCOUNTS = 50;
+
 export const list = query({
 	args: { now: v.number() },
 	returns: v.array(
@@ -68,29 +86,87 @@ export const list = query({
 			lastSyncedAt: v.union(v.number(), v.null()),
 			overdue: v.boolean(),
 			consentEndsAt: v.union(v.number(), v.null()),
-			lastError: v.union(v.object({ at: v.number(), message: v.string() }), v.null())
+			lastError: v.union(v.object({ at: v.number(), message: v.string() }), v.null()),
+			bankLogin: v.boolean(),
+			feeds: v.array(
+				v.object({
+					connectionAccountId: v.id('connectionAccounts'),
+					accountId: v.id('accounts'),
+					name: v.string()
+				})
+			),
+			ignored: v.array(
+				v.object({
+					connectionAccountId: v.id('connectionAccounts'),
+					name: v.union(v.string(), v.null()),
+					mask: v.union(v.string(), v.null())
+				})
+			)
 		})
 	),
 	handler: async (ctx, { now }) => {
 		await requireOwner(ctx);
 		const connections = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
-		return connections.map((connection) => ({
-			_id: connection._id,
-			name: connection.name,
-			status: connection.status,
-			lastSyncedAt: connection.lastSyncedAt ?? null,
-			overdue: isSyncOverdue(connection.lastSyncedAt ?? null, now),
-			consentEndsAt: renewalDue(connection.consentExpiresAt ?? null, now),
-			lastError: connection.lastError ?? null
-		}));
+		return await Promise.all(
+			connections.map(async (connection) => ({
+				...(await bankAccountsOf(ctx, connection._id)),
+				_id: connection._id,
+				name: connection.name,
+				status: connection.status,
+				lastSyncedAt: connection.lastSyncedAt ?? null,
+				overdue: isSyncOverdue(connection.lastSyncedAt ?? null, now),
+				consentEndsAt: renewalDue(connection.consentExpiresAt ?? null, now),
+				lastError: connection.lastError ?? null,
+				bankLogin: connection.provider.kind === 'plaid'
+			}))
+		);
 	}
 });
+
+async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>) {
+	const linked = await ctx.db
+		.query('connectionAccounts')
+		.withIndex('by_connection_externalId', (q) => q.eq('connectionId', connectionId))
+		.take(MAX_FED_ACCOUNTS);
+	const feeds: {
+		connectionAccountId: Id<'connectionAccounts'>;
+		accountId: Id<'accounts'>;
+		name: string;
+	}[] = [];
+	const ignored: {
+		connectionAccountId: Id<'connectionAccounts'>;
+		name: string | null;
+		mask: string | null;
+	}[] = [];
+	for (const row of linked) {
+		if (row.state === 'ignored') {
+			ignored.push({
+				connectionAccountId: row._id,
+				name: row.name ?? null,
+				mask: row.mask ?? null
+			});
+		}
+		if (row.state !== 'mapped') continue;
+		const account = await ctx.db.get('accounts', row.accountId);
+		if (account !== null) {
+			feeds.push({ connectionAccountId: row._id, accountId: account._id, name: account.name });
+		}
+	}
+	return { feeds, ignored };
+}
 
 const ownerSyncResult = v.union(
 	v.object({ kind: v.literal('synced'), added: v.number(), matched: v.number() }),
 	v.object({ kind: v.literal('busy') }),
 	v.object({ kind: v.literal('noToken') })
 );
+
+export const needsReconnect = internalQuery({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.boolean(),
+	handler: async (ctx, { connectionId }) =>
+		(await ctx.db.get('bankConnections', connectionId))?.status === 'needsAttention'
+});
 
 export const syncNow = action({
 	args: { connectionId: v.id('bankConnections') },
@@ -105,6 +181,7 @@ export const sync = internalAction({
 	args: { connectionId: v.id('bankConnections') },
 	returns: v.null(),
 	handler: async (ctx, { connectionId }) => {
+		if (!bankSyncService().available) return null;
 		await Effect.runPromise(
 			syncConnection(connectionId, { refresh: false }).pipe(
 				Effect.ignore,
@@ -299,6 +376,42 @@ export const reconnect = action({
 	}
 });
 
+export const remove = action({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.null(),
+	handler: async (ctx, { connectionId }) => {
+		await requireOwner(ctx);
+		if (bankSyncService().available) {
+			await runEffect(removeItem(connectionId).pipe(Effect.provide(liveLayer(ctx))), () => ({
+				code: 'BANK_UNAVAILABLE',
+				message: "Couldn't reach the bank to remove this connection; try again later."
+			}));
+		}
+		await ctx.runMutation(internal.bankConnections.forget, { connectionId });
+		return null;
+	}
+});
+
+export const forget = internalMutation({
+	args: { connectionId: v.id('bankConnections') },
+	returns: v.null(),
+	handler: async (ctx, { connectionId }) => {
+		const bankAccounts = await ctx.db
+			.query('connectionAccounts')
+			.withIndex('by_connection_externalId', (q) => q.eq('connectionId', connectionId))
+			.take(MAX_FED_ACCOUNTS);
+		if ((await ctx.db.get('bankConnections', connectionId)) !== null) {
+			await ctx.db.delete('bankConnections', connectionId);
+		}
+		for (const bankAccount of bankAccounts) {
+			await ctx.scheduler.runAfter(0, internal.heldAccounts.forget, {
+				connectionAccountId: bankAccount._id
+			});
+		}
+		return null;
+	}
+});
+
 export const syncAfterReconnect = action({
 	args: { connectionId: v.id('bankConnections') },
 	returns: ownerSyncResult,
@@ -317,6 +430,11 @@ async function ownerSync(
 		discover = false
 	}: { refresh: boolean; resume?: boolean; discover?: boolean }
 ): Promise<Infer<typeof ownerSyncResult>> {
+	if (!bankSyncService().available) {
+		const paused = await ctx.runQuery(internal.bankConnections.needsReconnect, { connectionId });
+		const refusal = paused ? needsLogin : syncUnavailable;
+		throw publicError(refusal.code, refusal.message);
+	}
 	const outcome = await runEffect(
 		syncConnection(connectionId, { refresh, resume, discover }).pipe(
 			Effect.provide(liveLayer(ctx))
@@ -328,6 +446,66 @@ async function ownerSync(
 	if (outcome.kind !== 'synced') return outcome;
 	return { kind: 'synced', added: outcome.added, matched: outcome.matched };
 }
+
+export const service = query({
+	args: {},
+	returns: v.object({
+		available: v.boolean(),
+		environment: v.union(v.literal('sandbox'), v.literal('production'))
+	}),
+	handler: async (ctx) => {
+		await requireOwner(ctx);
+		return bankSyncService();
+	}
+});
+
+export const connect = action({
+	args: {},
+	returns: v.object({ linkToken: v.string() }),
+	handler: async (ctx) => {
+		await requireOwner(ctx);
+		requireBankSync();
+		const { cutoverDate } = await ctx.runQuery(api.settings.get, {});
+		if (cutoverDate === null) throw publicError('INVALID_INPUT', 'Set the cutover date first.');
+		if (await ctx.runQuery(internal.bankConnections.atLimit, {}))
+			throw publicError('INVALID_INPUT', CONNECTION_LIMIT_REACHED);
+		const linkToken = await runEffect(
+			PlaidClient.use((plaid) =>
+				plaid.linkTokenCreate({
+					mode: 'create',
+					webhook: plaidWebhookUrl(),
+					clientUserId: OWNER_CLIENT_USER_ID
+				})
+			).pipe(Effect.provide(livePlaid())),
+			toPublicError
+		);
+		return { linkToken };
+	}
+});
+
+function institutionNameOrBank(institutionName: string | undefined) {
+	const name = institutionName?.trim() ?? '';
+	return name === '' ? 'Bank' : name;
+}
+
+export const finishConnect = action({
+	args: { publicToken: v.string(), institutionName: v.optional(v.string()) },
+	returns: v.id('bankConnections'),
+	handler: async (ctx, { publicToken, institutionName }) => {
+		await requireOwner(ctx);
+		requireBankSync();
+		const connectionId = await runEffect(
+			connectItem({
+				name: institutionNameOrBank(institutionName),
+				publicToken,
+				webhook: plaidWebhookUrl()
+			}).pipe(Effect.provide(liveLayer(ctx))),
+			toPublicError
+		);
+		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
+		return connectionId;
+	}
+});
 
 export const setup = internalAction({
 	args: {
@@ -342,7 +520,7 @@ export const setup = internalAction({
 			setupConnection({
 				...input,
 				accessToken,
-				webhook: `${env.CONVEX_SITE_URL}/plaid/webhook`
+				webhook: plaidWebhookUrl()
 			}).pipe(Effect.provide(liveLayer(ctx))),
 			toPublicError
 		);
@@ -351,11 +529,39 @@ export const setup = internalAction({
 	}
 });
 
+function plaidWebhookUrl() {
+	return `${env.CONVEX_SITE_URL}/plaid/webhook`;
+}
+
+function bankSyncService() {
+	return {
+		available:
+			env.PLAID_CLIENT_ID !== undefined &&
+			env.PLAID_SECRET !== undefined &&
+			env.BUDGE_TOKEN_KEY !== undefined,
+		environment: plaidEnvironment()
+	};
+}
+
+function plaidEnvironment() {
+	return env.BUDGE_PRODUCTION === undefined ? ('sandbox' as const) : ('production' as const);
+}
+
+const syncUnavailable = {
+	code: 'BANK_SYNC_UNAVAILABLE',
+	message: "Bank sync isn't set up on this server."
+} as const satisfies PublicError;
+
+function requireBankSync() {
+	if (!bankSyncService().available)
+		throw publicError(syncUnavailable.code, syncUnavailable.message);
+}
+
 function livePlaid() {
 	return PlaidClient.layerLive({
 		clientId: env.PLAID_CLIENT_ID,
 		secret: env.PLAID_SECRET,
-		environment: env.BUDGE_PRODUCTION === undefined ? 'sandbox' : 'production'
+		environment: plaidEnvironment()
 	});
 }
 
@@ -383,11 +589,12 @@ export function liveLayer(ctx: ActionCtx) {
 
 const needsLogin = {
 	code: 'BANK_CONNECTION_NEEDS_LOGIN',
-	message: 'The bank needs you to reconnect.'
+	message: 'Reconnect this bank first.'
 } as const satisfies PublicError;
 
 export function toPublicError(error: SyncError): PublicError {
 	if (failureOf(error).status === 'needsAttention') return needsLogin;
+	if (!bankSyncService().available) return syncUnavailable;
 	return { code: 'BANK_UNAVAILABLE', message: "Couldn't reach the bank; try again later." };
 }
 
@@ -749,13 +956,8 @@ export const save = internalMutation({
 				provider: { ...existing.provider, encryptedToken }
 			});
 		} else {
-			const held = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
-			if (held.length >= MAX_BANK_CONNECTIONS) {
-				throw publicError(
-					'INVALID_INPUT',
-					`Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections.`
-				);
-			}
+			if (await atConnectionLimit(ctx))
+				throw publicError('INVALID_INPUT', CONNECTION_LIMIT_REACHED);
 			connectionId = await ctx.db.insert('bankConnections', {
 				name,
 				status: 'ok',

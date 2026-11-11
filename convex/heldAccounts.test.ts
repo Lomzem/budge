@@ -7,7 +7,13 @@ import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { PlaidApi, PlaidClient } from './lib/plaidClient';
 import { HELD_BATCH } from './heldAccounts';
-import { setupConnection, suggestStartingBalance, SyncStore, syncConnection } from './lib/sync';
+import {
+	removeItem,
+	setupConnection,
+	suggestStartingBalance,
+	SyncStore,
+	syncConnection
+} from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
 import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
 
@@ -36,8 +42,8 @@ function rowsFor(externalId: string, idPrefix = externalId): SyncPage {
 }
 
 const bankAccounts: BankAccount[] = [
-	{ externalId: checkingId, name: 'Sample Checking', mask: '0042', balance: 120_000 },
-	{ externalId: savingsId, name: 'Sample Savings', mask: '4321', balance: 300_000 }
+	{ externalId: checkingId, name: 'Sample Checking', mask: '0042', kind: 'cash', balance: 120_000 },
+	{ externalId: savingsId, name: 'Sample Savings', mask: '4321', kind: 'cash', balance: 300_000 }
 ];
 
 function gate() {
@@ -161,12 +167,13 @@ async function connectedBudget() {
 
 describe('a bank Account Budge does not know', () => {
 	test('is held with its rows, named from Plaid, and imports nothing', async () => {
-		const { sync, held, transactions } = await connectedBudget();
+		const { connectionId, sync, held, transactions } = await connectedBudget();
 
 		expect(await sync(rowsFor(savingsId))).toMatchObject({ kind: 'synced', added: 0, held: 2 });
 
 		expect(await held()).toEqual([
 			expect.objectContaining({
+				connectionId,
 				connectionName: 'Sample Bank',
 				name: 'Sample Savings',
 				mask: '4321',
@@ -233,7 +240,7 @@ describe('a bank Account Budge does not know', () => {
 			accountsGet: () =>
 				Effect.succeed([
 					...bankAccounts,
-					{ externalId: cardId, name: 'Sample Card', mask: '7310', balance: -89_990 }
+					{ externalId: cardId, name: 'Sample Card', mask: '7310', kind: 'cash', balance: -89_990 }
 				])
 		});
 
@@ -505,6 +512,105 @@ describe('a bank Account Budge does not know', () => {
 	});
 });
 
+describe('a bank Account the owner stops syncing', () => {
+	test('keeps its Transactions, imports nothing later, and once brought back waits for setup with its type', async () => {
+		const { owner, sync, held, transactions, checking, connectionId } = await connectedBudget();
+		await sync(rowsFor(checkingId));
+		const imported = await transactions(checking);
+		expect(imported.length).toBeGreaterThan(0);
+		const [connection] = await owner.query(api.bankConnections.list, { now: Date.now() });
+		const feed = connection?.feeds[0];
+		assert(feed !== undefined, 'Checking is fed by the connection');
+
+		await owner.mutation(api.heldAccounts.stopSyncing, {
+			connectionAccountId: feed.connectionAccountId
+		});
+		expect(await sync(rowsFor(checkingId, 'later'))).toMatchObject({ added: 0, held: 0 });
+		expect(await transactions(checking)).toEqual(imported);
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toMatchObject([
+			{ _id: connectionId, feeds: [], ignored: [{ connectionAccountId: feed.connectionAccountId }] }
+		]);
+
+		await owner.mutation(api.heldAccounts.restore, {
+			connectionAccountId: feed.connectionAccountId
+		});
+		expect(await sync(rowsFor(checkingId, 'after'))).toMatchObject({ added: 0, held: 2 });
+		expect(
+			(await held()).find((account) => account._id === feed.connectionAccountId)
+		).toMatchObject({
+			kind: 'cash',
+			rows: 2
+		});
+		expect(
+			await publicErrorCode(
+				owner.mutation(api.heldAccounts.stopSyncing, {
+					connectionAccountId: feed.connectionAccountId
+				})
+			)
+		).toBe('INVALID_INPUT');
+	});
+});
+
+describe('a removed Bank Connection', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	test('leaves its Transactions and drops its bank Accounts and held rows', async () => {
+		const { owner, t, sync, held, transactions, checking, connectionId } = await connectedBudget();
+		await sync(rowsFor(checkingId));
+		await sync(rowsFor(savingsId));
+		const imported = await transactions(checking);
+		expect(await held()).toHaveLength(1);
+		vi.useFakeTimers();
+
+		await owner.action(api.bankConnections.remove, { connectionId });
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toEqual([]);
+		expect(await held()).toEqual([]);
+		expect(await transactions(checking)).toEqual(imported);
+		expect(
+			await t.run(async (ctx) => ({
+				bankAccounts: (await ctx.db.query('connectionAccounts').collect()).length,
+				heldRows: (
+					await ctx.db
+						.query('imports')
+						.withIndex('by_state_transactionId', (q) => q.eq('state', 'held'))
+						.collect()
+				).length
+			}))
+		).toEqual({ bankAccounts: 0, heldRows: 0 });
+	});
+
+	test('accepts ITEM_NOT_FOUND when removing the remote Item', async () => {
+		const { t, connectionId } = await connectedBudget();
+		const removed: string[] = [];
+		await t.action(async (ctx) => {
+			const exit = await Effect.runPromiseExit(
+				removeItem(connectionId).pipe(
+					Effect.provide(
+						Layer.mergeAll(
+							PlaidClient.layerTest({
+								itemRemove: (token) => {
+									removed.push(token);
+									return Effect.fail(
+										new PlaidApi({ error_code: 'ITEM_NOT_FOUND', request_id: '', status: 400 })
+									);
+								}
+							}),
+							TokenCipher.layer(tokenKey),
+							SyncStore.layer(ctx)
+						)
+					)
+				)
+			);
+			assert(Exit.isSuccess(exit), 'removing an item Plaid already forgot succeeds');
+		});
+		expect(removed).toEqual([accessToken]);
+	});
+});
+
 describe('the bank changes a row it holds for an unknown Account', () => {
 	const grocerId = `${savingsId}-txn-synthetic-1`;
 	const changes = (part: Partial<SyncPage>): SyncPage => ({ ...page, added: [], ...part });
@@ -578,7 +684,7 @@ describe('the bank changes a row it holds for an unknown Account', () => {
 
 describe('a suggested starting balance', () => {
 	const checkingReporting = (balance: number | null): BankAccount[] => [
-		{ externalId: checkingId, name: 'Sample Checking', mask: '0042', balance }
+		{ externalId: checkingId, name: 'Sample Checking', mask: '0042', kind: 'cash', balance }
 	];
 
 	test("is the bank's balance, even zero, and is withheld when the bank has no balance or no such Account", async () => {
@@ -619,7 +725,7 @@ describe('a suggested starting balance', () => {
 	});
 
 	const movedReporting = (balance: number): BankAccount[] => [
-		{ externalId: movedCheckingId, name: 'Sample Checking', mask: '0042', balance }
+		{ externalId: movedCheckingId, name: 'Sample Checking', mask: '0042', kind: 'cash', balance }
 	];
 
 	test('after the Account is mapped to a newer bank Account, comes from the newer one', async () => {

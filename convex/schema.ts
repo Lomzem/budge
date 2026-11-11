@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
+import { accountKind } from './lib/accountKind';
 import { webhookKeyValidator } from './lib/plaidWebhook';
 import { targetValidator } from './lib/targets';
 
@@ -11,7 +12,7 @@ export default defineSchema({
 
 	accounts: defineTable({
 		name: v.string(),
-		kind: v.union(v.literal('cash'), v.literal('creditCard')),
+		kind: accountKind,
 		position: v.number(),
 
 		lastReconciledOn: v.optional(v.string())
@@ -124,6 +125,7 @@ export default defineSchema({
 	})
 		.index('by_account_source_sourceId_date', ['accountId', 'source', 'sourceId', 'date'])
 		.index('by_transactionId_state', ['transactionId', 'state'])
+		.index('by_state_transactionId', ['state', 'transactionId'])
 		.index('by_connectionAccountId_state', ['connectionAccountId', 'state'])
 		.index('by_connectionAccountId_sourceId', ['connectionAccountId', 'sourceId']),
 
@@ -184,6 +186,8 @@ export default defineSchema({
 				externalId: v.string(),
 				name: v.optional(v.string()),
 				mask: v.optional(v.string()),
+
+				kind: v.optional(accountKind),
 				state: v.union(v.literal('held'), v.literal('ignored'))
 			})
 		)

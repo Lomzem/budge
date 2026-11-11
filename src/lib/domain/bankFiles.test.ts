@@ -137,7 +137,16 @@ describe('decoding a bank file', () => {
 	);
 
 	it.effect.each([
-		['an unknown layout', 'Date,Thing\n08/14/2026,1\n', 'not a Capital One or Discover'],
+		[
+			'an unknown layout, naming the columns it found',
+			'Date,Thing\n08/14/2026,1\n',
+			'not a Capital One or Discover CSV, or a QFX file. Its columns are “Date”, “Thing”.'
+		],
+		[
+			'an unknown layout with many columns, naming six and counting the rest',
+			'A,B,C,D,E,F,G,H\n1,2,3,4,5,6,7,8\n',
+			'Its columns are “A”, “B”, “C”, “D”, “E”, “F” and 2 more. Download'
+		],
 		[
 			'a date that does not exist',
 			'Trans. Date,Post Date,Description,Amount,Category\n02/30/2026,03/01/2026,SAMPLE,1.00,X\n',
@@ -148,7 +157,11 @@ describe('decoding a bank file', () => {
 			'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/14/2026,SAMPLE,1.005,X\n',
 			'Row 2'
 		],
-		['an empty file', '', 'not a Capital One or Discover'],
+		[
+			'an empty file',
+			'',
+			'not a Capital One or Discover CSV, or a QFX file. It has no column names.'
+		],
 		[
 			'a quote that never closes',
 			'Trans. Date,Post Date,Description,Amount,Category\n08/14/2026,08/15/2026,SAMPLE TACO STAND,18.25,"Restaurants\n08/18/2026,08/18/2026,SAMPLE PAYMENT,-200.00,Payments\n',

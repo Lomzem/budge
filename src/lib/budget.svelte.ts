@@ -24,6 +24,8 @@ export class BudgetMonth {
 		return data?.month === this.month ? data : undefined;
 	});
 
+	readonly shown: BudgetView | undefined = $derived.by(() => this.#query.data);
+	readonly stale = $derived.by(() => this.view === undefined && this.shown !== undefined);
 	readonly readyToAssign = $derived.by(() => this.#query.data?.readyToAssign);
 	readonly error = $derived.by(() => this.#query.error);
 
@@ -56,6 +58,12 @@ export class BudgetMonth {
 
 	next() {
 		this.month = addMonths(this.month, 1);
+	}
+
+	readonly onThisMonth = $derived.by(() => this.month === monthOf(this.today));
+
+	thisMonth() {
+		this.month = monthOf(this.today);
 	}
 
 	refreshToday() {

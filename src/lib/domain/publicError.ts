@@ -5,7 +5,8 @@ export const PublicErrorCode = Schema.Literals([
 	'NOT_FOUND',
 	'INVALID_INPUT',
 	'BANK_CONNECTION_NEEDS_LOGIN',
-	'BANK_UNAVAILABLE'
+	'BANK_UNAVAILABLE',
+	'BANK_SYNC_UNAVAILABLE'
 ]);
 export type PublicErrorCode = typeof PublicErrorCode.Type;
 

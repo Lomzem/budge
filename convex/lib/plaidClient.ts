@@ -52,17 +52,23 @@ interface PlaidClientShape {
 
 	readonly setWebhook: (accessToken: string, webhook: string) => Effect.Effect<void, PlaidError>;
 	readonly webhookVerificationKey: (keyId: string) => Effect.Effect<WebhookKey, PlaidError>;
-	readonly linkTokenCreate: (request: UpdateLinkRequest) => Effect.Effect<string, PlaidError>;
+	readonly linkTokenCreate: (request: LinkRequest) => Effect.Effect<string, PlaidError>;
+	readonly publicTokenExchange: (publicToken: string) => Effect.Effect<LinkedItem, PlaidError>;
 	readonly itemGet: (accessToken: string) => Effect.Effect<ItemState, PlaidError>;
+	readonly itemRemove: (accessToken: string) => Effect.Effect<void, PlaidError>;
 	readonly accountsGet: (
 		accessToken: string,
 		accountIds?: readonly string[]
 	) => Effect.Effect<BankAccount[], PlaidError>;
 }
 
-export interface UpdateLinkRequest {
+export type LinkRequest = { clientUserId: string } & (
+	{ mode: 'update'; accessToken: string } | { mode: 'create'; webhook: string }
+);
+
+export interface LinkedItem {
 	accessToken: string;
-	clientUserId: string;
+	itemId: string;
 }
 
 export interface ItemState {
@@ -92,8 +98,9 @@ interface CallLimits {
 	attempts: number;
 	attemptTimeout: Duration.Input;
 }
-const EVERY_CALL: CallLimits = { attempts: ATTEMPTS, attemptTimeout: ATTEMPT_TIMEOUT };
+const SAFE_TO_REPEAT: CallLimits = { attempts: ATTEMPTS, attemptTimeout: ATTEMPT_TIMEOUT };
 const WITHIN_PLAIDS_WEBHOOK_DEADLINE: CallLimits = { attempts: 1, attemptTimeout: '5 seconds' };
+const EXACTLY_ONCE: CallLimits = { attempts: 1, attemptTimeout: ATTEMPT_TIMEOUT };
 const BACKOFF = Schedule.exponential('2 seconds');
 
 export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>()(
@@ -119,7 +126,9 @@ export class PlaidClient extends Context.Service<PlaidClient, PlaidClientShape>(
 			setWebhook: fake.setWebhook ?? unexpected('setWebhook'),
 			webhookVerificationKey: fake.webhookVerificationKey ?? unexpected('webhookVerificationKey'),
 			linkTokenCreate: fake.linkTokenCreate ?? unexpected('linkTokenCreate'),
+			publicTokenExchange: fake.publicTokenExchange ?? unexpected('publicTokenExchange'),
 			itemGet: fake.itemGet ?? unexpected('itemGet'),
+			itemRemove: fake.itemRemove ?? unexpected('itemRemove'),
 			accountsGet: fake.accountsGet ?? unexpected('accountsGet')
 		});
 	}
@@ -138,6 +147,8 @@ const WebhookKeyBody = Schema.Struct({
 const PlaidErrorBody = Schema.Struct({ error_code: Schema.String, request_id: Schema.String });
 
 const LinkTokenBody = Schema.Struct({ link_token: Schema.String });
+
+const ExchangeBody = Schema.Struct({ access_token: Schema.String, item_id: Schema.String });
 
 const ItemGetBody = Schema.Struct({
 	item: Schema.Struct({ consent_expiration_time: Schema.NullOr(Schema.String) })
@@ -163,7 +174,7 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 		path: string,
 		body: Record<string, unknown>,
 		decode: (body: unknown) => Effect.Effect<A, unknown>,
-		limits: CallLimits = EVERY_CALL
+		limits: CallLimits
 	): Effect.Effect<A, PlaidError> => {
 		const { clientId, secret } = config;
 		if (clientId === undefined || secret === undefined) {
@@ -218,12 +229,18 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 					count,
 					options: { include_original_description: true }
 				},
-				decodeSyncPage
+				decodeSyncPage,
+				SAFE_TO_REPEAT
 			),
 		transactionsRefresh: (accessToken) =>
-			post('/transactions/refresh', { access_token: accessToken }, ignoreBody),
+			post('/transactions/refresh', { access_token: accessToken }, ignoreBody, SAFE_TO_REPEAT),
 		setWebhook: (accessToken, webhook) =>
-			post('/item/webhook/update', { access_token: accessToken, webhook }, ignoreBody),
+			post(
+				'/item/webhook/update',
+				{ access_token: accessToken, webhook },
+				ignoreBody,
+				SAFE_TO_REPEAT
+			),
 		webhookVerificationKey: (keyId) =>
 			post(
 				'/webhook_verification_key/get',
@@ -240,20 +257,36 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 					),
 				WITHIN_PLAIDS_WEBHOOK_DEADLINE
 			),
-		linkTokenCreate: ({ accessToken, clientUserId }) =>
+		linkTokenCreate: (request) =>
 			post(
 				'/link/token/create',
 				{
-					access_token: accessToken,
 					client_name: 'Budge',
 					language: 'en',
 					country_codes: ['US'],
-					user: { client_user_id: clientUserId }
+					user: { client_user_id: request.clientUserId },
+					...(request.mode === 'update'
+						? { access_token: request.accessToken }
+						: { products: ['transactions'], webhook: request.webhook })
 				},
 				(body) =>
-					Schema.decodeUnknownEffect(LinkTokenBody)(body).pipe(Effect.map((b) => b.link_token))
+					Schema.decodeUnknownEffect(LinkTokenBody)(body).pipe(Effect.map((b) => b.link_token)),
+				SAFE_TO_REPEAT
 			),
-		itemGet: (accessToken) => post('/item/get', { access_token: accessToken }, decodeItem),
+		publicTokenExchange: (publicToken) =>
+			post(
+				'/item/public_token/exchange',
+				{ public_token: publicToken },
+				(body) =>
+					Schema.decodeUnknownEffect(ExchangeBody)(body).pipe(
+						Effect.map((b) => ({ accessToken: b.access_token, itemId: b.item_id }))
+					),
+				EXACTLY_ONCE
+			),
+		itemGet: (accessToken) =>
+			post('/item/get', { access_token: accessToken }, decodeItem, SAFE_TO_REPEAT),
+		itemRemove: (accessToken) =>
+			post('/item/remove', { access_token: accessToken }, ignoreBody, SAFE_TO_REPEAT),
 		accountsGet: (accessToken, accountIds) =>
 			post(
 				'/accounts/get',
@@ -261,7 +294,8 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 					access_token: accessToken,
 					...(accountIds === undefined ? {} : { options: { account_ids: accountIds } })
 				},
-				decodeAccounts
+				decodeAccounts,
+				SAFE_TO_REPEAT
 			)
 	};
 }

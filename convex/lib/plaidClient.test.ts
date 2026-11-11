@@ -126,6 +126,18 @@ describe('PlaidClient', () => {
 		}).pipe(Effect.provide(plaid.layer));
 	});
 
+	it.effect('removes the Item with its access token', () => {
+		const plaid = fakePlaid(() =>
+			Promise.resolve(json(200, { request_id: 'request-synthetic-1' }))
+		);
+		return Effect.gen(function* () {
+			yield* PlaidClient.use((client) => client.itemRemove(accessToken));
+			expect(plaid.sent.map(({ url, body }) => ({ url, body }))).toEqual([
+				{ url: 'https://sandbox.plaid.com/item/remove', body: { access_token: accessToken } }
+			]);
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
 	it.effect('asks for an update-mode Link token with the access token and no products', () => {
 		const plaid = fakePlaid(() =>
 			Promise.resolve(
@@ -138,7 +150,11 @@ describe('PlaidClient', () => {
 		);
 		return Effect.gen(function* () {
 			const token = yield* PlaidClient.use((client) =>
-				client.linkTokenCreate({ accessToken, clientUserId: 'connection-synthetic-1' })
+				client.linkTokenCreate({
+					mode: 'update',
+					accessToken,
+					clientUserId: 'connection-synthetic-1'
+				})
 			);
 
 			expect(token).toBe('link-token-synthetic-1');
@@ -150,6 +166,73 @@ describe('PlaidClient', () => {
 				country_codes: ['US'],
 				user: { client_user_id: 'connection-synthetic-1' }
 			});
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
+	it.effect(
+		"asks for a create-mode Link token for transactions, with Budge's webhook and no Item",
+		() => {
+			const plaid = fakePlaid(() =>
+				Promise.resolve(
+					json(200, { link_token: 'link-token-synthetic-2', request_id: 'request-synthetic-2' })
+				)
+			);
+			return Effect.gen(function* () {
+				const token = yield* PlaidClient.use((client) =>
+					client.linkTokenCreate({
+						mode: 'create',
+						webhook: 'https://budge.example.test/plaid/webhook',
+						clientUserId: 'budge-owner'
+					})
+				);
+
+				expect(token).toBe('link-token-synthetic-2');
+				expect(plaid.sent[0]?.body).toEqual({
+					client_name: 'Budge',
+					language: 'en',
+					country_codes: ['US'],
+					user: { client_user_id: 'budge-owner' },
+					products: ['transactions'],
+					webhook: 'https://budge.example.test/plaid/webhook'
+				});
+			}).pipe(Effect.provide(plaid.layer));
+		}
+	);
+
+	it.effect("exchanges a public token for the Item's access token and id", () => {
+		const plaid = fakePlaid(() =>
+			Promise.resolve(
+				json(200, {
+					access_token: accessToken,
+					item_id: 'item-synthetic-9',
+					request_id: 'request-synthetic-3'
+				})
+			)
+		);
+		return Effect.gen(function* () {
+			const item = yield* PlaidClient.use((client) =>
+				client.publicTokenExchange('public-token-synthetic-1')
+			);
+
+			expect(item).toEqual({ accessToken, itemId: 'item-synthetic-9' });
+			expect(plaid.sent[0]?.url).toBe('https://sandbox.plaid.com/item/public_token/exchange');
+			expect(plaid.sent[0]?.body).toEqual({ public_token: 'public-token-synthetic-1' });
+		}).pipe(Effect.provide(plaid.layer));
+	});
+
+	it.effect('never retries a public token exchange, which Plaid honors only once', () => {
+		const plaid = fakePlaid(() => Promise.resolve(plaidError(500, 'INTERNAL_SERVER_ERROR')));
+		return Effect.gen(function* () {
+			const fiber = yield* Effect.forkChild(
+				Effect.flip(
+					PlaidClient.use((client) => client.publicTokenExchange('public-token-synthetic-1'))
+				)
+			);
+			yield* TestClock.adjust('1 minute');
+			const error = yield* Fiber.join(fiber);
+
+			expect(error._tag).toBe('PlaidApi');
+			expect(plaid.sent).toHaveLength(1);
 		}).pipe(Effect.provide(plaid.layer));
 	});
 
@@ -328,7 +411,13 @@ describe('PlaidClient', () => {
 			const accounts = yield* client.accountsGet(accessToken, ['account-synthetic-card']);
 
 			expect(accounts).toEqual([
-				{ externalId: 'account-synthetic-card', name: 'Sample Card', mask: '7310', balance: -1_250 }
+				{
+					externalId: 'account-synthetic-card',
+					name: 'Sample Card',
+					mask: '7310',
+					kind: 'creditCard',
+					balance: -1_250
+				}
 			]);
 			expect(plaid.sent.map(({ url, body }) => [url, body])).toEqual([
 				['https://sandbox.plaid.com/accounts/get', { access_token: accessToken }],

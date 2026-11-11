@@ -5,6 +5,7 @@ import type { Id } from '$convex/_generated/dataModel';
 import { SPLIT_LINE_LIMIT } from './domain/splits';
 import {
 	addLine,
+	fillRemainder,
 	choose,
 	chooseLink,
 	type AccountChoice,
@@ -194,13 +195,14 @@ describe('splitting across Categories', () => {
 	const typed = newDraft({ payee: 'Corner Market', amount: '12.50' });
 	const split = optionOf({ kind: 'split' });
 
-	test('starts with the whole amount on a line in the Category it had', () => {
-		const lines = choose(typed, split, remembering).lines;
+	test('starts with the Category it had and no amounts, so the whole amount is left to split', () => {
+		const draft = choose(typed, split, remembering);
 
-		expect(lines.map(({ categoryId, amount }) => ({ categoryId, amount }))).toEqual([
-			{ categoryId: groceries, amount: '12.50' },
+		expect(draft.lines.map(({ categoryId, amount }) => ({ categoryId, amount }))).toEqual([
+			{ categoryId: groceries, amount: '' },
 			{ categoryId: '', amount: '' }
 		]);
+		expect(view(draft, remembering, noCandidates).remainder).toBe(1250);
 	});
 
 	test.each([
@@ -222,6 +224,22 @@ describe('splitting across Categories', () => {
 				categoryId: index === 0 ? groceries : rent,
 				amount: amounts[index] ?? ''
 			}))
+		};
+	}
+
+	function emptySecondLine() {
+		const draft = filled('outflow', ['12.50', '']);
+		return {
+			...draft,
+			lines: draft.lines.map((line, index) => (index === 1 ? { ...line, categoryId: '' } : line))
+		};
+	}
+
+	function uncategorizedSecondLine() {
+		const draft = filled('outflow', ['10.00', '2.50']);
+		return {
+			...draft,
+			lines: draft.lines.map((line, index) => (index === 1 ? { ...line, categoryId: '' } : line))
 		};
 	}
 
@@ -251,38 +269,105 @@ describe('splitting across Categories', () => {
 
 	test.each([
 		{
+			problem: 'one of two lines is left empty',
+			draft: emptySecondLine(),
+			message: 'Line 2 is empty. Pick its Category and amount.',
+			blamed: { line: 2, part: 'lineCategory' }
+		},
+		{
+			problem: 'a line that can be removed is left empty',
+			draft: addLine(filled('outflow', ['10.00', '2.50'])),
+			message: 'Line 3 is empty. Fill it in, or remove the line.',
+			blamed: { line: 3, part: 'lineCategory' }
+		},
+		{
 			problem: 'a line has no Category',
-			draft: choose(typed, split, remembering),
-			message: 'Pick a Category for each line.'
+			draft: uncategorizedSecondLine(),
+			message: 'Pick a Category for line 2.',
+			blamed: { line: 2, part: 'lineCategory' }
 		},
 		{
 			problem: 'a line amount is not money',
 			draft: filled('outflow', ['12.50', 'lots']),
-			message: "Enter each line's amount, such as 12.50."
+			message: "Enter line 2's amount, such as 12.50.",
+			blamed: { line: 2, part: 'lineAmount' }
+		},
+		{
+			problem: 'a line has no amount',
+			draft: filled('outflow', ['12.50', '']),
+			message: "Enter line 2's amount.",
+			blamed: { line: 2, part: 'lineAmount' }
 		},
 		{
 			problem: 'the lines fall short of the amount',
 			draft: filled('outflow', ['10.00', '1.00']),
-			message: 'The lines must add up to the amount.'
+			message: '$1.50 is still left to split.',
+			blamed: { line: 2, part: 'lineAmount' }
+		},
+		{
+			problem: 'the lines go over the amount',
+			draft: filled('outflow', ['10.00', '3.00']),
+			message: 'The lines are $0.50 over the amount.',
+			blamed: { line: 2, part: 'lineAmount' }
 		}
-	])('refuses to save when $problem', ({ draft, message }) => {
-		expect(payloadOf(draft, remembering)).toEqual({ kind: 'invalid', message });
+	] satisfies {
+		problem: string;
+		draft: Draft;
+		message: string;
+		blamed: { line: number; part: 'lineCategory' | 'lineAmount' };
+	}[])('refuses to save when $problem, pointing at the line', ({ draft, message, blamed }) => {
+		const line = draft.lines[blamed.line - 1];
+
+		expect(payloadOf(draft, remembering)).toEqual({
+			kind: 'invalid',
+			message,
+			field: { kind: blamed.part, key: line?.key }
+		});
 	});
 
 	test.each([
-		{ amounts: ['12.50', ''], remainder: 0, blankLine: true },
-		{ amounts: ['10.00', '1.00'], remainder: 150, blankLine: false },
-		{ amounts: ['10.00', '5.00'], remainder: -250, blankLine: false },
-		{ amounts: ['10.00', 'lots'], remainder: undefined, blankLine: false }
-	] satisfies { amounts: [string, string]; remainder: number | undefined; blankLine: boolean }[])(
-		'lines of $amounts leave $remainder cents',
-		({ amounts, remainder, blankLine }) => {
-			const shown = view(filled('outflow', amounts), remembering, noCandidates);
-
-			expect({ remainder: shown.remainder, blankLine: shown.blankLine }).toEqual({
-				remainder,
-				blankLine
+		{ blank: 'second', amounts: ['10.00', ''], signed: [-1000, -250] },
+		{ blank: 'first', amounts: ['', '2.50'], signed: [-1000, -250] }
+	] satisfies { blank: string; amounts: [string, string]; signed: [number, number] }[])(
+		'saves the $blank line left blank as what is still left to split',
+		({ amounts, signed }) => {
+			expect(payloadOf(filled('outflow', amounts), remembering)).toMatchObject({
+				kind: 'ready',
+				fields: {
+					splits: [
+						{ categoryId: groceries, amount: signed[0] },
+						{ categoryId: rent, amount: signed[1] }
+					]
+				}
 			});
+		}
+	);
+
+	test.each([
+		{ amounts: ['12.50', ''], remainder: 0 },
+		{ amounts: ['10.00', '1.00'], remainder: 150 },
+		{ amounts: ['10.00', '5.00'], remainder: -250 },
+		{ amounts: ['10.00', 'lots'], remainder: undefined }
+	] satisfies { amounts: [string, string]; remainder: number | undefined }[])(
+		'lines of $amounts leave $remainder cents',
+		({ amounts, remainder }) => {
+			expect(view(filled('outflow', amounts), remembering, noCandidates).remainder).toBe(remainder);
+		}
+	);
+
+	test.each([
+		{ amounts: ['10.00', ''], line: 1, filled: ['10.00', '2.50'] },
+		{ amounts: ['', ''], line: 0, filled: ['12.50', ''] },
+		{ amounts: ['10.00', '1.00'], line: 1, filled: ['10.00', '1.00'] },
+		{ amounts: ['15.00', ''], line: 1, filled: ['15.00', ''] },
+		{ amounts: ['lots', ''], line: 1, filled: ['lots', ''] }
+	] satisfies { amounts: [string, string]; line: number; filled: [string, string] }[])(
+		'filling line $line of $amounts gives $filled',
+		({ amounts, line, filled: expected }) => {
+			const draft = filled('outflow', amounts);
+			const key = draft.lines[line]?.key ?? -1;
+
+			expect(fillRemainder(draft, key).lines.map((each) => each.amount)).toEqual(expected);
 		}
 	);
 
@@ -394,7 +479,8 @@ describe('transferring between Accounts', () => {
 
 		expect(payloadOf(movedToTheSameAccount, worldWith())).toEqual({
 			kind: 'invalid',
-			message: 'Pick another Account to transfer with.'
+			message: 'Pick another Account to transfer with.',
+			field: { kind: 'category' }
 		});
 	});
 
@@ -443,16 +529,23 @@ describe('transferring between Accounts', () => {
 
 describe('the Transaction around the Category', () => {
 	test.each([
-		{ problem: 'no Account', changes: { accountId: '' }, message: 'Pick an Account.' },
+		{
+			problem: 'no Account',
+			changes: { accountId: '' },
+			message: 'Pick an Account.',
+			field: 'account'
+		},
 		{
 			problem: 'an amount that is not money',
 			changes: { amount: 'twelve' },
-			message: 'Enter the amount, such as 12.50.'
+			message: 'Enter the amount, such as 12.50.',
+			field: 'amount'
 		}
-	])('refuses to save with $problem', ({ changes, message }) => {
+	])('refuses to save with $problem', ({ changes, message, field }) => {
 		expect(payloadOf(newDraft({ amount: '12.50', ...changes }), worldWith())).toEqual({
 			kind: 'invalid',
-			message
+			message,
+			field: { kind: field }
 		});
 	});
 

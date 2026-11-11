@@ -5,6 +5,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { env, internalMutation, type MutationCtx } from './_generated/server';
 import { publicError } from './lib/publicError';
+import type { BankAccountKind } from '../src/lib/domain/plaid';
 import type { syncRemoval, syncRow } from './lib/sync';
 import { saveTransaction } from './lib/transactions';
 
@@ -19,15 +20,24 @@ const SAVINGS_BANK = {
 	itemId: 'sample-item-savings-bank'
 } as const;
 
+const COMMUNITY_BANK = {
+	name: 'Sample Community Bank',
+	itemId: 'sample-item-community-bank',
+	savings: 'cb-savings'
+} as const;
+
 const NOT_A_REAL_TOKEN = 'sample-token-that-never-decrypts';
 
 const HELD_ACCOUNTS = [
-	{ externalId: 'cu-savings', name: 'Sample Savings Plus', mask: '4417' },
-	{ externalId: 'cu-card', name: 'Sample Rewards Card', mask: '9021' },
-	{ externalId: 'cu-holiday', name: 'Sample Holiday Club', mask: '1180' }
+	{ externalId: 'cu-savings', name: 'Sample Savings Plus', mask: '4417', kind: 'cash' },
+	{ externalId: 'cu-card', name: 'Sample Rewards Card', mask: '9021', kind: 'creditCard' },
+	{ externalId: 'cu-holiday', name: 'Sample Holiday Club', mask: '1180', kind: 'cash' }
 ] as const;
 
 const DAYS_FROM_NOW_UNTIL_CONSENT_ENDS = 5;
+const DAYS_SINCE_SAVINGS_BANK_LAST_SYNCED = 1;
+const HOURS_SINCE_COMMUNITY_BANK_LAST_SYNCED = 3;
+const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
 type SyncRow = Infer<typeof syncRow>;
@@ -38,6 +48,7 @@ export const run = internalMutation({
 	returns: v.null(),
 	handler: async (ctx) => {
 		const checking = await requireSeededAccount(ctx, 'Checking');
+		const savings = await requireSeededAccount(ctx, 'Savings');
 		const today = localIsoDate(new Date(Date.now()));
 		const daysAgo = (days: number) => addDays(today, -days);
 
@@ -76,7 +87,12 @@ export const run = internalMutation({
 				heldRow('cu-holiday', 'holiday-deposit', 3, 40_00, 'SAMPLE CLUB DEPOSIT')
 			],
 			recordAccounts: [
-				{ externalId: CREDIT_UNION.checking, name: 'Sample Everyday Checking', mask: '2208' },
+				{
+					externalId: CREDIT_UNION.checking,
+					name: 'Sample Everyday Checking',
+					mask: '2208',
+					kind: 'cash'
+				},
 				...HELD_ACCOUNTS
 			]
 		});
@@ -114,9 +130,33 @@ export const run = internalMutation({
 			accounts: []
 		});
 		await sync(ctx, savingsBank, { discover: false });
+		await ctx.db.patch('bankConnections', savingsBank, {
+			lastSyncedAt: Date.now() - DAYS_SINCE_SAVINGS_BANK_LAST_SYNCED * DAY_MS
+		});
 		await ctx.runMutation(internal.bankConnections.flagItem, {
 			itemId: SAVINGS_BANK.itemId,
 			code: 'ITEM_LOGIN_REQUIRED'
+		});
+
+		const communityBank = await ctx.runMutation(internal.bankConnections.save, {
+			name: COMMUNITY_BANK.name,
+			itemId: COMMUNITY_BANK.itemId,
+			encryptedToken: NOT_A_REAL_TOKEN,
+			accounts: [{ externalId: COMMUNITY_BANK.savings, accountId: savings }]
+		});
+		await sync(ctx, communityBank, {
+			discover: true,
+			recordAccounts: [
+				{
+					externalId: COMMUNITY_BANK.savings,
+					name: 'Sample Statement Savings',
+					mask: '6604',
+					kind: 'cash'
+				}
+			]
+		});
+		await ctx.db.patch('bankConnections', communityBank, {
+			lastSyncedAt: Date.now() - HOURS_SINCE_COMMUNITY_BANK_LAST_SYNCED * HOUR_MS
 		});
 		return null;
 	}
@@ -140,7 +180,7 @@ async function sync(
 		rows?: SyncRow[];
 		modified?: SyncRow[];
 		removed?: SyncRemoval[];
-		recordAccounts?: { externalId: string; name: string; mask: string }[];
+		recordAccounts?: { externalId: string; name: string; mask: string; kind: BankAccountKind }[];
 	}
 ): Promise<number> {
 	const taken = await ctx.runMutation(internal.bankConnections.takeLease, {

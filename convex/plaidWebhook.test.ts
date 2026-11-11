@@ -2,8 +2,9 @@ import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vites
 
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
 import { api, internal } from './_generated/api';
+import { MAX_BANK_CONNECTIONS } from './bankConnections';
 import { syncUpdatesBody, webhookSigner } from './lib/plaidWebhook.helper';
-import { newBackend, startBudget, useOwnerEnv } from './test.helper';
+import { newBackend, publicErrorOf, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -11,16 +12,19 @@ const accessToken = 'access-token-synthetic-not-real';
 const itemId = 'item-synthetic-1';
 const externalId = 'account-synthetic-checking';
 const newExternalId = 'account-synthetic-new-savings';
+const cardExternalId = 'account-synthetic-card';
 const cutoverDate = '2026-08-01';
 
 type Signer = Awaited<ReturnType<typeof webhookSigner>>;
 
 function fakePlaid(signer: Signer) {
 	const paths: string[] = [];
+	const bodies: Record<string, unknown> = {};
 	const state = {
 		keyOutage: false,
 		accountsOutage: false,
 		moreAccounts: 0,
+		card: false,
 		heldAnswer: null as { reached: () => void; release: Promise<void> } | null
 	};
 	const fetch = (input: RequestInfo | URL, init?: RequestInit) => {
@@ -35,6 +39,21 @@ function fakePlaid(signer: Signer) {
 				})
 			);
 		switch (url.pathname) {
+			case '/link/token/create':
+				return requestBody(init).then((body) => {
+					bodies[url.pathname] = body;
+					return answer({ link_token: 'link-sandbox-synthetic' });
+				});
+			case '/item/public_token/exchange':
+				return requestBody(init).then((body) => {
+					bodies[url.pathname] = body;
+					return answer({ access_token: accessToken, item_id: itemId });
+				});
+			case '/item/remove':
+				return requestBody(init).then((body) => {
+					bodies[url.pathname] = body;
+					return answer({});
+				});
 			case '/item/webhook/update':
 				return answer({ item: { item_id: itemId } });
 			case '/webhook_verification_key/get':
@@ -66,6 +85,17 @@ function fakePlaid(signer: Signer) {
 							type: 'depository',
 							balances: { current: 250 }
 						},
+						...(state.card
+							? [
+									{
+										account_id: cardExternalId,
+										name: 'Sample Rewards Card',
+										mask: '2222',
+										type: 'credit',
+										balances: { current: 42 }
+									}
+								]
+							: []),
 						...Array.from({ length: state.moreAccounts }, (_, n) => ({
 							account_id: `account-synthetic-more-${String(n)}`,
 							name: `Sample Savings ${String(n)}`,
@@ -89,11 +119,15 @@ function fakePlaid(signer: Signer) {
 				return assert.fail(`Unexpected Plaid call ${url.pathname}`);
 		}
 	};
-	return { paths, state, fetch };
+	return { paths, bodies, state, fetch };
+}
+
+async function requestBody(init: RequestInit | undefined): Promise<unknown> {
+	return await new Response(init?.body).json();
 }
 
 async function requestedKeyId(init: RequestInit | undefined) {
-	const body = (await new Response(init?.body).json()) as { key_id?: unknown };
+	const body = (await requestBody(init)) as { key_id?: unknown };
 	return body.key_id;
 }
 
@@ -657,6 +691,17 @@ describe('the daily sync', () => {
 		).toBe(connections);
 	});
 
+	test('on a server without a token key, records no failure on any Bank Connection', async () => {
+		const backend = await connectedBudget();
+		vi.stubEnv('BUDGE_TOKEN_KEY', undefined);
+
+		await backend.t.mutation(internal.bankConnections.syncAll, {});
+		await runScheduled(backend);
+
+		const [connection] = await backend.owner.query(api.bankConnections.list, { now: Date.now() });
+		expect(connection?.lastError).toBeNull();
+	});
+
 	test('makes no Plaid call for the seeded Bank Connection, which has no token', async () => {
 		const backend = newBackend();
 		await backend.t.mutation(internal.seed.run, {});
@@ -665,5 +710,141 @@ describe('the daily sync', () => {
 		await runScheduled(backend);
 
 		expect(plaid.paths).toEqual([]);
+	});
+});
+
+describe('connecting a bank from the app', () => {
+	const linked = {
+		publicToken: 'public-sandbox-synthetic',
+		institutionName: 'Sample Credit Union'
+	};
+
+	test("links a new Item for transactions with Budge's webhook, then lists its bank accounts with a suggested kind", async () => {
+		const { owner } = await startBudget({ cutoverDate });
+		plaid.state.card = true;
+
+		expect(await owner.action(api.bankConnections.connect, {})).toEqual({
+			linkToken: 'link-sandbox-synthetic'
+		});
+		expect(plaid.bodies['/link/token/create']).toMatchObject({
+			webhook: expect.stringMatching(/\/plaid\/webhook$/) as unknown
+		});
+
+		await owner.action(api.bankConnections.finishConnect, linked);
+		expect(plaid.bodies['/item/public_token/exchange']).toMatchObject({
+			public_token: linked.publicToken
+		});
+		const connections = await owner.query(api.bankConnections.list, { now: Date.now() });
+		expect(connections.map(({ name, status }) => ({ name, status }))).toEqual([
+			{ name: 'Sample Credit Union', status: 'ok' }
+		]);
+		const waiting = await owner.query(api.heldAccounts.list, {});
+		expect(waiting.map(({ name, mask, kind }) => ({ name, mask, kind }))).toEqual([
+			{ name: 'Sample Checking', mask: '0000', kind: 'cash' },
+			{ name: 'Sample Savings', mask: '1111', kind: 'cash' },
+			{ name: 'Sample Rewards Card', mask: '2222', kind: 'creditCard' }
+		]);
+	});
+
+	async function fillConnections(t: Awaited<ReturnType<typeof startBudget>>['t'], count: number) {
+		await t.run(async (ctx) => {
+			for (let i = 0; i < count; i++) {
+				await ctx.db.insert('bankConnections', {
+					name: `Other Bank ${String(i)}`,
+					status: 'ok',
+					provider: {
+						kind: 'plaid',
+						itemId: `item-synthetic-other-${String(i)}`,
+						encryptedToken: 'x'
+					}
+				});
+			}
+		});
+	}
+	const full = {
+		code: 'INVALID_INPUT',
+		message: `Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections. Remove one first.`
+	};
+
+	test('at the Bank Connection limit, Connect a bank refuses before opening the bank', async () => {
+		const { owner, t } = await startBudget({ cutoverDate });
+		await fillConnections(t, MAX_BANK_CONNECTIONS);
+
+		expect(await publicErrorOf(owner.action(api.bankConnections.connect, {}))).toEqual(full);
+		expect(plaid.paths).toEqual([]);
+	});
+
+	test('a connect that finishes after the limit filled removes the Item it exchanged', async () => {
+		const { owner, t } = await startBudget({ cutoverDate });
+		await fillConnections(t, MAX_BANK_CONNECTIONS - 1);
+		await owner.action(api.bankConnections.connect, {});
+		await fillConnections(t, 1);
+
+		expect(await publicErrorOf(owner.action(api.bankConnections.finishConnect, linked))).toEqual(
+			full
+		);
+		expect(plaid.bodies['/item/remove']).toEqual({ access_token: accessToken });
+		expect(
+			await t.run(async (ctx) => (await ctx.db.query('bankConnections').collect()).length)
+		).toBe(MAX_BANK_CONNECTIONS);
+	});
+
+	test('a bank with no institution name is saved as "Bank"', async () => {
+		const { owner } = await startBudget({ cutoverDate });
+		await owner.action(api.bankConnections.finishConnect, { publicToken: linked.publicToken });
+		const [connection] = await owner.query(api.bankConnections.list, { now: Date.now() });
+		expect(connection?.name).toBe('Bank');
+	});
+
+	test('before the cutover date is set, Connect a bank asks for it and calls no bank', async () => {
+		const { owner } = newBackend();
+		expect(await publicErrorOf(owner.action(api.bankConnections.connect, {}))).toEqual({
+			code: 'INVALID_INPUT',
+			message: 'Set the cutover date first.'
+		});
+		expect(plaid.paths).toEqual([]);
+	});
+
+	test.each(['PLAID_CLIENT_ID', 'PLAID_SECRET', 'BUDGE_TOKEN_KEY'])(
+		'without %s, Budge says bank sync is not set up instead of blaming the bank',
+		async (name) => {
+			const { owner } = await startBudget({ cutoverDate });
+			vi.stubEnv(name, undefined);
+			expect(await owner.query(api.bankConnections.service, {})).toEqual({
+				available: false,
+				environment: 'sandbox'
+			});
+			expect(await publicErrorOf(owner.action(api.bankConnections.connect, {}))).toEqual({
+				code: 'BANK_SYNC_UNAVAILABLE',
+				message: "Bank sync isn't set up on this server."
+			});
+			expect(plaid.paths).toEqual([]);
+		}
+	);
+
+	test.each(['PLAID_SECRET', 'BUDGE_TOKEN_KEY'])(
+		'Sync now on a server without %s says bank sync is not set up, calls no bank and leaves the connection without a failure',
+		async (name) => {
+			const { owner, connectionId } = await connectedBudget();
+			const called = plaid.paths.length;
+			vi.stubEnv(name, undefined);
+			expect(
+				await publicErrorOf(owner.action(api.bankConnections.syncNow, { connectionId }))
+			).toEqual({
+				code: 'BANK_SYNC_UNAVAILABLE',
+				message: "Bank sync isn't set up on this server."
+			});
+			expect(plaid.paths).toHaveLength(called);
+			const [connection] = await owner.query(api.bankConnections.list, { now: Date.now() });
+			expect(connection?.lastError).toBeNull();
+		}
+	);
+
+	test('with credentials and a token key, bank sync is available', async () => {
+		const { owner } = await startBudget({ cutoverDate });
+		expect(await owner.query(api.bankConnections.service, {})).toEqual({
+			available: true,
+			environment: 'sandbox'
+		});
 	});
 });
