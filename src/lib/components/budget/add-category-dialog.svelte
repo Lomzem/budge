@@ -71,6 +71,7 @@
 					<Label for="add-category-group">Category Group</Label>
 					<SelectField
 						id="add-category-group"
+						required
 						bind:value={groupId}
 						placeholder="Pick a group"
 						choices={groups.map((group) => ({ value: group.id, label: group.name }))}

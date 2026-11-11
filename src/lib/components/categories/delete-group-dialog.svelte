@@ -80,6 +80,7 @@
 						<Label for="delete-group-destination">Move its Categories to</Label>
 						<SelectField
 							id="delete-group-destination"
+							required
 							bind:value={destinationId}
 							placeholder="Pick a group"
 							choices={choices.map((choice) => ({ value: choice._id, label: choice.name }))}

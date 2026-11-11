@@ -80,6 +80,7 @@
 					<Label for="delete-category-destination">Move its history to</Label>
 					<SelectField
 						id="delete-category-destination"
+						required
 						bind:value={destinationId}
 						placeholder="Pick a Category"
 						choices={choices.map((group) => ({

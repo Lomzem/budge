@@ -39,6 +39,13 @@ describe('app components pick from shadcn-svelte, not native controls', () => {
 			'',
 			'<div class={`p-1 ${wide ? "flex" : ""} sm:overflow-scroll`}></div>',
 			['scroll']
+		],
+		['an overflow-auto class directive', '', '<div class:overflow-auto={wide}></div>', ['scroll']],
+		[
+			'overflow-y-auto through cn()',
+			"\timport { cn } from '$lib/utils';\n\tconst rows = cn('flex', 'overflow-y-auto');",
+			'<div class={rows}></div>',
+			['scroll']
 		]
 	])('%s is refused', async (_, imports, markup, expected) => {
 		expect(await refusals(imports, markup)).toEqual(expected);
@@ -54,6 +61,11 @@ describe('app components pick from shadcn-svelte, not native controls', () => {
 			'ScrollArea with overflow-hidden around it',
 			"\timport { ScrollArea } from '$lib/components/ui/scroll-area';",
 			'<div class="flex max-h-80 flex-col overflow-hidden"><ScrollArea><p>Rows</p></ScrollArea></div>'
+		],
+		[
+			'overflow-auto as text, not a class',
+			"\tconst hint = 'Avoid overflow-auto here.';",
+			'<p title="overflow-auto">{hint}</p>'
 		]
 	])('%s is allowed', async (_, imports, markup) => {
 		expect(await refusals(imports, markup)).toEqual([]);

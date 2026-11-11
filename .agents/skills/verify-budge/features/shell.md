@@ -20,7 +20,7 @@ Navigate between budgeting views, retain theme choice, and expose iPhone install
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/shell.ts`, also run by `bun run test:e2e:local`):
 
-- `shell/navigate`: Budget landing, every sidebar Section, then the 320 px tab bar to every Section and an Account (`shell-nav`).
+- `shell/navigate`: Budget landing, every sidebar Section, a wheel over the Budget table and the sidebar scrolling the page, then the 320 px tab bar to every Section and an Account (`shell-nav`).
 - `shell/phone-pages`: at 390 px, every Section and the Checking register load and scroll to the end (`shell-stable`).
 
 Every journey runs under the layout-shift guard (`e2e/journeys/layoutShift.ts`): a shift not caused by recent input fails the journey and names the elements that moved.

@@ -24,8 +24,8 @@
 		bind:ref={viewportRef}
 		data-slot="scroll-area-viewport"
 		class={[
-			'min-h-0 flex-1 overscroll-contain focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
-			orientation === 'horizontal' && 'snap-x snap-proximity scroll-px-1'
+			'min-h-0 flex-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+			orientation === 'horizontal' && 'snap-x snap-proximity scroll-px-1 overscroll-x-contain'
 		]}
 		{onscroll}
 	>

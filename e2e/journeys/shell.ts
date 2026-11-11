@@ -32,6 +32,22 @@ export const shell = {
 				}
 			});
 
+			await step('a wheel over the Budget table or the sidebar scrolls the page', async () => {
+				await page.setViewportSize({ width: 1280, height: 800 });
+				await sidebar.getByRole('link', { name: /^Budget/ }).click();
+				const table = page.getByRole('main').getByRole('table').first();
+				for (const area of [table, sidebar]) {
+					await expect(area).toBeVisible();
+					await page.evaluate(() => {
+						window.scrollTo(0, 0);
+					});
+					await area.hover({ position: { x: 40, y: 20 } });
+					const before = await page.evaluate(() => window.scrollY);
+					await page.mouse.wheel(0, 200);
+					await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
+				}
+			});
+
 			await step('on a 320 px phone the tab bar replaces the sidebar', async () => {
 				await page.setViewportSize({ width: 320, height: 640 });
 				await expect(sidebar).toBeHidden();

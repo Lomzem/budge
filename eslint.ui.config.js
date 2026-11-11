@@ -33,8 +33,16 @@ export default defineConfig(
 					message:
 						'Use SelectField from $lib/components/select-field.svelte, built on the shadcn-svelte Select, instead of a native <select>.'
 				},
-				...['SvelteLiteral[value', 'Literal[value', 'TemplateElement[value.raw'].map((node) => ({
-					selector: `${node}=${nativeScroll}]`,
+				...[
+					...["SvelteAttribute[key.name='class']", "CallExpression[callee.name='cn']"].flatMap(
+						(owner) =>
+							['SvelteLiteral[value', 'Literal[value', 'TemplateElement[value.raw'].map(
+								(node) => `${owner} ${node}=${nativeScroll}]`
+							)
+					),
+					`SvelteDirective[kind='Class'][key.name.name=${nativeScroll}]`
+				].map((selector) => ({
+					selector,
 					message:
 						'Scroll inside ScrollArea from $lib/components/ui/scroll-area, the shadcn-svelte ScrollArea, instead of an overflow-auto or overflow-scroll class.'
 				}))

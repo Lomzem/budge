@@ -305,6 +305,7 @@
 			<Label for="move-category">{direction === 'to' ? 'To Category' : 'From Category'}</Label>
 			<SelectField
 				id="move-category"
+				required
 				bind:value={otherId}
 				placeholder="Pick a Category"
 				choices={others.map((group) => ({

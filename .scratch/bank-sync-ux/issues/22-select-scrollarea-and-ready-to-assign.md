@@ -39,7 +39,9 @@ It is now a two-column grid (`grid-cols-label-figure` in `src/app.css`) with eve
 - `src/lib/components/ui/scroll-area/` is the shadcn-svelte ScrollArea.
   - Callers set the bounds: a height cap, or a flex parent. The area fills them.
   - The scrollbar overlays the content and shows on hover, so it moves nothing.
-  - Scrolling stays inside the area (`overscroll-contain`).
+  - A vertical area scrolls itself first, then passes the rest of a wheel or swipe to the page, as a native scroller does.
+  - A horizontal area keeps sideways swipes to itself (`overscroll-x-contain`), so a trackpad swipe over a table never goes back in history. Vertical swipes pass through to the page.
+  - The dialog body and the Select list contain both axes, because the page behind them is locked.
   - A horizontal area snaps its children to their start.
 - Every scroll container now uses it:
   - in the app: the sidebar, the Budget side panel, the Needs-you row and the import preview table;
@@ -54,11 +56,60 @@ It is now a two-column grid (`grid-cols-label-figure` in `src/app.css`) with eve
 `no-restricted-syntax` in `eslint.ui.config.js`, run by `bun run lint:ui`, refuses two things:
 
 - a native `<select>` element;
-- any class string containing `overflow-auto`, `overflow-scroll` or their `x-` and `y-` forms, with or without a variant prefix. It checks static attributes, class arrays, `cn()` arguments and template literals.
+- `overflow-auto`, `overflow-scroll` or their `x-` and `y-` forms, with or without a variant prefix. The rule checks:
+  - `class` attributes: static values, class arrays and template literals;
+  - `cn()` arguments;
+  - `class:` directives.
+
+  Other strings, such as a `title` or a script message, are ignored.
 
 `eslint/rules/ui-primitives-config.test.js` holds the refused and allowed cases. Before the conversion, the rule flagged all 15 selects. The previous `account-sidebar.svelte` fails it.
 
-The rule does not see CSS `overflow: auto` in stylesheets. None remain.
+The rule has limits:
+
+- It does not see CSS `overflow: auto` in stylesheets. None remain.
+- It does not see a class string kept in a plain variable outside `cn()`.
+- It does not lint the generated `ui/` files the owner has not taken over.
+
+## Local review
+
+Sol (GPT-6.1-Sol, high) reviewed `146fc1a`. It found three minor issues, all fixed:
+
+1. **Required pickers lost their announcement.** `SelectField` now takes `required` and sets `aria-required` on its trigger. Every select that was `required` before passes it:
+   - Category Group;
+   - both delete destinations;
+   - Move money;
+   - the import Account and Match pickers;
+   - the Transaction Account and split-line Category.
+
+   The twin picker is not required, because `Skip this row` is an empty but valid choice. `categories/manage` checks `aria-required` on Category Group, and it fails when `required` is removed.
+2. **`class:overflow-auto={…}` passed lint.** The rule now checks `class:` directives.
+3. **The rule flagged any string containing `overflow-auto`.** It now checks only `class` attributes, `cn()` arguments and `class:` directives.
+
+The new cases in `ui-primitives-config.test.js` fail under the previous rule: the refused directive and the allowed `title` text. The `cn()` case passes under both and keeps that coverage now that the rule is narrower.
+
+Sol left two questions open:
+
+- linting CSS and the generated `ui/` files, which are the limits above;
+- touch scroll chaining in nested scroll areas. The import preview's area, which is 320 px at most, sits inside the dialog's scrolling body. A swipe scrolls the preview to its end, then the dialog, as native scrolling does. Checking this question found the regression below.
+
+## Scroll chaining
+
+The recheck found a regression. Every ScrollArea had `overscroll-contain` on both axes, which main never had. In Chrome, that stops a wheel or swipe even when the area has nothing to scroll that way, so:
+
+- a vertical wheel over any table, which scrolls only sideways, left the page where it was, at every width;
+- a wheel over the sidebar or the Budget side panel, when they fit, left the page where it was.
+
+Now a vertical area chains natively, and a horizontal area contains only the sideways axis. Measured by wheel in Chromium:
+
+| Where | Before | After |
+| --- | --- | --- |
+| Accounts table, 1280 and 390 | page stays at 0 | page scrolls 300 px |
+| Budget side panel, 1440×900 | page stays at 0 | page scrolls 300 px |
+| Sidebar, 1280×720, nothing to scroll | page stays at 0 | page scrolls |
+| Sidebar, 1280×360, 158 px to scroll | sidebar scrolls, page stays | sidebar scrolls 158 px, then the page |
+
+`shell/navigate` now wheels over the Budget table and the sidebar, and expects the page to move. With both axes contained again, it fails.
 
 ## Journeys
 
@@ -93,3 +144,5 @@ The full journey run caught a layout shift on `/bank` (`plaid/late-sync`). A fai
   - the Bank card at 1280 and 390;
   - the `Needs you` row with its fade.
 - At 1280×360 a wheel over the sidebar scrolls it by 158 px and leaves the window at 0.
+- After the review fixes, the 18 accounts, categories, imports, inspector, splits, transactions and transfers journeys pass.
+- After the scroll-chaining fix, `shell/navigate` passes, and fails as a negative control with both axes contained.

@@ -8,6 +8,7 @@
 		choices,
 		placeholder = '',
 		disabled = false,
+		required = false,
 		onValueChange,
 		...trigger
 	}: {
@@ -18,6 +19,7 @@
 		choices: Choices;
 		placeholder?: string;
 		disabled?: boolean;
+		required?: boolean;
 		onValueChange?: (value: string) => void;
 	} = $props();
 
@@ -45,7 +47,7 @@
 		disabled: choice.disabled ?? false
 	}))}
 >
-	<Select.Trigger {...trigger}>
+	<Select.Trigger {...trigger} aria-required={required}>
 		<span class="min-w-0 truncate">{chosen?.label ?? placeholder}</span>
 	</Select.Trigger>
 	<Select.Content>

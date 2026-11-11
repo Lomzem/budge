@@ -24,11 +24,15 @@ export const categories = {
 		run: async (page, { step }) => {
 			await page.setViewportSize({ width: 320, height: 640 });
 
-			await step("Budget's Add Category offers only groups a Category can join", async () => {
+			await step("Budget's Add Category requires a group a Category can join", async () => {
 				await openBudget(page);
 				await page.getByRole('button', { name: 'Edit Categories' }).click();
 				await page.getByRole('menuitem', { name: 'Add Category', exact: true }).click();
 				const addCategory = page.getByRole('dialog', { name: 'Add Category' });
+				await expect(addCategory.getByRole('combobox', { name: 'Category Group' })).toHaveAttribute(
+					'aria-required',
+					'true'
+				);
 				const groups = await choicesOf(addCategory.getByLabel('Category Group'));
 				expect(groups).not.toHaveLength(0);
 				expect(groups).not.toContain('Credit Card Payments');

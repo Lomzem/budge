@@ -158,6 +158,7 @@
 				<Label for="import-account">Account</Label>
 				<SelectField
 					id="import-account"
+					required
 					bind:value={accountId}
 					onValueChange={() => (picks = [])}
 					placeholder="Pick an Account"
@@ -265,6 +266,7 @@
 		<label for={`import-pick-${String(index)}`}>Match with</label>
 		<SelectField
 			id={`import-pick-${String(index)}`}
+			required
 			bind:value={() => picks[index] ?? '', (pick: string) => (picks[index] = pick)}
 			placeholder="Pick one"
 			choices={[

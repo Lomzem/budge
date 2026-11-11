@@ -368,6 +368,7 @@
 							<Label for={`split-category-${String(line.key)}`}>Line {number} Category</Label>
 							<SelectField
 								id={`split-category-${String(line.key)}`}
+								required
 								bind:value={line.categoryId}
 								{...marked(`split-category-${String(line.key)}`)}
 								placeholder="Pick a Category"
@@ -553,6 +554,7 @@
 				<Label for="transaction-account">Account</Label>
 				<SelectField
 					id="transaction-account"
+					required
 					bind:value={draft.accountId}
 					disabled={locked || startingBalance}
 					{...marked('transaction-account')}
