@@ -124,10 +124,14 @@ export const list = query({
 });
 
 async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>) {
-	const linked = await ctx.db
-		.query('connectionAccounts')
-		.withIndex('by_connection_externalId', (q) => q.eq('connectionId', connectionId))
-		.take(MAX_FED_ACCOUNTS);
+	const inState = (state: 'mapped' | 'ignored') =>
+		ctx.db
+			.query('connectionAccounts')
+			.withIndex('by_connectionId_state', (q) =>
+				q.eq('connectionId', connectionId).eq('state', state)
+			)
+			.take(MAX_FED_ACCOUNTS);
+	const linked = [...(await inState('mapped')), ...(await inState('ignored'))];
 	const feeds: {
 		connectionAccountId: Id<'connectionAccounts'>;
 		accountId: Id<'accounts'>;

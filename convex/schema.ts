@@ -193,6 +193,7 @@ export default defineSchema({
 		)
 	)
 		.index('by_connection_externalId', ['connectionId', 'externalId'])
+		.index('by_connectionId_state', ['connectionId', 'state'])
 		.index('by_state', ['state'])
 		.index('by_accountId', ['accountId']),
 

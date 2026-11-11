@@ -6,6 +6,7 @@ import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json'
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { PlaidApi, PlaidClient } from './lib/plaidClient';
+import { findConnectionAccount } from './bankConnections';
 import { HELD_BATCH } from './heldAccounts';
 import {
 	removeItem,
@@ -72,6 +73,13 @@ function stubPlaid(answer: typeof answerPlaid) {
 	answerPlaid = answer;
 	vi.stubGlobal('fetch', plaidFetch);
 }
+
+const listedAccounts = (from: number, count: number) =>
+	Array.from({ length: count }, (_, n) => ({
+		externalId: `account-synthetic-listed-${String(from + n)}`,
+		name: `Sample Savings ${String(from + n)}`,
+		kind: 'cash' as const
+	}));
 
 async function connectedBudget() {
 	const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 100_000] } });
@@ -563,6 +571,42 @@ describe('a bank Account the owner stops syncing', () => {
 	});
 });
 
+describe('the Bank list', () => {
+	test('shows the bank Accounts a connection syncs or ignores while 50 others wait for setup', async () => {
+		const { owner, t, connectionId } = await connectedBudget();
+		await t.mutation(internal.heldAccounts.recordAccounts, {
+			connectionId,
+			accounts: listedAccounts(0, 50)
+		});
+		await t.mutation(internal.heldAccounts.recordAccounts, {
+			connectionId,
+			accounts: [
+				{ externalId: 'account-synthetic-z-brokerage', name: 'Sample Brokerage', kind: 'cash' },
+				{ externalId: 'account-synthetic-z-loan', name: 'Sample Loan', kind: 'cash' }
+			]
+		});
+		const [brokerage, loan] = await t.run((ctx) =>
+			Promise.all(
+				['account-synthetic-z-brokerage', 'account-synthetic-z-loan'].map((externalId) =>
+					findConnectionAccount(ctx, connectionId, externalId)
+				)
+			)
+		);
+		assert(brokerage && loan, 'the late bank Accounts were recorded');
+		await owner.mutation(api.heldAccounts.createAccount, {
+			connectionAccountId: brokerage._id,
+			name: 'Brokerage',
+			kind: 'cash'
+		});
+		await owner.mutation(api.heldAccounts.ignore, { connectionAccountId: loan._id });
+
+		const [listed] = await owner.query(api.bankConnections.list, { now: Date.now() });
+
+		expect(listed?.feeds.map(({ name }) => name)).toEqual(['Checking', 'Brokerage']);
+		expect(listed?.ignored.map(({ name }) => name)).toEqual(['Sample Loan']);
+	});
+});
+
 describe('a removed Bank Connection', () => {
 	let signedOut: unknown[];
 
@@ -599,13 +643,6 @@ describe('a removed Bank Connection', () => {
 
 	const bankAccountCount = ({ t }: Awaited<ReturnType<typeof connectedBudget>>) =>
 		t.run(async (ctx) => (await ctx.db.query('connectionAccounts').collect()).length);
-
-	const listedAccounts = (from: number, count: number) =>
-		Array.from({ length: count }, (_, n) => ({
-			externalId: `account-synthetic-listed-${String(from + n)}`,
-			name: `Sample Savings ${String(from + n)}`,
-			kind: 'cash' as const
-		}));
 
 	test('leaves its Transactions, signs out at the bank, and drops its bank Accounts and held rows', async () => {
 		const backend = await connectedBudget();
