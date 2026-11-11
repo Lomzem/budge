@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 import { expect, type Download } from '@playwright/test';
 
-import { openBudget, type Journey } from './journey';
+import type { Journey } from './journey';
 
 const tablesABackupRestores = [
 	'accounts',
@@ -30,10 +30,9 @@ export const exportJourneys = {
 			const dialog = page.getByRole('dialog', { name: 'Export' });
 			const text = async (download: Download) => readFile(await keepAsEvidence(download), 'utf8');
 
-			await step('open Export from the menu', async () => {
-				await openBudget(page);
-				await page.getByRole('button', { name: 'Menu' }).click();
-				await page.getByRole('menuitem', { name: 'Export…' }).click();
+			await step('open Export from Settings', async () => {
+				await page.goto('/settings');
+				await page.getByRole('button', { name: 'Export…' }).click();
 			});
 
 			const date = await step(
@@ -54,6 +53,7 @@ export const exportJourneys = {
 					for (const connection of exported.bankConnections ?? []) {
 						expect(connection).not.toHaveProperty('provider');
 					}
+					await expect(dialog.getByRole('status')).toHaveText(`Downloaded budge-${date}.json.`);
 					return date;
 				}
 			);

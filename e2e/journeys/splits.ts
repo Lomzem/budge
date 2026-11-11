@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { openAccount, type Journey } from './journey';
+import { choose, openAccount, type Journey } from './journey';
 
 export const splits = {
 	lines: {
@@ -11,9 +11,7 @@ export const splits = {
 			const memo = 'Smoke test split';
 			const row = page.getByRole('row').filter({ hasText: memo });
 			const dialog = page.getByRole('dialog');
-			const remainder = dialog.getByText(
-				/left to split|left for the empty line|over the amount|Fully split/
-			);
+			const remainder = dialog.getByText(/(left to split|over the amount|Fully split)$/);
 
 			await step('start a $50.00 Transaction on Card and choose Split', async () => {
 				await page.goto('/');
@@ -23,35 +21,53 @@ export const splits = {
 				const minusSignTheDirectionOverridesInTheLines = '-50.00';
 				await dialog.getByLabel('Amount').fill(minusSignTheDirectionOverridesInTheLines);
 				await dialog.getByLabel('Memo', { exact: true }).fill(memo);
-				await dialog
-					.getByLabel('Category or Transfer')
-					.selectOption({ label: 'Split across Categories' });
+				await choose(dialog.getByLabel('Category or Transfer'), 'Split across Categories');
 			});
 
 			await step(
-				"the first line starts with the whole amount, an empty second line isn't a finished split, and moving some to the second keeps the total",
+				'the lines start empty with the whole amount left, Save points at the first unfinished line, and each fix moves the alert on',
 				async () => {
-					await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('50.00');
-					await expect(remainder).toHaveText('Nothing left for the empty line');
-					await dialog.getByLabel('Line 1 Category').selectOption({ label: 'Groceries' });
+					await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('');
+					await expect(remainder).toHaveText('$50.00 left to split');
+					await dialog.getByRole('button', { name: 'Save' }).click();
+					await expect(dialog.getByRole('alert')).toHaveText(
+						'Line 1 is empty. Pick its Category and amount.'
+					);
+					const lineOneCategory = dialog.getByLabel('Line 1 Category');
+					await expect(lineOneCategory).toBeFocused();
+					await expect(lineOneCategory).toHaveAttribute('aria-invalid', 'true');
+					await expect(lineOneCategory).toHaveAccessibleDescription(
+						'Line 1 is empty. Pick its Category and amount.'
+					);
+					await choose(lineOneCategory, 'Groceries');
+					await expect(dialog.getByRole('alert')).toHaveText("Enter line 1's amount.");
+					await expect(lineOneCategory).not.toHaveAttribute('aria-invalid');
 					await dialog.getByLabel('Line 1 amount').fill('30.00');
+					await expect(dialog.getByRole('alert')).toHaveText(
+						'Line 2 is empty. Pick its Category and amount.'
+					);
 					await expect(remainder).toHaveText('$20.00 left to split');
 				}
 			);
 
 			await step(
-				'lines over the amount refuse to save; once they add up, the row reads Split',
+				'Add line focuses the new line without blaming it yet; lines over the amount refuse to save; once they add up, the row reads Split',
 				async () => {
-					await dialog.getByLabel('Line 2 Category').selectOption({ label: 'Gifts' });
+					await choose(dialog.getByLabel('Line 2 Category'), 'Gifts');
 					await dialog.getByLabel('Line 2 amount').fill('12.00');
 					await dialog.getByRole('button', { name: 'Add line' }).click();
-					await dialog.getByLabel('Line 3 Category').selectOption({ label: 'Coffee' });
+					const lineThreeCategory = dialog.getByLabel('Line 3 Category');
+					await expect(lineThreeCategory).toBeFocused();
+					await expect(lineThreeCategory).not.toHaveAttribute('aria-invalid');
+					await expect(dialog.getByRole('alert')).toHaveText('');
+					await choose(lineThreeCategory, 'Coffee');
 					await dialog.getByLabel('Line 3 amount').fill('9.00');
 					await expect(remainder).toHaveText('$1.00 over the amount');
 					await dialog.getByRole('button', { name: 'Save' }).click();
 					await expect(dialog.getByRole('alert')).toHaveText(
-						'The lines must add up to the amount.'
+						'The lines are $1.00 over the amount.'
 					);
+					await expect(dialog.getByLabel('Line 3 amount')).toBeFocused();
 					await dialog.getByLabel('Line 3 amount').fill('8.00');
 					await expect(remainder).toHaveText('Fully split');
 					await dialog.getByRole('button', { name: 'Save' }).click();
@@ -91,8 +107,8 @@ export const splits = {
 				await openAccount(page, 'Card');
 				await page.getByRole('button', { name: 'Add Transaction' }).click();
 				await dialog.getByLabel('Amount').fill('50.00');
-				await category.selectOption({ label: 'Split across Categories' });
-				await dialog.getByLabel('Line 1 Category').selectOption({ label: 'Gifts' });
+				await choose(category, 'Split across Categories');
+				await choose(dialog.getByLabel('Line 1 Category'), 'Gifts');
 				await dialog.getByLabel('Line 1 amount').fill('30.00');
 				await dialog.getByLabel('Line 1 memo').fill('Sample line note');
 				await dialog.getByLabel('Line 2 amount').fill('20.00');
@@ -100,17 +116,16 @@ export const splits = {
 			});
 
 			await step('leave for Groceries, change the amount to $80.00, and split again', async () => {
-				await category.selectOption({ label: 'Groceries' });
+				await choose(category, 'Groceries');
 				await dialog.getByLabel('Amount').fill('80.00');
-				await category.selectOption({ label: 'Split across Categories' });
+				await choose(category, 'Split across Categories');
 			});
 
 			await step('the split starts fresh from $80.00 and Groceries', async () => {
-				await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('80.00');
+				await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('');
+				await expect(dialog.getByText('$80.00 left to split')).toBeVisible();
 				await expect(dialog.getByLabel('Line 1 memo')).toHaveValue('');
-				await expect(dialog.getByLabel('Line 1 Category').locator('option:checked')).toHaveText(
-					'Groceries'
-				);
+				await expect(dialog.getByLabel('Line 1 Category')).toHaveText('Groceries');
 				await expect(dialog.getByLabel('Line 2 amount')).toHaveValue('');
 				await expect(dialog.getByLabel('Line 3 amount')).toHaveCount(0);
 			});

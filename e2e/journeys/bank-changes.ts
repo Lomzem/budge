@@ -22,7 +22,8 @@ async function openChecking(page: Page) {
 
 export const bankChanges = {
 	'take-the-banks': {
-		title: "taking the bank's version updates a changed row and deletes a removed one",
+		title:
+			"taking the bank's version updates a changed row in its editor and deletes a removed one from its row",
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			await step('open Checking', () => openChecking(page));
@@ -34,48 +35,62 @@ export const bankChanges = {
 					'SAMPLE GARDEN CENTER 7720',
 					'Bank changed this'
 				);
-				await expect(changed.getByText(/^Bank changed this: −\$44\.75 on /)).toBeVisible();
+				const banner = changed.getByRole('region', { name: 'Your bank changed this Transaction' });
+				await expect(banner).toBeFocused();
+				await expect(banner.getByText(/^The bank now says −\$44\.75 on /)).toBeVisible();
 				await changed.getByRole('button', { name: "Use the bank's version" }).click();
 				await expect(changed).toBeHidden();
 				await expect(garden).toContainText('$44.75');
 				await expect(garden).not.toContainText('Bank changed this');
 			});
 
-			await step('the removed streaming row is deleted', async () => {
+			await step('the removed streaming row is deleted from its row', async () => {
 				const streaming = rowOf(page, 'SAMPLE STREAMING 4410');
-				const removed = await openBankChange(page, 'SAMPLE STREAMING 4410', 'Bank removed this');
-				await expect(removed.getByText('Bank removed this.')).toBeVisible();
-				await removed.getByRole('button', { name: 'Delete it' }).click();
+				await expect(streaming).toContainText('Bank removed this');
+				await streaming
+					.getByRole('button', { name: /^Delete it: SAMPLE STREAMING 4410, / })
+					.click();
 				const confirm = page.getByRole('alertdialog', { name: 'Delete this Transaction too?' });
+				await expect(confirm).toContainText('The bank removed SAMPLE STREAMING 4410.');
 				await confirm.getByRole('button', { name: 'Delete' }).click();
 				await expect(confirm).toBeHidden();
-				await expect(removed).toBeHidden();
 				await expect(streaming).toHaveCount(0);
+				await expect(page.locator('[data-edit]:focus')).toHaveCount(1);
 			});
 		}
 	},
 	'keep-mine': {
-		title: 'keeping mine clears the bank flag and leaves my Transaction as I edited it',
+		title:
+			'keeping mine, from the row or its editor, clears the bank flag and leaves my Transaction as I edited it',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			await step('open Checking', () => openChecking(page));
 
-			await step('the changed garden-center row keeps my $40.00', async () => {
+			await step('the changed garden-center row keeps my $40.00 from its row', async () => {
 				const garden = rowOf(page, 'SAMPLE GARDEN CENTER 7720');
-				const changed = await openBankChange(
-					page,
-					'SAMPLE GARDEN CENTER 7720',
-					'Bank changed this'
-				);
-				await changed.getByRole('button', { name: 'Keep mine' }).click();
-				await expect(changed).toBeHidden();
+				await expect(garden).toContainText('Bank changed this');
+				await expect(
+					garden.getByRole('button', {
+						name: /^Use the bank's −\$44\.75: SAMPLE GARDEN CENTER 7720, /
+					})
+				).toBeVisible();
+				await garden
+					.getByRole('button', { name: /^Keep mine: SAMPLE GARDEN CENTER 7720, / })
+					.click();
 				await expect(garden).toContainText('$40.00');
 				await expect(garden).not.toContainText('Bank changed this');
+				await expect(garden.getByRole('button', { name: /^Keep mine/ })).toHaveCount(0);
+				await expect(
+					garden.getByRole('button', { name: /^SAMPLE GARDEN CENTER 7720/ })
+				).toBeFocused();
 			});
 
 			await step('the removed streaming row stays, with my memo', async () => {
 				const streaming = rowOf(page, 'SAMPLE STREAMING 4410');
 				const removed = await openBankChange(page, 'SAMPLE STREAMING 4410', 'Bank removed this');
+				const banner = removed.getByRole('region', { name: 'Your bank removed this Transaction' });
+				await expect(banner).toBeFocused();
+				await expect(banner).toContainText('Bank Text: SAMPLE STREAMING 4410');
 				await removed.getByRole('button', { name: 'Keep mine' }).click();
 				await expect(removed).toBeHidden();
 				await expect(streaming).toContainText('Shared family plan');

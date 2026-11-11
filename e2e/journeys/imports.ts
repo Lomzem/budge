@@ -32,23 +32,27 @@ export const imports = {
 
 			await step('the sidebar counts Unapproved Transactions; open Savings', async () => {
 				await page.goto('/');
-				const sidebar = page.getByRole('navigation', { name: 'Budget and Accounts' });
+				const sidebar = page.getByRole('navigation', { name: 'Sections and Accounts' });
 				await expect(
-					sidebar.getByRole('link', { name: /^All Accounts \d+ Unapproved$/ })
+					sidebar.getByRole('link', { name: /^Accounts \d+ Unapproved$/ })
 				).toBeVisible();
 				await openAccount(page, 'Savings');
 			});
 
-			await step('importing a one-row file previews and saves it', async () => {
-				await page.getByRole('button', { name: 'Import file' }).click();
-				await expect(dialog.getByLabel('Account')).toHaveValue(/.+/);
-				await chooseFile(
-					page,
-					inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E BOOKSHOP', '23.45')
-				);
-				await dialog.getByRole('button', { name: 'Save' }).click();
-				await expect(dialog).toBeHidden();
-			});
+			await step(
+				'Import file opens on the File field for this Account, then previews and saves a one-row file',
+				async () => {
+					await page.getByRole('button', { name: 'Import file' }).click();
+					await expect(dialog.getByLabel('Account')).not.toHaveText('Pick an Account');
+					await expect(dialog.getByLabel('File')).toBeFocused();
+					await chooseFile(
+						page,
+						inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E BOOKSHOP', '23.45')
+					);
+					await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
+					await expect(dialog).toBeHidden();
+				}
+			);
 
 			await step('the row arrives Unapproved, and Approve clears it', async () => {
 				await expect(approve).toBeVisible();
@@ -73,7 +77,7 @@ export const imports = {
 					page,
 					inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E SLOW CAFE', '9.87')
 				);
-				await dialog.getByRole('button', { name: 'Save' }).click();
+				await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
 				await commit.held;
 				await dialog.getByRole('button', { name: 'Cancel' }).click();
 				await expect(dialog).toBeHidden();
@@ -94,7 +98,7 @@ export const imports = {
 					).toBeVisible();
 					await expect(dialog.getByLabel('File')).toBeEnabled();
 					await expect(dialog).toHaveAttribute('data-state', 'open');
-					await expect(dialog.getByRole('alert')).toHaveCount(0);
+					await expect(dialog.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 				}
 			);
 		}

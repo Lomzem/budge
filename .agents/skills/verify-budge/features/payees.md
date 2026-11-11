@@ -10,7 +10,7 @@ Reuse the last Category for a Payee and remember an edited imported Payee for ex
 
 ## How to get to it (user POV)
 
-- Add/Edit Transaction → Payee and Category or Transfer. All Accounts or named Account → Payee filter (`#transaction-filter-payee`, populated by `payees.list`).
+- Add/Edit Transaction → Payee and Category or Transfer. The Accounts page or a named Account → Payee filter (`#transaction-filter-payee`, populated by `payees.list`).
 - Import file → saved imported row → Edit Transaction → Payee.
 - Global Payee rename has no visible menu or route in this checkout.
 
@@ -26,7 +26,7 @@ Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
 
-- **Category memory:** open Add Transaction on Checking; fill Payee `Sample Landlord`, expect selected `Category or Transfer` option Rent. Change Payee to `Sample Verification Florist`, expect Uncategorized. Return to Sample Landlord, explicitly select Groceries, change Payee away and back; require Groceries retained. Escape to cancel.
+- **Category memory:** open Add Transaction on Checking; fill Payee `Sample Landlord`, expect the `Category or Transfer` combobox to read Rent. Change Payee to `Sample Verification Florist`, expect Uncategorized. Return to Sample Landlord, explicitly select Groceries, change Payee away and back; require Groceries retained. Escape to cancel.
 - **Rename memory:** import an invented row with Bank Text `SAMPLE MEMORY 9001`, edit its Payee to `Sample Verification Shop`, categorize Groceries and Save. An imported Payee edit remembers every attached Bank Row’s exact Bank Text; manually repeat with multiple attached rows. Import a different-date/identity row with the exact same Bank Text; require the friendly Payee and Groceries after reload. Import text differing by one character and require no friendly rename. Open details to prove Bank Text stayed unchanged.
 - **Global rename:** record no UI entry as blocked, not passed by editing one Transaction. When a UI is provided, require all historical rows and search to adopt the new name and duplicate-name refusal. Inspect `convex/payees.ts` for the current public contract; direct API mutation is API coverage only and not a substitute for this user journey.
 

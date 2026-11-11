@@ -1,10 +1,11 @@
 import { expect } from '@playwright/test';
 
-import { cents, centsIn, openBudget, typed, type Journey } from './journey';
+import { cents, centsIn, choose, openBudget, typed, type Journey } from './journey';
 
 export const inspector = {
 	'move-money': {
-		title: 'the inspector moves money by keyboard, and opens under its row on a phone',
+		title:
+			'the inspector moves money by keyboard, and opens as a dialog on a phone that steps between Categories',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			await page.setViewportSize({ width: 1280, height: 800 });
@@ -32,10 +33,7 @@ export const inspector = {
 				const category = region.getByLabel(
 					direction === 'Move to' ? 'To Category' : 'From Category'
 				);
-				const coffee = await category
-					.locator('option', { hasText: /^Coffee / })
-					.getAttribute('value');
-				await category.selectOption(coffee ?? '');
+				await choose(category, /^Coffee \(/);
 				await region.getByLabel('Amount').fill(typed(1_000));
 				await region.getByLabel('Amount').press('Enter');
 			};
@@ -56,14 +54,40 @@ export const inspector = {
 				await expect.poll(() => assigned('Coffee')).toBe(before.coffee);
 			});
 
-			await step('on a phone the same inspector opens in a row under Groceries', async () => {
+			await step('on a phone the same inspector opens as a dialog over the Budget', async () => {
 				await page.setViewportSize({ width: 320, height: 640 });
-				await expect(region).toBeVisible();
-				await expect(page.getByRole('row').filter({ has: region })).toBeVisible();
-				await region.getByRole('button', { name: 'Close Groceries' }).click();
+				const dialog = page.getByRole('dialog', { name: 'Groceries' });
+				await expect(dialog).toBeVisible();
+				await expect(dialog.getByRole('region', { name: 'Groceries' })).toBeVisible();
+				await dialog.getByRole('button', { name: 'Close Groceries' }).click();
+				await expect(dialog).toBeHidden();
+				await expect(groceries).toBeFocused();
+			});
+
+			await step('Escape closes the phone inspector and returns to Groceries', async () => {
+				await groceries.click();
+				await expect(region).toBeFocused();
+				await page.keyboard.press('Escape');
 				await expect(region).toBeHidden();
 				await expect(groceries).toBeFocused();
 			});
+
+			await step(
+				'the phone inspector steps to the next Category and focuses its Assigned field',
+				async () => {
+					await groceries.click();
+					await page
+						.getByRole('dialog')
+						.getByRole('button', { name: 'Next Category: Dining Out' })
+						.click();
+					const stepped = page.getByRole('dialog', { name: 'Dining Out' });
+					await expect(stepped.getByLabel('Assigned this month')).toBeFocused();
+					await stepped.getByRole('button', { name: 'Previous Category: Groceries' }).click();
+					await expect(
+						page.getByRole('dialog', { name: 'Groceries' }).getByLabel('Assigned this month')
+					).toBeFocused();
+				}
+			);
 		}
 	}
 } satisfies Record<string, Journey>;

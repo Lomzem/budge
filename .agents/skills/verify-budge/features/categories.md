@@ -9,13 +9,13 @@ Manage the jobs for money, their order and visibility, and the history destinati
 
 ## How to get to it (user POV)
 
-- Sidebar/phone View menu → Categories, or Budget → `Manage Categories` (`/categories`); Add Category and Add Category Group are also on Budget.
+- Sidebar or phone tab bar → Categories, or Budget → `Manage Categories` (`/categories`); Add Category and Add Category Group are also on Budget.
 
 ## Driving it with Playwright
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/categories.ts`, also run by `bun run test:e2e:local`):
 
-- `categories/manage`: Budget’s Add Category offers no Credit Card Payments Group; create a Group and Category, rename, hide, delete into Groceries and delete the empty Group, at 320 px with no page overflow.
+- `categories/manage`: Budget’s Add Category offers no Credit Card Payments Group; create a Group and Category, open its menu by click (focus on `Rename`, Escape back to the trigger), rename, hide, delete into Groceries and delete the empty Group, at 320 px with no page overflow.
 - `categories/late-rename`: a rename that finishes after its dialog closed leaves the reopened dialog alone.
 
 Preconditions:
@@ -23,7 +23,7 @@ Preconditions:
 - Authenticated baseline from the index; reseed before independent mutations.
 
 - **Create:** click `Add Category Group`; dialog label `Name` = `Sample Verification Group`, button `Add`. Then `Add Category` (exact), labels `Category Group` and `Name` = `Sample Verification Category`; click `Add`. Require both on Budget after reload. Repeat Budget’s creation entry points.
-- **Actions:** focus `getByRole("button", { name: "Sample Verification Category actions", exact: true })`, press Enter, then choose menuitem `Rename`; fill Name and Save. Exercise `Move up`, `Move down`, and group placement options from the current menu; assert visible order after reload. Use the corresponding Group actions menu to rename and reorder the group.
+- **Actions:** focus `getByRole("button", { name: "Sample Verification Category actions", exact: true })`, press Enter (any app menu, opened by click or key, focuses its first enabled item), then choose menuitem `Rename`; fill Name and Save. Exercise `Move up`, `Move down`, and group placement options from the current menu; assert visible order after reload. Use the corresponding Group actions menu to rename and reorder the group.
 - **Visibility:** choose `Hide from budget` on Category and Group in separate runs; require the hidden indication in Categories, absence from the normal Budget table, and name/Available in Budget’s Hidden Categories section (manual drive beyond the journey). Use the menu’s show action to restore and verify after reload.
 - **Delete/history:** give the Category an invented Transaction, assignment, and split line first through their mapped UI. Choose `Delete…`, dialog `Delete <name>`, select `Move its history to` = Groceries, then `Delete Category`. Require source absent and each Transaction, split line and budget amount moved to Groceries. Delete a populated Group through its `Delete…` dialog, selecting `Move its Categories to` before `Delete group`; verify the Categories appear in the destination in order. An empty Group requires no destination. capture 320 px state.
 
