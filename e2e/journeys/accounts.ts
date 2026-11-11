@@ -266,6 +266,37 @@ export const accounts = {
 			});
 		}
 	},
+	'held-legacy-name': {
+		title:
+			'a held bank Account recorded with a name but no kind is never preselected into the same-named Account',
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const choose = page.getByRole('dialog', { name: 'Savings ending 6630' });
+			const intoSavings = choose.getByRole('radio', { name: 'Into Savings' });
+
+			const held = await step('it opens on a new Account, not Savings', async () => {
+				const button = await openHeld(page, 'Savings ending 6630', '1 transaction waiting');
+				await expect(choose.getByRole('radio', { name: 'Into a new Account' })).toBeChecked();
+				await expect(intoSavings).not.toBeChecked();
+				return button;
+			});
+
+			await step('choosing Savings asks the owner to check its kind', async () => {
+				await intoSavings.check();
+				await expect(choose).toContainText(
+					"The bank didn't say what kind of account this is, so make sure it is a cash Account like Savings."
+				);
+				await choose.getByRole('button', { name: 'Import its transactions' }).click();
+				await confirmStartingBalance(page, 'Starting balance', '1,000.00');
+				await expect(held).toBeHidden();
+			});
+
+			await step('Savings lists its row', async () => {
+				await openAccount(page, 'Savings');
+				await expect(page.getByRole('button', { name: /^SAMPLE DIVIDEND 0630/ })).toBeVisible();
+			});
+		}
+	},
 	'held-ignore': {
 		title: 'an ignored held bank Account leaves the list and stays gone',
 		fixture: 'bank-sync',
