@@ -28,6 +28,8 @@ const COMMUNITY_BANK = {
 
 const NOT_A_REAL_TOKEN = 'sample-token-that-never-decrypts';
 
+const RECORDED_BEFORE_KINDS = { externalId: 'cu-legacy', name: 'Savings', mask: '6630' } as const;
+
 const HELD_ACCOUNTS = [
 	{ externalId: 'cu-savings', name: 'Sample Savings Plus', mask: '4417', kind: 'cash' },
 	{ externalId: 'cu-card', name: 'Sample Rewards Card', mask: '9021', kind: 'creditCard' },
@@ -86,7 +88,14 @@ export const run = internalMutation({
 				heldRow('cu-card', 'card-bistro', 4, -36_29, 'SAMPLE BISTRO 0817'),
 				heldRow('cu-card', 'card-bookstore', 2, -21_08, 'SAMPLE BOOK NOOK 3306'),
 				heldRow('cu-holiday', 'holiday-deposit', 3, 40_00, 'SAMPLE CLUB DEPOSIT'),
-				heldRow('cu-unlisted', 'unlisted-fee', 2, -5_00, 'SAMPLE SERVICE FEE')
+				heldRow('cu-unlisted', 'unlisted-fee', 2, -5_00, 'SAMPLE SERVICE FEE'),
+				heldRow(
+					RECORDED_BEFORE_KINDS.externalId,
+					'legacy-dividend',
+					3,
+					1_25,
+					'SAMPLE DIVIDEND 0630'
+				)
 			],
 			recordAccounts: [
 				{
@@ -98,6 +107,8 @@ export const run = internalMutation({
 				...HELD_ACCOUNTS
 			]
 		});
+
+		await nameWithoutKind(ctx, creditUnion, RECORDED_BEFORE_KINDS);
 
 		await editLikeTheOwner(ctx, checking, 'SAMPLE GARDEN CENTER 7720', (edit) => ({
 			...edit,
@@ -177,6 +188,23 @@ async function requireSeededAccount(ctx: MutationCtx, name: string): Promise<Id<
 		if (account.name === name) return account._id;
 	}
 	throw publicError('INVALID_INPUT', 'Run seed:run before seedBankSync:run.');
+}
+
+async function nameWithoutKind(
+	ctx: MutationCtx,
+	connectionId: Id<'bankConnections'>,
+	account: { externalId: string; name: string; mask: string }
+) {
+	const held = await ctx.db
+		.query('connectionAccounts')
+		.withIndex('by_connection_externalId', (q) =>
+			q.eq('connectionId', connectionId).eq('externalId', account.externalId)
+		)
+		.unique();
+	if (held?.state !== 'held' || held.kind !== undefined) {
+		throw publicError('INVALID_INPUT', `${account.externalId} was not held without a kind.`);
+	}
+	await ctx.db.patch('connectionAccounts', held._id, { name: account.name, mask: account.mask });
 }
 
 async function sync(
