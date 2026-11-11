@@ -92,6 +92,11 @@
 		if (reconnecting) return 'Reconnecting…';
 		return null;
 	});
+	const slotText = $derived.by(() => {
+		if (pending !== null) return pending;
+		if (result === null) return synced;
+		return result.failed ? `${result.text} ${synced}` : result.text;
+	});
 	const reconnectBlocked = $derived(!connection.bankLogin || bank.linking !== null || syncing);
 	const paused = $derived(connection.bankLogin && connection.status === 'needsAttention');
 	const syncBlocked = $derived(!connection.bankLogin || paused || syncing || reconnecting);
@@ -284,34 +289,36 @@
 		<div
 			class="flex flex-col gap-x-4 gap-y-3 sm:flex-row sm:items-center sm:justify-between sm:pl-13"
 		>
-			<p
-				class={[
-					'flex min-h-5 min-w-0 flex-1 items-start gap-1.5 text-sm break-words',
-					pending === null && result?.failed ? 'text-destructive' : 'text-muted-foreground'
-				]}
-			>
-				{#if pending !== null}
-					<RefreshCwIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 animate-spin" />
-					<span class="min-w-0">{pending}</span>
-				{:else if result !== null}
-					{#if result.failed}
-						<TriangleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+			<div title={slotText} class="flex h-10 min-w-0 flex-col justify-center sm:flex-1">
+				<p
+					class={[
+						'flex min-w-0 items-start gap-1.5 text-sm break-words',
+						pending === null && result?.failed ? 'text-destructive' : 'text-muted-foreground'
+					]}
+				>
+					{#if pending !== null}
+						<RefreshCwIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 animate-spin" />
+						<span class="line-clamp-2 min-w-0">{pending}</span>
+					{:else if result !== null}
+						{#if result.failed}
+							<TriangleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+						{:else}
+							<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
+						{/if}
+						<span class="line-clamp-2 min-w-0"
+							>{result.text}
+							{#if result.failed}<span class="text-muted-foreground">{synced}</span>{/if}</span
+						>
 					{:else}
-						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
+						{#if problems.length === 0}
+							<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
+						{:else}
+							<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+						{/if}
+						<span class="line-clamp-2 min-w-0">{synced}</span>
 					{/if}
-					<span class="min-w-0"
-						>{result.text}
-						{#if result.failed}<span class="text-muted-foreground">{synced}</span>{/if}</span
-					>
-				{:else}
-					{#if problems.length === 0}
-						<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
-					{:else}
-						<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-					{/if}
-					<span class="min-w-0">{synced}</span>
-				{/if}
-			</p>
+				</p>
+			</div>
 			<span role="status" class="sr-only">{result?.text ?? ''}</span>
 			<div class="grid grid-cols-2 gap-2 sm:flex">
 				<div class="grid sm:w-36">

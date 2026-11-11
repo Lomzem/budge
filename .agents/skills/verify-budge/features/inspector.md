@@ -26,7 +26,7 @@ Preconditions:
 - Authenticated baseline from the index; reseed before independent mutations.
 
 - **Inspect:** focus `getByRole("button", { name: "Groceries", exact: true })`, press Enter; require `getByRole("region", { name: "Groceries", exact: true })` visible and Left over from last month visible; opening auto-focuses the region only at widths ≥1024 px. Escape from inside the region or Close Groceries must restore focus. Repeat at 320 px: it opens as `getByRole("dialog", { name: "Groceries" })` scrolled to the top, and Close or Escape returns focus to the Category-name button.
-- **Move:** record Assigned for Groceries/Coffee and Ready to Assign; in region check `Move to`, select `To Category` option beginning Coffee, fill Amount 10.00, submit `Move money`. Require Assigned −$10/+ $10 and Ready to Assign unchanged; reload and reopen. Choose Take from / From Category to reverse and verify.
+- **Move:** record Assigned for Groceries/Coffee and Ready to Assign; in region check `Move to`, `choose` the `To Category` option beginning `Coffee (`, fill Amount 10.00, submit `Move money`. Require Assigned −$10/+ $10 and Ready to Assign unchanged; reload and reopen. Choose Take from / From Category to reverse and verify.
 - **Cover:** create an invented outflow large enough to overspend an ordinary Cash Category using Transaction UI; select it on Budget. Click its `Cover $… from Ready to Assign` action (inspect actual amount in ARIA). Require Available exactly zero, Assigned increased by deficit and Ready to Assign decreased by deficit; reload.
 
 ## Gotchas

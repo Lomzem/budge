@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import { holdResponseTo } from '../heldResponse';
-import { openBudget, type Journey } from './journey';
+import { choicesOf, choose, openBudget, type Journey } from './journey';
 
 async function act(page: Page, name: string, action: string) {
 	const trigger = page.getByRole('button', {
@@ -29,9 +29,9 @@ export const categories = {
 				await page.getByRole('button', { name: 'Edit Categories' }).click();
 				await page.getByRole('menuitem', { name: 'Add Category', exact: true }).click();
 				const addCategory = page.getByRole('dialog', { name: 'Add Category' });
-				const groups = addCategory.getByLabel('Category Group').getByRole('option');
-				await expect(groups).not.toHaveCount(0);
-				await expect(groups.filter({ hasText: 'Credit Card Payments' })).toHaveCount(0);
+				const groups = await choicesOf(addCategory.getByLabel('Category Group'));
+				expect(groups).not.toHaveLength(0);
+				expect(groups).not.toContain('Credit Card Payments');
 				await page.keyboard.press('Escape');
 				await expect(addCategory).toBeHidden();
 			});
@@ -46,10 +46,18 @@ export const categories = {
 
 				await page.getByRole('button', { name: 'Add Category', exact: true }).click();
 				const addCategory = page.getByRole('dialog', { name: 'Add Category' });
-				await addCategory.getByLabel('Category Group').selectOption({ label: 'Smoke Test Group' });
+				await choose(addCategory.getByLabel('Category Group'), 'Smoke Test Group');
 				await addCategory.getByLabel('Name').fill('Smoke Test Category');
 				await addCategory.getByRole('button', { name: 'Add' }).click();
 				await expect(addCategory).toBeHidden();
+			});
+
+			await step('a click opens its menu on the first action', async () => {
+				const trigger = page.getByRole('button', { name: 'Smoke Test Category actions' });
+				await trigger.click();
+				await expect(page.getByRole('menuitem', { name: 'Rename' })).toBeFocused();
+				await page.keyboard.press('Escape');
+				await expect(trigger).toBeFocused();
 			});
 
 			await step('rename it, then hide it, with nothing scrolling sideways', async () => {
@@ -72,7 +80,7 @@ export const categories = {
 			await step('delete the Category into Groceries, then its empty group', async () => {
 				await act(page, 'Smoke Test Renamed', 'Delete…');
 				const deleteCategory = page.getByRole('dialog', { name: 'Delete Smoke Test Renamed' });
-				await deleteCategory.getByLabel('Move its history to').selectOption({ label: 'Groceries' });
+				await choose(deleteCategory.getByLabel('Move its history to'), 'Groceries');
 				await deleteCategory.getByRole('button', { name: 'Delete Category' }).click();
 				await expect(deleteCategory).toBeHidden();
 				await expect(page.getByRole('button', { name: /^Smoke Test Renamed/ })).toHaveCount(0);

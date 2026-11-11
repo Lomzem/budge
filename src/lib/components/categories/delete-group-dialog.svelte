@@ -5,6 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Label } from '$lib/components/ui/label';
+	import SelectField from '$lib/components/select-field.svelte';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	import type { ManagedGroup } from './types';
@@ -77,17 +78,12 @@
 				{#if count > 0}
 					<div class="flex flex-col gap-2">
 						<Label for="delete-group-destination">Move its Categories to</Label>
-						<select
+						<SelectField
 							id="delete-group-destination"
 							bind:value={destinationId}
-							required
-							class="h-9 rounded-md border border-input bg-card px-2.5 text-base md:text-sm pointer-coarse:h-11"
-						>
-							<option value="" disabled>Pick a group</option>
-							{#each choices as choice (choice._id)}
-								<option value={choice._id}>{choice.name}</option>
-							{/each}
-						</select>
+							placeholder="Pick a group"
+							choices={choices.map((choice) => ({ value: choice._id, label: choice.name }))}
+						/>
 					</div>
 				{/if}
 				<Dialog.Footer {error}>

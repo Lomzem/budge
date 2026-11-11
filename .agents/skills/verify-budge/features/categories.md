@@ -15,7 +15,7 @@ Manage the jobs for money, their order and visibility, and the history destinati
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/categories.ts`, also run by `bun run test:e2e:local`):
 
-- `categories/manage`: Budget’s Add Category offers no Credit Card Payments Group; create a Group and Category, rename, hide, delete into Groceries and delete the empty Group, at 320 px with no page overflow.
+- `categories/manage`: Budget’s Add Category offers no Credit Card Payments Group; create a Group and Category, open its menu by click (focus on `Rename`, Escape back to the trigger), rename, hide, delete into Groceries and delete the empty Group, at 320 px with no page overflow.
 - `categories/late-rename`: a rename that finishes after its dialog closed leaves the reopened dialog alone.
 
 Preconditions:

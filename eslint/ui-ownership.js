@@ -23,5 +23,11 @@ export const generatedUiIgnores = [
 	'!src/lib/components/ui/checkbox/checkbox.svelte',
 	'!src/lib/components/ui/radio-group/radio-group-item.svelte',
 	'!src/lib/components/ui/label/label.svelte',
-	'!src/lib/components/ui/input/input.svelte'
+	'!src/lib/components/ui/input/input.svelte',
+	'!src/lib/components/ui/select/select-trigger.svelte',
+	'!src/lib/components/ui/select/select-content.svelte',
+	'!src/lib/components/ui/select/select-item.svelte',
+	'!src/lib/components/ui/select/select-group-heading.svelte',
+	'!src/lib/components/ui/scroll-area/scroll-area.svelte',
+	'!src/lib/components/ui/scroll-area/scroll-area-scrollbar.svelte'
 ];

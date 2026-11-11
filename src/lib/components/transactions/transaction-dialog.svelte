@@ -11,6 +11,8 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import type { Choices } from '$lib/components/choices';
+	import SelectField from '$lib/components/select-field.svelte';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { formatDate, localIsoDate } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
@@ -193,6 +195,57 @@
 		if (added) document.getElementById(`split-category-${String(added.key)}`)?.focus();
 	}
 
+	function categoryChoices(savedId: string | undefined, savedName: string | undefined): Choices {
+		const data = categories.data;
+		const saved = savedId !== undefined && (!data || unlisted(data, savedId));
+		return [
+			...(saved ? [{ value: savedId, label: savedName ?? '' }] : []),
+			...(data?.readyToAssignId ? [{ value: data.readyToAssignId, label: 'Ready to Assign' }] : []),
+			...(data?.groups ?? []).map((group) => ({
+				group: group.name,
+				choices: group.categories.map((category) => ({ value: category._id, label: category.name }))
+			}))
+		];
+	}
+
+	function selectionChoices(): Choices {
+		const { selection, transferAccounts } = shown;
+		const looking = selection.kind === 'recalling' || selection.kind === 'recallFailed';
+		return [
+			...(looking
+				? [
+						{
+							value: optionOf(selection),
+							label:
+								selection.kind === 'recalling'
+									? 'Looking up the last Category…'
+									: 'Pick a Category',
+							disabled: true
+						}
+					]
+				: []),
+			{ value: optionOf({ kind: 'uncategorized' }), label: 'Uncategorized' },
+			...(startingBalance
+				? []
+				: [{ value: optionOf({ kind: 'split' }), label: 'Split across Categories' }]),
+			...categoryChoices(
+				transaction?.categoryId ?? undefined,
+				transaction?.categoryName ?? undefined
+			),
+			...(transferAccounts.length > 0 && !startingBalance
+				? [
+						{
+							group: 'Transfer to or from',
+							choices: transferAccounts.map((account) => ({
+								value: optionOf({ kind: 'transfer', accountId: account._id }),
+								label: `Transfer: ${account.name}`
+							}))
+						}
+					]
+				: [])
+		];
+	}
+
 	function moveToAmount(event: KeyboardEvent) {
 		if (event.key !== 'Enter') return;
 		event.preventDefault();
@@ -302,26 +355,6 @@
 	}
 </script>
 
-{#snippet categoryOptions(savedId: string | undefined, savedName: string | undefined)}
-	{#if categories.data}
-		{#if unlisted(categories.data, savedId) && savedId}
-			<option value={savedId}>{savedName}</option>
-		{/if}
-		{#if categories.data.readyToAssignId !== null}
-			<option value={categories.data.readyToAssignId}>Ready to Assign</option>
-		{/if}
-		{#each categories.data.groups as group (group._id)}
-			<optgroup label={group.name}>
-				{#each group.categories as category (category._id)}
-					<option value={category._id}>{category.name}</option>
-				{/each}
-			</optgroup>
-		{/each}
-	{:else if savedId}
-		<option value={savedId}>{savedName}</option>
-	{/if}
-{/snippet}
-
 {#snippet splitLines()}
 	<fieldset class="flex flex-col gap-3 rounded-lg border border-border p-3">
 		<legend class="px-1 text-sm font-medium">Split lines</legend>
@@ -333,16 +366,13 @@
 					<div class="flex flex-wrap items-end gap-2">
 						<div class="flex min-w-40 flex-1 flex-col gap-1">
 							<Label for={`split-category-${String(line.key)}`}>Line {number} Category</Label>
-							<select
+							<SelectField
 								id={`split-category-${String(line.key)}`}
 								bind:value={line.categoryId}
-								required
 								{...marked(`split-category-${String(line.key)}`)}
-								class="h-9 min-w-0 rounded-md border border-input bg-card px-2.5 text-base aria-invalid:border-destructive md:text-sm pointer-coarse:h-11"
-							>
-								<option value="" disabled>Pick a Category</option>
-								{@render categoryOptions(saved?.id, saved?.name)}
-							</select>
+								placeholder="Pick a Category"
+								choices={categoryChoices(saved?.id, saved?.name)}
+							/>
 						</div>
 						<div class="flex w-28 flex-col gap-1">
 							<Label for={`split-amount-${String(line.key)}`}>Line {number} amount</Label>
@@ -521,18 +551,14 @@
 			{/if}
 			<div class="flex flex-col gap-2">
 				<Label for="transaction-account">Account</Label>
-				<select
+				<SelectField
 					id="transaction-account"
 					bind:value={draft.accountId}
 					disabled={locked || startingBalance}
-					required
 					{...marked('transaction-account')}
-					class="h-9 rounded-md border border-input bg-card px-2.5 text-base disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive md:text-sm pointer-coarse:h-11"
-				>
-					{#each accounts.all as account (account._id)}
-						<option value={account._id}>{account.name}</option>
-					{/each}
-				</select>
+					placeholder="Pick an Account"
+					choices={accounts.all.map((account) => ({ value: account._id, label: account.name }))}
+				/>
 			</div>
 			<div class="flex flex-col gap-2">
 				<Label for="transaction-date">Date</Label>
@@ -599,7 +625,7 @@
 				<Label for="transaction-category"
 					>{startingBalance ? 'Category' : 'Category or Transfer'}</Label
 				>
-				<select
+				<SelectField
 					id="transaction-category"
 					bind:value={
 						() => optionOf(shown.selection),
@@ -608,33 +634,8 @@
 						}
 					}
 					{...marked('transaction-category')}
-					class="h-9 rounded-md border border-input bg-card px-2.5 text-base aria-invalid:border-destructive md:text-sm pointer-coarse:h-11"
-				>
-					{#if shown.selection.kind === 'recalling' || shown.selection.kind === 'recallFailed'}
-						<option value={optionOf(shown.selection)} disabled>
-							{shown.selection.kind === 'recalling'
-								? 'Looking up the last Category…'
-								: 'Pick a Category'}
-						</option>
-					{/if}
-					<option value={optionOf({ kind: 'uncategorized' })}>Uncategorized</option>
-					{#if !startingBalance}
-						<option value={optionOf({ kind: 'split' })}>Split across Categories</option>
-					{/if}
-					{@render categoryOptions(
-						transaction?.categoryId ?? undefined,
-						transaction?.categoryName ?? undefined
-					)}
-					{#if shown.transferAccounts.length > 0 && !startingBalance}
-						<optgroup label="Transfer to or from">
-							{#each shown.transferAccounts as account (account._id)}
-								<option value={optionOf({ kind: 'transfer', accountId: account._id })}
-									>Transfer: {account.name}</option
-								>
-							{/each}
-						</optgroup>
-					{/if}
-				</select>
+					choices={selectionChoices()}
+				/>
 				{#if shown.selection.kind === 'recallFailed'}
 					<p class="text-sm text-destructive" role="alert">{shown.selection.message}</p>
 				{/if}

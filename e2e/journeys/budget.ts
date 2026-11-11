@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { cents, centsIn, openBudget, typed, type Journey } from './journey';
+import { cents, centsIn, expectClearOf, openBudget, typed, type Journey } from './journey';
 
 function monthName(monthsFromNow: number) {
 	const today = new Date();
@@ -17,6 +17,10 @@ export const budget = {
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			const assigned = page.getByRole('textbox', { name: 'Assigned for Groceries', exact: true });
+			const diningOut = page.getByRole('textbox', {
+				name: 'Assigned for Dining Out',
+				exact: true
+			});
 			const readyToAssign = () => centsIn(page.getByTestId('ready-to-assign'));
 
 			const before = await step('open the Budget', async () => {
@@ -34,20 +38,17 @@ export const budget = {
 				async () => {
 					await assigned.fill(tenDollarsMore);
 					await assigned.press('Enter');
-					await expect(page.locator('input[data-assigned]:focus')).toHaveCount(1);
-					await expect(assigned).not.toBeFocused();
+					await expect(diningOut).toBeFocused();
 					await expect(assigned).toHaveValue(tenDollarsMore);
 					await expect.poll(readyToAssign).toBe(before.readyToAssign - 1_000);
 				}
 			);
 
 			await step('ArrowUp and ArrowDown move between Assigned fields', async () => {
-				const below = page.locator('input[data-assigned]:focus');
-				await below.press('ArrowUp');
+				await diningOut.press('ArrowUp');
 				await expect(assigned).toBeFocused();
 				await assigned.press('ArrowDown');
-				await expect(assigned).not.toBeFocused();
-				await expect(below).toHaveCount(1);
+				await expect(diningOut).toBeFocused();
 			});
 
 			await step('a reload keeps Assigned and Ready to Assign', async () => {
@@ -69,12 +70,31 @@ export const budget = {
 			});
 
 			await step(
+				'on a 390 px phone an unreadable Assigned shows its hint under the field, clear of the next Category and the tab bar',
+				async () => {
+					await page.setViewportSize({ width: 390, height: 844 });
+					await assigned.fill('abc');
+					await assigned.press('Enter');
+					const hint = page.getByText('Try 120.00, 100+20 or +5. Esc restores.');
+					const tabs = page.getByRole('navigation', { name: 'Sections', exact: true });
+					await expectClearOf(hint, page.getByRole('row').filter({ has: diningOut }), tabs);
+					await diningOut.scrollIntoViewIfNeeded();
+					await expectClearOf(diningOut, hint, tabs);
+					await assigned.press('Escape');
+					await expect(hint).toHaveCount(0);
+					await expect(assigned).toHaveValue(tenDollarsMore);
+					await page.setViewportSize({ width: 1280, height: 800 });
+				}
+			);
+
+			await step(
 				'a negative Assigned stays put when the field is only focused, left, or Escaped',
 				async () => {
 					await assigned.fill('0-20');
 					await assigned.press('Enter');
 					await expect(assigned).toHaveValue(typed(-2_000));
-					const settled = await readyToAssign();
+					const settled = before.readyToAssign + before.assigned + 2_000;
+					await expect.poll(readyToAssign).toBe(settled);
 					await assigned.focus();
 					await assigned.blur();
 					await assigned.focus();
@@ -98,8 +118,7 @@ export const budget = {
 			const chosen = (label: string) =>
 				page
 					.getByRole('search', { name: 'Search and filter Transactions' })
-					.getByLabel(label, { exact: true })
-					.locator('option:checked');
+					.getByLabel(label, { exact: true });
 
 			await step('the first item is painted on screen, not only present in the page', async () => {
 				await openBudget(page);

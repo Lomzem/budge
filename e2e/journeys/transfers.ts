@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import { localToday } from '../../src/lib/domain/dates';
-import { centsIn, openAccount, type Journey } from './journey';
+import { centsIn, choose, openAccount, type Journey } from './journey';
 
 const balance = (page: Page) => () => centsIn(page.getByTestId('account-balance'));
 
@@ -13,7 +13,7 @@ async function importRow(page: Page, bankText: string, type: 'Debit' | 'Credit')
 	].join('\n');
 	await page.getByRole('button', { name: 'Import file' }).click();
 	const dialog = page.getByRole('dialog', { name: 'Import a bank file' });
-	await expect(dialog.getByLabel('Account')).toHaveValue(/.+/);
+	await expect(dialog.getByLabel('Account')).not.toHaveText('Pick an Account');
 	await dialog.getByLabel('File').setInputFiles({
 		name: 'bank.csv',
 		mimeType: 'text/csv',
@@ -44,9 +44,7 @@ export const transfers = {
 
 			await step('a $12.34 Transfer to Savings has no Payee and leaves Checking', async () => {
 				await page.getByRole('button', { name: 'Add Transaction' }).click();
-				await dialog
-					.getByLabel('Category or Transfer')
-					.selectOption({ label: 'Transfer: Savings' });
+				await choose(dialog.getByLabel('Category or Transfer'), 'Transfer: Savings');
 				await expect(dialog.getByLabel('Payee')).toBeHidden();
 				await dialog.getByLabel('Amount').fill('12.34');
 				await dialog.getByLabel('Memo').fill(memo);
@@ -100,9 +98,7 @@ export const transfers = {
 				"making Checking's import a Transfer offers to link the Savings import",
 				async () => {
 					await page.getByRole('button', { name: /^SAMPLE E2E XFER OUT/ }).click();
-					await dialog
-						.getByLabel('Category or Transfer')
-						.selectOption({ label: 'Transfer: Savings' });
+					await choose(dialog.getByLabel('Category or Transfer'), 'Transfer: Savings');
 					await expect(
 						dialog.getByRole('radio', { name: /^Link the import SAMPLE E2E XFER IN/ })
 					).toBeChecked();

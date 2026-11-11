@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 
 import { holdResponseTo } from '../heldResponse';
-import { centsIn, openAccount, type Journey } from './journey';
+import { centsIn, expectClearOf, openAccount, type Journey } from './journey';
 
 export const transactions = {
 	create: {
@@ -117,6 +117,10 @@ export const transactions = {
 		run: async (page, { step }) => {
 			const approveAll = page.getByRole('button', { name: /^Approve (all )?\d/ });
 			const waitingHeading = page.getByRole('rowheader', { name: 'Unapproved', exact: true });
+			const unapprovedRows = () =>
+				page
+					.getByRole('button', { name: /, Unapproved, edit Transaction on / })
+					.evaluateAll((rows) => rows.map((row) => row.getAttribute('aria-label') ?? '').sort());
 
 			const label = await step(
 				'Accounts heads the Unapproved rows apart from the Approved ones',
@@ -144,8 +148,10 @@ export const transactions = {
 			);
 
 			await step(
-				'a search approves only the Unapproved rows it shows, and Undo puts them back',
+				'a search approves only the Unapproved rows it shows, leaves the rest Unapproved, and Undo puts them back',
 				async () => {
+					const outside = (await unapprovedRows()).find((name) => !name.includes('BOOKSHOP'));
+					if (outside === undefined) throw new Error('every Unapproved row is a bookshop');
 					await page.getByRole('searchbox', { name: 'Search' }).fill('BOOKSHOP');
 					const shown = page.getByRole('button', { name: /^Approve \d+ shown$/ });
 					const counted = Number(/\d+/.exec((await shown.textContent()) ?? '')?.[0]);
@@ -159,6 +165,9 @@ export const transactions = {
 					await expect(
 						page.getByRole('button', { name: 'Approve shown', exact: true })
 					).toHaveAttribute('aria-disabled', 'true');
+					await page.getByRole('button', { name: 'Clear search and filters' }).click();
+					await expect(page.getByRole('button', { name: outside, exact: true })).toBeVisible();
+					await page.getByRole('searchbox', { name: 'Search' }).fill('BOOKSHOP');
 					await page.getByRole('button', { name: 'Undo', exact: true }).click();
 					await expect(shown).toHaveText(`Approve ${String(counted)} shown`);
 					await page.getByRole('button', { name: 'Clear search and filters' }).click();
@@ -166,18 +175,21 @@ export const transactions = {
 				}
 			);
 
-			await step('Approve all approves them and offers Undo', async () => {
+			const waiting = await step('Approve all approves them and offers Undo', async () => {
+				const before = await unapprovedRows();
 				const counted = Number(/\d+/.exec(label ?? '')?.[0]);
 				await approveAll.click();
 				await expect(
 					page.getByText(`Approved ${String(counted)} Transaction${counted === 1 ? '' : 's'}.`)
 				).toBeVisible();
 				await expect(waitingHeading).toHaveCount(0);
+				return before;
 			});
 
 			await step('Undo puts exactly those back to Unapproved', async () => {
 				await page.getByRole('button', { name: 'Undo', exact: true }).click();
 				await expect(approveAll).toHaveText(label ?? '');
+				await expect.poll(unapprovedRows).toEqual(waiting);
 				await expect(waitingHeading).toBeVisible();
 				await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0);
 			});
@@ -203,9 +215,24 @@ export const transactions = {
 				).toBe(true);
 			});
 
+			await step('the first Transaction shows above the tab bar without scrolling', async () => {
+				await expectClearOf(
+					table.getByRole('button', { name: /edit Transaction on/ }).first(),
+					page.getByRole('navigation', { name: 'Sections', exact: true })
+				);
+			});
+
 			await step('approve it from its dialog', async () => {
 				await table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193, Unapproved/ }).click();
 				const editing = page.getByRole('dialog', { name: 'Edit Transaction' });
+				const pinned = editing.locator('[data-slot="dialog-bar"]');
+				for (const field of [
+					editing.getByLabel('Category'),
+					editing.getByRole('button', { name: 'Save' })
+				]) {
+					await field.scrollIntoViewIfNeeded();
+					await expectClearOf(field, pinned);
+				}
 				await editing.getByRole('button', { name: 'Approve', exact: true }).click();
 				await expect(editing).toBeHidden();
 				await expect(

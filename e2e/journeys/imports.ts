@@ -39,16 +39,20 @@ export const imports = {
 				await openAccount(page, 'Savings');
 			});
 
-			await step('importing a one-row file previews and saves it', async () => {
-				await page.getByRole('button', { name: 'Import file' }).click();
-				await expect(dialog.getByLabel('Account')).toHaveValue(/.+/);
-				await chooseFile(
-					page,
-					inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E BOOKSHOP', '23.45')
-				);
-				await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
-				await expect(dialog).toBeHidden();
-			});
+			await step(
+				'Import file opens on the File field for this Account, then previews and saves a one-row file',
+				async () => {
+					await page.getByRole('button', { name: 'Import file' }).click();
+					await expect(dialog.getByLabel('Account')).not.toHaveText('Pick an Account');
+					await expect(dialog.getByLabel('File')).toBeFocused();
+					await chooseFile(
+						page,
+						inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E BOOKSHOP', '23.45')
+					);
+					await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
+					await expect(dialog).toBeHidden();
+				}
+			);
 
 			await step('the row arrives Unapproved, and Approve clears it', async () => {
 				await expect(approve).toBeVisible();

@@ -98,7 +98,7 @@ interface CallLimits {
 	attempts: number;
 	attemptTimeout: Duration.Input;
 }
-const EVERY_CALL: CallLimits = { attempts: ATTEMPTS, attemptTimeout: ATTEMPT_TIMEOUT };
+const SAFE_TO_REPEAT: CallLimits = { attempts: ATTEMPTS, attemptTimeout: ATTEMPT_TIMEOUT };
 const WITHIN_PLAIDS_WEBHOOK_DEADLINE: CallLimits = { attempts: 1, attemptTimeout: '5 seconds' };
 const EXACTLY_ONCE: CallLimits = { attempts: 1, attemptTimeout: ATTEMPT_TIMEOUT };
 const BACKOFF = Schedule.exponential('2 seconds');
@@ -174,7 +174,7 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 		path: string,
 		body: Record<string, unknown>,
 		decode: (body: unknown) => Effect.Effect<A, unknown>,
-		limits: CallLimits = EVERY_CALL
+		limits: CallLimits
 	): Effect.Effect<A, PlaidError> => {
 		const { clientId, secret } = config;
 		if (clientId === undefined || secret === undefined) {
@@ -229,12 +229,18 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 					count,
 					options: { include_original_description: true }
 				},
-				decodeSyncPage
+				decodeSyncPage,
+				SAFE_TO_REPEAT
 			),
 		transactionsRefresh: (accessToken) =>
-			post('/transactions/refresh', { access_token: accessToken }, ignoreBody),
+			post('/transactions/refresh', { access_token: accessToken }, ignoreBody, SAFE_TO_REPEAT),
 		setWebhook: (accessToken, webhook) =>
-			post('/item/webhook/update', { access_token: accessToken, webhook }, ignoreBody),
+			post(
+				'/item/webhook/update',
+				{ access_token: accessToken, webhook },
+				ignoreBody,
+				SAFE_TO_REPEAT
+			),
 		webhookVerificationKey: (keyId) =>
 			post(
 				'/webhook_verification_key/get',
@@ -264,7 +270,8 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 						: { products: ['transactions'], webhook: request.webhook })
 				},
 				(body) =>
-					Schema.decodeUnknownEffect(LinkTokenBody)(body).pipe(Effect.map((b) => b.link_token))
+					Schema.decodeUnknownEffect(LinkTokenBody)(body).pipe(Effect.map((b) => b.link_token)),
+				SAFE_TO_REPEAT
 			),
 		publicTokenExchange: (publicToken) =>
 			post(
@@ -276,8 +283,10 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 					),
 				EXACTLY_ONCE
 			),
-		itemGet: (accessToken) => post('/item/get', { access_token: accessToken }, decodeItem),
-		itemRemove: (accessToken) => post('/item/remove', { access_token: accessToken }, ignoreBody),
+		itemGet: (accessToken) =>
+			post('/item/get', { access_token: accessToken }, decodeItem, SAFE_TO_REPEAT),
+		itemRemove: (accessToken) =>
+			post('/item/remove', { access_token: accessToken }, ignoreBody, SAFE_TO_REPEAT),
 		accountsGet: (accessToken, accountIds) =>
 			post(
 				'/accounts/get',
@@ -285,7 +294,8 @@ function makeClient(http: HttpClient.HttpClient, config: PlaidConfig): PlaidClie
 					access_token: accessToken,
 					...(accountIds === undefined ? {} : { options: { account_ids: accountIds } })
 				},
-				decodeAccounts
+				decodeAccounts,
+				SAFE_TO_REPEAT
 			)
 	};
 }

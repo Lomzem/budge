@@ -170,9 +170,17 @@ describe('setting up a Bank Connection', () => {
 		);
 
 		assert(setup.ok, 'setup failed');
-		expect(await backend.t.run((ctx) => ctx.db.get('bankConnections', setup.value))).toMatchObject({
-			provider: { kind: 'plaid', itemId }
-		});
+		const saved = await backend.t.run((ctx) => ctx.db.get('bankConnections', setup.value));
+		assert(saved?.provider.kind === 'plaid', 'no Plaid connection saved');
+		expect(saved.provider.itemId).toBe(itemId);
+		const sealed = saved.provider.encryptedToken;
+		const kept = await Effect.runPromise(
+			Effect.gen(function* () {
+				const cipher = yield* TokenCipher;
+				return yield* cipher.decrypt(sealed, itemId);
+			}).pipe(Effect.provide(TokenCipher.layer(tokenKey)))
+		);
+		expect(kept).toBe(accessToken);
 	});
 
 	test('at the Bank Connection limit, setting up an Item again replaces its token and a new Item is refused', async () => {

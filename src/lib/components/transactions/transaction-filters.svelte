@@ -9,6 +9,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import type { Choices } from '$lib/components/choices';
+	import SelectField from '$lib/components/select-field.svelte';
 
 	import {
 		BANK_CHANGES,
@@ -37,8 +39,23 @@
 	let filtersOpen = $state(false);
 	let searchInput: HTMLInputElement | null = $state(null);
 
-	const selectClass =
-		'h-9 w-full min-w-0 rounded-md border border-input bg-card px-2.5 text-base pointer-coarse:h-11';
+	function categoryChoices(): Choices {
+		const data = categories.data;
+		return [
+			{
+				value: '',
+				label: categories.error
+					? "Categories didn't load. Reload to filter by one."
+					: 'Any Category'
+			},
+			{ value: UNCATEGORIZED, label: 'Uncategorized' },
+			...(data?.readyToAssignId ? [{ value: data.readyToAssignId, label: 'Ready to Assign' }] : []),
+			...(data?.groups ?? []).map((group) => ({
+				group: group.name,
+				choices: group.categories.map((category) => ({ value: category._id, label: category.name }))
+			}))
+		];
+	}
 
 	const roomy = new MediaQuery('(min-width: 480px)', true);
 </script>
@@ -106,53 +123,49 @@
 		{#if showAccount}
 			<div class="col-span-2 flex flex-col gap-1 @3xl:col-span-1">
 				<Label for="transaction-filter-account">Account</Label>
-				<select id="transaction-filter-account" bind:value={values.accountId} class={selectClass}>
-					<option value="">All Accounts</option>
-					{#each accounts.all as account (account._id)}
-						<option value={account._id}>{account.name}</option>
-					{/each}
-				</select>
+				<SelectField
+					id="transaction-filter-account"
+					bind:value={values.accountId}
+					choices={[
+						{ value: '', label: 'All Accounts' },
+						...accounts.all.map((account) => ({ value: account._id, label: account.name }))
+					]}
+				/>
 			</div>
 		{/if}
 		<div class="flex flex-col gap-1">
 			<Label for="transaction-filter-category">Category</Label>
-			<select id="transaction-filter-category" bind:value={values.categoryId} class={selectClass}>
-				<option value="">
-					{categories.error ? "Categories didn't load. Reload to filter by one." : 'Any Category'}
-				</option>
-				<option value={UNCATEGORIZED}>Uncategorized</option>
-				{#if categories.data}
-					{#if categories.data.readyToAssignId !== null}
-						<option value={categories.data.readyToAssignId}>Ready to Assign</option>
-					{/if}
-					{#each categories.data.groups as group (group._id)}
-						<optgroup label={group.name}>
-							{#each group.categories as category (category._id)}
-								<option value={category._id}>{category.name}</option>
-							{/each}
-						</optgroup>
-					{/each}
-				{/if}
-			</select>
+			<SelectField
+				id="transaction-filter-category"
+				bind:value={values.categoryId}
+				choices={categoryChoices()}
+			/>
 		</div>
 		<div class="flex flex-col gap-1">
 			<Label for="transaction-filter-status">Status</Label>
-			<select id="transaction-filter-status" bind:value={values.status} class={selectClass}>
-				<option value="">Any status</option>
-				<option value={UNAPPROVED}>Unapproved</option>
-				<option value={BANK_CHANGES}>Bank changes</option>
-			</select>
+			<SelectField
+				id="transaction-filter-status"
+				bind:value={values.status}
+				choices={[
+					{ value: '', label: 'Any status' },
+					{ value: UNAPPROVED, label: 'Unapproved' },
+					{ value: BANK_CHANGES, label: 'Bank changes' }
+				]}
+			/>
 		</div>
 		<div class="flex flex-col gap-1">
 			<Label for="transaction-filter-payee">Payee</Label>
-			<select id="transaction-filter-payee" bind:value={values.payeeId} class={selectClass}>
-				<option value="">
-					{payees.error ? "Payees didn't load. Reload to filter by one." : 'Any Payee'}
-				</option>
-				{#each payees.data ?? [] as payee (payee._id)}
-					<option value={payee._id}>{payee.name}</option>
-				{/each}
-			</select>
+			<SelectField
+				id="transaction-filter-payee"
+				bind:value={values.payeeId}
+				choices={[
+					{
+						value: '',
+						label: payees.error ? "Payees didn't load. Reload to filter by one." : 'Any Payee'
+					},
+					...(payees.data ?? []).map((payee) => ({ value: payee._id, label: payee.name }))
+				]}
+			/>
 		</div>
 		<div class="flex flex-col gap-1">
 			<Label for="transaction-filter-from">From</Label>

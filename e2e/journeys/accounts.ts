@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test';
 
 import { formatCents } from '../../src/lib/domain/money';
 import { holdResponseTo } from '../heldResponse';
-import { cents, centsIn, openAccount, typed, type Journey } from './journey';
+import { cents, centsIn, choicesOf, openAccount, typed, type Journey } from './journey';
 
 async function openStartingBalance(page: Page, name: string) {
 	await page.getByRole('button', { name: `${name} actions` }).click();
@@ -130,11 +130,10 @@ export const accounts = {
 					await expect(dialog.getByLabel('Payee')).toBeDisabled();
 					await expect(dialog.getByLabel('Payee')).toHaveValue('Starting Balance');
 					const category = dialog.getByLabel('Category', { exact: true });
-					await expect(category.getByRole('option', { name: 'Groceries' })).toHaveCount(1);
-					await expect(
-						category.getByRole('option', { name: 'Split across Categories' })
-					).toHaveCount(0);
-					await expect(category.getByRole('option', { name: /^Transfer:/ })).toHaveCount(0);
+					const choices = await choicesOf(category);
+					expect(choices).toContain('Groceries');
+					expect(choices).not.toContain('Split across Categories');
+					expect(choices.filter((name) => name.startsWith('Transfer:'))).toEqual([]);
 				}
 			);
 

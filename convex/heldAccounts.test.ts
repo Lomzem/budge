@@ -583,7 +583,7 @@ describe('a removed Bank Connection', () => {
 		).toEqual({ bankAccounts: 0, heldRows: 0 });
 	});
 
-	test('is removed even when Plaid no longer knows its login', async () => {
+	test('accepts ITEM_NOT_FOUND when removing the remote Item', async () => {
 		const { t, connectionId } = await connectedBudget();
 		const removed: string[] = [];
 		await t.action(async (ctx) => {

@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { cents, centsIn, openBudget, typed, type Journey } from './journey';
+import { cents, centsIn, choose, openBudget, typed, type Journey } from './journey';
 
 export const inspector = {
 	'move-money': {
@@ -33,10 +33,7 @@ export const inspector = {
 				const category = region.getByLabel(
 					direction === 'Move to' ? 'To Category' : 'From Category'
 				);
-				const coffee = await category
-					.locator('option', { hasText: /^Coffee / })
-					.getAttribute('value');
-				await category.selectOption(coffee ?? '');
+				await choose(category, /^Coffee \(/);
 				await region.getByLabel('Amount').fill(typed(1_000));
 				await region.getByLabel('Amount').press('Enter');
 			};
@@ -79,17 +76,16 @@ export const inspector = {
 				'the phone inspector steps to the next Category and focuses its Assigned field',
 				async () => {
 					await groceries.click();
-					const next = page.getByRole('dialog').getByRole('button', { name: /^Next Category: / });
-					const nextName = ((await next.getAttribute('aria-label')) ?? '').replace(
-						'Next Category: ',
-						''
-					);
-					await next.click();
-					const stepped = page.getByRole('dialog', { name: nextName });
+					await page
+						.getByRole('dialog')
+						.getByRole('button', { name: 'Next Category: Dining Out' })
+						.click();
+					const stepped = page.getByRole('dialog', { name: 'Dining Out' });
 					await expect(stepped.getByLabel('Assigned this month')).toBeFocused();
+					await stepped.getByRole('button', { name: 'Previous Category: Groceries' }).click();
 					await expect(
-						stepped.getByRole('button', { name: 'Previous Category: Groceries' })
-					).toBeVisible();
+						page.getByRole('dialog', { name: 'Groceries' }).getByLabel('Assigned this month')
+					).toBeFocused();
 				}
 			);
 		}

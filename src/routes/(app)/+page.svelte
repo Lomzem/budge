@@ -31,6 +31,7 @@
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
 	import { formatBankChangeCount } from '$lib/domain/bankChanges';
+	import { ScrollArea } from '$lib/components/ui/scroll-area';
 
 	const accounts = getAccounts();
 	const bank = getBankConnections();
@@ -162,7 +163,7 @@
 		return list;
 	});
 
-	let needsList = $state<HTMLUListElement | null>(null);
+	let needsList = $state<HTMLElement | null>(null);
 	let needsBefore = $state(false);
 	let needsAfter = $state(false);
 
@@ -308,21 +309,21 @@
 			{#if readyToAssign}
 				<div
 					class={[
-						'flex w-full flex-wrap items-center justify-between gap-x-3 rounded-lg px-4 py-2 xs:gap-x-6 sm:w-auto sm:min-w-56 sm:px-5 sm:py-3',
+						'grid w-full grid-cols-label-figure items-baseline gap-x-3 gap-y-0.5 rounded-lg px-4 py-3 xs:gap-x-4 sm:w-auto sm:gap-x-8 sm:px-5',
 						readyToAssign.amount < 0 ? 'bg-destructive-tint' : 'bg-funded-tint'
 					]}
 				>
-					<p class="text-sm font-bold">Ready to Assign</p>
+					<p class="text-sm font-bold whitespace-nowrap">Ready to Assign</p>
 					<p
 						data-testid="ready-to-assign"
 						class={[
-							'shrink-0 text-lg font-bold whitespace-nowrap tabular-nums xs:text-2xl sm:text-3xl',
+							'text-right text-lg leading-tight font-bold whitespace-nowrap tabular-nums xs:text-2xl sm:row-span-2 sm:self-center sm:text-3xl',
 							readyToAssign.amount < 0 ? 'text-destructive' : 'text-funded'
 						]}
 					>
 						{formatCents(readyToAssign.amount)}
 					</p>
-					<p class="min-h-4 basis-full text-xs">
+					<p class="col-span-2 min-h-4 text-xs sm:col-span-1">
 						{#if readyToAssign.uncategorized < 0}
 							{formatCents(-readyToAssign.uncategorized)} of spending has no Category yet
 						{:else if readyToAssign.uncategorized > 0}
@@ -377,44 +378,46 @@
 					Nothing needs you right now.
 				</p>
 			{:else}
-				<ul
-					bind:this={needsList}
-					onscroll={measureNeeds}
+				<div
 					class={[
-						'-mx-1 flex min-w-0 flex-1 snap-x snap-proximity scroll-px-1 gap-2 overflow-x-auto fade-edges p-1',
+						'-mx-1 flex min-w-0 flex-1 fade-edges',
 						needsBefore && 'fade-start',
 						needsAfter && 'fade-end'
 					]}
 				>
-					{#each needs as need (need.text)}
-						{@const chip = [
-							'flex min-h-8 items-center rounded-full px-3 text-sm font-bold whitespace-nowrap pointer-coarse:min-h-11',
-							need.tone === 'bad'
-								? 'bg-destructive-tint text-destructive'
-								: 'bg-warning-tint text-warning'
-						]}
-						<li class="shrink-0 snap-start">
-							{#if need.link}
-								<a
-									href="{resolve(need.link.path)}{need.link.query}"
-									class={[chip, 'underline-offset-4 hover:underline']}
-								>
-									{@render needText(need)}
-								</a>
-							{:else if need.action}
-								<button
-									type="button"
-									class={[chip, 'underline-offset-4 hover:underline']}
-									onclick={need.action}
-								>
-									{@render needText(need)}
-								</button>
-							{:else}
-								<span class={chip}>{@render needText(need)}</span>
-							{/if}
-						</li>
-					{/each}
-				</ul>
+					<ScrollArea orientation="horizontal" bind:viewportRef={needsList} onscroll={measureNeeds}>
+						<ul class="flex gap-2 p-1">
+							{#each needs as need (need.text)}
+								{@const chip = [
+									'flex min-h-8 items-center rounded-full px-3 text-sm font-bold whitespace-nowrap pointer-coarse:min-h-11',
+									need.tone === 'bad'
+										? 'bg-destructive-tint text-destructive'
+										: 'bg-warning-tint text-warning'
+								]}
+								<li class="shrink-0 snap-start">
+									{#if need.link}
+										<a
+											href="{resolve(need.link.path)}{need.link.query}"
+											class={[chip, 'underline-offset-4 hover:underline']}
+										>
+											{@render needText(need)}
+										</a>
+									{:else if need.action}
+										<button
+											type="button"
+											class={[chip, 'underline-offset-4 hover:underline']}
+											onclick={need.action}
+										>
+											{@render needText(need)}
+										</button>
+									{:else}
+										<span class={chip}>{@render needText(need)}</span>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					</ScrollArea>
+				</div>
 				{@render needsScroller(-1, needsBefore)}
 				{@render needsScroller(1, needsAfter)}
 			{/if}
@@ -472,17 +475,19 @@
 						<BudgetTable groups={view.groups} selectedId={selected?.id ?? null} onselect={select} />
 					</div>
 					{#if wide.current}
-						<aside
-							class="sticky top-8 -m-1 flex max-h-side-panel-height w-82 shrink-0 flex-col gap-6 overflow-y-auto overscroll-contain p-1"
-						>
-							{#if selected}
-								<div class="rounded-lg border bg-card p-5">{@render inspector()}</div>
-							{:else}
-								<p class="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-									Select a Category to see its Target, move money or cover overspending here.
-								</p>
-								<UpcomingList upcoming={view.upcoming} />
-							{/if}
+						<aside class="sticky top-8 -m-1 flex max-h-side-panel-height w-82 shrink-0 flex-col">
+							<ScrollArea>
+								<div class="flex flex-col gap-6 p-1">
+									{#if selected}
+										<div class="rounded-lg border bg-card p-5">{@render inspector()}</div>
+									{:else}
+										<p class="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+											Select a Category to see its Target, move money or cover overspending here.
+										</p>
+										<UpcomingList upcoming={view.upcoming} />
+									{/if}
+								</div>
+							</ScrollArea>
 						</aside>
 					{/if}
 				</div>

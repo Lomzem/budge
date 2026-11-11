@@ -140,8 +140,12 @@
 	/>
 	{#if error}<span id={errorId} role="alert" class="sr-only">{error}</span>{/if}
 	{#if hint}
-		<span aria-hidden="true" class="mt-1 block text-xs whitespace-normal text-destructive"
-			>{hint}</span
+		<span
+			{@attach (node: HTMLElement) => {
+				node.scrollIntoView({ block: 'nearest' });
+			}}
+			aria-hidden="true"
+			class="mt-1 block text-xs whitespace-normal text-destructive">{hint}</span
 		>
 	{/if}
 </div>

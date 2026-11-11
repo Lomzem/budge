@@ -12,7 +12,7 @@ export function parseCents(text: string): number | undefined {
 
 const SUM = /^[-−]?[^+\-−]+(?:[+\-−][^+\-−]+)*$/;
 
-export function parseCentsSum(text: string): number | undefined {
+function parseCentsSum(text: string): number | undefined {
 	const trimmed = text.trim();
 	if (!SUM.test(trimmed)) return undefined;
 	let total = 0;

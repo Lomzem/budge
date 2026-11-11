@@ -6,6 +6,8 @@ import ts from 'typescript-eslint';
 
 import svelteConfig from './svelte.config.ts';
 
+const nativeScroll = String.raw`/\boverflow-(x-|y-)?(auto|scroll)\b/`;
+
 export default defineConfig(
 	globalIgnores(['.svelte-kit/', 'build/', '.vercel/', 'convex/', ...generatedUiIgnores]),
 
@@ -23,7 +25,20 @@ export default defineConfig(
 			'shadcn/no-arbitrary-values': 'error',
 			'shadcn/no-inline-styles': 'error',
 			'shadcn/no-unknown-classes': 'error',
-			'shadcn/require-static-classes': 'error'
+			'shadcn/require-static-classes': 'error',
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector: "SvelteElement[kind='html'][name.name='select']",
+					message:
+						'Use SelectField from $lib/components/select-field.svelte, built on the shadcn-svelte Select, instead of a native <select>.'
+				},
+				...['SvelteLiteral[value', 'Literal[value', 'TemplateElement[value.raw'].map((node) => ({
+					selector: `${node}=${nativeScroll}]`,
+					message:
+						'Scroll inside ScrollArea from $lib/components/ui/scroll-area, the shadcn-svelte ScrollArea, instead of an overflow-auto or overflow-scroll class.'
+				}))
+			]
 		}
 	}
 );

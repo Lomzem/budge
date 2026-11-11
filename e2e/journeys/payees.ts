@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { openAccount, type Journey } from './journey';
+import { choose, openAccount, type Journey } from './journey';
 
 export const payees = {
 	'last-category': {
@@ -10,7 +10,6 @@ export const payees = {
 			const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
 			const payee = dialog.getByLabel('Payee');
 			const category = dialog.getByLabel('Category or Transfer');
-			const picked = category.locator('option:checked');
 
 			await step('open Add Transaction on Checking', async () => {
 				await page.goto('/');
@@ -21,18 +20,18 @@ export const payees = {
 			await step("a known Payee fills in its last Category; a new one doesn't", async () => {
 				const seedsRentPayee = 'Sample Landlord';
 				await payee.fill(seedsRentPayee);
-				await expect(picked).toHaveText('Rent');
+				await expect(category).toHaveText('Rent');
 				await payee.fill('Smoke Test Florist');
-				await expect(picked).toHaveText('Uncategorized');
+				await expect(category).toHaveText('Uncategorized');
 			});
 
 			await step('a Category picked by hand survives retyping the Payee', async () => {
 				await payee.fill('Sample Landlord');
-				await expect(picked).toHaveText('Rent');
-				await category.selectOption({ label: 'Groceries' });
+				await expect(category).toHaveText('Rent');
+				await choose(category, 'Groceries');
 				await payee.fill('Sample Landlor');
 				await payee.fill('Sample Landlord');
-				await expect(picked).toHaveText('Groceries');
+				await expect(category).toHaveText('Groceries');
 			});
 		}
 	}

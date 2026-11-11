@@ -6,6 +6,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import SelectField from '$lib/components/select-field.svelte';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	let {
@@ -68,16 +69,12 @@
 			{#if kind === 'category'}
 				<div class="flex flex-col gap-2">
 					<Label for="add-category-group">Category Group</Label>
-					<select
+					<SelectField
 						id="add-category-group"
 						bind:value={groupId}
-						required
-						class="h-9 rounded-md border border-input bg-card px-2.5 text-base md:text-sm pointer-coarse:h-11"
-					>
-						{#each groups as group (group.id)}
-							<option value={group.id}>{group.name}</option>
-						{/each}
-					</select>
+						placeholder="Pick a group"
+						choices={groups.map((group) => ({ value: group.id, label: group.name }))}
+					/>
 				</div>
 			{/if}
 			<div class="flex flex-col gap-2">

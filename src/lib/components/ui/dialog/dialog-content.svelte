@@ -5,6 +5,8 @@
 	import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
 	import * as Dialog from './index.js';
 	import DialogPortal from './dialog-portal.svelte';
+	import { ScrollArea as ScrollAreaPrimitive } from 'bits-ui';
+	import Scrollbar from '../scroll-area/scroll-area-scrollbar.svelte';
 	import { untrack, type Snippet } from 'svelte';
 	import type { ComponentProps } from 'svelte';
 
@@ -24,7 +26,7 @@
 		size?: 'default' | 'wide';
 	} = $props();
 
-	let body: HTMLDivElement | null = $state(null);
+	let body: HTMLElement | null = $state(null);
 	let scrolled = $state(false);
 	let heading = $state('');
 
@@ -58,17 +60,20 @@
 		)}
 		{...restProps}
 	>
-		<div
-			bind:this={body}
-			{onscroll}
-			data-slot="dialog-body"
-			class={[
-				'grid min-h-0 scroll-pb-40 gap-5 overflow-y-auto overscroll-contain p-5 sm:scroll-pb-24 sm:p-6',
-				showCloseButton && 'scroll-pt-20 pointer-coarse:scroll-pt-24'
-			]}
-		>
-			{@render children()}
-		</div>
+		<ScrollAreaPrimitive.Root data-slot="scroll-area" class="relative flex min-h-0 flex-1 flex-col">
+			<ScrollAreaPrimitive.Viewport
+				bind:ref={body}
+				{onscroll}
+				data-slot="dialog-body"
+				class={[
+					'min-h-0 flex-1 scroll-pb-40 overscroll-contain sm:scroll-pb-24',
+					showCloseButton && 'scroll-pt-20 pointer-coarse:scroll-pt-24'
+				]}
+			>
+				<div class="grid gap-5 p-5 sm:p-6">{@render children()}</div>
+			</ScrollAreaPrimitive.Viewport>
+			<Scrollbar orientation="vertical" />
+		</ScrollAreaPrimitive.Root>
 		{#if showCloseButton}
 			<div
 				data-slot="dialog-bar"

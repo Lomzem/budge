@@ -9,6 +9,7 @@
 	import { getBankConnections } from '$lib/bankConnections.svelte';
 	import AccountDialog from '$lib/components/accounts/account-dialog.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
 	import { SECTIONS } from '$lib/views';
@@ -36,81 +37,82 @@
 	<BrandMark class="size-7" />
 	Budge
 </a>
-<nav
-	aria-label="Sections and Accounts"
-	class="flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-6"
->
-	<ul class="flex flex-col gap-0.5">
-		{#each SECTIONS as section (section.href)}
-			{@const Icon = section.icon}
-			<li>
-				<a
-					href={resolve(section.href)}
-					aria-current={section.href === page.url.pathname ? 'page' : undefined}
-					class={linkClass}
-				>
-					<Icon aria-hidden="true" class="size-5 shrink-0 text-muted-foreground" />
-					<span class="flex-1">{section.label}</span>
-					{#if section.href === '/accounts' && unapprovedCount > 0}
-						<SectionBadge count={formatUnapprovedCount(unapprovedCount)} label="Unapproved" />
-					{:else if section.href === '/bank' && bank.needingYou > 0}
-						<SectionBadge
-							count={String(bank.needingYou)}
-							label="need you"
-							tone={bank.broken ? 'bad' : 'warn'}
-						/>
-					{/if}
-				</a>
-			</li>
-		{/each}
-	</ul>
-	{#if ready}
-		<div class="flex flex-col gap-3">
-			<div class="flex items-center justify-between gap-2 pl-2.5">
-				<h2 class="text-xs font-bold text-muted-foreground">Accounts</h2>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label="Add Account"
-					onclick={() => (addOpen = true)}
-				>
-					<PlusIcon aria-hidden="true" />
-				</Button>
-			</div>
-			{#if accounts.all.length === 0}
-				<p class="px-2.5 text-xs text-muted-foreground">No Accounts yet.</p>
-			{/if}
-			{#each accounts.groups as group (group.label)}
-				<section aria-labelledby="sidebar-{group.label}" class="flex flex-col gap-0.5">
-					<h3
-						id="sidebar-{group.label}"
-						class="flex items-baseline justify-between gap-2 px-2.5 pb-1 text-xs text-muted-foreground"
+<ScrollArea>
+	<nav aria-label="Sections and Accounts" class="flex flex-col gap-6 px-3 pb-6">
+		<ul class="flex flex-col gap-0.5">
+			{#each SECTIONS as section (section.href)}
+				{@const Icon = section.icon}
+				<li>
+					<a
+						href={resolve(section.href)}
+						aria-current={section.href === page.url.pathname ? 'page' : undefined}
+						class={linkClass}
 					>
-						{group.label}
-						<span>{formatCents(total(group.accounts))}</span>
-					</h3>
-					<ul class="flex flex-col gap-0.5">
-						{#each group.accounts as account (account._id)}
-							{@const href = resolve('/(app)/accounts/[accountId]', { accountId: account._id })}
-							<li>
-								<a
-									{href}
-									aria-current={href === page.url.pathname ? 'page' : undefined}
-									class={[linkClass, 'justify-between']}
-								>
-									<span class="truncate">{account.name}</span>
-									<span class={['shrink-0 font-normal', account.balance < 0 && 'text-destructive']}>
-										{formatCents(account.balance)}
-									</span>
-								</a>
-							</li>
-						{/each}
-					</ul>
-				</section>
+						<Icon aria-hidden="true" class="size-5 shrink-0 text-muted-foreground" />
+						<span class="flex-1">{section.label}</span>
+						{#if section.href === '/accounts' && unapprovedCount > 0}
+							<SectionBadge count={formatUnapprovedCount(unapprovedCount)} label="Unapproved" />
+						{:else if section.href === '/bank' && bank.needingYou > 0}
+							<SectionBadge
+								count={String(bank.needingYou)}
+								label="need you"
+								tone={bank.broken ? 'bad' : 'warn'}
+							/>
+						{/if}
+					</a>
+				</li>
 			{/each}
-		</div>
-	{/if}
-</nav>
+		</ul>
+		{#if ready}
+			<div class="flex flex-col gap-3">
+				<div class="flex items-center justify-between gap-2 pl-2.5">
+					<h2 class="text-xs font-bold text-muted-foreground">Accounts</h2>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Add Account"
+						onclick={() => (addOpen = true)}
+					>
+						<PlusIcon aria-hidden="true" />
+					</Button>
+				</div>
+				{#if accounts.all.length === 0}
+					<p class="px-2.5 text-xs text-muted-foreground">No Accounts yet.</p>
+				{/if}
+				{#each accounts.groups as group (group.label)}
+					<section aria-labelledby="sidebar-{group.label}" class="flex flex-col gap-0.5">
+						<h3
+							id="sidebar-{group.label}"
+							class="flex items-baseline justify-between gap-2 px-2.5 pb-1 text-xs text-muted-foreground"
+						>
+							{group.label}
+							<span>{formatCents(total(group.accounts))}</span>
+						</h3>
+						<ul class="flex flex-col gap-0.5">
+							{#each group.accounts as account (account._id)}
+								{@const href = resolve('/(app)/accounts/[accountId]', { accountId: account._id })}
+								<li>
+									<a
+										{href}
+										aria-current={href === page.url.pathname ? 'page' : undefined}
+										class={[linkClass, 'justify-between']}
+									>
+										<span class="truncate">{account.name}</span>
+										<span
+											class={['shrink-0 font-normal', account.balance < 0 && 'text-destructive']}
+										>
+											{formatCents(account.balance)}
+										</span>
+									</a>
+								</li>
+							{/each}
+						</ul>
+					</section>
+				{/each}
+			</div>
+		{/if}
+	</nav>
+</ScrollArea>
 
 {#if ready}
 	<AccountDialog bind:open={addOpen} />

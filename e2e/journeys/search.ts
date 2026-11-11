@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
-import type { Journey } from './journey';
+import { choose, type Journey } from './journey';
 
 async function openAllAccounts(page: Page) {
 	await page.goto('/accounts');
@@ -25,6 +25,7 @@ export const search = {
 		run: async (page, { step }) => {
 			await page.setViewportSize({ width: 1280, height: 800 });
 			const searchbox = page.getByRole('searchbox', { name: 'Search' });
+			let landlordId = '';
 
 			await step(
 				'search finds a Transaction by its Bank Text and a split by its line memo',
@@ -40,7 +41,9 @@ export const search = {
 
 			await step('the Payee filter narrows the list', async () => {
 				await searchbox.fill('');
-				await page.getByLabel('Payee', { exact: true }).selectOption({ label: 'Sample Landlord' });
+				await choose(page.getByLabel('Payee', { exact: true }), 'Sample Landlord');
+				await expect.poll(() => new URL(page.url()).searchParams.get('payee')).toMatch(/.+/);
+				landlordId = new URL(page.url()).searchParams.get('payee') ?? '';
 				await expect
 					.poll(async () => new Set(await listedPayees(page)))
 					.toEqual(new Set(['Sample Landlord']));
@@ -49,27 +52,23 @@ export const search = {
 			await step(
 				'the split has no Category of its own; its Gifts line lists it under Gifts',
 				async () => {
-					await page.getByLabel('Payee', { exact: true }).selectOption({ label: 'Any Payee' });
-					await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Gifts' });
+					await choose(page.getByLabel('Payee', { exact: true }), 'Any Payee');
+					await choose(page.getByLabel('Category', { exact: true }), 'Gifts');
 					await expect.poll(() => listedPayees(page)).toContain('Sample Warehouse Club');
 				}
 			);
 
 			await step('Clear search and filters resets them', async () => {
 				await page.getByRole('button', { name: 'Clear search and filters' }).click();
-				await expect(page.getByLabel('Category', { exact: true })).toHaveValue('');
+				await expect(page.getByLabel('Category', { exact: true })).toHaveText('Any Category');
 			});
 
 			await step(
 				'a link whose filters name nothing Budge offers drops them and lists every Transaction',
 				async () => {
-					const landlordId = await page
-						.getByLabel('Payee', { exact: true })
-						.locator('option', { hasText: 'Sample Landlord' })
-						.getAttribute('value');
 					expect(landlordId).toBeTruthy();
-					await page.goto(`/accounts?account=${String(landlordId)}&category=123&payee=xyz&q=`);
-					await expect(page.getByLabel('Payee', { exact: true })).toHaveValue('');
+					await page.goto(`/accounts?account=${landlordId}&category=123&payee=xyz&q=`);
+					await expect(page.getByLabel('Payee', { exact: true })).toHaveText('Any Payee');
 					await expect.poll(async () => (await listedPayees(page)).length).toBeGreaterThan(3);
 					await expect(page).toHaveURL(/\/accounts$/);
 					await expect(page.getByText("Budge couldn't load Transactions")).toHaveCount(0);

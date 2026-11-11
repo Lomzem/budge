@@ -244,6 +244,10 @@
 		scrollbar-gutter: stable;
 		-webkit-text-size-adjust: 100%;
 		text-rendering: optimizeLegibility;
+		/* Below lg, what scrolls into view stops above the fixed tab bar. */
+		@variant max-lg {
+			scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+		}
 	}
 	h1,
 	h2,
@@ -297,4 +301,9 @@
 
 @utility fade-end {
 	--fade-end: 2.5rem;
+}
+
+/* A label column that takes the free room beside a figure column as wide as its figure. */
+@utility grid-cols-label-figure {
+	grid-template-columns: minmax(0, 1fr) auto;
 }
