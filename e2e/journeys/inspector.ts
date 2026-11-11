@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 
+import { pausableSync } from '../heldResponse';
 import { cents, centsIn, choose, openBudget, typed, type Journey } from './journey';
 
 export const inspector = {
@@ -14,6 +15,7 @@ export const inspector = {
 				cents(await page.getByRole('textbox', { name: `Assigned for ${name}` }).inputValue());
 			const groceries = page.getByRole('button', { name: 'Groceries', exact: true });
 			const region = page.getByRole('region', { name: 'Groceries' });
+			const sync = await pausableSync(page);
 
 			await step('Enter on Groceries opens its inspector, focused', async () => {
 				await openBudget(page);
@@ -53,6 +55,23 @@ export const inspector = {
 				await expect.poll(() => assigned('Groceries')).toBe(before.groceries);
 				await expect.poll(() => assigned('Coffee')).toBe(before.coffee);
 			});
+
+			await step(
+				'while the next month loads, the inspector takes no input, then takes it again',
+				async () => {
+					const amount = region.getByLabel('Amount');
+					sync.pause();
+					await page.getByRole('button', { name: 'Next month', exact: true }).click();
+					await amount.focus();
+					await expect(amount).not.toBeFocused();
+					sync.resume();
+					await expect(async () => {
+						await amount.focus();
+						await expect(amount).toBeFocused({ timeout: 100 });
+					}).toPass();
+					await page.getByRole('button', { name: 'Previous month', exact: true }).click();
+				}
+			);
 
 			await step('on a phone the same inspector opens as a dialog over the Budget', async () => {
 				await page.setViewportSize({ width: 320, height: 640 });

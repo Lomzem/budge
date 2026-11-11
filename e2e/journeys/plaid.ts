@@ -197,41 +197,53 @@ export const plaid = {
 	},
 	remove: {
 		title:
-			'removing a Bank Connection asks first, keeps its Transactions, and moves focus to the next card',
+			'removing a Bank Connection asks first, waits for bank sync to sign out of the bank, and moves focus to the next card',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const communityBank = card(page, 'Sample Community Bank');
-			const actions = communityBank.getByRole('button', {
-				name: 'Sample Community Bank actions'
-			});
-			const confirm = page.getByRole('alertdialog', { name: 'Remove Sample Community Bank?' });
+			const sandbox = card(page, 'Sample Bank (Sandbox)');
+			const actionsOf = (name: string) =>
+				card(page, name).getByRole('button', { name: `${name} actions` });
+			const confirmOf = (name: string) =>
+				page.getByRole('alertdialog', { name: `Remove ${name}?` });
+			const removeConnection = async (name: string) => {
+				await actionsOf(name).click();
+				await page.getByRole('menuitem', { name: 'Remove connection…' }).click();
+				await confirmOf(name).getByRole('button', { name: 'Remove connection' }).click();
+			};
 
 			await step('Keep it closes the confirm and leaves the card', async () => {
 				await openBank(page);
-				await actions.click();
+				await actionsOf('Sample Community Bank').click();
 				await page.getByRole('menuitem', { name: 'Remove connection…' }).click();
-				await expect(confirm).toContainText('Transactions it already brought in stay');
-				await confirm.getByRole('button', { name: 'Keep it' }).click();
-				await expect(confirm).toBeHidden();
-				await expect(actions).toBeFocused();
+				await expect(confirmOf('Sample Community Bank')).toContainText(
+					'Transactions it already brought in stay'
+				);
+				await confirmOf('Sample Community Bank').getByRole('button', { name: 'Keep it' }).click();
+				await expect(confirmOf('Sample Community Bank')).toBeHidden();
+				await expect(actionsOf('Sample Community Bank')).toBeFocused();
 				await expect(communityBank).toBeVisible();
 			});
 
-			await step('Remove connection drops the card and reports it', async () => {
-				await actions.click();
-				await page.getByRole('menuitem', { name: 'Remove connection…' }).click();
-				await confirm.getByRole('button', { name: 'Remove connection' }).click();
-				await expect(communityBank).toHaveCount(0);
-				await expect(page.getByRole('status').filter({ hasText: /^Sample Community/ })).toHaveText(
-					'Sample Community Bank: Removed. Its Transactions stay in your Accounts.'
+			await step(
+				'without bank sync set up, a connection with a bank login stays and says why',
+				async () => {
+					await removeConnection('Sample Community Bank');
+					await expect(communityBank.getByRole('status')).toHaveText(
+						"Bank sync isn't set up on this server, so Budge can't sign out of this bank yet. Set it up, then remove the connection."
+					);
+					await expect(communityBank).toBeVisible();
+					await expect(communityBank.getByRole('link', { name: 'Savings' })).toBeVisible();
+				}
+			);
+
+			await step('a connection with no bank login is removed and reported', async () => {
+				await removeConnection('Sample Bank (Sandbox)');
+				await expect(sandbox).toHaveCount(0);
+				await expect(page.getByRole('status').filter({ hasText: /^Sample Bank/ })).toHaveText(
+					'Sample Bank (Sandbox): Removed. Its Transactions stay in your Accounts.'
 				);
 				await expect(page.locator('article:focus')).toHaveCount(1);
-			});
-
-			await step('Savings keeps its Transactions and no longer names the bank', async () => {
-				await openAccount(page, 'Savings');
-				await expect(page.getByTestId('account-sync')).not.toContainText('Sample Community Bank');
-				await expect(page.getByRole('button', { name: /, edit/ }).first()).toBeVisible();
 			});
 		}
 	},

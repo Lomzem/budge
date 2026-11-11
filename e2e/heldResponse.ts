@@ -60,3 +60,31 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 		}
 	};
 }
+
+export async function pausableSync(page: Page) {
+	const queued: Frame[] = [];
+	let browser: WebSocketRoute | undefined;
+	let paused = false;
+
+	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => {
+		browser = socket;
+		const server = socket.connectToServer();
+		socket.onMessage((frame) => {
+			server.send(frame);
+		});
+		server.onMessage((frame) => {
+			if (paused) queued.push(frame);
+			else socket.send(frame);
+		});
+	});
+
+	return {
+		pause() {
+			paused = true;
+		},
+		resume() {
+			paused = false;
+			for (const frame of queued.splice(0)) browser?.send(frame);
+		}
+	};
+}
