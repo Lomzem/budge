@@ -23,6 +23,49 @@ async function chooseFile(page: Page, csv: string) {
 }
 
 export const imports = {
+	twin: {
+		title:
+			'a relabelled re-import of an imported row asks by its own label whether it is already here',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			await page.setViewportSize({ width: 1280, height: 800 });
+			const dialog = page.getByRole('dialog', { name: 'Import a bank file' });
+			const twin = dialog.getByRole('combobox', { name: /^Likely already here/ });
+
+			await step('import one row into Savings', async () => {
+				await page.goto('/');
+				await openAccount(page, 'Savings');
+				await page.getByRole('button', { name: 'Import file' }).click();
+				await chooseFile(page, inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E TWIN', '12.34'));
+				await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
+				await expect(dialog).toBeHidden();
+			});
+
+			await step('the same row, relabelled, names its visible picker by its label', async () => {
+				await page.getByRole('button', { name: 'Import file' }).click();
+				await dialog.getByLabel('File').setInputFiles({
+					name: 'savings.csv',
+					mimeType: 'text/csv',
+					buffer: Buffer.from(
+						inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E TWIN RELABELLED', '12.34')
+					)
+				});
+				await expect(twin).toBeVisible();
+				await expect(twin).toHaveText('Skip this row');
+			});
+
+			await step('adding it as new imports both rows', async () => {
+				await twin.click();
+				await page.getByRole('option', { name: 'Add it as new' }).click();
+				await expect(twin).toHaveText('Add it as new');
+				await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
+				await expect(dialog).toBeHidden();
+				await expect(
+					page.getByRole('button', { name: /^SAMPLE E2E TWIN RELABELLED/ })
+				).toBeVisible();
+			});
+		}
+	},
 	approve: {
 		title: 'an imported row arrives Unapproved and Approve clears it',
 		fixture: 'budget-with-accounts',

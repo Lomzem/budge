@@ -22,6 +22,7 @@ Keep approved or edited Transactions safe when the bank changes history, while a
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/bank-changes.ts`, also run by `bun run test:e2e:local`):
 
 - `bank-changes/take-the-banks`: `bank-resolve` by taking the bank's version of both flagged rows: the changed one in its editor, the removed one from its row.
+- `bank-changes/late-delete`: a delete that finishes after its confirmation was dismissed leaves the next row's confirmation (opened from the keyboard on the gym row while the first delete is held) open, and that confirmation deletes its own row.
 - `bank-changes/keep-mine`: `bank-resolve` by keeping mine on both: the changed one from its row, the removed one in its editor.
 
 Preconditions:
@@ -29,14 +30,15 @@ Preconditions:
 - Authenticated baseline from the index, then `bun run app seed bank-sync` instead of `budget-with-accounts`. Reseed before each independent recipe.
 - Readiness: on `/accounts/…` for Checking, require a `row` containing button `/^SAMPLE GARDEN CENTER 7720/` and the text `Bank changed this`.
 
-The fixture syncs Sample Credit Union twice through the production sync mutations (no Plaid). Before the second sync the owner edits two rows: SAMPLE GARDEN CENTER 7720 to $40.00 and SAMPLE STREAMING 4410's memo to `Shared family plan`. The second sync then changes and removes rows:
+The fixture syncs Sample Credit Union twice through the production sync mutations (no Plaid). Before the second sync the owner edits three rows: SAMPLE GARDEN CENTER 7720 to $40.00, SAMPLE STREAMING 4410's memo to `Shared family plan` and SAMPLE GYM 5521's memo to `Month to month`. The second sync then changes and removes rows:
 
-| Bank Text                 | Owner state           | Bank's change   | Expected on Checking                   |
-| ------------------------- | --------------------- | --------------- | -------------------------------------- |
-| SAMPLE PET SUPPLY 0311    | untouched, Unapproved | amount → $19.02 | quiet: −$19.02, Unapproved, no flag    |
-| SAMPLE CAR WASH 0904      | untouched, Unapproved | removed         | quiet: row gone                        |
-| SAMPLE GARDEN CENTER 7720 | edited to $40.00      | amount → $44.75 | −$40.00, `Bank changed this`           |
-| SAMPLE STREAMING 4410     | memo edited, approved | removed         | −$9.91, memo kept, `Bank removed this` |
+| Bank Text                 | Owner state           | Bank's change   | Expected on Checking                    |
+| ------------------------- | --------------------- | --------------- | --------------------------------------- |
+| SAMPLE PET SUPPLY 0311    | untouched, Unapproved | amount → $19.02 | quiet: −$19.02, Unapproved, no flag     |
+| SAMPLE CAR WASH 0904      | untouched, Unapproved | removed         | quiet: row gone                         |
+| SAMPLE GARDEN CENTER 7720 | edited to $40.00      | amount → $44.75 | −$40.00, `Bank changed this`            |
+| SAMPLE STREAMING 4410     | memo edited, approved | removed         | −$9.91, memo kept, `Bank removed this`  |
+| SAMPLE GYM 5521           | memo edited, approved | removed         | −$12.00, memo kept, `Bank removed this` |
 
 - **Quiet (`bank-quiet`):** require the pet row's amount −$19.02 and button name containing `Unapproved`, and no button `/^SAMPLE CAR WASH 0904/`. Neither row carries a flag.
 - **Take the bank's (beyond `bank-changes/take-the-banks`):** check the Account balance moved by −$4.75 and +$9.91 and reload to prove persistence.

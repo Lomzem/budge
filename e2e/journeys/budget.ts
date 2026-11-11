@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 
+import { holdResponseTo } from '../heldResponse';
 import { cents, centsIn, expectClearOf, openBudget, typed, type Journey } from './journey';
 
 function monthName(monthsFromNow: number) {
@@ -106,6 +107,46 @@ export const budget = {
 					await expect.poll(readyToAssign).toBe(settled);
 				}
 			);
+		}
+	},
+	'assign-back': {
+		title:
+			'putting Assigned back while the first save is still on its way saves the amount typed last',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			const saving = await holdResponseTo(page, 'budget:setAssigned');
+			const assigned = page.getByRole('textbox', { name: 'Assigned for Groceries', exact: true });
+			const readyToAssign = () => centsIn(page.getByTestId('ready-to-assign'));
+
+			const before = await step('open the Budget', async () => {
+				await openBudget(page);
+				return {
+					assigned: await assigned.inputValue(),
+					readyToAssign: await readyToAssign()
+				};
+			});
+
+			await step('assign $10 more to Groceries and hold the save', async () => {
+				await assigned.fill(typed(cents(before.assigned) + 1_000));
+				await assigned.press('Enter');
+				await saving.held;
+			});
+
+			await step('type the old amount back while the first save is held', async () => {
+				await assigned.focus();
+				await expect(assigned).toHaveValue(typed(cents(before.assigned) + 1_000));
+				await assigned.fill(before.assigned);
+				await assigned.press('Enter');
+				saving.release();
+			});
+
+			await step('Groceries keeps the old amount, after a reload too', async () => {
+				await expect(assigned).toHaveValue(before.assigned);
+				await expect.poll(readyToAssign).toBe(before.readyToAssign);
+				await page.reload();
+				await expect(assigned).toHaveValue(before.assigned);
+				await expect.poll(readyToAssign).toBe(before.readyToAssign);
+			});
 		}
 	},
 	'needs-you': {

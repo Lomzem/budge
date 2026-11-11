@@ -18,6 +18,7 @@ Preview invented bank files before saving; match existing Transactions, retain e
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/imports.ts`, also run by `bun run test:e2e:local`):
 
 - `imports/approve`: from Savings, `Import file` opens on the File field with the Account preset; a one-row invented Capital One CSV previews, saves Unapproved, and Approve clears it.
+- `imports/twin`: at 1280 px a relabelled re-import of a row already imported is held back with a `Likely already here` choice named by its label (`Skip this row`); choosing `Add it as new` imports it.
 - `imports/late-save`: an import save that finishes after the dialog was cancelled leaves the reopened dialog alone.
 
 Preconditions:
