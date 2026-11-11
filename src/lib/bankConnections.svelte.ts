@@ -51,6 +51,17 @@ export function describeSync(outcome: SyncOutcome): Report {
 	};
 }
 
+export function describeReconnect(outcome: SyncOutcome): Report {
+	if (outcome.kind === 'synced') {
+		return {
+			text: `Reconnected. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`,
+			failed: false
+		};
+	}
+	const synced = describeSync(outcome);
+	return { text: `Reconnected. ${synced.text}`, failed: synced.failed };
+}
+
 export class BankConnections {
 	now = $state(Date.now());
 	readonly #client = useConvexClient();
@@ -152,13 +163,7 @@ export class BankConnections {
 		if (outcome === 'exit') return null;
 		if (outcome === 'unavailable')
 			return { text: "Plaid Link didn't load. Try again.", failed: true };
-		return {
-			text:
-				outcome.kind === 'synced'
-					? `Reconnected. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`
-					: 'Reconnected.',
-			failed: false
-		};
+		return describeReconnect(outcome);
 	}
 
 	async remove(connectionId: Id<'bankConnections'>): Promise<Report> {
