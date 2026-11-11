@@ -50,6 +50,7 @@
 	let amount = $state('');
 	let moving = $state(false);
 	let moveError = $state('');
+	let moveInvalid: 'move-category' | 'move-amount' | null = $state(null);
 	let covering = $state(false);
 	let coverError = $state('');
 	let assigning = $state(false);
@@ -86,17 +87,24 @@
 		return others.flatMap((group) => group.categories).find((c) => c.id === id)?.id;
 	}
 
+	function refuseMove(control: 'move-category' | 'move-amount', message: string) {
+		moveInvalid = control;
+		moveError = message;
+		document.getElementById(control)?.focus();
+	}
+
 	async function move(event: SubmitEvent) {
 		event.preventDefault();
 		moveError = '';
+		moveInvalid = null;
 		const other = findOther(otherId);
 		const cents = parseCents(amount);
 		if (other === undefined) {
-			moveError = 'Pick a Category.';
+			refuseMove('move-category', 'Pick a Category.');
 			return;
 		}
 		if (cents === undefined || cents <= 0) {
-			moveError = 'Enter an amount above zero, such as 25.00.';
+			refuseMove('move-amount', 'Enter an amount above zero, such as 25.00.');
 			return;
 		}
 		moving = true;
@@ -306,6 +314,8 @@
 			<SelectField
 				id="move-category"
 				required
+				aria-invalid={moveInvalid === 'move-category' ? true : undefined}
+				aria-describedby={moveInvalid === 'move-category' ? 'move-error' : undefined}
 				bind:value={otherId}
 				placeholder="Pick a Category"
 				choices={others.map((group) => ({
@@ -323,6 +333,8 @@
 				<Input
 					id="move-amount"
 					bind:value={amount}
+					aria-invalid={moveInvalid === 'move-amount' ? true : undefined}
+					aria-describedby={moveInvalid === 'move-amount' ? 'move-error' : undefined}
 					inputmode="decimal"
 					placeholder="0.00"
 					autocomplete="off"
@@ -331,7 +343,7 @@
 				<Button type="submit" variant="outline" disabled={moving}>Move</Button>
 			</div>
 		</div>
-		<p class="-mt-1 min-h-5 text-sm text-destructive">
+		<p id="move-error" class="-mt-1 min-h-5 text-sm text-destructive">
 			{#if moveError}<span role="alert">{moveError}</span>{/if}
 		</p>
 	</form>

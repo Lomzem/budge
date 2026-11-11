@@ -59,7 +59,28 @@ Verification:
 - Journeys `bank-changes/take-the-banks`, `bank-changes/keep-mine`, `search/filters`, `plaid/attention` and `plaid/status` pass (`test-results/verify-budge/marker`).
 - By hand on `bank-sync`: the Budget's `2 bank changes` chip opens `?status=bank-changes`, which reads `2 Transactions the bank changed` and lists both rows, newest first.
 
+## #29, first review: 24 comments
+
+Fixed, with a journey that failed before the fix where one can reach it:
+
+- **278:** a held bank Account the bank gave no type starts with no type chosen. Import as a new Account asks for one (`aria-invalid` type group, focus on Cash). The seed adds an unnamed bank Account with no kind. `accounts/held-unknown-kind`.
+- **306:** an Assigned save typed back to the old amount while the first save is pending is saved, and only the latest save clears the pending value. `budget/assign-back`.
+- **315:** a refused move marks and focuses the field at fault.
+- **322:** a failed settings query shows an error in the cutover slot instead of loading forever.
+- **346:** the compact and wide import pickers have distinct IDs. `imports/twin`.
+- **371:** a failed Category or Payee lookup keeps the selected filters and says so, instead of dropping them.
+- **384:** a failed Undo keeps Undo available.
+- **396:** the removal confirmation runs through `DialogSession`, so a delete finishing after its confirmation was dismissed leaves the next one open. The seed adds a second owner-edited removed row (SAMPLE GYM 5521). `bank-changes/late-delete`.
+- **409:** an Accounts query error ends the layout's loading state with the server error (or the sign-out screen for `FORBIDDEN`).
+
+Declined, with a reply:
+
+- **286:** mapping into an already-fed Account is a move (same account, newer login); the suggestion says what it's based on and stays editable.
+- **296:** the owner reads "transactions"; "Bank Row" stays the code's word.
+- **419:** a Budget URL without a month means the month the owner was on, so the Budget link returns to it; `This month` goes back to today.
+- **Design (269, 330, 356, 429, 437, 446, 459, 472, 480, 488, 497, 502):** these cite the v1 UI rules, which the Design plan in `spec.md` supersedes. `.coderabbit.yaml` now points the Svelte path instructions at that plan, and the plan names each allowed case: sheets for bounded groups, counts and status words beside their item, rounded `Needs you` links, icon-only controls below md and for "more actions", and a one-sentence sign-in line.
+
 ## Remaining
 
-- #28: an incremental review of the marker commit.
-- #29 and #30: first reviews. Both were rate limited at 18:57 UTC.
+- #28 and #29: incremental reviews of the fixes.
+- #30: first review (rate limited at 20:03 UTC).

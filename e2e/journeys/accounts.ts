@@ -216,6 +216,56 @@ export const accounts = {
 			});
 		}
 	},
+	'held-unknown-kind': {
+		title:
+			'a held bank Account the bank never described asks for its type instead of assuming cash',
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const choose = page.getByRole('dialog', { name: 'An unnamed bank Account' });
+			const type = choose.getByRole('radiogroup').filter({ has: page.getByLabel('Credit card') });
+			const importIt = choose.getByRole('button', { name: 'Import its transactions' });
+
+			const held = await step(
+				'a new Account for it has no type until the owner picks one',
+				async () => {
+					const button = await openHeld(page, 'An unnamed bank Account', '1 transaction waiting');
+					await expect(choose.getByRole('radio', { name: 'Into a new Account' })).toBeChecked();
+					await choose.getByLabel('Name').fill('Service Account');
+					await expect(choose.getByRole('radio', { name: /^Cash/ })).not.toBeChecked();
+					await expect(choose.getByRole('radio', { name: 'Credit card' })).not.toBeChecked();
+					await importIt.click();
+					await expect(choose.getByRole('alert')).toHaveText(
+						"Choose this Account's type: cash or credit card."
+					);
+					await expect(choose.getByRole('radio', { name: /^Cash/ })).toBeFocused();
+					await expect(type).toHaveAttribute('aria-invalid', 'true');
+					await expect(type).toHaveAccessibleDescription(
+						"Choose this Account's type: cash or credit card."
+					);
+					return button;
+				}
+			);
+
+			await step('choosing Checking says the bank gave no kind to check against', async () => {
+				await choose.getByRole('radio', { name: 'Into Checking' }).check();
+				await expect(choose).toContainText(
+					"The bank didn't say what kind of account this is, so make sure it is a cash Account like Checking."
+				);
+				await expect(importIt).not.toHaveAttribute('aria-disabled', 'true');
+			});
+
+			await step('as a new credit card, its row lands there', async () => {
+				await choose.getByRole('radio', { name: 'Into a new Account' }).check();
+				await choose.getByRole('radio', { name: 'Credit card' }).check();
+				await importIt.click();
+				await confirmStartingBalance(page, 'Amount owed on the cutover date', '0.00');
+				await expect(held).toBeHidden();
+				await openAccount(page, 'Service Account');
+				await expect(page.getByRole('button', { name: /^SAMPLE SERVICE FEE/ })).toBeVisible();
+				await expect.poll(() => centsIn(page.getByTestId('account-balance'))).toBe(-5_00);
+			});
+		}
+	},
 	'held-ignore': {
 		title: 'an ignored held bank Account leaves the list and stays gone',
 		fixture: 'bank-sync',

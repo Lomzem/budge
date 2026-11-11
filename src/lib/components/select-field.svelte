@@ -13,8 +13,8 @@
 		...trigger
 	}: {
 		id: string;
-		'aria-invalid'?: boolean;
-		'aria-describedby'?: string;
+		'aria-invalid'?: boolean | undefined;
+		'aria-describedby'?: string | undefined;
 		value?: string;
 		choices: Choices;
 		placeholder?: string;

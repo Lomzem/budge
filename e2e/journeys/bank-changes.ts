@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import { holdResponseTo } from '../heldResponse';
 import { openAccount, type Journey } from './journey';
 
 function rowOf(page: Page, payee: string) {
@@ -56,6 +57,45 @@ export const bankChanges = {
 				await expect(confirm).toBeHidden();
 				await expect(streaming).toHaveCount(0);
 				await expect(page.locator('[data-edit]:focus')).toHaveCount(1);
+			});
+		}
+	},
+	'late-delete': {
+		title:
+			'a delete that finishes after its confirmation was dismissed leaves the next confirmation open',
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const deleting = await holdResponseTo(page, 'imports:resolveBankChange');
+			const confirm = page.getByRole('alertdialog', { name: 'Delete this Transaction too?' });
+			const streaming = rowOf(page, 'SAMPLE STREAMING 4410');
+			const gym = rowOf(page, 'SAMPLE GYM 5521');
+
+			await step('open Checking', () => openChecking(page));
+
+			await step('delete the streaming row, hold the delete, and dismiss', async () => {
+				await streaming
+					.getByRole('button', { name: /^Delete it: SAMPLE STREAMING 4410, / })
+					.click();
+				await confirm.getByRole('button', { name: 'Delete' }).click();
+				await deleting.held;
+				await page.keyboard.press('Escape');
+				await expect(confirm).toBeHidden();
+			});
+
+			await step('from the keyboard, confirm the gym row, then release', async () => {
+				await gym.getByRole('button', { name: /^Delete it: SAMPLE GYM 5521, / }).focus();
+				await page.keyboard.press('Enter');
+				await expect(confirm).toContainText('The bank removed SAMPLE GYM 5521.');
+				deleting.release();
+				await expect(streaming).toHaveCount(0);
+			});
+
+			await step('the gym confirmation stays open and deletes its own row', async () => {
+				await expect(confirm).toBeVisible();
+				await expect(confirm).toContainText('The bank removed SAMPLE GYM 5521.');
+				await confirm.getByRole('button', { name: 'Delete' }).click();
+				await expect(confirm).toBeHidden();
+				await expect(gym).toHaveCount(0);
 			});
 		}
 	},

@@ -64,8 +64,10 @@ desktop                                        phone
 
 - The signature is the ledger total. Ready to Assign is a large tabular amount with an accountant's double rule beneath it: green when there are dollars to assign, red ink when more was assigned than came in. Everything around it stays quiet.
 - Status is color plus words: an amount is never the only signal, and each status has one word ("Overspent", "Needs you", "Funded").
-- A row is the unit, not a card. Lists are ruled rows on the sheet surface. Cards appear only where content sits side by side.
-- One "Needs you" list replaces scattered notices. Each item is a sentence with one action.
+- A row is the unit, not a card. Lists are ruled rows on the sheet surface. A bounded group that the owner works through as one thing (a bank connection, a Category group, a settings section, the Category inspector) sits on its own sheet with the ruled rows inside it; rows themselves never become cards.
+- Small counts and status words sit beside the item they describe (`Bank 2` in the navigation, `Hidden` on a Category, a `Needs you` task's count) instead of in a separate notice.
+- A "more actions" menu shows only an ellipsis, and below the md container width the search, filter, clear and add controls show only their icon. Each has an accessible name that names the action and its target. Every other control keeps a visible label.
+- One "Needs you" list replaces scattered notices. Each item is a sentence with one action, set as a rounded link so the row of tasks reads as things to press, not as status.
 - Motion only answers the user: dialogs open, rows expand, and a saved amount settles. `prefers-reduced-motion` turns it off.
 
 **Self-review against defaults.**

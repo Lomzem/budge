@@ -80,11 +80,13 @@ export const run = internalMutation({
 				checkingRow('garden', daysAgo(6), -42_17, 'SAMPLE GARDEN CENTER 7720'),
 				checkingRow('streaming', daysAgo(5), -9_91, 'SAMPLE STREAMING 4410'),
 				checkingRow('car-wash', daysAgo(5), -27_36, 'SAMPLE CAR WASH 0904'),
+				checkingRow('gym', daysAgo(8), -12_00, 'SAMPLE GYM 5521'),
 				heldRow('cu-savings', 'savings-interest', 4, 3_17, 'SAMPLE INTEREST PAID'),
 				heldRow('cu-savings', 'savings-deposit', 3, 250_00, 'SAMPLE TRANSFER IN 5512'),
 				heldRow('cu-card', 'card-bistro', 4, -36_29, 'SAMPLE BISTRO 0817'),
 				heldRow('cu-card', 'card-bookstore', 2, -21_08, 'SAMPLE BOOK NOOK 3306'),
-				heldRow('cu-holiday', 'holiday-deposit', 3, 40_00, 'SAMPLE CLUB DEPOSIT')
+				heldRow('cu-holiday', 'holiday-deposit', 3, 40_00, 'SAMPLE CLUB DEPOSIT'),
+				heldRow('cu-unlisted', 'unlisted-fee', 2, -5_00, 'SAMPLE SERVICE FEE')
 			],
 			recordAccounts: [
 				{
@@ -105,6 +107,10 @@ export const run = internalMutation({
 			...edit,
 			memo: 'Shared family plan'
 		}));
+		await editLikeTheOwner(ctx, checking, 'SAMPLE GYM 5521', (edit) => ({
+			...edit,
+			memo: 'Month to month'
+		}));
 
 		const lease = await sync(ctx, creditUnion, {
 			discover: false,
@@ -114,7 +120,8 @@ export const run = internalMutation({
 			],
 			removed: [
 				{ externalAccountId: CREDIT_UNION.checking, sourceId: 'streaming' },
-				{ externalAccountId: CREDIT_UNION.checking, sourceId: 'car-wash' }
+				{ externalAccountId: CREDIT_UNION.checking, sourceId: 'car-wash' },
+				{ externalAccountId: CREDIT_UNION.checking, sourceId: 'gym' }
 			]
 		});
 		await ctx.runMutation(internal.bankConnections.recordConsent, {

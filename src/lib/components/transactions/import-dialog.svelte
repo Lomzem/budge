@@ -213,11 +213,11 @@
 												<Table.Cell width="fill">
 													<span class="block max-w-full truncate">{row.bankText}</span>
 													<span class="block text-xs @lg:hidden">
-														{@render outcome(index)}
+														{@render outcome(index, 'compact')}
 													</span>
 												</Table.Cell>
 												<Table.Cell align="end" numeric>{formatCents(row.amount)}</Table.Cell>
-												<Table.Cell showFrom="lg">{@render outcome(index)}</Table.Cell>
+												<Table.Cell showFrom="lg">{@render outcome(index, 'wide')}</Table.Cell>
 											</Table.Row>
 										{/each}
 									</Table.Body>
@@ -240,14 +240,14 @@
 	</Dialog.Content>
 </Dialog.Root>
 
-{#snippet outcome(index: number)}
+{#snippet outcome(index: number, width: string)}
 	{@const decision = decisions[index]}
 	{#if decision === undefined}
 		<span class="text-muted-foreground">…</span>
 	{:else if (decision.kind === 'skip' || decision.kind === 'new') && decision.alike !== undefined}
-		{@render twin(index, decision.alike)}
+		{@render twin(`import-pick-${width}-${String(index)}`, index, decision.alike)}
 	{:else if decision.kind !== 'skip' && decision.candidates !== undefined}
-		{@render picker(index, decision.candidates)}
+		{@render picker(`import-pick-${width}-${String(index)}`, index, decision.candidates)}
 	{:else if decision.kind === 'new'}
 		New
 	{:else if decision.kind === 'skip'}
@@ -261,11 +261,11 @@
 	{/if}
 {/snippet}
 
-{#snippet picker(index: number, candidates: PreviewCandidate[])}
+{#snippet picker(id: string, index: number, candidates: PreviewCandidate[])}
 	<div class="flex max-w-56 flex-col gap-1 text-xs">
-		<label for={`import-pick-${String(index)}`}>Match with</label>
+		<label for={id}>Match with</label>
 		<SelectField
-			id={`import-pick-${String(index)}`}
+			{id}
 			required
 			bind:value={() => picks[index] ?? '', (pick: string) => (picks[index] = pick)}
 			placeholder="Pick one"
@@ -280,13 +280,13 @@
 	</div>
 {/snippet}
 
-{#snippet twin(index: number, alike: PreviewCandidate)}
+{#snippet twin(id: string, index: number, alike: PreviewCandidate)}
 	<div class="flex max-w-56 flex-col gap-1 text-xs">
-		<label for={`import-pick-${String(index)}`} class="text-warning">
+		<label for={id} class="text-warning">
 			Likely already here: {alike.payeeName ?? 'No Payee'}, {formatDate(alike.date)}
 		</label>
 		<SelectField
-			id={`import-pick-${String(index)}`}
+			{id}
 			bind:value={() => picks[index] ?? '', (pick: string) => (picks[index] = pick)}
 			choices={[
 				{ value: '', label: 'Skip this row' },
