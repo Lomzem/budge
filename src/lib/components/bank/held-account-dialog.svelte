@@ -75,7 +75,7 @@
 				waiting: waitingNote(account),
 				kind: account.kind
 			},
-			choice: sameName(account)?._id ?? 'new',
+			choice: (account.kind === null ? undefined : sameName(account)?._id) ?? 'new',
 			name: account.name ?? '',
 			kind: account.kind ?? '',
 			error: '',
