@@ -63,7 +63,7 @@ Verification:
 
 Fixed, with a journey that failed before the fix where one can reach it:
 
-- **278:** a held bank Account the bank gave no type starts with no type chosen. Import as a new Account asks for one (`aria-invalid` type group, focus on Cash). The seed adds an unnamed bank Account with no kind. `accounts/held-unknown-kind`. Follow-up: a bank Account recorded before kinds existed has a name but no kind, so the dialog no longer preselects a same-named Account for an untyped one; mapping it takes the owner's choice. No fixture can record a named, untyped bank Account (the sync writes both), so this has no journey.
+- **278:** a held bank Account the bank gave no type starts with no type chosen. Import as a new Account asks for one (`aria-invalid` type group, focus on Cash). The seed adds an unnamed bank Account with no kind. `accounts/held-unknown-kind`. Follow-up: a bank Account recorded before kinds existed has a name but no kind, so the dialog no longer preselects a same-named Account for an untyped one; mapping it takes the owner's choice. The sync never records a name without a kind, so the `bank-sync` seed patches one held bank Account (Savings ending 6630) to the legacy shape. `accounts/held-legacy-name` failed on the dialog before `20c8b7c`, because Savings was preselected.
 - **306:** an Assigned save typed back to the old amount while the first save is pending is saved, and only the latest save clears the pending value. `budget/assign-back`.
 - **315:** a refused move marks and focuses the field at fault.
 - **322:** a failed settings query shows an error in the cutover slot instead of loading forever.
