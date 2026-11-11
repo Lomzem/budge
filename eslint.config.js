@@ -160,7 +160,7 @@ export default defineConfig(
 					patterns: [
 						{
 							regex: '(^|/)transactions(\\.[cm]?[jt]s)?$',
-							importNames: ['refreshSearchText'],
+							importNames: ['refreshDerivedFields'],
 							message:
 								'Call an operation in convex/lib/transactions.ts; it keeps search text whole.'
 						},
