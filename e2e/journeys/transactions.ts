@@ -133,6 +133,11 @@ export const transactions = {
 					return approveAll.textContent();
 				}
 			);
+			const total = Number(/\d+/.exec(label ?? '')?.[0]);
+			const allUnapproved = async () => {
+				await expect.poll(async () => (await unapprovedRows()).length).toBe(total);
+				return unapprovedRows();
+			};
 
 			await step(
 				"a row's Approve offers Undo, which puts it back and focuses its Approve again",
@@ -150,7 +155,7 @@ export const transactions = {
 			await step(
 				'a search approves only the Unapproved rows it shows, leaves the rest Unapproved, and Undo puts them back',
 				async () => {
-					const outside = (await unapprovedRows()).find((name) => !name.includes('BOOKSHOP'));
+					const outside = (await allUnapproved()).find((name) => !name.includes('BOOKSHOP'));
 					if (outside === undefined) throw new Error('every Unapproved row is a bookshop');
 					await page.getByRole('searchbox', { name: 'Search' }).fill('BOOKSHOP');
 					const shown = page.getByRole('button', { name: /^Approve \d+ shown$/ });
@@ -176,11 +181,10 @@ export const transactions = {
 			);
 
 			const waiting = await step('Approve all approves them and offers Undo', async () => {
-				const before = await unapprovedRows();
-				const counted = Number(/\d+/.exec(label ?? '')?.[0]);
+				const before = await allUnapproved();
 				await approveAll.click();
 				await expect(
-					page.getByText(`Approved ${String(counted)} Transaction${counted === 1 ? '' : 's'}.`)
+					page.getByText(`Approved ${String(total)} Transaction${total === 1 ? '' : 's'}.`)
 				).toBeVisible();
 				await expect(waitingHeading).toHaveCount(0);
 				return before;
