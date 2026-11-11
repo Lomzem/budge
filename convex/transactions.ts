@@ -312,7 +312,7 @@ function bankChanges(
 		? transactions.withIndex('by_bankChange_date', (q) =>
 				q.eq('bankChange', true).gte('date', from).lte('date', to)
 			)
-		: transactions.withIndex('by_account_bankChange_date', (q) =>
+		: transactions.withIndex('by_accountId_bankChange_date', (q) =>
 				q.eq('accountId', accountId).eq('bankChange', true).gte('date', from).lte('date', to)
 			);
 }
@@ -523,7 +523,7 @@ export const approveMany = mutation({
 		const approved: Id<'transactions'>[] = [];
 		for (const transactionId of new Set(transactionIds)) {
 			const transaction = await ctx.db.get('transactions', transactionId);
-			if (transaction === null || transaction.approved) continue;
+			if (transaction?.approved !== false) continue;
 			await markApproved(ctx, transactionId);
 			approved.push(transactionId);
 		}

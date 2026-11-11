@@ -111,7 +111,7 @@ describe('decoding a Plaid sync page', () => {
 
 describe("decoding Plaid's Accounts", () => {
 	it.effect(
-		'reads each Account, its kind, and its current balance as a Budge balance in cents',
+		"reads each Account, the kind it suggests (none for a type Budge doesn't budget, such as investment), and its current balance as a Budge balance in cents",
 		() =>
 			Effect.gen(function* () {
 				expect(yield* decodeAccounts(accounts)).toEqual([
@@ -141,6 +141,12 @@ describe("decoding Plaid's Accounts", () => {
 						mask: '5521',
 						kind: 'creditCard',
 						balance: -1_250_000
+					},
+					{
+						externalId: 'account-synthetic-brokerage',
+						name: 'Sample Brokerage',
+						mask: '8800',
+						balance: 307_525
 					}
 				]);
 			})

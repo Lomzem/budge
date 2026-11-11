@@ -236,7 +236,7 @@ export const recordAccounts = internalMutation({
 					externalId,
 					name,
 					...(mask === undefined ? {} : { mask }),
-					kind,
+					...(kind === undefined ? {} : { kind }),
 					state: 'held'
 				});
 			} else if (known.state === 'mapped') {

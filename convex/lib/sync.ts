@@ -104,7 +104,7 @@ export const recordAccountsArgs = {
 			externalId: v.string(),
 			name: v.string(),
 			mask: v.optional(v.string()),
-			kind: accountKind
+			kind: v.optional(accountKind)
 		})
 	)
 };
@@ -180,7 +180,7 @@ interface SyncStoreShape {
 	readonly recordAccounts: (args: {
 		connectionId: Id<'bankConnections'>;
 		answersRequestAt: number | null;
-		accounts: { externalId: string; name: string; mask?: string; kind: BankAccountKind }[];
+		accounts: { externalId: string; name: string; mask?: string; kind?: BankAccountKind }[];
 	}) => Effect.Effect<void>;
 	readonly startingBalanceBasis: (accountId: Id<'accounts'>) => Effect.Effect<StartingBalanceBasis>;
 }
@@ -333,7 +333,12 @@ export const syncConnection = Effect.fnUntraced(function* (
 });
 
 function namesOf({ externalId, name, mask, kind }: BankAccount) {
-	return { externalId, name, kind, ...(mask === undefined ? {} : { mask }) };
+	return {
+		externalId,
+		name,
+		...(kind === undefined ? {} : { kind }),
+		...(mask === undefined ? {} : { mask })
+	};
 }
 
 export type StartingBalanceSuggestion =
@@ -407,7 +412,11 @@ export const setupConnection = Effect.fnUntraced(function* (input: {
 	webhook: string;
 	accounts: { externalId: string; accountId: Id<'accounts'> }[];
 	accountsCheckRequestedAt?: number;
-}): Effect.fn.Return<Id<'bankConnections'>, SyncError, PlaidClient | TokenCipher | SyncStore> {
+}): Effect.fn.Return<
+	{ connectionId: Id<'bankConnections'>; webhookSet: boolean },
+	SyncError,
+	PlaidClient | TokenCipher | SyncStore
+> {
 	const cipher = yield* TokenCipher;
 	const plaid = yield* PlaidClient;
 	const store = yield* SyncStore;
@@ -421,8 +430,10 @@ export const setupConnection = Effect.fnUntraced(function* (input: {
 			? {}
 			: { accountsCheckRequestedAt: input.accountsCheckRequestedAt })
 	});
-	yield* Effect.ignore(plaid.setWebhook(input.accessToken, input.webhook));
-	return connectionId;
+	const webhookSet = yield* plaid
+		.setWebhook(input.accessToken, input.webhook)
+		.pipe(Effect.match({ onFailure: () => false, onSuccess: () => true }));
+	return { connectionId, webhookSet };
 });
 
 export const OWNER_CLIENT_USER_ID = 'budge-owner';
@@ -436,7 +447,7 @@ export const connectItem = Effect.fnUntraced(function* (input: {
 	const store = yield* SyncStore;
 	const { accessToken, itemId } = yield* plaid.publicTokenExchange(input.publicToken);
 	const accountsCheckRequestedAt = yield* Clock.currentTimeMillis;
-	const connectionId = yield* setupConnection({
+	const { connectionId } = yield* setupConnection({
 		name: input.name,
 		itemId,
 		accessToken,

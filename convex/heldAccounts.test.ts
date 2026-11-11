@@ -107,7 +107,7 @@ async function connectedBudget() {
 			assert(Exit.isSuccess(exit), 'the program failed');
 			return exit.value;
 		});
-	const connectionId = await inAction(
+	const { connectionId } = await inAction(
 		{ setWebhook: () => Effect.void },
 		setupConnection({
 			name: 'Sample Bank',
@@ -133,7 +133,7 @@ async function connectedBudget() {
 	const syncWith = (plaid: FakePlaid) =>
 		inAction(plaid, syncConnection(connectionId, { refresh: false }));
 	const connectNewBank = async () => {
-		const newConnection = await inAction(
+		const { connectionId: newConnection } = await inAction(
 			{ setWebhook: () => Effect.void },
 			setupConnection({
 				name: 'Sample New Bank',

@@ -153,11 +153,16 @@ export interface BankAccount {
 	name: string;
 	mask?: string;
 
-	kind: BankAccountKind;
+	kind?: BankAccountKind;
 	balance: number | null;
 }
 
 const OWED_TYPES = new Set(['credit', 'loan']);
+
+function suggestedKind(type: string): BankAccountKind | undefined {
+	if (OWED_TYPES.has(type)) return 'creditCard';
+	return type === 'depository' ? 'cash' : undefined;
+}
 
 function budgetSigned(type: string, current: number) {
 	return OWED_TYPES.has(type) && current !== 0 ? -current : current;
@@ -169,11 +174,12 @@ export const decodeAccounts = (body: unknown): Effect.Effect<BankAccount[], Sche
 			response.accounts.map((account) => {
 				const current = account.balances.current;
 				const mask = clean(account.mask);
+				const kind = suggestedKind(account.type);
 				return {
 					externalId: account.account_id,
 					name: clean(account.name) ?? 'Bank account',
 					...(mask === undefined ? {} : { mask }),
-					kind: OWED_TYPES.has(account.type) ? 'creditCard' : 'cash',
+					...(kind === undefined ? {} : { kind }),
 					balance: current === null ? null : budgetSigned(account.type, current)
 				};
 			})

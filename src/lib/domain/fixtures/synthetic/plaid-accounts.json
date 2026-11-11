@@ -50,6 +50,20 @@
 			"official_name": null,
 			"subtype": "auto",
 			"type": "loan"
+		},
+		{
+			"account_id": "account-synthetic-brokerage",
+			"balances": {
+				"available": null,
+				"current": 3075.25,
+				"limit": null,
+				"iso_currency_code": "USD"
+			},
+			"mask": "8800",
+			"name": "Sample Brokerage",
+			"official_name": null,
+			"subtype": "brokerage",
+			"type": "investment"
 		}
 	],
 	"item": { "item_id": "item-synthetic-1" },

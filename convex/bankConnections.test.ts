@@ -103,7 +103,7 @@ async function connectedBudget() {
 		})
 	);
 	assert(setup.ok, 'setup failed');
-	const connectionId = setup.value;
+	const { connectionId } = setup.value;
 	const sync = (plaid: FakePlaid, refresh = false) =>
 		runInAction(backend, plaid, syncConnection(connectionId, { refresh }));
 	const connection = () => t.run((ctx) => ctx.db.get('bankConnections', connectionId));
@@ -170,7 +170,10 @@ describe('setting up a Bank Connection', () => {
 		);
 
 		assert(setup.ok, 'setup failed');
-		const saved = await backend.t.run((ctx) => ctx.db.get('bankConnections', setup.value));
+		expect(setup.value.webhookSet).toBe(false);
+		const saved = await backend.t.run((ctx) =>
+			ctx.db.get('bankConnections', setup.value.connectionId)
+		);
 		assert(saved?.provider.kind === 'plaid', 'no Plaid connection saved');
 		expect(saved.provider.itemId).toBe(itemId);
 		const sealed = saved.provider.encryptedToken;

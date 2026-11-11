@@ -86,7 +86,7 @@ async function syncedBudget() {
 			if (Exit.isFailure(exit)) assert.fail(`Bank operation failed: ${Cause.pretty(exit.cause)}`);
 			return exit.value;
 		});
-	const connectionId = await run(
+	const { connectionId } = await run(
 		{ setWebhook: () => Effect.void },
 		setupConnection({
 			name: 'Sample Bank',
