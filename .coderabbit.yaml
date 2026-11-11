@@ -29,11 +29,18 @@ reviews:
         Follow AGENTS.md, and use the vocabulary defined in GLOSSARY.md for domain concepts.
     - path: 'src/**/*.svelte'
       instructions: |
-        Check the UI rules in the "UI rules" note of .scratch/v1-spec/map.md and the UI section of
-        .scratch/v1-spec/spec.md: shadcn-svelte components and semantic HTML; no badges, pills, or
-        taglines; cards only for items compared side by side; theme color tokens; WCAG 2.2 AA in
-        dark and light themes; a visible label and keyboard path for every control; responsive
-        from 320 px. Shared UI state lives in context-provided classes in .svelte.ts modules, never
+        Check the "Design plan" and "Constraints" sections of .scratch/bank-sync-ux/spec.md, which
+        supersede the UI rules in .scratch/v1-spec: shadcn-svelte components and semantic HTML;
+        theme color tokens; status shown as color plus words; WCAG 2.2 AA in dark and light themes;
+        no layout shifts; responsive from 320 px. Every control has a keyboard path and an
+        accessible name that names its action and target. A "more actions" menu may show only an
+        ellipsis; below the md container width, search, filter, clear and add controls may show
+        only their icon; every other control keeps a visible label. Small counts and status words
+        beside a navigation item, row or task are allowed, and the Budget's `Needs you` tasks are
+        rounded links, each a sentence with one action. The sign-in page may say in one sentence
+        what Budge is for. Bounded groups such as a bank connection, a Category group, a settings
+        section or the Category inspector may sit on a sheet surface; lists inside them stay ruled
+        rows. Shared UI state lives in context-provided classes in .svelte.ts modules, never
         in module-level $state. Components must not execute Effects from the `effect` package
         with `Effect.run*` APIs. This rule does not ban Svelte's `$effect` rune.
     - path: '.scratch/**'
