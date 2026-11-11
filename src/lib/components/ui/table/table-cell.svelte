@@ -20,7 +20,7 @@
 	bind:this={ref}
 	data-slot="table-cell"
 	class={cn(
-		'p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0',
+		'px-2 py-2 align-middle whitespace-nowrap sm:px-3',
 		tableColumnVariants({ align, width, showFrom, numeric }),
 		className
 	)}

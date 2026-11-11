@@ -7,33 +7,42 @@ export type TargetProgress = NonNullable<CategoryBudget['target']>;
 export type TargetDefinition = TargetProgress['definition'];
 
 export function availableStatus(
-	category: Pick<CategoryBudget, 'status' | 'available' | 'target'>
+	category: Pick<CategoryBudget, 'status' | 'available' | 'target' | 'payment'>
 ): { text: string; class: string } | undefined {
+	if (category.status === 'overspent')
+		return {
+			text: `Overspent by ${formatCents(-category.available)}`,
+			class: 'text-destructive'
+		};
+	const uncovered = category.payment?.uncovered ?? 0;
+	if (uncovered > 0) return { text: uncoveredNote(uncovered), class: 'text-warning' };
 	switch (category.status) {
-		case 'overspent':
-			return {
-				text: `Overspent by ${formatCents(-category.available)}`,
-				class: 'text-destructive'
-			};
 		case 'underfunded':
 			return {
 				text: `${formatCents(category.target?.needed ?? 0)} more needed`,
 				class: 'text-warning'
 			};
 		case 'funded':
-			return { text: 'Funded', class: 'text-funded' };
+			return { text: category.target ? 'Funded' : '', class: 'text-funded' };
 		case 'empty':
 			return undefined;
 	}
 }
 
+function uncoveredNote(cents: number) {
+	return `${formatCents(cents)} of card debt not yet covered`;
+}
+
+export function waitingNotes(category: Pick<CategoryBudget, 'payment'>): string[] {
+	return (category.payment?.waitingOn ?? []).map(
+		(w) => `${formatCents(w.amount)} waiting on ${w.name}`
+	);
+}
+
 export function paymentNotes(category: Pick<CategoryBudget, 'payment'>): string[] {
-	const { payment } = category;
-	if (payment === null) return [];
-	const notes = payment.waitingOn.map((w) => `${formatCents(w.amount)} waiting on ${w.name}`);
-	if (payment.uncovered > 0)
-		notes.push(`${formatCents(payment.uncovered)} of card debt not yet covered`);
-	return notes;
+	const uncovered = category.payment?.uncovered ?? 0;
+	const notes = waitingNotes(category);
+	return uncovered > 0 ? [...notes, uncoveredNote(uncovered)] : notes;
 }
 
 export function describeTarget(target: TargetProgress): string {

@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import { attempt } from '$lib/attempt';
+	import { attentionOf, getBankConnections } from '$lib/bankConnections.svelte';
 	import ReconcileDialog from '$lib/components/accounts/reconcile-dialog.svelte';
 	import RenameAccountDialog from '$lib/components/accounts/rename-account-dialog.svelte';
 	import StartingBalanceStep from '$lib/components/accounts/starting-balance-step.svelte';
@@ -12,6 +13,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { formatDate } from '$lib/domain/dates';
+	import { formatSynced } from '$lib/domain/freshness';
 	import { formatCents } from '$lib/domain/money';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 
@@ -21,6 +23,12 @@
 
 	const accounts = getAccounts();
 	const account = $derived(accounts.find(params.accountId));
+	const bank = getBankConnections();
+	const feeder = $derived(
+		bank.all.find((connection) =>
+			connection.feeds.some((feed) => feed.accountId === params.accountId)
+		)
+	);
 	let renameOpen = $state(false);
 	let reconcileOpen = $state(false);
 	let moveError = $state('');
@@ -28,10 +36,34 @@
 		account: { _id: Account['_id']; kind: Account['kind']; name: string };
 	}>();
 
-	let reconciled: { accountId: string; message: string } | undefined = $state();
+	let notice: { accountId: string; message: string } | undefined = $state();
+	const noticeText = $derived(notice?.accountId === params.accountId ? notice.message : '');
+	let actionsButton: HTMLButtonElement | null = $state(null);
+
+	function dismiss() {
+		notice = undefined;
+		moveError = '';
+		actionsButton?.focus();
+	}
+
+	async function stopSyncing() {
+		const feed = feeder?.feeds.find((candidate) => candidate.accountId === params.accountId);
+		if (!feeder || !feed) return;
+		const accountId = params.accountId;
+		const bankName = feeder.name;
+		moveError = '';
+		const report = await bank.stopSyncing(feed.connectionAccountId, feed.name);
+		if (report.failed) moveError = report.text;
+		else {
+			notice = {
+				accountId,
+				message: `Stopped syncing from ${bankName}. Its Transactions stay; bring it back from the Bank page.`
+			};
+		}
+	}
 
 	function onReconciled(adjustment: number) {
-		reconciled = {
+		notice = {
 			accountId: params.accountId,
 			message:
 				adjustment === 0
@@ -59,67 +91,134 @@
 
 {#if account}
 	<div class="flex flex-col gap-4">
-		<header class="flex flex-wrap items-center justify-between gap-2">
-			<div class="flex min-w-0 items-center gap-1">
-				<h1 class="truncate text-xl font-semibold">{account.name}</h1>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Button variant="ghost" size="icon" aria-label="{account.name} actions" {...props}>
-								<EllipsisIcon aria-hidden="true" />
-							</Button>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="start">
-						<DropdownMenu.Item onSelect={() => (renameOpen = true)}>Rename</DropdownMenu.Item>
-						<DropdownMenu.Item
-							disabled={!accounts.canMove(account._id, -1)}
-							onSelect={() => void move(-1)}
-						>
-							Move up
-						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							disabled={!accounts.canMove(account._id, 1)}
-							onSelect={() => void move(1)}
-						>
-							Move down
-						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							onSelect={() => {
-								editStartingBalance(account);
-							}}
-						>
-							Starting balance
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-			</div>
-			<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-				<p class="tabular-nums">
-					<span class="text-muted-foreground">Balance</span>
-					<span data-testid="account-balance">{formatCents(account.balance)}</span>
+		<header class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+			<div class="flex min-w-0 flex-col gap-1">
+				<div class="-mr-2 flex min-w-0 items-center gap-1">
+					<h1 class="truncate text-2xl font-bold tracking-tight">{account.name}</h1>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger>
+							{#snippet child({ props })}
+								<Button
+									bind:ref={actionsButton}
+									variant="ghost"
+									size="icon"
+									aria-label="{account.name} actions"
+									{...props}
+								>
+									<EllipsisIcon aria-hidden="true" />
+								</Button>
+							{/snippet}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="start">
+							<DropdownMenu.Item onSelect={() => (renameOpen = true)}>Rename</DropdownMenu.Item>
+							<DropdownMenu.Item
+								disabled={!accounts.canMove(account._id, -1)}
+								onSelect={() => void move(-1)}
+							>
+								Move up
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								disabled={!accounts.canMove(account._id, 1)}
+								onSelect={() => void move(1)}
+							>
+								Move down
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								onSelect={() => {
+									editStartingBalance(account);
+								}}
+							>
+								Starting balance
+							</DropdownMenu.Item>
+							{#if feeder}
+								<DropdownMenu.Separator />
+								<DropdownMenu.Item onSelect={() => void stopSyncing()}>
+									Stop syncing from {feeder.name}
+								</DropdownMenu.Item>
+							{/if}
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
+				</div>
+				<p class="text-sm text-muted-foreground">
+					{account.kind === 'creditCard' ? 'Credit card' : 'Cash'} Account
 				</p>
-				<p class="text-sm text-muted-foreground" data-testid="last-reconciled">
-					{#if account.lastReconciledOn}
-						Reconciled
-						<time datetime={account.lastReconciledOn}>{formatDate(account.lastReconciledOn)}</time>
-					{:else}
-						Not reconciled yet
+				<p
+					class="line-clamp-2 min-h-12 text-sm/6 break-words text-muted-foreground sm:line-clamp-1 sm:min-h-6"
+					data-testid="account-sync"
+				>
+					{#if feeder}
+						{@const attention = attentionOf(feeder)}
+						{#if attention !== null}
+							<a
+								href="{resolve('/bank')}#connection-{feeder._id}"
+								aria-label="{attention}: {feeder.name}"
+								class="mr-1 rounded-full bg-warning-tint px-2 py-0.5 text-xs font-bold text-warning underline-offset-4 hover:underline"
+								>{attention}</a
+							>
+						{/if}
+						{formatSynced(feeder.lastSyncedAt, bank.now)} from
+						<a
+							href={resolve('/bank')}
+							class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
+							>{feeder.name}</a
+						>
+					{:else if bank.loaded}
+						Entered by hand or from bank files
 					{/if}
 				</p>
-				<Button variant="outline" size="sm" onclick={() => (reconcileOpen = true)}>Reconcile</Button
-				>
+			</div>
+			<div
+				class="grid w-full items-end gap-x-4 sm:flex sm:w-auto sm:flex-wrap sm:gap-x-6 sm:gap-y-3"
+			>
+				<div class="contents sm:flex sm:flex-col sm:items-end">
+					<p class="col-start-1 text-sm font-bold">Balance</p>
+					<p
+						data-testid="account-balance"
+						class={[
+							'col-start-1 w-fit text-2xl font-bold',
+							account.balance < 0 && 'text-destructive'
+						]}
+					>
+						{formatCents(account.balance)}
+					</p>
+				</div>
+				<div class="contents sm:flex sm:flex-col sm:items-start sm:gap-1">
+					<p
+						class="col-start-1 mt-1 text-sm text-muted-foreground sm:mt-0"
+						data-testid="last-reconciled"
+					>
+						{#if account.lastReconciledOn}
+							Reconciled
+							<time datetime={account.lastReconciledOn}>{formatDate(account.lastReconciledOn)}</time
+							>
+						{:else}
+							Not reconciled yet
+						{/if}
+					</p>
+					<div class="col-start-2 row-span-3 row-start-1 self-end justify-self-end">
+						<Button variant="outline" size="sm" onclick={() => (reconcileOpen = true)}>
+							Reconcile
+						</Button>
+					</div>
+				</div>
 			</div>
 		</header>
-		{#if reconciled?.accountId === account._id}
-			<p role="status" class="text-sm">{reconciled.message}</p>
-		{/if}
-		{#if moveError}
-			<p role="alert" class="text-sm text-destructive">{moveError}</p>
-		{/if}
 		{#key account._id}
 			<TransactionTable accountId={account._id} />
 		{/key}
+	</div>
+	<div
+		class={noticeText === '' && moveError === ''
+			? 'sr-only'
+			: 'fixed inset-x-4 bottom-20 z-50 mx-auto flex max-w-md items-center gap-3 rounded-md border bg-popover py-2 pr-2 pl-4 text-sm shadow-lg lg:bottom-6'}
+	>
+		<div class="min-w-0 flex-1">
+			<p role="status">{noticeText}</p>
+			<p role="alert" class="text-destructive">{moveError}</p>
+		</div>
+		{#if noticeText !== '' || moveError !== ''}
+			<Button variant="ghost" size="sm" onclick={dismiss}>Dismiss</Button>
+		{/if}
 	</div>
 	<RenameAccountDialog bind:open={renameOpen} accountId={account._id} currentName={account.name} />
 	<ReconcileDialog bind:open={reconcileOpen} {account} {onReconciled} />
@@ -144,9 +243,12 @@
 		</Dialog.Content>
 	</Dialog.Root>
 {:else if accounts.loaded}
-	<h1 class="text-xl font-semibold">No such Account</h1>
+	<h1 class="text-2xl font-bold tracking-tight">No such Account</h1>
 	<p class="mt-2 text-muted-foreground">
-		It may have been removed. <a class="underline" href={resolve('/accounts')}>See All Accounts</a>.
+		It may have been removed.
+		<a class="underline underline-offset-4 hover:no-underline" href={resolve('/accounts')}
+			>See every Account</a
+		>.
 	</p>
 {:else}
 	<p role="status" class="text-muted-foreground">Loading…</p>

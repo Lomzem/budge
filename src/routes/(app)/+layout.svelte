@@ -6,9 +6,9 @@
 	import { BankConnections, setBankConnections } from '$lib/bankConnections.svelte';
 	import { BudgetMonth, setBudgetMonth } from '$lib/budget.svelte';
 	import AccountSidebar from '$lib/components/shell/account-sidebar.svelte';
-	import AppMenu from '$lib/components/shell/app-menu.svelte';
+	import BrandMark from '$lib/components/shell/brand-mark.svelte';
 	import SignOutButton from '$lib/components/shell/sign-out-button.svelte';
-	import ViewMenu from '$lib/components/shell/view-menu.svelte';
+	import TabBar from '$lib/components/shell/tab-bar.svelte';
 	import { setupConvexWithClerk } from '$lib/convex.svelte';
 	import { readPublicError } from '$lib/publicError';
 
@@ -32,7 +32,7 @@
 		if (whoami.error) {
 			return readPublicError(whoami.error)?.code === 'FORBIDDEN' ? 'forbidden' : 'failed';
 		}
-		return whoami.isLoading ? 'loading' : 'owner';
+		return whoami.isLoading || !accounts.loaded ? 'loading' : 'owner';
 	});
 </script>
 
@@ -42,39 +42,43 @@
 	}}
 />
 
-{#if access === 'owner'}
+{#if access === 'owner' || access === 'loading'}
 	<a
 		href="#main"
-		class="sr-only rounded-md bg-background px-3 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
+		class="sr-only rounded-md bg-background px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50"
 	>
 		Skip to content
 	</a>
 	<div class="flex flex-1">
-		<aside
-			class="hidden w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground lg:flex"
-		>
-			<AccountSidebar />
+		<aside class="hidden w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground lg:block">
+			<div class="sticky top-0 flex h-svh flex-col">
+				<AccountSidebar ready={access === 'owner'} />
+			</div>
 		</aside>
-		<div class="flex min-w-0 flex-1 flex-col">
-			<header class="flex items-center justify-between gap-2 border-b px-3 py-2 lg:hidden">
-				<ViewMenu />
-				<AppMenu />
-			</header>
-			<main id="main" tabindex="-1" class="flex-1 p-4 outline-none lg:p-6">
+		<main
+			id="main"
+			tabindex="-1"
+			class="mx-auto w-full max-w-screen-2xl min-w-0 flex-1 px-4 pt-5 pb-24 outline-none sm:px-6 lg:px-8 lg:pt-8 lg:pb-10"
+		>
+			{#if access === 'owner'}
 				{@render children()}
-			</main>
-		</div>
+			{:else}
+				<p role="status" class="text-muted-foreground">Loading…</p>
+			{/if}
+		</main>
 	</div>
+	<TabBar ready={access === 'owner'} />
 {:else}
 	<main class="flex flex-1 flex-col items-center justify-center gap-4 p-4 text-center">
-		<h1 class="text-2xl font-semibold">Budge</h1>
-		{#if access === 'loading'}
-			<p role="status" class="text-muted-foreground">Loading…</p>
-		{:else if access === 'forbidden'}
-			<p role="alert">This account can't open Budge.</p>
-			<SignOutButton />
-		{:else}
-			<p role="alert">Budge couldn't reach its server. Try reloading the page.</p>
-		{/if}
+		<BrandMark class="size-12" />
+		<h1 class="text-2xl font-bold tracking-tight">Budge</h1>
+		<div class="flex min-h-24 flex-col items-center gap-3">
+			{#if access === 'forbidden'}
+				<p role="alert">This account can't open Budge.</p>
+				<SignOutButton />
+			{:else}
+				<p role="alert">Budge couldn't reach its server. Try reloading the page.</p>
+			{/if}
+		</div>
 	</main>
 {/if}

@@ -1,97 +1,169 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn-svelte/tailwind.css';
-@import '@fontsource-variable/inter';
 
 @custom-variant dark (&:is(.dark *));
 
+/* `optional` never swaps after first paint, so the font can't move the page; the root layout preloads the Latin file so it arrives in time. */
+@font-face {
+	font-family: 'Atkinson Hyperlegible Next';
+	font-style: normal;
+	font-display: optional;
+	font-weight: 200 800;
+	src: url('@fontsource-variable/atkinson-hyperlegible-next/files/atkinson-hyperlegible-next-latin-wght-normal.woff2')
+		format('woff2-variations');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: 'Atkinson Hyperlegible Next';
+	font-style: normal;
+	font-display: optional;
+	font-weight: 200 800;
+	src: url('@fontsource-variable/atkinson-hyperlegible-next/files/atkinson-hyperlegible-next-latin-ext-wght-normal.woff2')
+		format('woff2-variations');
+	unicode-range:
+		U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+		U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+		U+A720-A7FF;
+}
+
+/* Arial sized to Atkinson's metrics, for a first visit that paints before the font arrives. */
+@font-face {
+	font-family: 'Atkinson Fallback';
+	src: local('Arial'), local('Liberation Sans'), local('Helvetica');
+	size-adjust: 98.88%;
+	ascent-override: 99.51%;
+	descent-override: 31.96%;
+	line-gap-override: 0%;
+}
+
 :root {
 	color-scheme: light;
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.145 0 0);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.205 0 0);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.97 0 0);
-	--secondary-foreground: oklch(0.205 0 0);
-	--muted: oklch(0.97 0 0);
-	/* 4.5:1 on --muted as well as on --background. */
-	--muted-foreground: oklch(0.5 0 0);
-	--accent: oklch(0.97 0 0);
-	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
-	/* Status text: 4.5:1 on --background and --muted, always beside words that say the same. */
-	--funded: oklch(0.5 0.13 150);
-	--warning: oklch(0.52 0.12 65);
-	--border: oklch(0.922 0 0);
+	/* Paper is the page, sheet the raised surfaces; ratios are WCAG 2.2 contrast. */
+	--background: #f3f6f1;
+	--foreground: #17242c;
+	--card: #ffffff;
+	--card-foreground: #17242c;
+	--popover: #ffffff;
+	--popover-foreground: #17242c;
+	--primary: #1e6847;
+	--primary-foreground: #ffffff;
+	--secondary: #e7eee6;
+	--secondary-foreground: #17242c;
+	--muted: #e7eee6;
+	/* 6.1:1 on --muted, 6.6:1 on --background. */
+	--muted-foreground: #4a5b53;
+	--accent: #e7eee6;
+	--accent-foreground: #17242c;
+	--destructive: #b3261e;
+	--destructive-tint: #f9e4e1;
+	/* Status text: 4.9:1 or more on every surface, always beside words that say the same. */
+	--funded: #1e6847;
+	--funded-tint: #daeadd;
+	--warning: #875800;
+	--warning-tint: #f6ebd3;
+	--border: #d3dfd5;
 	/* Control boundaries need 3:1 contrast (WCAG 1.4.11). */
-	--input: oklch(0.556 0 0);
-	--ring: oklch(0.439 0 0);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
-	--radius: 0.625rem;
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(0.205 0 0);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.439 0 0);
+	--input: #7a8c82;
+	--ring: #1e6847;
+	--chart-1: #1e6847;
+	--chart-2: #4a5b53;
+	--chart-3: #875800;
+	--chart-4: #b3261e;
+	--chart-5: #17242c;
+	--radius: 0.5rem;
+	--sidebar: #e9efe7;
+	--sidebar-foreground: #17242c;
+	--sidebar-primary: #1e6847;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: #daeadd;
+	--sidebar-accent-foreground: #17242c;
+	--sidebar-border: #d3dfd5;
+	--sidebar-ring: #1e6847;
+}
+
+/* A theme change recolors everything at once instead of animating each control. */
+.theme-switching,
+.theme-switching * {
+	transition: none !important;
 }
 
 .dark {
 	color-scheme: dark;
-	--background: oklch(0.145 0 0);
-	--foreground: oklch(0.985 0 0);
-	--card: oklch(0.205 0 0);
-	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.205 0 0);
-	--popover-foreground: oklch(0.985 0 0);
-	--primary: oklch(0.922 0 0);
-	--primary-foreground: oklch(0.205 0 0);
-	--secondary: oklch(0.269 0 0);
-	--secondary-foreground: oklch(0.985 0 0);
-	--muted: oklch(0.269 0 0);
-	--muted-foreground: oklch(0.708 0 0);
-	--accent: oklch(0.269 0 0);
-	--accent-foreground: oklch(0.985 0 0);
-	--destructive: oklch(0.704 0.191 22.216);
-	--funded: oklch(0.78 0.15 150);
-	--warning: oklch(0.82 0.14 75);
-	--border: oklch(1 0 0 / 10%);
+	--background: #0f1713;
+	--foreground: #e4ece6;
+	--card: #16211b;
+	--card-foreground: #e4ece6;
+	--popover: #1b2821;
+	--popover-foreground: #e4ece6;
+	--primary: #73cc9c;
+	--primary-foreground: #0f1713;
+	--secondary: #1f2c25;
+	--secondary-foreground: #e4ece6;
+	--muted: #1f2c25;
+	--muted-foreground: #9db0a5;
+	--accent: #1f2c25;
+	--accent-foreground: #e4ece6;
+	--destructive: #ff8f86;
+	--destructive-tint: #3a1f1c;
+	--funded: #73cc9c;
+	--funded-tint: #1d3528;
+	--warning: #edb759;
+	--warning-tint: #33291a;
+	--border: #2a3b32;
 	/* Control boundaries need 3:1 contrast (WCAG 1.4.11). */
-	--input: oklch(0.556 0 0);
-	--ring: oklch(0.708 0 0);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
-	--sidebar: oklch(0.205 0 0);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.922 0 0);
-	--sidebar-primary-foreground: oklch(0.205 0 0);
-	--sidebar-accent: oklch(0.269 0 0);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.708 0 0);
+	--input: #6b8276;
+	--ring: #73cc9c;
+	--chart-1: #73cc9c;
+	--chart-2: #9db0a5;
+	--chart-3: #edb759;
+	--chart-4: #ff8f86;
+	--chart-5: #e4ece6;
+	--sidebar: #121c17;
+	--sidebar-foreground: #e4ece6;
+	--sidebar-primary: #73cc9c;
+	--sidebar-primary-foreground: #0f1713;
+	--sidebar-accent: #1d3528;
+	--sidebar-accent-foreground: #e4ece6;
+	--sidebar-border: #2a3b32;
+	--sidebar-ring: #73cc9c;
+}
+
+/* A 1.2 scale from a 16 px base; sm and base are both body size. */
+@theme {
+	--text-xs: 0.8333rem;
+	--text-xs--line-height: 1.25rem;
+	--text-sm: 1rem;
+	--text-sm--line-height: 1.5rem;
+	--text-base: 1rem;
+	--text-base--line-height: 1.5rem;
+	--text-lg: 1.2rem;
+	--text-lg--line-height: 1.75rem;
+	--text-xl: 1.44rem;
+	--text-xl--line-height: 2rem;
+	--text-2xl: 1.728rem;
+	--text-2xl--line-height: 2.25rem;
+	--text-3xl: 2.0736rem;
+	--text-3xl--line-height: 2.5rem;
+	--text-4xl: 2.4883rem;
+	--text-4xl--line-height: 3rem;
+	--container-8xl: 88rem;
+	--breakpoint-xs: 22rem;
 }
 
 @theme inline {
 	--color-secondary-hover: color-mix(in oklch, var(--secondary), var(--foreground) 5%);
 	--radius-button-xs: min(var(--radius-md), 10px);
 	--radius-button-sm: min(var(--radius-md), 12px);
-	--text-button-sm: 0.8rem;
+	--text-button-sm: 0.8333rem;
 	--spacing-dialog-height: calc(100dvh - 2rem);
+	--spacing-dialog-height-sm: calc(100dvh - 6rem);
+	--spacing-side-panel-height: calc(100dvh - 4rem);
 	--container-dialog-width: calc(100% - 2rem);
-	--font-sans: 'Inter Variable', sans-serif;
+	--font-sans: 'Atkinson Hyperlegible Next', 'Atkinson Fallback', sans-serif;
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -110,7 +182,10 @@
 	--color-border: var(--border);
 	--color-destructive: var(--destructive);
 	--color-funded: var(--funded);
+	--color-funded-tint: var(--funded-tint);
 	--color-warning: var(--warning);
+	--color-warning-tint: var(--warning-tint);
+	--color-destructive-tint: var(--destructive-tint);
 	--color-accent-foreground: var(--accent-foreground);
 	--color-accent: var(--accent);
 	--color-muted-foreground: var(--muted-foreground);
@@ -163,5 +238,72 @@
 	}
 	html {
 		@apply font-sans;
+		/* Amounts line up digit for digit, and a changed amount keeps its width. */
+		font-variant-numeric: tabular-nums;
+		/* A page that grows a scrollbar doesn't push its content sideways. */
+		scrollbar-gutter: stable;
+		-webkit-text-size-adjust: 100%;
+		text-rendering: optimizeLegibility;
+		/* Below lg, what scrolls into view stops above the fixed tab bar. */
+		@variant max-lg {
+			scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+		}
 	}
+	h1,
+	h2,
+	h3 {
+		text-wrap: balance;
+	}
+	p {
+		text-wrap: pretty;
+	}
+	:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 2px;
+	}
+	/* The filter bar has its own Clear button; the native one shifts the text. */
+	input[type='search']::-webkit-search-cancel-button {
+		appearance: none;
+	}
+	/* A Payee field suggests names as you type; the picker arrow promises a menu it doesn't have. */
+	input[list]::-webkit-calendar-picker-indicator {
+		display: none !important;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		::before,
+		::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+			scroll-behavior: auto !important;
+		}
+	}
+}
+
+@utility pb-safe {
+	padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility fade-edges {
+	mask-image: linear-gradient(
+		to right,
+		transparent 0,
+		black var(--fade-start, 0px),
+		black calc(100% - var(--fade-end, 0px)),
+		transparent 100%
+	);
+}
+
+@utility fade-start {
+	--fade-start: 2.5rem;
+}
+
+@utility fade-end {
+	--fade-end: 2.5rem;
+}
+
+/* A label column that takes the free room beside a figure column as wide as its figure. */
+@utility grid-cols-label-figure {
+	grid-template-columns: minmax(0, 1fr) auto;
 }

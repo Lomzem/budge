@@ -10,6 +10,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import SelectField from '$lib/components/select-field.svelte';
 	import * as Table from '$lib/components/ui/table';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import type { BankFile } from '$lib/domain/bankFiles';
@@ -17,6 +18,7 @@
 	import { formatCents } from '$lib/domain/money';
 	import { readBankFile } from '$lib/import';
 	import { readPublicError } from '$lib/publicError';
+	import { ScrollArea } from '$lib/components/ui/scroll-area';
 
 	type FileRows = FunctionArgs<typeof api.imports.commit>['rows'];
 	type PreviewCandidate = Extract<
@@ -115,6 +117,12 @@
 		else error = committed.error?.message ?? "Budge couldn't save the import. Try again.";
 	}
 
+	const submitLabel = $derived.by(() => {
+		if (saving) return 'Importing…';
+		if (!ready) return 'Import';
+		return `Import ${plural(counts.new + counts.match, 'row', 'rows')}`;
+	});
+
 	function plural(count: number, one: string, many: string) {
 		return `${String(count)} ${count === 1 ? one : many}`;
 	}
@@ -130,7 +138,14 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content size="wide">
+	<Dialog.Content
+		size="wide"
+		onOpenAutoFocus={(event: Event) => {
+			if (defaultAccountId === undefined) return;
+			event.preventDefault();
+			document.getElementById('import-file')?.focus();
+		}}
+	>
 		<Dialog.Header>
 			<Dialog.Title>Import a bank file</Dialog.Title>
 			<Dialog.Description>
@@ -141,17 +156,14 @@
 		<form class="flex min-w-0 flex-col gap-4" onsubmit={save}>
 			<div class="flex flex-col gap-2">
 				<Label for="import-account">Account</Label>
-				<select
+				<SelectField
 					id="import-account"
-					bind:value={accountId}
-					onchange={() => (picks = [])}
 					required
-					class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
-				>
-					{#each accounts.all as option (option._id)}
-						<option value={option._id}>{option.name}</option>
-					{/each}
-				</select>
+					bind:value={accountId}
+					onValueChange={() => (picks = [])}
+					placeholder="Pick an Account"
+					choices={accounts.all.map((option) => ({ value: option._id, label: option.name }))}
+				/>
 			</div>
 			<div class="flex flex-col gap-2">
 				<Label for="import-file">File</Label>
@@ -180,46 +192,49 @@
 					{:else}
 						<p role="status" class="text-muted-foreground">Checking for Matches…</p>
 					{/if}
-					<div class="@container max-h-80 overflow-y-auto">
-						<Table.Root>
-							<Table.Header>
-								<Table.Row>
-									<Table.Head width="fit">Date</Table.Head>
-									<Table.Head width="fill">Bank Text</Table.Head>
-									<Table.Head width="fit" align="end">Amount</Table.Head>
-									<Table.Head showFrom="lg">On save</Table.Head>
-								</Table.Row>
-							</Table.Header>
-							<Table.Body>
-								{#each file.rows as row, index (index)}
-									<Table.Row>
-										<Table.Cell numeric>
-											<time datetime={row.date}>{formatDate(row.date, 'short')}</time>
-										</Table.Cell>
-										<Table.Cell width="fill">
-											<span class="block max-w-full truncate">{row.bankText}</span>
-											<span class="block text-xs @lg:hidden">
-												{@render outcome(index)}
-											</span>
-										</Table.Cell>
-										<Table.Cell align="end" numeric>{formatCents(row.amount)}</Table.Cell>
-										<Table.Cell showFrom="lg">{@render outcome(index)}</Table.Cell>
-									</Table.Row>
-								{/each}
-							</Table.Body>
-						</Table.Root>
+					<div class="flex max-h-80 flex-col">
+						<ScrollArea>
+							<div class="@container">
+								<Table.Root>
+									<Table.Header>
+										<Table.Row>
+											<Table.Head width="fit">Date</Table.Head>
+											<Table.Head width="fill">Bank Text</Table.Head>
+											<Table.Head width="fit" align="end">Amount</Table.Head>
+											<Table.Head showFrom="lg">On save</Table.Head>
+										</Table.Row>
+									</Table.Header>
+									<Table.Body>
+										{#each file.rows as row, index (index)}
+											<Table.Row>
+												<Table.Cell numeric>
+													<time datetime={row.date}>{formatDate(row.date)}</time>
+												</Table.Cell>
+												<Table.Cell width="fill">
+													<span class="block max-w-full truncate">{row.bankText}</span>
+													<span class="block text-xs @lg:hidden">
+														{@render outcome(index)}
+													</span>
+												</Table.Cell>
+												<Table.Cell align="end" numeric>{formatCents(row.amount)}</Table.Cell>
+												<Table.Cell showFrom="lg">{@render outcome(index)}</Table.Cell>
+											</Table.Row>
+										{/each}
+									</Table.Body>
+								</Table.Root>
+							</div>
+						</ScrollArea>
 					</div>
 				</section>
 			{/if}
 
-			{#if error}
-				<p role="alert" class="text-sm text-destructive">{error}</p>
-			{/if}
-			<Dialog.Footer>
+			<Dialog.Footer {error}>
 				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
-				<Button type="submit" disabled={!ready || saving}>
-					{saving ? 'Saving…' : 'Save'}
-				</Button>
+				<div class="grid min-w-36">
+					<Button type="submit" disabled={!ready || saving}>
+						{submitLabel}
+					</Button>
+				</div>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
@@ -229,6 +244,8 @@
 	{@const decision = decisions[index]}
 	{#if decision === undefined}
 		<span class="text-muted-foreground">…</span>
+	{:else if (decision.kind === 'skip' || decision.kind === 'new') && decision.alike !== undefined}
+		{@render twin(index, decision.alike)}
 	{:else if decision.kind !== 'skip' && decision.candidates !== undefined}
 		{@render picker(index, decision.candidates)}
 	{:else if decision.kind === 'new'}
@@ -238,30 +255,43 @@
 	{:else}
 		<span class="text-xs">
 			Matches {decision.transaction.payeeName ?? 'No Payee'}, {formatDate(
-				decision.transaction.date,
-				'short'
+				decision.transaction.date
 			)}
 		</span>
 	{/if}
 {/snippet}
 
 {#snippet picker(index: number, candidates: PreviewCandidate[])}
-	<label class="flex flex-col gap-1 text-xs">
-		<span>Match with</span>
-		<select
-			bind:value={picks[index]}
+	<div class="flex max-w-56 flex-col gap-1 text-xs">
+		<label for={`import-pick-${String(index)}`}>Match with</label>
+		<SelectField
+			id={`import-pick-${String(index)}`}
 			required
-			class="h-8 max-w-56 rounded-lg border border-input bg-background px-2 text-base md:text-sm"
-		>
-			<option value="">Pick one</option>
-			{#each candidates as candidate (candidate._id)}
-				<option value={candidate._id}>
-					{candidate.payeeName ?? 'No Payee'}, {formatDate(candidate.date, 'short')}{candidate.memo
-						? `, ${candidate.memo}`
-						: ''}
-				</option>
-			{/each}
-			<option value="new">None, add as new</option>
-		</select>
-	</label>
+			bind:value={() => picks[index] ?? '', (pick: string) => (picks[index] = pick)}
+			placeholder="Pick one"
+			choices={[
+				...candidates.map((candidate) => ({
+					value: candidate._id,
+					label: `${candidate.payeeName ?? 'No Payee'}, ${formatDate(candidate.date)}${candidate.memo ? `, ${candidate.memo}` : ''}`
+				})),
+				{ value: 'new', label: 'None, add as new' }
+			]}
+		/>
+	</div>
+{/snippet}
+
+{#snippet twin(index: number, alike: PreviewCandidate)}
+	<div class="flex max-w-56 flex-col gap-1 text-xs">
+		<label for={`import-pick-${String(index)}`} class="text-warning">
+			Likely already here: {alike.payeeName ?? 'No Payee'}, {formatDate(alike.date)}
+		</label>
+		<SelectField
+			id={`import-pick-${String(index)}`}
+			bind:value={() => picks[index] ?? '', (pick: string) => (picks[index] = pick)}
+			choices={[
+				{ value: '', label: 'Skip this row' },
+				{ value: 'new', label: 'Add it as new' }
+			]}
+		/>
+	</div>
 {/snippet}
