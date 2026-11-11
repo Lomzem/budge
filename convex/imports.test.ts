@@ -553,6 +553,22 @@ describe('approving', () => {
 		).rejects.toThrow('Too many Transactions');
 	});
 
+	test('Approve shown passes over a Transaction from before approvals, so its Undo cannot unapprove it', async () => {
+		const { t, owner, checking } = await budgetWithChecking();
+		const legacy = await t.run((ctx) =>
+			ctx.db.insert('transactions', {
+				accountId: checking,
+				date: '2026-08-16',
+				amount: -100,
+				cleared: 'cleared'
+			})
+		);
+
+		expect(
+			await owner.mutation(api.transactions.approveMany, { transactionIds: [legacy] })
+		).toEqual([]);
+	});
+
 	test('counts Unapproved Transactions to one past the limit, so the count reads as at least', async () => {
 		const { t, owner, checking } = await budgetWithChecking();
 		await t.run(async (ctx) => {

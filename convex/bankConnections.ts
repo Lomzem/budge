@@ -532,9 +532,9 @@ export const setup = internalAction({
 		accessToken: v.string(),
 		accounts: v.array(v.object({ externalId: v.string(), accountId: v.id('accounts') }))
 	},
-	returns: v.id('bankConnections'),
+	returns: v.object({ connectionId: v.id('bankConnections'), webhookSet: v.boolean() }),
 	handler: async (ctx, { accessToken, ...input }) => {
-		const connectionId = await runEffect(
+		const setUp = await runEffect(
 			setupConnection({
 				...input,
 				accessToken,
@@ -542,8 +542,10 @@ export const setup = internalAction({
 			}).pipe(Effect.provide(liveLayer(ctx))),
 			toPublicError
 		);
-		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, { connectionId });
-		return connectionId;
+		await ctx.scheduler.runAfter(0, internal.bankConnections.sync, {
+			connectionId: setUp.connectionId
+		});
+		return setUp;
 	}
 });
 

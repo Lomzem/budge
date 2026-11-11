@@ -41,7 +41,7 @@ The fix stores the answer on the Transaction instead of scanning:
 
 - A Transaction carries `bankChange: true` while one of its Bank Rows is `changed` or `removed`.
 - `refreshDerivedFields` (formerly `refreshSearchText`) keeps the marker, the same way it keeps `searchText`. It already runs after every owned write that touches a Transaction or its Bank Rows, and `updateBankRow` now runs it when a Bank Row's state changes.
-- Two indexes, `by_bankChange_date` and `by_account_bankChange_date`, serve the list and the count. The list uses native `paginate`, newest date first. The count reads at most 501 rows of the index.
+- Two indexes, `by_bankChange_date` and `by_accountId_bankChange_date`, serve the list and the count. The list uses native `paginate`, newest date first. The count reads at most 501 rows of the index.
 
 The test "a bank change in one Account stays reachable behind a thousand in another, and the list runs newest date first" failed on `e5b2838` at both points: the Checking count was 0, and the first row was the older Savings date.
 
@@ -90,7 +90,14 @@ Declined, with a reply:
   - The spec no longer names production's bank.
   - The spec accepts background-sync row insertion as a layout-shift exception, and ticket 07 matches.
 
+## #28, incremental review: 4 comments, all fixed
+
+- **Webhook update during setup:** `setupConnection` still saves the token first, then returns `webhookSet`. `bankConnections.setup` returns `{ connectionId, webhookSet }`, so an operator sees a refused webhook update and can run setup again. In-app Connect ignores it as before, because the daily sync and Sync now still reach the Item. Proof: "keeps the exchanged token when Plaid refuses the webhook update" expects `webhookSet: false`.
+- **Index name:** `by_account_bankChange_date` is now `by_accountId_bankChange_date`.
+- **Unsupported Plaid types:** only `depository` suggests a Cash Account, and `credit` or `loan` a Credit Card Account. Any other type, such as `investment`, is held with no kind, so the held-account dialog asks the owner. The account is not dropped: its transactions would still arrive and bring it back as an unnamed held account. Proof: the `decodeAccounts` table adds a brokerage account with no kind, and fails before the fix.
+- **`approveMany` and rows from before approvals:** it now passes over any Transaction whose `approved` is not `false`, the rule `hasApproval` uses. Approve shown calls it, so the returned IDs feed Undo. Proof: "Approve shown passes over a Transaction from before approvals…" fails before the fix.
+
 ## Remaining
 
-- #28 and #29: incremental reviews of the fixes.
-- #30: incremental review of the fixes.
+- #28: incremental review of these fixes.
+- #29 and #30: incremental reviews of their fixes.

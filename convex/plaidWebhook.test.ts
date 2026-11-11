@@ -186,7 +186,7 @@ async function connectedBudget() {
 	const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 0] } });
 	const { owner, t } = backend;
 	const { Checking: checking } = backend.accounts;
-	const connectionId = await t.action(internal.bankConnections.setup, {
+	const { connectionId } = await t.action(internal.bankConnections.setup, {
 		name: 'Sample Bank',
 		itemId,
 		accessToken,

@@ -90,7 +90,7 @@ export default defineSchema({
 		.index('by_approved_date', ['approved', 'date'])
 		.index('by_account_approved_date', ['accountId', 'approved', 'date'])
 		.index('by_bankChange_date', ['bankChange', 'date'])
-		.index('by_account_bankChange_date', ['accountId', 'bankChange', 'date'])
+		.index('by_accountId_bankChange_date', ['accountId', 'bankChange', 'date'])
 
 		.searchIndex('search_text', {
 			searchField: 'searchText',
