@@ -4,6 +4,7 @@ import { holdResponseTo } from '../heldResponse';
 import { openAccount, type Journey } from './journey';
 
 const notSetUp = "Bank sync isn't set up on this server.";
+const SLOWER_THAN_RECENT_INPUT_MS = 1_000;
 const noLogin = 'A sample connection with no bank login, so it can’t sync or reconnect.';
 
 function card(page: Page, name: string) {
@@ -41,7 +42,8 @@ export const plaid = {
 		}
 	},
 	'late-sync': {
-		title: 'two Sync nows that finish late each report only on their own connection',
+		title:
+			'two Sync nows that finish late each report only on their own connection, and the result moves nothing',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const sync = await holdResponseTo(page, 'bankConnections:syncNow');
@@ -66,6 +68,7 @@ export const plaid = {
 			await step(
 				'each released result reports on its own card while the other keeps syncing',
 				async () => {
+					await page.waitForTimeout(SLOWER_THAN_RECENT_INPUT_MS);
 					const pressed = [communityBank, creditUnion];
 					const answered = pressed[sync.releaseEarliest()];
 					const waiting = pressed.find((candidate) => candidate !== answered);

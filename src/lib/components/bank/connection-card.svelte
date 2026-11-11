@@ -287,9 +287,9 @@
 			{/if}
 		</div>
 		<div
-			class="flex flex-col gap-x-4 gap-y-3 sm:flex-row sm:items-center sm:justify-between sm:pl-13"
+			class="flex flex-col gap-x-4 gap-y-3 sm:flex-row sm:items-start sm:justify-between sm:pl-13"
 		>
-			<div title={slotText} class="flex h-10 min-w-0 flex-col justify-center sm:flex-1">
+			<div title={slotText} class="h-10 min-w-0 sm:h-12 sm:flex-1 sm:pt-2">
 				<p
 					class={[
 						'flex min-w-0 items-start gap-1.5 text-sm break-words',
