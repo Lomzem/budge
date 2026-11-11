@@ -475,7 +475,13 @@
 						<BudgetTable groups={view.groups} selectedId={selected?.id ?? null} onselect={select} />
 					</div>
 					{#if wide.current}
-						<aside class="sticky top-8 -m-1 flex max-h-side-panel-height w-82 shrink-0 flex-col">
+						<aside
+							class={[
+								'sticky top-8 -m-1 flex max-h-side-panel-height w-82 shrink-0 flex-col',
+								budget.stale && 'opacity-60'
+							]}
+							inert={budget.stale}
+						>
 							<ScrollArea>
 								<div class="flex flex-col gap-6 p-1">
 									{#if selected}
