@@ -51,7 +51,11 @@
 			Budge tracks money from this date on. Starting balances are dated on it.
 		</p>
 	</div>
-	{#if settings.data === undefined}
+	{#if settings.error}
+		<p role="alert" class="flex h-9 items-center text-destructive">
+			Budge couldn't load the cutover date. Try reloading the page.
+		</p>
+	{:else if settings.data === undefined}
 		<p role="status" class="h-9 text-muted-foreground">Loading…</p>
 	{:else if changing || cutoverDate === null}
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->

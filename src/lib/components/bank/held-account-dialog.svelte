@@ -56,7 +56,7 @@
 		};
 		choice: string;
 		name: string;
-		kind: AccountKind;
+		kind: AccountKind | '';
 		error: string;
 		mapped: MappedAccount | null;
 	}>();
@@ -77,7 +77,7 @@
 			},
 			choice: sameName(account)?._id ?? 'new',
 			name: account.name ?? '',
-			kind: account.kind ?? 'cash',
+			kind: account.kind ?? '',
 			error: '',
 			mapped: null
 		});
@@ -125,11 +125,16 @@
 			return;
 		}
 		if (mismatchOf(session.choice, session.bankAccount.kind)) return;
+		if (session.choice === 'new' && session.kind === '') {
+			session.error = "Choose this Account's type: cash or credit card.";
+			document.getElementById('held-new-cash')?.focus();
+			return;
+		}
 		const request = {
 			connectionAccountId: session.bankAccount._id,
 			choice: session.choice,
 			name: session.name.trim(),
-			kind: session.kind
+			kind: session.kind === '' ? 'cash' : session.kind
 		};
 		session.error = '';
 		const saved = await dialog.run('save', () => saveChoice(request));
@@ -172,6 +177,7 @@
 				{:else}
 					{@const target = accounts.find(session.choice)}
 					{@const mismatch = mismatchOf(session.choice, session.bankAccount.kind)}
+					{@const untyped = session.error !== '' && session.choice === 'new' && session.kind === ''}
 					<Dialog.Header>
 						<Dialog.Title>{session.bankAccount.label}</Dialog.Title>
 						<Dialog.Description>
@@ -227,7 +233,11 @@
 								</div>
 								<fieldset class="flex flex-col gap-2">
 									<legend class="mb-2 font-bold">Type</legend>
-									<RadioGroup.Root bind:value={session.kind}>
+									<RadioGroup.Root
+										bind:value={session.kind}
+										aria-invalid={untyped || undefined}
+										aria-describedby={untyped ? 'held-error' : undefined}
+									>
 										<div class="flex min-h-9 items-center gap-2.5">
 											<RadioGroup.Item value="cash" id="held-new-cash" />
 											<Label for="held-new-cash">Cash, such as checking or savings</Label>
@@ -251,6 +261,11 @@
 								</p>
 							{:else if target !== undefined}
 								<p class="col-start-1 row-start-1 self-start rounded-md bg-muted p-4">
+									{#if session.bankAccount.kind === null}
+										The bank didn't say what kind of account this is, so make sure it is {kindName(
+											target.kind
+										)} like {target.name}.
+									{/if}
 									Its transactions join {target.name}. Next, you check {target.name}'s Starting
 									Balance.
 								</p>
@@ -261,7 +276,7 @@
 								</p>
 							{/if}
 						</div>
-						<Dialog.Footer error={session.error}>
+						<Dialog.Footer error={session.error} errorId="held-error">
 							<div class="grid min-w-40">
 								<Button
 									type="submit"

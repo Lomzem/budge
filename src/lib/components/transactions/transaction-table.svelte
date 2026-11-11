@@ -22,6 +22,7 @@
 	import { formatCents } from '$lib/domain/money';
 	import { BANK_CHANGE_LIMIT } from '$lib/domain/bankChanges';
 	import { formatUnapprovedCount, UNAPPROVED_COUNT_LIMIT } from '$lib/domain/unapproved';
+	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	import ImportDialog from './import-dialog.svelte';
 	import TransactionDialog from './transaction-dialog.svelte';
@@ -82,8 +83,7 @@
 	const accounts = getAccounts();
 	const categoryChoices = useQuery(api.categories.list, {});
 	const payeeChoices = useQuery(api.payees.list, {});
-	function idsOf<T>(query: { data: T | undefined; error: unknown }, ids: (data: T) => string[]) {
-		if (query.error) return [];
+	function idsOf<T>(query: { data: T | undefined }, ids: (data: T) => string[]) {
 		return query.data === undefined ? undefined : ids(query.data);
 	}
 	const offered = $derived(
@@ -97,6 +97,9 @@
 		})
 	);
 	const applied = $derived(offered ?? noFilters);
+	const unchecked = $derived(
+		offered === undefined && Boolean(categoryChoices.error ?? payeeChoices.error)
+	);
 	$effect(() => {
 		if (offered === undefined) return;
 		const dropped = (['accountId', 'categoryId', 'payeeId'] as const).some(
@@ -171,7 +174,8 @@
 	const unapprove = useMutation(api.transactions.unapprove);
 	const resolveBankChange = useMutation(api.imports.resolveBankChange);
 	let resolving = $state(false);
-	let confirmRemoval = $state<{ row: Row; importId: Id<'imports'>; payee: string } | null>(null);
+	const removal = new DialogSession<{ row: Row; importId: Id<'imports'>; payee: string }>();
+	const confirmRemoval = $derived(removal.current);
 	let afterRemoval: HTMLElement | undefined;
 	let undoable = $state<{
 		scopeKey: string;
@@ -196,6 +200,8 @@
 
 	const problem = $derived.by(() => {
 		if (rowError !== '') return rowError;
+		if (unchecked)
+			return "Budge couldn't load the Categories or Payees to check your filters. Try reloading the page.";
 		if (first.error ?? second.error)
 			return "Budge couldn't load Transactions. Try reloading the page.";
 		return '';
@@ -230,6 +236,7 @@
 	const more = $derived(secondShown ? second : first);
 	const canShowMore = $derived(more.status === 'CanLoadMore' || more.status === 'LoadingMore');
 	const result = $derived.by(() => {
+		if (unchecked) return 'Transactions show once your filters are checked.';
 		if (rows.length === 0 && loading) return 'Loading Transactions…';
 		if (bankChangesCut) {
 			const newest = `the newest ${String(BANK_CHANGE_LIMIT)} bank changes`;
@@ -413,11 +420,13 @@
 
 	async function undoApproveAll() {
 		if (undo === null) return;
-		const { transactionIds } = undo;
+		const entry = undo;
+		const { transactionIds } = entry;
 		undoable = null;
 		rowError = '';
 		const restored = await attempt(() => unapprove({ transactionIds }));
 		if (!restored.ok) {
+			undoable ??= entry;
 			rowError = "Budge couldn't undo the approvals. Try again.";
 			return;
 		}
@@ -518,7 +527,9 @@
 							variant="outline"
 							aria-disabled={resolving}
 							aria-label="Delete it: {payee}, {formatDate(row.date)}"
-							onclick={() => (confirmRemoval = { row, importId: bankChange._id, payee })}
+							onclick={() => {
+								removal.open({ row, importId: bankChange._id, payee });
+							}}
 						>
 							Delete it
 						</Button>
@@ -711,7 +722,7 @@
 <AlertDialog.Root
 	open={confirmRemoval !== null}
 	onOpenChange={(next) => {
-		if (!next) confirmRemoval = null;
+		if (!next) removal.dismiss();
 	}}
 >
 	<AlertDialog.Content
@@ -745,10 +756,13 @@
 				variant="destructive"
 				disabled={resolving}
 				onclick={async () => {
-					if (confirmRemoval === null) return;
-					const { row, importId, payee } = confirmRemoval;
-					afterRemoval = await resolveRow(row, importId, 'bank', payee);
-					confirmRemoval = null;
+					const opening = removal.current;
+					if (opening === null) return;
+					const { row, importId, payee } = opening;
+					const removed = await removal.run('save', () => resolveRow(row, importId, 'bank', payee));
+					if (!removed.ok) return;
+					afterRemoval = removed.value;
+					removal.close(opening);
 				}}>Delete</AlertDialog.Action
 			>
 		</AlertDialog.Footer>

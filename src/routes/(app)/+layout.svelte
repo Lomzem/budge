@@ -29,8 +29,9 @@
 	const access = $derived.by(() => {
 		if (auth.isLoading) return 'loading';
 		if (!auth.isAuthenticated) return 'forbidden';
-		if (whoami.error) {
-			return readPublicError(whoami.error)?.code === 'FORBIDDEN' ? 'forbidden' : 'failed';
+		const failure = whoami.error ?? accounts.error;
+		if (failure) {
+			return readPublicError(failure)?.code === 'FORBIDDEN' ? 'forbidden' : 'failed';
 		}
 		return whoami.isLoading || !accounts.loaded ? 'loading' : 'owner';
 	});

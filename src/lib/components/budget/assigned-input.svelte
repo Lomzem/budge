@@ -24,6 +24,7 @@
 	let error = $state('');
 	let hint = $state('');
 	let sent: number | null = $state(null);
+	let latest = 0;
 	const errorId = $props.id();
 
 	const read = () => draft ?? shown(sent ?? amount);
@@ -37,14 +38,16 @@
 	};
 
 	function start(event: FocusEvent) {
-		if (error === '') display(amount);
+		if (error === '') display(sent ?? amount);
 		(event.currentTarget as HTMLInputElement).select();
 	}
 
 	async function save(cents: number) {
-		if (cents === amount) return;
+		if (cents === (sent ?? amount)) return;
 		sent = cents;
+		const ticket = ++latest;
 		const saved = await attempt(() => onsave(cents));
+		if (ticket !== latest) return;
 		sent = null;
 		if (!saved.ok) {
 			error = "Budge couldn't save Assigned. Try again.";
