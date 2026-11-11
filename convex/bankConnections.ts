@@ -381,31 +381,45 @@ export const remove = action({
 	returns: v.null(),
 	handler: async (ctx, { connectionId }) => {
 		await requireOwner(ctx);
-		if (bankSyncService().available) {
-			await runEffect(removeItem(connectionId).pipe(Effect.provide(liveLayer(ctx))), () => ({
-				code: 'BANK_UNAVAILABLE',
-				message: "Couldn't reach the bank to remove this connection; try again later."
-			}));
-		}
-		await ctx.runMutation(internal.bankConnections.forget, { connectionId });
+		await runEffect(removeItem(connectionId).pipe(Effect.provide(liveLayer(ctx))), () =>
+			bankSyncService().available ? bankUnreachableOnRemove : bankSyncNeededToRemove
+		);
+		await ctx.runMutation(internal.bankConnections.forget, { connectionId, cursor: null });
 		return null;
 	}
 });
 
+const bankUnreachableOnRemove = {
+	code: 'BANK_UNAVAILABLE',
+	message: "Couldn't reach the bank to remove this connection; try again later."
+} as const satisfies PublicError;
+
+const bankSyncNeededToRemove = {
+	code: 'BANK_SYNC_UNAVAILABLE',
+	message:
+		"Bank sync isn't set up on this server, so Budge can't sign out of this bank yet. Set it up, then remove the connection."
+} as const satisfies PublicError;
+
 export const forget = internalMutation({
-	args: { connectionId: v.id('bankConnections') },
+	args: { connectionId: v.id('bankConnections'), cursor: v.union(v.string(), v.null()) },
 	returns: v.null(),
-	handler: async (ctx, { connectionId }) => {
-		const bankAccounts = await ctx.db
-			.query('connectionAccounts')
-			.withIndex('by_connection_externalId', (q) => q.eq('connectionId', connectionId))
-			.take(MAX_FED_ACCOUNTS);
+	handler: async (ctx, { connectionId, cursor }) => {
 		if ((await ctx.db.get('bankConnections', connectionId)) !== null) {
 			await ctx.db.delete('bankConnections', connectionId);
 		}
-		for (const bankAccount of bankAccounts) {
+		const { page, isDone, continueCursor } = await ctx.db
+			.query('connectionAccounts')
+			.withIndex('by_connection_externalId', (q) => q.eq('connectionId', connectionId))
+			.paginate({ numItems: MAX_FED_ACCOUNTS, cursor });
+		for (const bankAccount of page) {
 			await ctx.scheduler.runAfter(0, internal.heldAccounts.forget, {
 				connectionAccountId: bankAccount._id
+			});
+		}
+		if (!isDone) {
+			await ctx.scheduler.runAfter(0, internal.bankConnections.forget, {
+				connectionId,
+				cursor: continueCursor
 			});
 		}
 		return null;
@@ -939,7 +953,7 @@ async function syncAgainIfRequested(ctx: MutationCtx, connection: Doc<'bankConne
 export const save = internalMutation({
 	args: saveArgs,
 	returns: v.id('bankConnections'),
-	handler: async (ctx, { name, itemId, encryptedToken, accounts }) => {
+	handler: async (ctx, { name, itemId, encryptedToken, accounts, accountsCheckRequestedAt }) => {
 		for (const { accountId } of accounts) {
 			if ((await ctx.db.get('accounts', accountId)) === null) throw publicError('NOT_FOUND');
 		}
@@ -953,7 +967,11 @@ export const save = internalMutation({
 			await ctx.db.patch('bankConnections', connectionId, {
 				name,
 				status: 'ok',
-				provider: { ...existing.provider, encryptedToken }
+				provider: { ...existing.provider, encryptedToken },
+				...(accountsCheckRequestedAt === undefined ||
+				(existing.accountsCheckRequestedAt ?? 0) >= accountsCheckRequestedAt
+					? {}
+					: { accountsCheckRequestedAt })
 			});
 		} else {
 			if (await atConnectionLimit(ctx))
@@ -961,7 +979,8 @@ export const save = internalMutation({
 			connectionId = await ctx.db.insert('bankConnections', {
 				name,
 				status: 'ok',
-				provider: { kind: 'plaid', itemId, encryptedToken }
+				provider: { kind: 'plaid', itemId, encryptedToken },
+				...(accountsCheckRequestedAt === undefined ? {} : { accountsCheckRequestedAt })
 			});
 		}
 		for (const { externalId, accountId } of accounts) {

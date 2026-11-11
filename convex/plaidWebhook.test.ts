@@ -23,6 +23,8 @@ function fakePlaid(signer: Signer) {
 	const state = {
 		keyOutage: false,
 		accountsOutage: false,
+		institutionDown: false,
+		quiet: false,
 		moreAccounts: 0,
 		card: false,
 		heldAnswer: null as { reached: () => void; release: Promise<void> } | null
@@ -64,11 +66,12 @@ function fakePlaid(signer: Signer) {
 					keyId === signer.wireKey.kid ? answer({ key: signer.wireKey }) : unknownKeyId()
 				);
 			case '/transactions/sync':
-				return answer(syncPage);
+				return answer(
+					state.quiet ? { ...syncPage, added: [], modified: [], removed: [] } : syncPage
+				);
 			case '/accounts/get': {
-				if (state.accountsOutage) {
-					return Promise.resolve(new Response('Service Unavailable', { status: 503 }));
-				}
+				const refused = accountsRefusal(state);
+				if (refused !== null) return Promise.resolve(refused);
 				const accounts = answer({
 					accounts: [
 						{
@@ -120,6 +123,20 @@ function fakePlaid(signer: Signer) {
 		}
 	};
 	return { paths, bodies, state, fetch };
+}
+
+function accountsRefusal(state: { accountsOutage: boolean; institutionDown: boolean }) {
+	if (state.accountsOutage) return new Response('Service Unavailable', { status: 503 });
+	if (!state.institutionDown) return null;
+	return Response.json(
+		{
+			error_type: 'INSTITUTION_ERROR',
+			error_code: 'INSTITUTION_NOT_RESPONDING',
+			error_message: 'this institution is not currently responding',
+			request_id: 'request-synthetic'
+		},
+		{ status: 400 }
+	);
 }
 
 async function requestBody(init: RequestInit | undefined): Promise<unknown> {
@@ -744,6 +761,23 @@ describe('connecting a bank from the app', () => {
 			{ name: 'Sample Savings', mask: '1111', kind: 'cash' },
 			{ name: 'Sample Rewards Card', mask: '2222', kind: 'creditCard' }
 		]);
+	});
+
+	test('lists the bank accounts on a later sync when the bank could not list them at connect', async () => {
+		const backend = await startBudget({ cutoverDate });
+		const { owner, t } = backend;
+		plaid.state.quiet = true;
+		plaid.state.institutionDown = true;
+		await owner.action(api.bankConnections.finishConnect, linked);
+		await runScheduled(backend);
+		expect(await owner.query(api.heldAccounts.list, {})).toEqual([]);
+
+		plaid.state.institutionDown = false;
+		await t.mutation(internal.bankConnections.syncAll, {});
+		await runScheduled(backend);
+
+		const waiting = await owner.query(api.heldAccounts.list, {});
+		expect(waiting.map(({ name }) => name)).toEqual(['Sample Checking', 'Sample Savings']);
 	});
 
 	async function fillConnections(t: Awaited<ReturnType<typeof startBudget>>['t'], count: number) {

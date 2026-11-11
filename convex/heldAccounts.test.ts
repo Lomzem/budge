@@ -3,7 +3,7 @@ import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vites
 
 import { decodeSyncPage, type BankAccount, type SyncPage } from '../src/lib/domain/plaid';
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { PlaidApi, PlaidClient } from './lib/plaidClient';
 import { HELD_BATCH } from './heldAccounts';
@@ -15,7 +15,7 @@ import {
 	syncConnection
 } from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
-import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
+import { publicErrorCode, publicErrorOf, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -60,6 +60,18 @@ function gate() {
 }
 
 type FakePlaid = Parameters<typeof PlaidClient.layerTest>[0];
+
+let answerPlaid: (url: URL, init?: RequestInit) => Promise<Response> = (url) =>
+	assert.fail(`Unexpected Plaid call ${url.pathname}`);
+
+function plaidFetch(input: RequestInfo | URL, init?: RequestInit) {
+	return answerPlaid(new URL(input instanceof Request ? input.url : input), init);
+}
+
+function stubPlaid(answer: typeof answerPlaid) {
+	answerPlaid = answer;
+	vi.stubGlobal('fetch', plaidFetch);
+}
 
 async function connectedBudget() {
 	const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 100_000] } });
@@ -552,21 +564,60 @@ describe('a bank Account the owner stops syncing', () => {
 });
 
 describe('a removed Bank Connection', () => {
+	let signedOut: unknown[];
+
+	function useBankSync() {
+		vi.stubEnv('PLAID_CLIENT_ID', 'client-id-synthetic');
+		vi.stubEnv('PLAID_SECRET', 'secret-synthetic-not-real');
+		vi.stubEnv('BUDGE_TOKEN_KEY', tokenKey);
+	}
+
+	beforeEach(() => {
+		signedOut = [];
+		useBankSync();
+		stubPlaid(async (url, init) => {
+			assert(url.pathname === '/item/remove', `Unexpected Plaid call ${url.pathname}`);
+			signedOut.push(await new Response(init?.body).json());
+			return Response.json({ request_id: 'request-synthetic' });
+		});
+	});
+
 	afterEach(() => {
+		vi.unstubAllGlobals();
 		vi.useRealTimers();
 	});
 
-	test('leaves its Transactions and drops its bank Accounts and held rows', async () => {
-		const { owner, t, sync, held, transactions, checking, connectionId } = await connectedBudget();
+	async function removeAndSettle(
+		{ owner, t }: Awaited<ReturnType<typeof connectedBudget>>,
+		connectionId: Id<'bankConnections'>
+	) {
+		vi.useFakeTimers();
+		await owner.action(api.bankConnections.remove, { connectionId });
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+		vi.useRealTimers();
+	}
+
+	const bankAccountCount = ({ t }: Awaited<ReturnType<typeof connectedBudget>>) =>
+		t.run(async (ctx) => (await ctx.db.query('connectionAccounts').collect()).length);
+
+	const listedAccounts = (from: number, count: number) =>
+		Array.from({ length: count }, (_, n) => ({
+			externalId: `account-synthetic-listed-${String(from + n)}`,
+			name: `Sample Savings ${String(from + n)}`,
+			kind: 'cash' as const
+		}));
+
+	test('leaves its Transactions, signs out at the bank, and drops its bank Accounts and held rows', async () => {
+		const backend = await connectedBudget();
+		const { owner, t, sync, held, transactions, checking, connectionId } = backend;
 		await sync(rowsFor(checkingId));
 		await sync(rowsFor(savingsId));
 		const imported = await transactions(checking);
 		expect(await held()).toHaveLength(1);
-		vi.useFakeTimers();
 
-		await owner.action(api.bankConnections.remove, { connectionId });
-		await t.finishAllScheduledFunctions(vi.runAllTimers);
+		await removeAndSettle(backend, connectionId);
 
+		expect(signedOut).toEqual([{ access_token: accessToken }]);
 		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toEqual([]);
 		expect(await held()).toEqual([]);
 		expect(await transactions(checking)).toEqual(imported);
@@ -582,6 +633,63 @@ describe('a removed Bank Connection', () => {
 			}))
 		).toEqual({ bankAccounts: 0, heldRows: 0 });
 	});
+
+	test('drops every bank Account the bank listed, past the first 50', async () => {
+		const backend = await connectedBudget();
+		const { t, connectionId } = backend;
+		for (const [from, count] of [
+			[0, 50],
+			[50, 1]
+		] as const) {
+			await t.mutation(internal.heldAccounts.recordAccounts, {
+				connectionId,
+				accounts: listedAccounts(from, count)
+			});
+		}
+		expect(await bankAccountCount(backend)).toBe(52);
+
+		await removeAndSettle(backend, connectionId);
+
+		expect(await bankAccountCount(backend)).toBe(0);
+	});
+
+	test('records nothing when the bank lists its Accounts after the removal', async () => {
+		const backend = await connectedBudget();
+		const { t, connectionId } = backend;
+		await removeAndSettle(backend, connectionId);
+
+		await t.mutation(internal.heldAccounts.recordAccounts, {
+			connectionId,
+			accounts: listedAccounts(0, 1)
+		});
+
+		expect(await bankAccountCount(backend)).toBe(0);
+	});
+
+	test.each(['PLAID_SECRET', 'BUDGE_TOKEN_KEY'])(
+		'on a server without %s, is kept with its bank login until Budge can sign out at the bank',
+		async (name) => {
+			const backend = await connectedBudget();
+			const { owner, connectionId } = backend;
+			vi.stubEnv(name, undefined);
+
+			expect(
+				await publicErrorOf(owner.action(api.bankConnections.remove, { connectionId }))
+			).toEqual({
+				code: 'BANK_SYNC_UNAVAILABLE',
+				message:
+					"Bank sync isn't set up on this server, so Budge can't sign out of this bank yet. Set it up, then remove the connection."
+			});
+			expect(signedOut).toEqual([]);
+			expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toHaveLength(1);
+
+			useBankSync();
+			await removeAndSettle(backend, connectionId);
+
+			expect(signedOut).toEqual([{ access_token: accessToken }]);
+			expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toEqual([]);
+		}
+	);
 
 	test('accepts ITEM_NOT_FOUND when removing the remote Item', async () => {
 		const { t, connectionId } = await connectedBudget();
@@ -776,8 +884,7 @@ describe('a suggested starting balance', () => {
 			vi.stubEnv('PLAID_CLIENT_ID', 'client-id-synthetic');
 			vi.stubEnv('PLAID_SECRET', 'secret-synthetic-not-real');
 			vi.stubEnv('BUDGE_TOKEN_KEY', tokenKey);
-			vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
-				const url = new URL(input instanceof Request ? input.url : input);
+			stubPlaid((url) => {
 				assert(url.pathname === '/accounts/get', `Unexpected Plaid call ${url.pathname}`);
 				const accounts = [
 					{

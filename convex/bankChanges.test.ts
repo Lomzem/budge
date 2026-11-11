@@ -948,6 +948,22 @@ describe('the Bank changes list', () => {
 		expect(await listed()).toEqual(['SAMPLE PAYROLL', 'SAMPLE GROCER 0193']);
 		expect(await listed({ search: 'grocer' })).toEqual(['SAMPLE GROCER 0193']);
 		expect(await count()).toEqual({ count: 2, complete: true });
+		const pageAfter = (cursor: string | null) =>
+			budget.owner.query(api.transactions.list, {
+				bankChanges: true,
+				paginationOpts: { numItems: 1, cursor }
+			});
+		const first = await pageAfter(null);
+		const second = await pageAfter(first.continueCursor);
+		expect(
+			[first, second].map(({ page, isDone }) => ({
+				payees: page.map((row) => row.payeeName),
+				isDone
+			}))
+		).toEqual([
+			{ payees: ['SAMPLE PAYROLL'], isDone: false },
+			{ payees: ['SAMPLE GROCER 0193'], isDone: true }
+		]);
 
 		const importId = (await budget.row('SAMPLE GROCER 0193')).bankRows[0]?._id;
 		assert(importId !== undefined, 'No Bank Row');
@@ -957,14 +973,14 @@ describe('the Bank changes list', () => {
 		expect(await count()).toEqual({ count: 1, complete: true });
 	});
 
-	test('past the newest bank changes it reads, the count and every Account say the list is incomplete', async () => {
+	test('past its newest bank changes the whole list says it is incomplete, and an Account with fewer lists all of its own', async () => {
 		const { owner, t, accounts } = await startBudget({
 			accounts: { Checking: ['cash', 0], Savings: ['cash', 0] }
 		});
 		await t.run(async (ctx) => {
-			for (let n = 0; n <= BANK_CHANGE_LIMIT; n++) {
+			const flag = async (accountId: Id<'accounts'>, bankText: string) => {
 				const transactionId = await ctx.db.insert('transactions', {
-					accountId: accounts.Savings,
+					accountId,
 					date: '2026-08-12',
 					amount: -100,
 					cleared: 'cleared',
@@ -972,20 +988,33 @@ describe('the Bank changes list', () => {
 				});
 				await ctx.db.insert('imports', {
 					source: 'plaid',
-					accountId: accounts.Savings,
+					accountId,
 					date: '2026-08-12',
 					amount: -150,
-					bankText: `SAMPLE SHOP ${String(n)}`,
+					bankText,
 					transactionId,
 					matched: true,
 					state: 'changed'
 				});
+			};
+			await flag(accounts.Checking, 'SAMPLE CAFE');
+			for (let n = 0; n <= BANK_CHANGE_LIMIT; n++) {
+				await flag(accounts.Savings, `SAMPLE SHOP ${String(n)}`);
 			}
 		});
 		const count = (accountId?: Id<'accounts'>) =>
 			owner.query(api.transactions.bankChangeCount, accountId === undefined ? {} : { accountId });
+		const listed = async (accountId: Id<'accounts'>) =>
+			(
+				await owner.query(api.transactions.list, {
+					accountId,
+					bankChanges: true,
+					paginationOpts: { numItems: 50, cursor: null }
+				})
+			).page;
 
 		expect(await count()).toEqual({ count: BANK_CHANGE_LIMIT, complete: false });
-		expect(await count(accounts.Checking)).toEqual({ count: 0, complete: false });
+		expect(await count(accounts.Checking)).toEqual({ count: 1, complete: true });
+		expect(await listed(accounts.Checking)).toHaveLength(1);
 	});
 });
