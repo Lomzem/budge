@@ -20,10 +20,14 @@ export interface MatchCandidate<T> {
 	linkedFromFeed?: boolean;
 }
 
+export interface KnownRow<T> extends Pick<BankRow, 'date' | 'amount' | 'bankText'> {
+	transactionId?: T;
+}
+
 export interface MatchContext<T> {
 	knownImportIds: ReadonlySet<string>;
 
-	knownRowsWithoutId?: readonly Pick<BankRow, 'date' | 'amount' | 'bankText'>[];
+	knownRowsWithoutId?: readonly KnownRow<T>[];
 
 	candidates: readonly MatchCandidate<T>[];
 	matchImported?: boolean;
@@ -61,20 +65,35 @@ export function matchBankRows<T>(
 		.map(({ id, date, amount }) => ({ id, date, amount, time: Date.parse(date) }));
 	const alikes = fromFile ? context.candidates.filter(linkedHere) : [];
 	const alikeTaken = new Set<T>();
+	const takeRepeat = (row: BankRow) => {
+		const repeat = repeats.findIndex(
+			(known) =>
+				known.date === row.date && known.amount === row.amount && known.bankText === row.bankText
+		);
+		const [known] = repeat === -1 ? [] : repeats.splice(repeat, 1);
+		if (known?.transactionId !== undefined) alikeTaken.add(known.transactionId);
+		return known !== undefined;
+	};
+	const takeAlike = (row: BankRow) => {
+		const alike = alikes.find(
+			(candidate) =>
+				!alikeTaken.has(candidate.id) &&
+				candidate.amount === row.amount &&
+				candidate.date === row.date
+		)?.id;
+		if (alike === undefined) return undefined;
+		alikeTaken.add(alike);
+		const repeat = repeats.findIndex((known) => known.transactionId === alike);
+		if (repeat !== -1) repeats.splice(repeat, 1);
+		return alike;
+	};
 
 	return rows.map((row) => {
 		if (row.sourceId !== undefined) {
 			if (seenIds.has(row.sourceId)) return { kind: 'skip' };
 			seenIds.add(row.sourceId);
-		} else {
-			const repeat = repeats.findIndex(
-				(known) =>
-					known.date === row.date && known.amount === row.amount && known.bankText === row.bankText
-			);
-			if (repeat !== -1) {
-				repeats.splice(repeat, 1);
-				return { kind: 'skip' };
-			}
+		} else if (takeRepeat(row)) {
+			return { kind: 'skip' };
 		}
 
 		const earliest = addDays(row.date, -MATCH_WINDOW_DAYS);
@@ -91,17 +110,10 @@ export function matchBankRows<T>(
 			.sort((a, b) => Math.abs(a.time - at) - Math.abs(b.time - at))
 			.map((candidate) => candidate.id);
 
-		if (candidates.length === 0 && row.sourceId === undefined) {
-			const alike = alikes.find(
-				(candidate) =>
-					!alikeTaken.has(candidate.id) &&
-					candidate.amount === row.amount &&
-					candidate.date === row.date
-			)?.id;
-			if (alike !== undefined) {
-				alikeTaken.add(alike);
-				return row.pick === 'new' ? { kind: 'new', alike } : { kind: 'skip', alike };
-			}
+		const alike =
+			candidates.length === 0 && row.sourceId === undefined ? takeAlike(row) : undefined;
+		if (alike !== undefined) {
+			return row.pick === 'new' ? { kind: 'new', alike } : { kind: 'skip', alike };
 		}
 		if (row.pick === 'new')
 			return candidates.length > 0

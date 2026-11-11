@@ -173,7 +173,7 @@ export const decodeAccounts = (body: unknown): Effect.Effect<BankAccount[], Sche
 					externalId: account.account_id,
 					name: clean(account.name) ?? 'Bank account',
 					...(mask === undefined ? {} : { mask }),
-					kind: account.type === 'credit' ? 'creditCard' : 'cash',
+					kind: OWED_TYPES.has(account.type) ? 'creditCard' : 'cash',
 					balance: current === null ? null : budgetSigned(account.type, current)
 				};
 			})

@@ -5,6 +5,7 @@ import {
 	type PaginationResult
 } from 'convex/server';
 import { v, type Infer } from 'convex/values';
+import { Option, Schema } from 'effect';
 
 import { BANK_CHANGE_LIMIT } from '../src/lib/domain/bankChanges';
 import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
@@ -102,7 +103,7 @@ export const list = query({
 		}
 		const result =
 			bankChanges === true
-				? await withBankChanges(ctx, filters, approval)
+				? await withBankChanges(ctx, filters, approval, paginationOpts)
 				: await pageOf(ctx, filters, searching, approval, paginationOpts);
 		return {
 			...result,
@@ -301,17 +302,23 @@ async function filtered(
 		.paginate(paginationOpts);
 }
 
+const BANK_CHANGES_SCANNED_PER_STATE = 2 * BANK_CHANGE_LIMIT;
+
 async function bankChanged(ctx: QueryCtx, accountId: Id<'accounts'> | undefined) {
 	const found = new Map<Id<'transactions'>, Doc<'transactions'>>();
 	let complete = true;
 	for (const state of ['changed', 'removed'] as const) {
-		const flagged = await ctx.db
+		const flagged = ctx.db
 			.query('imports')
 			.withIndex('by_state_transactionId', (q) => q.eq('state', state))
-			.order('desc')
-			.take(BANK_CHANGE_LIMIT + 1);
-		if (flagged.length > BANK_CHANGE_LIMIT) complete = false;
-		for (const { transactionId } of flagged.slice(0, BANK_CHANGE_LIMIT)) {
+			.order('desc');
+		let scanned = 0;
+		for await (const { transactionId } of flagged) {
+			if (found.size > BANK_CHANGE_LIMIT || scanned === BANK_CHANGES_SCANNED_PER_STATE) {
+				complete = false;
+				break;
+			}
+			scanned++;
 			if (transactionId === undefined || found.has(transactionId)) continue;
 			const transaction = await ctx.db.get('transactions', transactionId);
 			if (transaction === null) continue;
@@ -331,10 +338,11 @@ async function bankChanged(ctx: QueryCtx, accountId: Id<'accounts'> | undefined)
 async function withBankChanges(
 	ctx: QueryCtx,
 	filters: Filters,
-	approval: Approval | undefined
+	approval: Approval | undefined,
+	paginationOpts: PaginationOptions
 ): Promise<PaginationResult<Doc<'transactions'>>> {
 	const { categoryId, uncategorized, payeeId, from, to, search } = filters;
-	const page = (await bankChanged(ctx, filters.accountId)).transactions.filter(
+	const listed = (await bankChanged(ctx, filters.accountId)).transactions.filter(
 		(transaction) =>
 			hasApproval(transaction, approval) &&
 			(categoryId === undefined || transaction.categoryId === categoryId) &&
@@ -344,7 +352,45 @@ async function withBankChanges(
 			transaction.date <= (to ?? LAST_DATE) &&
 			(search === '' || hasEveryTerm(transaction.searchText, search))
 	);
-	return { page, isDone: true, continueCursor: '' };
+	const start = bankChangeKey(paginationOpts.cursor ?? LIST_START);
+	const remaining = listed.filter((transaction) => listedAfter(transaction, start));
+	const end = paginationOpts.endCursor;
+	const page =
+		end === undefined || end === null
+			? remaining.slice(0, paginationOpts.numItems)
+			: remaining.filter((transaction) => !listedAfter(transaction, bankChangeKey(end)));
+	const last = page.at(-1);
+	return {
+		page,
+		isDone: page.length === remaining.length,
+		continueCursor:
+			last === undefined
+				? (paginationOpts.cursor ?? LIST_START)
+				: JSON.stringify([last.date, last._creationTime])
+	};
+}
+
+const LIST_START = JSON.stringify(['~', 0]);
+
+const bankChangeCursor = Schema.Tuple([Schema.String, Schema.Finite]);
+
+function bankChangeKey(cursor: string): readonly [string, number] {
+	const key = Option.getOrUndefined(
+		Schema.decodeOption(Schema.fromJsonString(bankChangeCursor))(cursor)
+	);
+	if (key === undefined)
+		throw publicError('INVALID_INPUT', 'This page of bank changes is out of date.');
+	return key;
+}
+
+function listedAfter(
+	transaction: Doc<'transactions'>,
+	[date, creationTime]: readonly [string, number]
+) {
+	return (
+		transaction.date < date ||
+		(transaction.date === date && transaction._creationTime < creationTime)
+	);
 }
 
 export const bankChangeCount = query({

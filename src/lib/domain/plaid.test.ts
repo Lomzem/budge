@@ -134,6 +134,13 @@ describe("decoding Plaid's Accounts", () => {
 						name: 'Sample Savings',
 						kind: 'cash',
 						balance: null
+					},
+					{
+						externalId: 'account-synthetic-loan',
+						name: 'Sample Car Loan',
+						mask: '5521',
+						kind: 'creditCard',
+						balance: -1_250_000
 					}
 				]);
 			})

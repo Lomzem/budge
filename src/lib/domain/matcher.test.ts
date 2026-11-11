@@ -79,6 +79,19 @@ describe('the matcher', () => {
 		).toEqual([{ kind: 'new' }]);
 	});
 
+	test('a known row and its imported Transaction hold back only one row of a re-imported pair', () => {
+		const known = { ...coffee, transactionId: 'a' };
+		const imported = handEntered('a', { cleared: true, linkedSources: ['csv'] });
+		const relabelled = { ...coffee, bankText: 'SAMPLE COFFEE' };
+		const context = { knownRowsWithoutId: [known], candidates: [imported] };
+
+		expect(decide([coffee, coffee], context)).toEqual([{ kind: 'skip' }, { kind: 'new' }]);
+		expect(decide([relabelled, coffee], context)).toEqual([
+			{ kind: 'skip', alike: 'a' },
+			{ kind: 'new' }
+		]);
+	});
+
 	test('a Transaction dated 10 days either side is a candidate', () => {
 		expect(
 			decide([coffee], {

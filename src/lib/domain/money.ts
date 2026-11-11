@@ -20,8 +20,9 @@ function parseCentsSum(text: string): number | undefined {
 		const cents = parseCents(term.trim());
 		if (cents === undefined) return undefined;
 		total += operator === '' || operator === '+' ? cents : -cents;
+		if (!Number.isSafeInteger(total)) return undefined;
 	}
-	return Number.isSafeInteger(total) ? total : undefined;
+	return total;
 }
 
 export function parseAssigned(text: string, saved: number): number | undefined {

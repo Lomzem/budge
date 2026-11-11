@@ -44,12 +44,20 @@ describe('parseAssigned', () => {
 		expect(parseAssigned(text, 11_000)).toBe(dollars * 100);
 	});
 
-	test.each(['', '+', '++5', '+abc', '-', '100+', '5++5', '5+abc', '1.2.3+1'])(
-		'rejects %j',
-		(text) => {
-			expect(parseAssigned(text, 11_000)).toBeUndefined();
-		}
-	);
+	test.each([
+		'',
+		'+',
+		'++5',
+		'+abc',
+		'-',
+		'100+',
+		'5++5',
+		'5+abc',
+		'1.2.3+1',
+		'90071992547409.91+0.02-90071992547409.91'
+	])('rejects %j', (text) => {
+		expect(parseAssigned(text, 11_000)).toBeUndefined();
+	});
 });
 
 describe('formatCents', () => {

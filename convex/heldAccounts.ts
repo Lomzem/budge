@@ -226,6 +226,8 @@ export const recordAccounts = internalMutation({
 				`A Bank Connection has at most ${String(MAX_CONNECTION_ACCOUNTS)} Accounts.`
 			);
 		}
+		const connection = await ctx.db.get('bankConnections', connectionId);
+		if (connection === null) return null;
 		for (const { externalId, name, mask, kind } of accounts) {
 			const known = await findConnectionAccount(ctx, connectionId, externalId);
 			if (known === null) {
@@ -243,12 +245,7 @@ export const recordAccounts = internalMutation({
 				await ctx.db.patch('connectionAccounts', known._id, { name, mask, kind });
 			}
 		}
-		const connection = await ctx.db.get('bankConnections', connectionId);
-		if (
-			connection !== null &&
-			answersRequestAt != null &&
-			connection.accountsCheckRequestedAt === answersRequestAt
-		) {
+		if (answersRequestAt != null && connection.accountsCheckRequestedAt === answersRequestAt) {
 			await ctx.db.patch('bankConnections', connectionId, { accountsCheckRequestedAt: undefined });
 		}
 		return null;

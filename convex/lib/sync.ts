@@ -1,6 +1,6 @@
 import type { GenericActionCtx } from 'convex/server';
 import { v, type Infer } from 'convex/values';
-import { Cause, Context, Effect, Layer, Option, Result } from 'effect';
+import { Cause, Clock, Context, Effect, Layer, Option, Result } from 'effect';
 
 import {
 	syncRowsOf,
@@ -126,7 +126,8 @@ export const saveArgs = {
 	name: v.string(),
 	itemId: v.string(),
 	encryptedToken: v.string(),
-	accounts: v.array(v.object({ externalId: v.string(), accountId: v.id('accounts') }))
+	accounts: v.array(v.object({ externalId: v.string(), accountId: v.id('accounts') })),
+	accountsCheckRequestedAt: v.optional(v.number())
 };
 
 interface SyncStoreShape {
@@ -174,6 +175,7 @@ interface SyncStoreShape {
 		itemId: string;
 		encryptedToken: string;
 		accounts: { externalId: string; accountId: Id<'accounts'> }[];
+		accountsCheckRequestedAt?: number;
 	}) => Effect.Effect<Id<'bankConnections'>>;
 	readonly recordAccounts: (args: {
 		connectionId: Id<'bankConnections'>;
@@ -404,6 +406,7 @@ export const setupConnection = Effect.fnUntraced(function* (input: {
 	accessToken: string;
 	webhook: string;
 	accounts: { externalId: string; accountId: Id<'accounts'> }[];
+	accountsCheckRequestedAt?: number;
 }): Effect.fn.Return<Id<'bankConnections'>, SyncError, PlaidClient | TokenCipher | SyncStore> {
 	const cipher = yield* TokenCipher;
 	const plaid = yield* PlaidClient;
@@ -413,7 +416,10 @@ export const setupConnection = Effect.fnUntraced(function* (input: {
 		name: input.name,
 		itemId: input.itemId,
 		encryptedToken,
-		accounts: input.accounts
+		accounts: input.accounts,
+		...(input.accountsCheckRequestedAt === undefined
+			? {}
+			: { accountsCheckRequestedAt: input.accountsCheckRequestedAt })
 	});
 	yield* Effect.ignore(plaid.setWebhook(input.accessToken, input.webhook));
 	return connectionId;
@@ -429,19 +435,21 @@ export const connectItem = Effect.fnUntraced(function* (input: {
 	const plaid = yield* PlaidClient;
 	const store = yield* SyncStore;
 	const { accessToken, itemId } = yield* plaid.publicTokenExchange(input.publicToken);
+	const accountsCheckRequestedAt = yield* Clock.currentTimeMillis;
 	const connectionId = yield* setupConnection({
 		name: input.name,
 		itemId,
 		accessToken,
 		webhook: input.webhook,
-		accounts: []
+		accounts: [],
+		accountsCheckRequestedAt
 	}).pipe(Effect.onError(() => Effect.ignore(plaid.itemRemove(accessToken))));
 	yield* Effect.ignore(
 		plaid.accountsGet(accessToken).pipe(
 			Effect.flatMap((accounts) =>
 				store.recordAccounts({
 					connectionId,
-					answersRequestAt: null,
+					answersRequestAt: accountsCheckRequestedAt,
 					accounts: accounts.map(namesOf)
 				})
 			)
