@@ -6,14 +6,17 @@
 		ref = $bindable(null),
 		class: className,
 		children,
+		labels = 'always',
 		...restProps
-	}: WithElementRef<HTMLAttributes<HTMLTableSectionElement>> = $props();
+	}: WithElementRef<HTMLAttributes<HTMLTableSectionElement>> & {
+		labels?: 'always' | 'lg';
+	} = $props();
 </script>
 
 <thead
 	bind:this={ref}
 	data-slot="table-header"
-	class={cn('[&_tr]:border-b', className)}
+	class={cn('[&_tr]:border-b', labels === 'lg' && '@max-lg:sr-only', className)}
 	{...restProps}
 >
 	{@render children?.()}

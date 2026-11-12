@@ -52,9 +52,44 @@ describe('the matcher', () => {
 		['dated 11 days before', { date: '2026-08-03' }],
 		['dated 11 days after', { date: '2026-08-25' }],
 		['already Cleared', { cleared: true }],
-		['already linked to a Bank Row from the same source', { linkedSources: ['csv' as const] }]
+		[
+			'already linked to a Bank Row from the same source a day earlier',
+			{ date: '2026-08-13', linkedSources: ['csv' as const] }
+		]
 	])('a Transaction %s is no candidate', (_, change) => {
 		expect(decide([coffee], { candidates: [handEntered('a', change)] })).toEqual([{ kind: 'new' }]);
+	});
+
+	test('a row without an ID on the day of a same-amount Transaction already imported from its source is held back as a likely duplicate', () => {
+		const imported = handEntered('a', { cleared: true, linkedSources: ['csv'] });
+		const relabelled = { ...coffee, bankText: 'SAMPLE COFFEE' };
+		expect(decide([relabelled, relabelled], { candidates: [imported] })).toEqual([
+			{ kind: 'skip', alike: 'a' },
+			{ kind: 'new' }
+		]);
+		expect(decide([{ ...relabelled, pick: 'new' }], { candidates: [imported] })).toEqual([
+			{ kind: 'new', alike: 'a' }
+		]);
+		expect(
+			decide(
+				[{ ...relabelled, sourceId: 'FIT-2' }],
+				{ candidates: [{ ...imported, linkedSources: ['qfx'] }] },
+				'qfx'
+			)
+		).toEqual([{ kind: 'new' }]);
+	});
+
+	test('a known row and its imported Transaction hold back only one row of a re-imported pair', () => {
+		const known = { ...coffee, transactionId: 'a' };
+		const imported = handEntered('a', { cleared: true, linkedSources: ['csv'] });
+		const relabelled = { ...coffee, bankText: 'SAMPLE COFFEE' };
+		const context = { knownRowsWithoutId: [known], candidates: [imported] };
+
+		expect(decide([coffee, coffee], context)).toEqual([{ kind: 'skip' }, { kind: 'new' }]);
+		expect(decide([relabelled, coffee], context)).toEqual([
+			{ kind: 'skip', alike: 'a' },
+			{ kind: 'new' }
+		]);
 	});
 
 	test('a Transaction dated 10 days either side is a candidate', () => {

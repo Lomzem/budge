@@ -5,6 +5,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { env, internalMutation, type MutationCtx } from './_generated/server';
 import { publicError } from './lib/publicError';
+import type { BankAccountKind } from '../src/lib/domain/plaid';
 import type { syncRemoval, syncRow } from './lib/sync';
 import { saveTransaction } from './lib/transactions';
 
@@ -19,15 +20,26 @@ const SAVINGS_BANK = {
 	itemId: 'sample-item-savings-bank'
 } as const;
 
+const COMMUNITY_BANK = {
+	name: 'Sample Community Bank',
+	itemId: 'sample-item-community-bank',
+	savings: 'cb-savings'
+} as const;
+
 const NOT_A_REAL_TOKEN = 'sample-token-that-never-decrypts';
 
+const RECORDED_BEFORE_KINDS = { externalId: 'cu-legacy', name: 'Savings', mask: '6630' } as const;
+
 const HELD_ACCOUNTS = [
-	{ externalId: 'cu-savings', name: 'Sample Savings Plus', mask: '4417' },
-	{ externalId: 'cu-card', name: 'Sample Rewards Card', mask: '9021' },
-	{ externalId: 'cu-holiday', name: 'Sample Holiday Club', mask: '1180' }
+	{ externalId: 'cu-savings', name: 'Sample Savings Plus', mask: '4417', kind: 'cash' },
+	{ externalId: 'cu-card', name: 'Sample Rewards Card', mask: '9021', kind: 'creditCard' },
+	{ externalId: 'cu-holiday', name: 'Sample Holiday Club', mask: '1180', kind: 'cash' }
 ] as const;
 
 const DAYS_FROM_NOW_UNTIL_CONSENT_ENDS = 5;
+const DAYS_SINCE_SAVINGS_BANK_LAST_SYNCED = 1;
+const HOURS_SINCE_COMMUNITY_BANK_LAST_SYNCED = 3;
+const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
 type SyncRow = Infer<typeof syncRow>;
@@ -38,6 +50,7 @@ export const run = internalMutation({
 	returns: v.null(),
 	handler: async (ctx) => {
 		const checking = await requireSeededAccount(ctx, 'Checking');
+		const savings = await requireSeededAccount(ctx, 'Savings');
 		const today = localIsoDate(new Date(Date.now()));
 		const daysAgo = (days: number) => addDays(today, -days);
 
@@ -69,17 +82,33 @@ export const run = internalMutation({
 				checkingRow('garden', daysAgo(6), -42_17, 'SAMPLE GARDEN CENTER 7720'),
 				checkingRow('streaming', daysAgo(5), -9_91, 'SAMPLE STREAMING 4410'),
 				checkingRow('car-wash', daysAgo(5), -27_36, 'SAMPLE CAR WASH 0904'),
+				checkingRow('gym', daysAgo(8), -12_00, 'SAMPLE GYM 5521'),
 				heldRow('cu-savings', 'savings-interest', 4, 3_17, 'SAMPLE INTEREST PAID'),
 				heldRow('cu-savings', 'savings-deposit', 3, 250_00, 'SAMPLE TRANSFER IN 5512'),
 				heldRow('cu-card', 'card-bistro', 4, -36_29, 'SAMPLE BISTRO 0817'),
 				heldRow('cu-card', 'card-bookstore', 2, -21_08, 'SAMPLE BOOK NOOK 3306'),
-				heldRow('cu-holiday', 'holiday-deposit', 3, 40_00, 'SAMPLE CLUB DEPOSIT')
+				heldRow('cu-holiday', 'holiday-deposit', 3, 40_00, 'SAMPLE CLUB DEPOSIT'),
+				heldRow('cu-unlisted', 'unlisted-fee', 2, -5_00, 'SAMPLE SERVICE FEE'),
+				heldRow(
+					RECORDED_BEFORE_KINDS.externalId,
+					'legacy-dividend',
+					3,
+					1_25,
+					'SAMPLE DIVIDEND 0630'
+				)
 			],
 			recordAccounts: [
-				{ externalId: CREDIT_UNION.checking, name: 'Sample Everyday Checking', mask: '2208' },
+				{
+					externalId: CREDIT_UNION.checking,
+					name: 'Sample Everyday Checking',
+					mask: '2208',
+					kind: 'cash'
+				},
 				...HELD_ACCOUNTS
 			]
 		});
+
+		await nameWithoutKind(ctx, creditUnion, RECORDED_BEFORE_KINDS);
 
 		await editLikeTheOwner(ctx, checking, 'SAMPLE GARDEN CENTER 7720', (edit) => ({
 			...edit,
@@ -88,6 +117,10 @@ export const run = internalMutation({
 		await editLikeTheOwner(ctx, checking, 'SAMPLE STREAMING 4410', (edit) => ({
 			...edit,
 			memo: 'Shared family plan'
+		}));
+		await editLikeTheOwner(ctx, checking, 'SAMPLE GYM 5521', (edit) => ({
+			...edit,
+			memo: 'Month to month'
 		}));
 
 		const lease = await sync(ctx, creditUnion, {
@@ -98,7 +131,8 @@ export const run = internalMutation({
 			],
 			removed: [
 				{ externalAccountId: CREDIT_UNION.checking, sourceId: 'streaming' },
-				{ externalAccountId: CREDIT_UNION.checking, sourceId: 'car-wash' }
+				{ externalAccountId: CREDIT_UNION.checking, sourceId: 'car-wash' },
+				{ externalAccountId: CREDIT_UNION.checking, sourceId: 'gym' }
 			]
 		});
 		await ctx.runMutation(internal.bankConnections.recordConsent, {
@@ -114,9 +148,33 @@ export const run = internalMutation({
 			accounts: []
 		});
 		await sync(ctx, savingsBank, { discover: false });
+		await ctx.db.patch('bankConnections', savingsBank, {
+			lastSyncedAt: Date.now() - DAYS_SINCE_SAVINGS_BANK_LAST_SYNCED * DAY_MS
+		});
 		await ctx.runMutation(internal.bankConnections.flagItem, {
 			itemId: SAVINGS_BANK.itemId,
 			code: 'ITEM_LOGIN_REQUIRED'
+		});
+
+		const communityBank = await ctx.runMutation(internal.bankConnections.save, {
+			name: COMMUNITY_BANK.name,
+			itemId: COMMUNITY_BANK.itemId,
+			encryptedToken: NOT_A_REAL_TOKEN,
+			accounts: [{ externalId: COMMUNITY_BANK.savings, accountId: savings }]
+		});
+		await sync(ctx, communityBank, {
+			discover: true,
+			recordAccounts: [
+				{
+					externalId: COMMUNITY_BANK.savings,
+					name: 'Sample Statement Savings',
+					mask: '6604',
+					kind: 'cash'
+				}
+			]
+		});
+		await ctx.db.patch('bankConnections', communityBank, {
+			lastSyncedAt: Date.now() - HOURS_SINCE_COMMUNITY_BANK_LAST_SYNCED * HOUR_MS
 		});
 		return null;
 	}
@@ -132,6 +190,23 @@ async function requireSeededAccount(ctx: MutationCtx, name: string): Promise<Id<
 	throw publicError('INVALID_INPUT', 'Run seed:run before seedBankSync:run.');
 }
 
+async function nameWithoutKind(
+	ctx: MutationCtx,
+	connectionId: Id<'bankConnections'>,
+	account: { externalId: string; name: string; mask: string }
+) {
+	const held = await ctx.db
+		.query('connectionAccounts')
+		.withIndex('by_connection_externalId', (q) =>
+			q.eq('connectionId', connectionId).eq('externalId', account.externalId)
+		)
+		.unique();
+	if (held?.state !== 'held' || held.kind !== undefined) {
+		throw publicError('INVALID_INPUT', `${account.externalId} was not held without a kind.`);
+	}
+	await ctx.db.patch('connectionAccounts', held._id, { name: account.name, mask: account.mask });
+}
+
 async function sync(
 	ctx: MutationCtx,
 	connectionId: Id<'bankConnections'>,
@@ -140,7 +215,7 @@ async function sync(
 		rows?: SyncRow[];
 		modified?: SyncRow[];
 		removed?: SyncRemoval[];
-		recordAccounts?: { externalId: string; name: string; mask: string }[];
+		recordAccounts?: { externalId: string; name: string; mask: string; kind: BankAccountKind }[];
 	}
 ): Promise<number> {
 	const taken = await ctx.runMutation(internal.bankConnections.takeLease, {

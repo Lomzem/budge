@@ -3,13 +3,20 @@ import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vites
 
 import { decodeSyncPage, type BankAccount, type SyncPage } from '../src/lib/domain/plaid';
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { PlaidApi, PlaidClient } from './lib/plaidClient';
+import { findConnectionAccount } from './bankConnections';
 import { HELD_BATCH } from './heldAccounts';
-import { setupConnection, suggestStartingBalance, SyncStore, syncConnection } from './lib/sync';
+import {
+	removeItem,
+	setupConnection,
+	suggestStartingBalance,
+	SyncStore,
+	syncConnection
+} from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
-import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
+import { publicErrorCode, publicErrorOf, startBudget, useOwnerEnv } from './test.helper';
 
 useOwnerEnv();
 
@@ -36,8 +43,8 @@ function rowsFor(externalId: string, idPrefix = externalId): SyncPage {
 }
 
 const bankAccounts: BankAccount[] = [
-	{ externalId: checkingId, name: 'Sample Checking', mask: '0042', balance: 120_000 },
-	{ externalId: savingsId, name: 'Sample Savings', mask: '4321', balance: 300_000 }
+	{ externalId: checkingId, name: 'Sample Checking', mask: '0042', kind: 'cash', balance: 120_000 },
+	{ externalId: savingsId, name: 'Sample Savings', mask: '4321', kind: 'cash', balance: 300_000 }
 ];
 
 function gate() {
@@ -54,6 +61,25 @@ function gate() {
 }
 
 type FakePlaid = Parameters<typeof PlaidClient.layerTest>[0];
+
+let answerPlaid: (url: URL, init?: RequestInit) => Promise<Response> = (url) =>
+	assert.fail(`Unexpected Plaid call ${url.pathname}`);
+
+function plaidFetch(input: RequestInfo | URL, init?: RequestInit) {
+	return answerPlaid(new URL(input instanceof Request ? input.url : input), init);
+}
+
+function stubPlaid(answer: typeof answerPlaid) {
+	answerPlaid = answer;
+	vi.stubGlobal('fetch', plaidFetch);
+}
+
+const listedAccounts = (from: number, count: number) =>
+	Array.from({ length: count }, (_, n) => ({
+		externalId: `account-synthetic-listed-${String(from + n)}`,
+		name: `Sample Savings ${String(from + n)}`,
+		kind: 'cash' as const
+	}));
 
 async function connectedBudget() {
 	const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 100_000] } });
@@ -81,7 +107,7 @@ async function connectedBudget() {
 			assert(Exit.isSuccess(exit), 'the program failed');
 			return exit.value;
 		});
-	const connectionId = await inAction(
+	const { connectionId } = await inAction(
 		{ setWebhook: () => Effect.void },
 		setupConnection({
 			name: 'Sample Bank',
@@ -107,7 +133,7 @@ async function connectedBudget() {
 	const syncWith = (plaid: FakePlaid) =>
 		inAction(plaid, syncConnection(connectionId, { refresh: false }));
 	const connectNewBank = async () => {
-		const newConnection = await inAction(
+		const { connectionId: newConnection } = await inAction(
 			{ setWebhook: () => Effect.void },
 			setupConnection({
 				name: 'Sample New Bank',
@@ -161,12 +187,13 @@ async function connectedBudget() {
 
 describe('a bank Account Budge does not know', () => {
 	test('is held with its rows, named from Plaid, and imports nothing', async () => {
-		const { sync, held, transactions } = await connectedBudget();
+		const { connectionId, sync, held, transactions } = await connectedBudget();
 
 		expect(await sync(rowsFor(savingsId))).toMatchObject({ kind: 'synced', added: 0, held: 2 });
 
 		expect(await held()).toEqual([
 			expect.objectContaining({
+				connectionId,
 				connectionName: 'Sample Bank',
 				name: 'Sample Savings',
 				mask: '4321',
@@ -233,7 +260,7 @@ describe('a bank Account Budge does not know', () => {
 			accountsGet: () =>
 				Effect.succeed([
 					...bankAccounts,
-					{ externalId: cardId, name: 'Sample Card', mask: '7310', balance: -89_990 }
+					{ externalId: cardId, name: 'Sample Card', mask: '7310', kind: 'cash', balance: -89_990 }
 				])
 		});
 
@@ -505,6 +532,230 @@ describe('a bank Account Budge does not know', () => {
 	});
 });
 
+describe('a bank Account the owner stops syncing', () => {
+	test('keeps its Transactions, imports nothing later, and once brought back waits for setup with its type', async () => {
+		const { owner, sync, held, transactions, checking, connectionId } = await connectedBudget();
+		await sync(rowsFor(checkingId));
+		const imported = await transactions(checking);
+		expect(imported.length).toBeGreaterThan(0);
+		const [connection] = await owner.query(api.bankConnections.list, { now: Date.now() });
+		const feed = connection?.feeds[0];
+		assert(feed !== undefined, 'Checking is fed by the connection');
+
+		await owner.mutation(api.heldAccounts.stopSyncing, {
+			connectionAccountId: feed.connectionAccountId
+		});
+		expect(await sync(rowsFor(checkingId, 'later'))).toMatchObject({ added: 0, held: 0 });
+		expect(await transactions(checking)).toEqual(imported);
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toMatchObject([
+			{ _id: connectionId, feeds: [], ignored: [{ connectionAccountId: feed.connectionAccountId }] }
+		]);
+
+		await owner.mutation(api.heldAccounts.restore, {
+			connectionAccountId: feed.connectionAccountId
+		});
+		expect(await sync(rowsFor(checkingId, 'after'))).toMatchObject({ added: 0, held: 2 });
+		expect(
+			(await held()).find((account) => account._id === feed.connectionAccountId)
+		).toMatchObject({
+			kind: 'cash',
+			rows: 2
+		});
+		expect(
+			await publicErrorCode(
+				owner.mutation(api.heldAccounts.stopSyncing, {
+					connectionAccountId: feed.connectionAccountId
+				})
+			)
+		).toBe('INVALID_INPUT');
+	});
+});
+
+describe('the Bank list', () => {
+	test('shows the bank Accounts a connection syncs or ignores while 50 others wait for setup', async () => {
+		const { owner, t, connectionId } = await connectedBudget();
+		await t.mutation(internal.heldAccounts.recordAccounts, {
+			connectionId,
+			accounts: listedAccounts(0, 50)
+		});
+		await t.mutation(internal.heldAccounts.recordAccounts, {
+			connectionId,
+			accounts: [
+				{ externalId: 'account-synthetic-z-brokerage', name: 'Sample Brokerage', kind: 'cash' },
+				{ externalId: 'account-synthetic-z-loan', name: 'Sample Loan', kind: 'cash' }
+			]
+		});
+		const [brokerage, loan] = await t.run((ctx) =>
+			Promise.all(
+				['account-synthetic-z-brokerage', 'account-synthetic-z-loan'].map((externalId) =>
+					findConnectionAccount(ctx, connectionId, externalId)
+				)
+			)
+		);
+		assert(brokerage && loan, 'the late bank Accounts were recorded');
+		await owner.mutation(api.heldAccounts.createAccount, {
+			connectionAccountId: brokerage._id,
+			name: 'Brokerage',
+			kind: 'cash'
+		});
+		await owner.mutation(api.heldAccounts.ignore, { connectionAccountId: loan._id });
+
+		const [listed] = await owner.query(api.bankConnections.list, { now: Date.now() });
+
+		expect(listed?.feeds.map(({ name }) => name)).toEqual(['Checking', 'Brokerage']);
+		expect(listed?.ignored.map(({ name }) => name)).toEqual(['Sample Loan']);
+	});
+});
+
+describe('a removed Bank Connection', () => {
+	let signedOut: unknown[];
+
+	function useBankSync() {
+		vi.stubEnv('PLAID_CLIENT_ID', 'client-id-synthetic');
+		vi.stubEnv('PLAID_SECRET', 'secret-synthetic-not-real');
+		vi.stubEnv('BUDGE_TOKEN_KEY', tokenKey);
+	}
+
+	beforeEach(() => {
+		signedOut = [];
+		useBankSync();
+		stubPlaid(async (url, init) => {
+			assert(url.pathname === '/item/remove', `Unexpected Plaid call ${url.pathname}`);
+			signedOut.push(await new Response(init?.body).json());
+			return Response.json({ request_id: 'request-synthetic' });
+		});
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.useRealTimers();
+	});
+
+	async function removeAndSettle(
+		{ owner, t }: Awaited<ReturnType<typeof connectedBudget>>,
+		connectionId: Id<'bankConnections'>
+	) {
+		vi.useFakeTimers();
+		await owner.action(api.bankConnections.remove, { connectionId });
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+		vi.useRealTimers();
+	}
+
+	const bankAccountCount = ({ t }: Awaited<ReturnType<typeof connectedBudget>>) =>
+		t.run(async (ctx) => (await ctx.db.query('connectionAccounts').collect()).length);
+
+	test('leaves its Transactions, signs out at the bank, and drops its bank Accounts and held rows', async () => {
+		const backend = await connectedBudget();
+		const { owner, t, sync, held, transactions, checking, connectionId } = backend;
+		await sync(rowsFor(checkingId));
+		await sync(rowsFor(savingsId));
+		const imported = await transactions(checking);
+		expect(await held()).toHaveLength(1);
+
+		await removeAndSettle(backend, connectionId);
+
+		expect(signedOut).toEqual([{ access_token: accessToken }]);
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toEqual([]);
+		expect(await held()).toEqual([]);
+		expect(await transactions(checking)).toEqual(imported);
+		expect(
+			await t.run(async (ctx) => ({
+				bankAccounts: (await ctx.db.query('connectionAccounts').collect()).length,
+				heldRows: (
+					await ctx.db
+						.query('imports')
+						.withIndex('by_state_transactionId', (q) => q.eq('state', 'held'))
+						.collect()
+				).length
+			}))
+		).toEqual({ bankAccounts: 0, heldRows: 0 });
+	});
+
+	test('drops every bank Account the bank listed, past the first 50', async () => {
+		const backend = await connectedBudget();
+		const { t, connectionId } = backend;
+		for (const [from, count] of [
+			[0, 50],
+			[50, 1]
+		] as const) {
+			await t.mutation(internal.heldAccounts.recordAccounts, {
+				connectionId,
+				accounts: listedAccounts(from, count)
+			});
+		}
+		expect(await bankAccountCount(backend)).toBe(52);
+
+		await removeAndSettle(backend, connectionId);
+
+		expect(await bankAccountCount(backend)).toBe(0);
+	});
+
+	test('records nothing when the bank lists its Accounts after the removal', async () => {
+		const backend = await connectedBudget();
+		const { t, connectionId } = backend;
+		await removeAndSettle(backend, connectionId);
+
+		await t.mutation(internal.heldAccounts.recordAccounts, {
+			connectionId,
+			accounts: listedAccounts(0, 1)
+		});
+
+		expect(await bankAccountCount(backend)).toBe(0);
+	});
+
+	test.each(['PLAID_SECRET', 'BUDGE_TOKEN_KEY'])(
+		'on a server without %s, is kept with its bank login until Budge can sign out at the bank',
+		async (name) => {
+			const backend = await connectedBudget();
+			const { owner, connectionId } = backend;
+			vi.stubEnv(name, undefined);
+
+			expect(
+				await publicErrorOf(owner.action(api.bankConnections.remove, { connectionId }))
+			).toEqual({
+				code: 'BANK_SYNC_UNAVAILABLE',
+				message:
+					"Bank sync isn't set up on this server, so Budge can't sign out of this bank yet. Set it up, then remove the connection."
+			});
+			expect(signedOut).toEqual([]);
+			expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toHaveLength(1);
+
+			useBankSync();
+			await removeAndSettle(backend, connectionId);
+
+			expect(signedOut).toEqual([{ access_token: accessToken }]);
+			expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toEqual([]);
+		}
+	);
+
+	test('accepts ITEM_NOT_FOUND when removing the remote Item', async () => {
+		const { t, connectionId } = await connectedBudget();
+		const removed: string[] = [];
+		await t.action(async (ctx) => {
+			const exit = await Effect.runPromiseExit(
+				removeItem(connectionId).pipe(
+					Effect.provide(
+						Layer.mergeAll(
+							PlaidClient.layerTest({
+								itemRemove: (token) => {
+									removed.push(token);
+									return Effect.fail(
+										new PlaidApi({ error_code: 'ITEM_NOT_FOUND', request_id: '', status: 400 })
+									);
+								}
+							}),
+							TokenCipher.layer(tokenKey),
+							SyncStore.layer(ctx)
+						)
+					)
+				)
+			);
+			assert(Exit.isSuccess(exit), 'removing an item Plaid already forgot succeeds');
+		});
+		expect(removed).toEqual([accessToken]);
+	});
+});
+
 describe('the bank changes a row it holds for an unknown Account', () => {
 	const grocerId = `${savingsId}-txn-synthetic-1`;
 	const changes = (part: Partial<SyncPage>): SyncPage => ({ ...page, added: [], ...part });
@@ -578,7 +829,7 @@ describe('the bank changes a row it holds for an unknown Account', () => {
 
 describe('a suggested starting balance', () => {
 	const checkingReporting = (balance: number | null): BankAccount[] => [
-		{ externalId: checkingId, name: 'Sample Checking', mask: '0042', balance }
+		{ externalId: checkingId, name: 'Sample Checking', mask: '0042', kind: 'cash', balance }
 	];
 
 	test("is the bank's balance, even zero, and is withheld when the bank has no balance or no such Account", async () => {
@@ -619,7 +870,7 @@ describe('a suggested starting balance', () => {
 	});
 
 	const movedReporting = (balance: number): BankAccount[] => [
-		{ externalId: movedCheckingId, name: 'Sample Checking', mask: '0042', balance }
+		{ externalId: movedCheckingId, name: 'Sample Checking', mask: '0042', kind: 'cash', balance }
 	];
 
 	test('after the Account is mapped to a newer bank Account, comes from the newer one', async () => {
@@ -670,8 +921,7 @@ describe('a suggested starting balance', () => {
 			vi.stubEnv('PLAID_CLIENT_ID', 'client-id-synthetic');
 			vi.stubEnv('PLAID_SECRET', 'secret-synthetic-not-real');
 			vi.stubEnv('BUDGE_TOKEN_KEY', tokenKey);
-			vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
-				const url = new URL(input instanceof Request ? input.url : input);
+			stubPlaid((url) => {
 				assert(url.pathname === '/accounts/get', `Unexpected Plaid call ${url.pathname}`);
 				const accounts = [
 					{

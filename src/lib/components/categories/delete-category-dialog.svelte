@@ -6,6 +6,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Label } from '$lib/components/ui/label';
+	import SelectField from '$lib/components/select-field.svelte';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	import type { ManagedGroup } from './types';
@@ -77,26 +78,18 @@
 			<form class="flex flex-col gap-4" onsubmit={submit}>
 				<div class="flex flex-col gap-2">
 					<Label for="delete-category-destination">Move its history to</Label>
-					<select
+					<SelectField
 						id="delete-category-destination"
-						bind:value={destinationId}
 						required
-						class="h-8 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
-					>
-						<option value="" disabled>Pick a Category</option>
-						{#each choices as group (group._id)}
-							<optgroup label={group.name}>
-								{#each group.categories as choice (choice._id)}
-									<option value={choice._id}>{choice.name}</option>
-								{/each}
-							</optgroup>
-						{/each}
-					</select>
+						bind:value={destinationId}
+						placeholder="Pick a Category"
+						choices={choices.map((group) => ({
+							group: group.name,
+							choices: group.categories.map((choice) => ({ value: choice._id, label: choice.name }))
+						}))}
+					/>
 				</div>
-				{#if error}
-					<p role="alert" class="text-sm text-destructive">{error}</p>
-				{/if}
-				<Dialog.Footer>
+				<Dialog.Footer {error}>
 					<Button type="submit" variant="destructive" disabled={dialog.pending('save')}
 						>Delete Category</Button
 					>

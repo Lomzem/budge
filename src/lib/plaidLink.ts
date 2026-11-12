@@ -9,7 +9,10 @@ interface LinkHandler {
 interface PlaidLink {
 	create: (config: {
 		token: string;
-		onSuccess: (publicToken: string | null) => void;
+		onSuccess: (
+			publicToken: string,
+			metadata: { institution?: { name?: string | null } | null } | null
+		) => void;
 		onExit: (error: { error_code: string } | null) => void;
 	}) => LinkHandler;
 }
@@ -49,15 +52,25 @@ function loadLink(): Promise<PlaidLink | null> {
 	return loading;
 }
 
-export async function openPlaidLink(token: string): Promise<'success' | 'exit' | 'unavailable'> {
+export interface Linked {
+	kind: 'linked';
+	publicToken: string;
+	institutionName: string | undefined;
+}
+
+export async function openPlaidLink(token: string): Promise<Linked | 'exit' | 'unavailable'> {
 	const plaid = await loadLink();
 	if (plaid === null) return 'unavailable';
 	return await new Promise((resolve) => {
 		const handler = plaid.create({
 			token,
-			onSuccess: () => {
+			onSuccess: (publicToken, metadata) => {
 				handler.destroy();
-				resolve('success');
+				resolve({
+					kind: 'linked',
+					publicToken,
+					institutionName: metadata?.institution?.name ?? undefined
+				});
 			},
 			onExit: () => {
 				handler.destroy();

@@ -7,6 +7,7 @@ import { exportJourneys } from './export';
 import { imports } from './imports';
 import { inspector } from './inspector';
 import type { Journey } from './journey';
+import { watchUnpromptedLayoutShifts } from './layoutShift';
 import { payees } from './payees';
 import { plaid } from './plaid';
 import { reconciliation } from './reconciliation';
@@ -51,6 +52,11 @@ export const journeys: readonly NamedJourney[] = Object.entries(byFeature).flatM
 		Object.entries(journeysOfFeature).map(([key, journey]) => ({
 			...journey,
 			name: `${feature}/${key}`,
-			feature
+			feature,
+			run: async (page, context) => {
+				const layoutShifts = await watchUnpromptedLayoutShifts(page);
+				await journey.run(page, context);
+				await layoutShifts.assertNone();
+			}
 		}))
 );

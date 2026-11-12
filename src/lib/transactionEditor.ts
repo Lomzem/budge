@@ -92,9 +92,13 @@ export interface World {
 	readonly payeeMemory: Lookup<Id<'categories'> | null>;
 }
 
+export type Field =
+	| { readonly kind: 'account' | 'amount' | 'category' }
+	| { readonly kind: 'lineCategory' | 'lineAmount'; readonly key: number };
+
 export type Payload =
 	| { readonly kind: 'waiting' }
-	| { readonly kind: 'invalid'; readonly message: string }
+	| { readonly kind: 'invalid'; readonly message: string; readonly field: Field }
 	| { readonly kind: 'ready'; readonly fields: Fields };
 
 export interface View<Candidate> {
@@ -102,7 +106,6 @@ export interface View<Candidate> {
 	readonly transferAccounts: readonly AccountChoice[];
 	readonly cardPayment: boolean;
 	readonly remainder: number | undefined;
-	readonly blankLine: boolean;
 	readonly candidates: readonly Candidate[];
 	readonly link: string;
 	readonly payload: Payload;
@@ -296,7 +299,6 @@ export function choose(draft: Draft, option: string, world: World): Draft {
 	const previous = selectionOf(draft, world);
 	let chosen: Draft = { ...draft, choice, picked: true };
 	if (choice.kind === 'split') {
-		const total = parseCents(draft.amount);
 		const key = draft.nextLineKey;
 		chosen = {
 			...chosen,
@@ -304,7 +306,7 @@ export function choose(draft: Draft, option: string, world: World): Draft {
 				{
 					key,
 					categoryId: previous.kind === 'category' ? previous.categoryId : '',
-					amount: total === undefined ? draft.amount : shownSize(total),
+					amount: '',
 					memo: ''
 				},
 				{ key: key + 1, categoryId: '', amount: '', memo: '' }
@@ -331,6 +333,20 @@ export function addLine(draft: Draft): Draft {
 export function removeLine(draft: Draft, key: number): Draft {
 	if (draft.lines.length <= 2) return draft;
 	return { ...draft, lines: draft.lines.filter((line) => line.key !== key) };
+}
+
+export function fillRemainder(draft: Draft, key: number): Draft {
+	const left = remainderOf(draft);
+	const line = draft.lines.find((candidate) => candidate.key === key);
+	if (left === undefined || left <= 0 || line?.amount.trim() !== '') {
+		return draft;
+	}
+	return {
+		...draft,
+		lines: draft.lines.map((candidate) =>
+			candidate.key === key ? { ...candidate, amount: shownSize(left) } : candidate
+		)
+	};
 }
 
 export function chooseLink(draft: Draft, link: string): Draft {
@@ -378,18 +394,65 @@ function remainderOf(draft: Draft) {
 	return left;
 }
 
-function splitsOf(draft: Draft, world: World) {
+function invalid(message: string, field: Field): Payload {
+	return { kind: 'invalid', message, field };
+}
+
+function lineProblem(
+	line: Draft['lines'][number],
+	number: string,
+	removable: boolean,
+	world: World
+): Payload | undefined {
+	const categoryId = categoryIn(world, line.categoryId);
+	const blank = line.amount.trim() === '';
+	if (categoryId === undefined && line.categoryId === '' && blank) {
+		const fix = removable ? 'Fill it in, or remove the line.' : 'Pick its Category and amount.';
+		return invalid(`Line ${number} is empty. ${fix}`, { kind: 'lineCategory', key: line.key });
+	}
+	if (categoryId === undefined) {
+		return invalid(`Pick a Category for line ${number}.`, { kind: 'lineCategory', key: line.key });
+	}
+	if (parseCents(line.amount) !== undefined) return undefined;
+	return invalid(
+		blank
+			? `Enter line ${number}'s amount${removable ? ', or remove the line' : ''}.`
+			: `Enter line ${number}'s amount, such as 12.50.`,
+		{ kind: 'lineAmount', key: line.key }
+	);
+}
+
+function withLastBlankFilled(draft: Draft, world: World): Draft {
+	const blanks = draft.lines.filter((line) => line.amount.trim() === '');
+	const [blank] = blanks;
+	if (blanks.length !== 1 || blank === undefined) return draft;
+	if (categoryIn(world, blank.categoryId) === undefined) return draft;
+	return fillRemainder(draft, blank.key);
+}
+
+function splitsOf(typed: Draft, world: World) {
+	const draft = withLastBlankFilled(typed, world);
 	const splits = [];
-	for (const line of draft.lines) {
+	const removable = draft.lines.length > 2;
+	for (const [index, line] of draft.lines.entries()) {
+		const problem = lineProblem(line, String(index + 1), removable, world);
+		if (problem !== undefined) return problem;
 		const categoryId = categoryIn(world, line.categoryId);
 		const cents = parseCents(line.amount);
-		if (categoryId === undefined) return 'Pick a Category for each line.';
-		if (cents === undefined) return "Enter each line's amount, such as 12.50.";
+		if (categoryId === undefined || cents === undefined) continue;
 		const amount = draft.direction === 'outflow' ? -cents : cents;
 		splits.push({ categoryId, amount, memo: line.memo });
 	}
-	if (splits.length < 2) return 'A split needs two or more lines.';
-	if (remainderOf(draft) !== 0) return 'The lines must add up to the amount.';
+	const last = draft.lines.at(-1);
+	const lastAmount: Field =
+		last === undefined ? { kind: 'category' } : { kind: 'lineAmount', key: last.key };
+	if (splits.length < 2) return invalid('A split needs two or more lines.', lastAmount);
+	const remainder = remainderOf(draft) ?? 0;
+	if (remainder > 0)
+		return invalid(`${formatCents(remainder)} is still left to split.`, lastAmount);
+	if (remainder < 0) {
+		return invalid(`The lines are ${formatCents(-remainder)} over the amount.`, lastAmount);
+	}
 	return splits;
 }
 
@@ -412,9 +475,9 @@ function payloadOf(
 ): Payload {
 	const account = world.accounts.find((a) => a._id === draft.accountId);
 	const amount = signedAmount(draft);
-	if (!account) return { kind: 'invalid', message: 'Pick an Account.' };
+	if (!account) return invalid('Pick an Account.', { kind: 'account' });
 	if (amount === undefined) {
-		return { kind: 'invalid', message: 'Enter the amount, such as 12.50.' };
+		return invalid('Enter the amount, such as 12.50.', { kind: 'amount' });
 	}
 	const shared = { accountId: account._id, date: draft.date, amount, memo: draft.memo };
 	switch (choice.kind) {
@@ -427,12 +490,12 @@ function payloadOf(
 			};
 		case 'split': {
 			const splits = splitsOf(draft, world);
-			if (typeof splits === 'string') return { kind: 'invalid', message: splits };
+			if ('kind' in splits) return splits;
 			return { kind: 'ready', fields: { ...shared, payee: draft.payee, splits } };
 		}
 		case 'transfer': {
 			const other = transferAccounts.find((a) => a._id === choice.accountId);
-			if (!other) return { kind: 'invalid', message: 'Pick another Account to transfer with.' };
+			if (!other) return invalid('Pick another Account to transfer with.', { kind: 'category' });
 			const noPayeeOrCategory = { payee: '' };
 			return {
 				kind: 'ready',
@@ -479,7 +542,6 @@ export function view<Candidate extends { readonly _id: Id<'transactions'> }>(
 		transferAccounts,
 		cardPayment: isCardPayment(draft, selection, world.accounts),
 		remainder: remainderOf(draft),
-		blankLine: draft.lines.some((line) => line.amount.trim() === ''),
 		candidates,
 		link,
 		payload

@@ -358,8 +358,8 @@ async function writeTransfer(ctx: MutationCtx, first: Side, second: Side) {
 	await ctx.db.replace('transactions', firstId, firstFields);
 	await countTransaction(ctx, firstFields, 1);
 	await countTransaction(ctx, secondFields, 1);
-	await refreshSearchText(ctx, firstId);
-	await refreshSearchText(ctx, secondId);
+	await refreshDerivedFields(ctx, firstId);
+	await refreshDerivedFields(ctx, secondId);
 	return firstId;
 }
 
@@ -369,7 +369,7 @@ export async function insertTransaction(
 	lines: readonly SplitLine[] = []
 ) {
 	const id = await insertCounted(ctx, fields, lines);
-	await refreshSearchText(ctx, id);
+	await refreshDerivedFields(ctx, id);
 	return id;
 }
 
@@ -396,7 +396,7 @@ export async function replaceTransaction(
 		existing.kind === undefined ? fields : { ...fields, kind: existing.kind }
 	);
 	await putIn(ctx, existing._id, fields, lines);
-	await refreshSearchText(ctx, existing._id);
+	await refreshDerivedFields(ctx, existing._id);
 }
 
 export type ImportedFields = Omit<TransactionFields, 'cleared' | 'approved'>;
@@ -450,7 +450,7 @@ async function attachBankRow(
 			merchantName: undefined
 		});
 	}
-	await refreshSearchText(ctx, transactionId);
+	await refreshDerivedFields(ctx, transactionId);
 }
 
 export async function unmatchBankRow(
@@ -467,8 +467,8 @@ export async function unmatchBankRow(
 		[]
 	);
 	await ctx.db.patch('imports', bankRowId, { transactionId, matched: false, state: 'linked' });
-	await refreshSearchText(ctx, transactionId);
-	await refreshSearchText(ctx, matchedId);
+	await refreshDerivedFields(ctx, transactionId);
+	await refreshDerivedFields(ctx, matchedId);
 	if (!(await hasBankRow(ctx, matchedId))) {
 		await ctx.db.patch('transactions', matchedId, { cleared: 'uncleared', approved: true });
 	}
@@ -482,7 +482,7 @@ export async function keepAfterBankRemoval(
 ) {
 	await ctx.db.patch('imports', bankRowId, { transactionId: undefined, matched: false });
 	await ctx.db.patch('transactions', transactionId, { approved: true });
-	await refreshSearchText(ctx, transactionId);
+	await refreshDerivedFields(ctx, transactionId);
 }
 
 export interface BankRowChange {
@@ -500,8 +500,9 @@ export async function updateBankRow(
 ) {
 	await ctx.db.patch('imports', bankRow._id, change);
 	const bankTextChanged = change.bankText !== undefined && change.bankText !== bankRow.bankText;
-	if (bankTextChanged && bankRow.transactionId !== undefined) {
-		await refreshSearchText(ctx, bankRow.transactionId);
+	const derivedChanged = bankTextChanged || change.state !== undefined;
+	if (derivedChanged && bankRow.transactionId !== undefined) {
+		await refreshDerivedFields(ctx, bankRow.transactionId);
 	}
 }
 
@@ -526,6 +527,10 @@ export async function markCleared(
 
 export async function markApproved(ctx: MutationCtx, transactionId: Id<'transactions'>) {
 	await ctx.db.patch('transactions', transactionId, { approved: true });
+}
+
+export async function markUnapproved(ctx: MutationCtx, transactionId: Id<'transactions'>) {
+	await ctx.db.patch('transactions', transactionId, { approved: false });
 }
 
 export async function moveCategoryHistory(
@@ -566,7 +571,7 @@ export async function refreshPayeeSearchText(
 		.query('transactions')
 		.withIndex('by_payee_date', (q) => q.eq('payeeId', payeeId))
 		.paginate({ numItems: PAYEE_RENAME_BATCH, cursor });
-	for (const transaction of page) await refreshSearchText(ctx, transaction._id);
+	for (const transaction of page) await refreshDerivedFields(ctx, transaction._id);
 	if (!isDone) {
 		await ctx.scheduler.runAfter(0, internal.payees.refreshSearchText, {
 			payeeId,
@@ -575,20 +580,26 @@ export async function refreshPayeeSearchText(
 	}
 }
 
-export async function refreshSearchText(ctx: MutationCtx, transactionId: Id<'transactions'>) {
+export async function refreshDerivedFields(ctx: MutationCtx, transactionId: Id<'transactions'>) {
 	const transaction = await ctx.db.get('transactions', transactionId);
 	if (transaction === null) return;
 	const lines = transaction.split === true ? await splitLinesOf(ctx, transactionId) : [];
+	const bankRows = await bankRowsOf(ctx, transactionId);
 	const searchText = [
 		await payeeNameOf(ctx, transaction),
 		transaction.memo,
 		...lines.map((line) => line.memo),
-		...(await bankTextsOf(ctx, transactionId))
+		...bankRows.map((bankRow) => bankRow.bankText)
 	]
 		.filter((part) => part !== undefined && part !== null && part !== '')
 		.join(' ');
-	if (transaction.searchText !== searchText) {
-		await ctx.db.patch('transactions', transactionId, { searchText });
+	const bankChange = bankRows.some(
+		(bankRow) => bankRow.state === 'changed' || bankRow.state === 'removed'
+	)
+		? (true as const)
+		: undefined;
+	if (transaction.searchText !== searchText || transaction.bankChange !== bankChange) {
+		await ctx.db.patch('transactions', transactionId, { searchText, bankChange });
 	}
 }
 
@@ -675,8 +686,8 @@ export async function hasBankRow(ctx: QueryCtx, transactionId: Id<'transactions'
 	return false;
 }
 
-async function bankTextsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
-	const bankTexts: string[] = [];
-	for await (const bankRow of allBankRowsOf(ctx, transactionId)) bankTexts.push(bankRow.bankText);
-	return bankTexts;
+async function bankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	const bankRows: Doc<'imports'>[] = [];
+	for await (const bankRow of allBankRowsOf(ctx, transactionId)) bankRows.push(bankRow);
+	return bankRows;
 }

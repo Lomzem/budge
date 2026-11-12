@@ -10,7 +10,7 @@ Set Monthly or By date Targets, fund the missing amount, and see the upcoming ob
 
 ## How to get to it (user POV)
 
-- Budget → Category inspector → Add Target or Edit Target; Upcoming below inspector/table.
+- Budget → Category inspector → Add Target or Edit Target; Upcoming sits in the side panel at 1024 px and up while no Category is open (the inspector takes the panel when one is), and below the table on narrower screens.
 
 ## Driving it with Playwright
 

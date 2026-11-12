@@ -10,6 +10,30 @@ export function parseCents(text: string): number | undefined {
 	return sign && cents !== 0 ? -cents : cents;
 }
 
+const SUM = /^[-−]?[^+\-−]+(?:[+\-−][^+\-−]+)*$/;
+
+function parseCentsSum(text: string): number | undefined {
+	const trimmed = text.trim();
+	if (!SUM.test(trimmed)) return undefined;
+	let total = 0;
+	for (const [, operator, term = ''] of trimmed.matchAll(/([+\-−]?)([^+\-−]+)/g)) {
+		const cents = parseCents(term.trim());
+		if (cents === undefined) return undefined;
+		total += operator === '' || operator === '+' ? cents : -cents;
+		if (!Number.isSafeInteger(total)) return undefined;
+	}
+	return total;
+}
+
+export function parseAssigned(text: string, saved: number): number | undefined {
+	const trimmed = text.trim();
+	const relative = /^[+\-−]/.test(trimmed);
+	const cents = parseCentsSum(relative ? `0${trimmed}` : trimmed);
+	if (cents === undefined) return undefined;
+	const total = relative ? saved + cents : cents;
+	return Number.isSafeInteger(total) ? total : undefined;
+}
+
 const dollars = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
 export function formatCents(cents: number): string {

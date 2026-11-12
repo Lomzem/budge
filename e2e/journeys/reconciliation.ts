@@ -36,6 +36,9 @@ export const reconciliation = {
 					const bankOwedOneDollarMoreThanCleared = owed + 100;
 					await page.keyboard.type(typed(bankOwedOneDollarMoreThanCleared));
 					await expect(dialog.getByRole('status')).toContainText('differs by −$1.00');
+					await expect(
+						dialog.getByRole('button', { name: 'Reconcile with −$1.00 adjustment' })
+					).toBeVisible();
 					await page.keyboard.press('Enter');
 					await expect(dialog).toBeHidden();
 				}
@@ -49,7 +52,9 @@ export const reconciliation = {
 					);
 					await expect(page.getByTestId('last-reconciled')).toContainText(/^Reconciled \w+/);
 					await expect(adjustment).toHaveCount(1);
-					await expect(adjustment.getByText('Reconciled', { exact: true })).toBeAttached();
+					await expect(
+						adjustment.getByText('Reconciled', { exact: true }).filter({ visible: true })
+					).toHaveCount(1);
 					await expect(
 						adjustment.getByText('Ready to Assign').filter({ visible: true })
 					).toBeVisible();
@@ -57,16 +62,38 @@ export const reconciliation = {
 			);
 
 			await step(
-				"opening it shows the lock; its amount can't be edited until it's unlocked",
+				"opening it shows the lock; its amount can't be edited until an Unlock is confirmed",
 				async () => {
 					await adjustment.getByRole('button', { name: /^Reconciliation Adjustment/ }).click();
 					await expect(dialog.getByLabel('Amount')).toBeDisabled();
 					await expect(dialog.getByRole('button', { name: 'Delete' })).toHaveCount(0);
 					await dialog.getByRole('button', { name: 'Unlock' }).click();
+					const confirm = page.getByRole('alertdialog', { name: 'Unlock this Transaction?' });
+					await confirm.getByRole('button', { name: 'Keep it locked' }).click();
+					await expect(dialog.getByLabel('Amount')).toBeDisabled();
+					await dialog.getByRole('button', { name: 'Unlock' }).click();
+					await confirm.getByRole('button', { name: 'Unlock' }).click();
 					await expect(dialog.getByLabel('Amount')).toBeEnabled();
+					await expect(dialog.getByRole('status').filter({ hasText: /^Unlocked/ })).toBeVisible();
 					await page.keyboard.press('Escape');
 					await expect(dialog).toBeHidden();
 					await expect(adjustment.getByRole('checkbox', { name: /^Cleared/ })).toBeChecked();
+				}
+			);
+
+			await step(
+				'when the bank shows the cleared balance, one tap reconciles with no new adjustment',
+				async () => {
+					await page.getByRole('button', { name: 'Reconcile' }).click();
+					await expect(dialog.getByTestId('cleared-balance')).toHaveText(/\$/);
+					await dialog
+						.getByRole('button', { name: /^The bank shows the same: reconcile at/ })
+						.click();
+					await expect(dialog).toBeHidden();
+					await expect(
+						page.getByRole('status').filter({ hasText: 'Reconciled. The balances matched.' })
+					).toBeVisible();
+					await expect(adjustment).toHaveCount(1);
 				}
 			);
 		}

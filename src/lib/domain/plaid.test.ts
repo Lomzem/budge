@@ -110,24 +110,46 @@ describe('decoding a Plaid sync page', () => {
 });
 
 describe("decoding Plaid's Accounts", () => {
-	it.effect('reads each Account and its current balance as a Budge balance in cents', () =>
-		Effect.gen(function* () {
-			expect(yield* decodeAccounts(accounts)).toEqual([
-				{
-					externalId: 'account-synthetic-checking',
-					name: 'Sample Checking',
-					mask: '0042',
-					balance: 120_417
-				},
-				{
-					externalId: 'account-synthetic-card',
-					name: 'Sample Card',
-					mask: '7310',
-					balance: -89_990
-				},
-				{ externalId: 'account-synthetic-savings', name: 'Sample Savings', balance: null }
-			]);
-		})
+	it.effect(
+		"reads each Account, the kind it suggests (none for a type Budge doesn't budget, such as investment), and its current balance as a Budge balance in cents",
+		() =>
+			Effect.gen(function* () {
+				expect(yield* decodeAccounts(accounts)).toEqual([
+					{
+						externalId: 'account-synthetic-checking',
+						name: 'Sample Checking',
+						mask: '0042',
+						kind: 'cash',
+						balance: 120_417
+					},
+					{
+						externalId: 'account-synthetic-card',
+						name: 'Sample Card',
+						mask: '7310',
+						kind: 'creditCard',
+						balance: -89_990
+					},
+					{
+						externalId: 'account-synthetic-savings',
+						name: 'Sample Savings',
+						kind: 'cash',
+						balance: null
+					},
+					{
+						externalId: 'account-synthetic-loan',
+						name: 'Sample Car Loan',
+						mask: '5521',
+						kind: 'creditCard',
+						balance: -1_250_000
+					},
+					{
+						externalId: 'account-synthetic-brokerage',
+						name: 'Sample Brokerage',
+						mask: '8800',
+						balance: 307_525
+					}
+				]);
+			})
 	);
 
 	it.effect('fails on a balance finer than a cent', () =>

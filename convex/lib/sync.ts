@@ -1,16 +1,18 @@
 import type { GenericActionCtx } from 'convex/server';
 import { v, type Infer } from 'convex/values';
-import { Cause, Context, Effect, Layer, Option, Result } from 'effect';
+import { Cause, Clock, Context, Effect, Layer, Option, Result } from 'effect';
 
 import {
 	syncRowsOf,
 	type BankAccount,
+	type BankAccountKind,
 	type SyncPage,
 	type SyncRemoval,
 	type SyncRow
 } from '../../src/lib/domain/plaid';
 import { internal } from '../_generated/api';
 import type { DataModel, Id } from '../_generated/dataModel';
+import { accountKind } from './accountKind';
 import { PlaidClient, type PlaidError } from './plaidClient';
 import { failureOf, type SyncFailure } from './syncFailure';
 import { TokenCipher, TokenCipherError } from './tokenCipher';
@@ -98,7 +100,12 @@ export const recordAccountsArgs = {
 	connectionId: v.id('bankConnections'),
 	answersRequestAt: v.optional(v.union(v.number(), v.null())),
 	accounts: v.array(
-		v.object({ externalId: v.string(), name: v.string(), mask: v.optional(v.string()) })
+		v.object({
+			externalId: v.string(),
+			name: v.string(),
+			mask: v.optional(v.string()),
+			kind: v.optional(accountKind)
+		})
 	)
 };
 
@@ -119,7 +126,8 @@ export const saveArgs = {
 	name: v.string(),
 	itemId: v.string(),
 	encryptedToken: v.string(),
-	accounts: v.array(v.object({ externalId: v.string(), accountId: v.id('accounts') }))
+	accounts: v.array(v.object({ externalId: v.string(), accountId: v.id('accounts') })),
+	accountsCheckRequestedAt: v.optional(v.number())
 };
 
 interface SyncStoreShape {
@@ -167,11 +175,12 @@ interface SyncStoreShape {
 		itemId: string;
 		encryptedToken: string;
 		accounts: { externalId: string; accountId: Id<'accounts'> }[];
+		accountsCheckRequestedAt?: number;
 	}) => Effect.Effect<Id<'bankConnections'>>;
 	readonly recordAccounts: (args: {
 		connectionId: Id<'bankConnections'>;
 		answersRequestAt: number | null;
-		accounts: { externalId: string; name: string; mask?: string }[];
+		accounts: { externalId: string; name: string; mask?: string; kind?: BankAccountKind }[];
 	}) => Effect.Effect<void>;
 	readonly startingBalanceBasis: (accountId: Id<'accounts'>) => Effect.Effect<StartingBalanceBasis>;
 }
@@ -323,8 +332,13 @@ export const syncConnection = Effect.fnUntraced(function* (
 	);
 });
 
-function namesOf({ externalId, name, mask }: BankAccount) {
-	return { externalId, name, ...(mask === undefined ? {} : { mask }) };
+function namesOf({ externalId, name, mask, kind }: BankAccount) {
+	return {
+		externalId,
+		name,
+		...(kind === undefined ? {} : { kind }),
+		...(mask === undefined ? {} : { mask })
+	};
 }
 
 export type StartingBalanceSuggestion =
@@ -397,18 +411,62 @@ export const setupConnection = Effect.fnUntraced(function* (input: {
 	accessToken: string;
 	webhook: string;
 	accounts: { externalId: string; accountId: Id<'accounts'> }[];
-}): Effect.fn.Return<Id<'bankConnections'>, SyncError, PlaidClient | TokenCipher | SyncStore> {
+	accountsCheckRequestedAt?: number;
+}): Effect.fn.Return<
+	{ connectionId: Id<'bankConnections'>; webhookSet: boolean },
+	SyncError,
+	PlaidClient | TokenCipher | SyncStore
+> {
 	const cipher = yield* TokenCipher;
 	const plaid = yield* PlaidClient;
 	const store = yield* SyncStore;
 	const encryptedToken = yield* cipher.encrypt(input.accessToken, input.itemId);
-	yield* plaid.setWebhook(input.accessToken, input.webhook);
-	return yield* store.save({
+	const connectionId = yield* store.save({
 		name: input.name,
 		itemId: input.itemId,
 		encryptedToken,
-		accounts: input.accounts
+		accounts: input.accounts,
+		...(input.accountsCheckRequestedAt === undefined
+			? {}
+			: { accountsCheckRequestedAt: input.accountsCheckRequestedAt })
 	});
+	const webhookSet = yield* plaid
+		.setWebhook(input.accessToken, input.webhook)
+		.pipe(Effect.match({ onFailure: () => false, onSuccess: () => true }));
+	return { connectionId, webhookSet };
+});
+
+export const OWNER_CLIENT_USER_ID = 'budge-owner';
+
+export const connectItem = Effect.fnUntraced(function* (input: {
+	name: string;
+	publicToken: string;
+	webhook: string;
+}): Effect.fn.Return<Id<'bankConnections'>, SyncError, PlaidClient | TokenCipher | SyncStore> {
+	const plaid = yield* PlaidClient;
+	const store = yield* SyncStore;
+	const { accessToken, itemId } = yield* plaid.publicTokenExchange(input.publicToken);
+	const accountsCheckRequestedAt = yield* Clock.currentTimeMillis;
+	const { connectionId } = yield* setupConnection({
+		name: input.name,
+		itemId,
+		accessToken,
+		webhook: input.webhook,
+		accounts: [],
+		accountsCheckRequestedAt
+	}).pipe(Effect.onError(() => Effect.ignore(plaid.itemRemove(accessToken))));
+	yield* Effect.ignore(
+		plaid.accountsGet(accessToken).pipe(
+			Effect.flatMap((accounts) =>
+				store.recordAccounts({
+					connectionId,
+					answersRequestAt: accountsCheckRequestedAt,
+					accounts: accounts.map(namesOf)
+				})
+			)
+		)
+	);
+	return connectionId;
 });
 
 export const reconnectLinkToken = Effect.fnUntraced(function* (
@@ -424,6 +482,30 @@ export const reconnectLinkToken = Effect.fnUntraced(function* (
 	const credentials = yield* store.credentials(connectionId);
 	if (credentials === 'missing' || credentials === 'noToken') return { kind: credentials };
 	const accessToken = yield* cipher.decrypt(credentials.encryptedToken, credentials.itemId);
-	const linkToken = yield* plaid.linkTokenCreate({ accessToken, clientUserId: connectionId });
+	const linkToken = yield* plaid.linkTokenCreate({
+		mode: 'update',
+		accessToken,
+		clientUserId: OWNER_CLIENT_USER_ID
+	});
 	return { kind: 'linkToken', linkToken };
+});
+
+const ALREADY_GONE = new Set(['ITEM_NOT_FOUND', 'INVALID_ACCESS_TOKEN']);
+
+export const removeItem = Effect.fnUntraced(function* (
+	connectionId: Id<'bankConnections'>
+): Effect.fn.Return<void, SyncError, PlaidClient | TokenCipher | SyncStore> {
+	const store = yield* SyncStore;
+	const plaid = yield* PlaidClient;
+	const cipher = yield* TokenCipher;
+	const credentials = yield* store.credentials(connectionId);
+	if (credentials === 'missing' || credentials === 'noToken') return;
+	const accessToken = yield* cipher.decrypt(credentials.encryptedToken, credentials.itemId);
+	yield* plaid
+		.itemRemove(accessToken)
+		.pipe(
+			Effect.catchTag('PlaidApi', (error) =>
+				ALREADY_GONE.has(error.error_code) ? Effect.void : Effect.fail(error)
+			)
+		);
 });

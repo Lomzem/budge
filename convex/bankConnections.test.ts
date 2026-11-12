@@ -1,5 +1,5 @@
 import { Effect, Exit, Layer } from 'effect';
-import { assert, describe, expect, test } from 'vitest';
+import { assert, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { decodeSyncPage, type SyncPage } from '../src/lib/domain/plaid';
 import syncPage from '../src/lib/domain/fixtures/synthetic/plaid-sync-page.json';
@@ -33,6 +33,12 @@ const accessToken = 'access-token-synthetic-not-real';
 const itemId = 'item-synthetic-1';
 const externalId = 'account-synthetic-checking';
 const tokenKey = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+
+beforeEach(() => {
+	vi.stubEnv('PLAID_CLIENT_ID', 'client-id-synthetic');
+	vi.stubEnv('PLAID_SECRET', 'secret-synthetic-not-real');
+	vi.stubEnv('BUDGE_TOKEN_KEY', tokenKey);
+});
 
 const page = Effect.runSync(decodeSyncPage(syncPage));
 
@@ -97,7 +103,7 @@ async function connectedBudget() {
 		})
 	);
 	assert(setup.ok, 'setup failed');
-	const connectionId = setup.value;
+	const { connectionId } = setup.value;
 	const sync = (plaid: FakePlaid, refresh = false) =>
 		runInAction(backend, plaid, syncConnection(connectionId, { refresh }));
 	const connection = () => t.run((ctx) => ctx.db.get('bankConnections', connectionId));
@@ -121,8 +127,8 @@ const synced = (result: { ok: true; value: unknown } | { ok: false }) =>
 	result.ok ? result.value : result;
 
 describe('setting up a Bank Connection', () => {
-	test('seals the token, maps the Account, and points the webhook at Budge', async () => {
-		const { t, webhooks, connection, connectionId, checking } = await connectedBudget();
+	test('seals the token, maps the Account it feeds, and points the webhook at Budge', async () => {
+		const { t, owner, webhooks, connection, connectionId, checking } = await connectedBudget();
 
 		expect(webhooks).toEqual(['https://budge.example.test/plaid/webhook']);
 		const saved = await connection();
@@ -135,6 +141,49 @@ describe('setting up a Bank Connection', () => {
 		expect(await t.run((ctx) => ctx.db.query('connectionAccounts').collect())).toMatchObject([
 			{ connectionId, externalId, state: 'mapped', accountId: checking }
 		]);
+		expect(await owner.query(api.bankConnections.list, { now: Date.now() })).toMatchObject([
+			{ _id: connectionId, feeds: [{ accountId: checking, name: 'Checking' }] }
+		]);
+	});
+
+	test('keeps the exchanged token when Plaid refuses the webhook update', async () => {
+		const backend = await startBudget({ cutoverDate, accounts: { Checking: ['cash', 0] } });
+		const setup = await runInAction(
+			backend,
+			{
+				setWebhook: () =>
+					Effect.fail(
+						new PlaidApi({
+							error_code: 'INTERNAL_SERVER_ERROR',
+							status: 500,
+							request_id: 'request-synthetic-4'
+						})
+					)
+			},
+			setupConnection({
+				name: 'Sample Bank',
+				itemId,
+				accessToken,
+				webhook: 'https://budge.example.test/plaid/webhook',
+				accounts: [{ externalId, accountId: backend.accounts.Checking }]
+			})
+		);
+
+		assert(setup.ok, 'setup failed');
+		expect(setup.value.webhookSet).toBe(false);
+		const saved = await backend.t.run((ctx) =>
+			ctx.db.get('bankConnections', setup.value.connectionId)
+		);
+		assert(saved?.provider.kind === 'plaid', 'no Plaid connection saved');
+		expect(saved.provider.itemId).toBe(itemId);
+		const sealed = saved.provider.encryptedToken;
+		const kept = await Effect.runPromise(
+			Effect.gen(function* () {
+				const cipher = yield* TokenCipher;
+				return yield* cipher.decrypt(sealed, itemId);
+			}).pipe(Effect.provide(TokenCipher.layer(tokenKey)))
+		);
+		expect(kept).toBe(accessToken);
 	});
 
 	test('at the Bank Connection limit, setting up an Item again replaces its token and a new Item is refused', async () => {
@@ -170,7 +219,7 @@ describe('setting up a Bank Connection', () => {
 			await publicErrorOf(save('sealed-token-synthetic-3', 'item-synthetic-one-too-many'))
 		).toEqual({
 			code: 'INVALID_INPUT',
-			message: `Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections.`
+			message: `Budge holds at most ${String(MAX_BANK_CONNECTIONS)} Bank Connections. Remove one first.`
 		});
 		expect(
 			await t.run(async (ctx) => (await ctx.db.query('bankConnections').collect()).length)
@@ -516,7 +565,7 @@ describe('syncing a Bank Connection', () => {
 			await publicErrorOf(owner.action(api.bankConnections.syncNow, { connectionId }))
 		).toEqual({
 			code: 'BANK_CONNECTION_NEEDS_LOGIN',
-			message: 'The bank needs you to reconnect.'
+			message: 'Reconnect this bank first.'
 		});
 	});
 
@@ -667,7 +716,7 @@ describe('reconnecting a Bank Connection', () => {
 		);
 
 		expect(synced(result)).toEqual({ kind: 'linkToken', linkToken: 'link-token-synthetic-1' });
-		expect(requests).toEqual([{ accessToken, clientUserId: connectionId }]);
+		expect(requests).toEqual([{ mode: 'update', accessToken, clientUserId: 'budge-owner' }]);
 	});
 
 	test('a successful sync after Reconnect clears the needed login', async () => {
@@ -776,14 +825,22 @@ describe('the Bank Connection status', () => {
 
 		expect(Object.keys(status ?? {}).sort()).toEqual([
 			'_id',
+			'bankLogin',
 			'consentEndsAt',
+			'feeds',
+			'ignored',
 			'lastError',
 			'lastSyncedAt',
 			'name',
 			'overdue',
 			'status'
 		]);
-		expect(status).toMatchObject({ _id: connectionId, name: 'Sample Bank', lastError: null });
+		expect(status).toMatchObject({
+			_id: connectionId,
+			name: 'Sample Bank',
+			lastError: null,
+			bankLogin: true
+		});
 		expect(JSON.stringify(status)).not.toMatch(/item-synthetic|cursor-synthetic|v1\./);
 	});
 

@@ -16,16 +16,19 @@
 	let error = $state('');
 
 	let downloading = $state(false);
+	let done = $state('');
 
 	$effect(() => {
 		if (open)
 			untrack(() => {
+				if (!busy) done = '';
 				dialog.openOrResume({}, 'export');
 			});
 	});
 
-	async function exportAs(save: (data: BudgetExport, date: string) => void | Promise<void>) {
+	async function exportAs(save: (data: BudgetExport, date: string) => string | Promise<string>) {
 		error = '';
+		done = '';
 		const exported = await dialog.run('export', async () => {
 			const data = await fetchExport(client);
 			downloading = true;
@@ -35,7 +38,8 @@
 					downloading = false;
 				});
 		});
-		if (!exported.ok) error = "Budge couldn't export. Try again.";
+		if (exported.ok) done = exported.value;
+		else error = "Budge couldn't export. Try again.";
 	}
 
 	function setOpen(next: boolean) {
@@ -57,19 +61,17 @@
 				Download everything in Budge as a backup. Bank Connection tokens are left out.
 			</Dialog.Description>
 		</Dialog.Header>
-		<p class="text-sm text-muted-foreground">
-			JSON is one file. CSV is one file per table, so your browser may ask to allow several
-			downloads.
-		</p>
-		{#if downloading}
-			<p role="status" class="text-sm text-muted-foreground">
+		<p role="status" class="min-h-10 text-sm text-muted-foreground">
+			{#if downloading}
 				Downloading… Keep this page open until every file has started.
-			</p>
-		{/if}
-		{#if error}
-			<p role="alert" class="text-sm text-destructive">{error}</p>
-		{/if}
-		<Dialog.Footer>
+			{:else if done}
+				<span class="text-foreground">{done}</span>
+			{:else}
+				JSON is one file. CSV is one file per table, so your browser may ask to allow several
+				downloads.
+			{/if}
+		</p>
+		<Dialog.Footer {error}>
 			<Button variant="outline" disabled={busy} onclick={() => exportAs(downloadCsv)}>
 				Download CSV
 			</Button>

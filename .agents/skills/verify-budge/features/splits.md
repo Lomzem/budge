@@ -9,7 +9,7 @@ Divide one Transaction across Categories and memos while preserving its total an
 
 ## How to get to it (user POV)
 
-- Add/Edit Transaction → Category or Transfer → Split across Categories.
+- Add/Edit Transaction → Category or Transfer → Split across Categories. Amount is asked before the split lines; the `… left to split` status sits right of `Add line` in a fixed spot. Saving lines that don't add up says `$1.50 is still left to split.` when they're short or `The lines are $1.00 over the amount.` when they're over. Choosing Split keeps the Category it had on line 1 and leaves every amount empty, so the status reads the whole amount `left to split`; focusing an empty line amount fills in what is left. A refused save names the field to fix and focuses it: `Line N is empty. Pick its Category and amount.` (its Category; with three or more lines, `Fill it in, or remove the line.`), `Pick a Category for line N.`, `Enter line N's amount.` (`, or remove the line` when one can go), or the last line's amount for a short or over total; that field is `aria-invalid` and described by the alert. `Add line` focuses the new line's Category and clears the alert until the next Save. When the amounts add up but a line amount is blank the status reads `$0.00 left to split`. When exactly one line has its Category but no amount and something is left, Save gives that line what is left and saves in one press (`src/lib/transactionEditor.test.ts` owns it).
 
 ## Driving it with Playwright
 

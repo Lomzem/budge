@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { ClerkProvider } from 'svelte-clerk';
 
+	import font from '@fontsource-variable/atkinson-hyperlegible-next/files/atkinson-hyperlegible-next-latin-wght-normal.woff2?url';
+
 	import '../app.css';
 	import { Theme, setTheme } from '$lib/theme.svelte';
 
@@ -10,6 +12,10 @@
 
 	setTheme(new Theme());
 </script>
+
+<svelte:head>
+	<link rel="preload" href={font} as="font" type="font/woff2" crossorigin="anonymous" />
+</svelte:head>
 
 <ClerkProvider
 	{...data}

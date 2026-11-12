@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import { localToday } from '../../src/lib/domain/dates';
-import { centsIn, openAccount, type Journey } from './journey';
+import { centsIn, choose, openAccount, type Journey } from './journey';
 
 const balance = (page: Page) => () => centsIn(page.getByTestId('account-balance'));
 
@@ -13,14 +13,14 @@ async function importRow(page: Page, bankText: string, type: 'Debit' | 'Credit')
 	].join('\n');
 	await page.getByRole('button', { name: 'Import file' }).click();
 	const dialog = page.getByRole('dialog', { name: 'Import a bank file' });
-	await expect(dialog.getByLabel('Account')).toHaveValue(/.+/);
+	await expect(dialog.getByLabel('Account')).not.toHaveText('Pick an Account');
 	await dialog.getByLabel('File').setInputFiles({
 		name: 'bank.csv',
 		mimeType: 'text/csv',
 		buffer: Buffer.from(csv)
 	});
 	await expect(dialog.getByRole('status')).toHaveText(/^1 new Transaction/);
-	await dialog.getByRole('button', { name: 'Save' }).click();
+	await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
 	await expect(dialog).toBeHidden();
 }
 
@@ -44,9 +44,7 @@ export const transfers = {
 
 			await step('a $12.34 Transfer to Savings has no Payee and leaves Checking', async () => {
 				await page.getByRole('button', { name: 'Add Transaction' }).click();
-				await dialog
-					.getByLabel('Category or Transfer')
-					.selectOption({ label: 'Transfer: Savings' });
+				await choose(dialog.getByLabel('Category or Transfer'), 'Transfer: Savings');
 				await expect(dialog.getByLabel('Payee')).toBeHidden();
 				await dialog.getByLabel('Amount').fill('12.34');
 				await dialog.getByLabel('Memo').fill(memo);
@@ -63,15 +61,19 @@ export const transfers = {
 				await expect(row.getByText('From Checking').filter({ visible: true })).toBeVisible();
 			});
 
-			await step('deleting from the Savings side takes both sides out', async () => {
-				await row.getByRole('button', { name: /^Transfer/ }).click();
-				await dialog.getByRole('button', { name: 'Delete' }).click();
-				await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
-				await expect(row).toHaveCount(0);
-				await expect.poll(balance(page)).toBe(before.savings);
-				await openAccount(page, 'Checking');
-				await expect(row).toHaveCount(0);
-			});
+			await step(
+				'deleting from the Savings side takes both sides out and leaves focus on a neighboring row',
+				async () => {
+					await row.getByRole('button', { name: /^Transfer/ }).click();
+					await dialog.getByRole('button', { name: 'Delete' }).click();
+					await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+					await expect(row).toHaveCount(0);
+					await expect(page.locator('[data-edit]:focus')).toBeVisible();
+					await expect.poll(balance(page)).toBe(before.savings);
+					await openAccount(page, 'Checking');
+					await expect(row).toHaveCount(0);
+				}
+			);
 		}
 	},
 	'import-link': {
@@ -96,9 +98,7 @@ export const transfers = {
 				"making Checking's import a Transfer offers to link the Savings import",
 				async () => {
 					await page.getByRole('button', { name: /^SAMPLE E2E XFER OUT/ }).click();
-					await dialog
-						.getByLabel('Category or Transfer')
-						.selectOption({ label: 'Transfer: Savings' });
+					await choose(dialog.getByLabel('Category or Transfer'), 'Transfer: Savings');
 					await expect(
 						dialog.getByRole('radio', { name: /^Link the import SAMPLE E2E XFER IN/ })
 					).toBeChecked();

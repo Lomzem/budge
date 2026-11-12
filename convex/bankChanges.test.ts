@@ -1,12 +1,14 @@
 import { Cause, Effect, Exit, Layer } from 'effect';
-import { assert, describe, expect, test } from 'vitest';
+import { assert, describe, expect, onTestFinished, test, vi } from 'vitest';
 
+import { BANK_CHANGE_LIMIT } from '../src/lib/domain/bankChanges';
 import { decodeSyncPage } from '../src/lib/domain/plaid';
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { PlaidApi, PlaidClient, type SyncRequest } from './lib/plaidClient';
 import { setupConnection, SyncStore, syncConnection } from './lib/sync';
 import { TokenCipher } from './lib/tokenCipher';
+import { refreshDerivedFields } from './lib/transactions';
 import {
 	publicErrorCode,
 	publicErrorMessage,
@@ -84,7 +86,7 @@ async function syncedBudget() {
 			if (Exit.isFailure(exit)) assert.fail(`Bank operation failed: ${Cause.pretty(exit.cause)}`);
 			return exit.value;
 		});
-	const connectionId = await run(
+	const { connectionId } = await run(
 		{ setWebhook: () => Effect.void },
 		setupConnection({
 			name: 'Sample Bank',
@@ -104,7 +106,9 @@ async function syncedBudget() {
 				transactionsSync,
 				itemGet: () => Effect.succeed({ consentExpiresAt: null }),
 				accountsGet: () =>
-					Effect.succeed([{ externalId: account, name: 'Sample Checking', balance: null }])
+					Effect.succeed([
+						{ externalId: account, name: 'Sample Checking', kind: 'cash', balance: null }
+					])
 			},
 			syncConnection(connectionId, { refresh: false })
 		);
@@ -921,5 +925,148 @@ describe('a Transaction backed by more than ten Bank Rows', () => {
 		const grocerRow = await budget.row('SAMPLE GROCER 0193');
 
 		expect(await budget.search('corner market')).toEqual([grocerRow._id]);
+	});
+});
+
+describe('the Bank changes list', () => {
+	test('holds each flagged Transaction, newest first, until the owner resolves it', async () => {
+		const budget = await syncedBudget();
+		await ownerVersions.edited(budget);
+		const payrollRow = await budget.row('SAMPLE PAYROLL');
+		await budget.owner.mutation(api.transactions.approve, { transactionId: payrollRow._id });
+		await budget.sync(changes({ modified: [grocerChanged], removed: [payroll.transaction_id] }));
+		const listed = async (narrowing: { search?: string } = {}) =>
+			(
+				await budget.owner.query(api.transactions.list, {
+					bankChanges: true,
+					...narrowing,
+					paginationOpts: { numItems: 50, cursor: null }
+				})
+			).page.map((row) => row.payeeName);
+		const count = () =>
+			budget.owner.query(api.transactions.bankChangeCount, { accountId: budget.checking });
+
+		expect(await listed()).toEqual(['SAMPLE PAYROLL', 'SAMPLE GROCER 0193']);
+		expect(await listed({ search: 'grocer' })).toEqual(['SAMPLE GROCER 0193']);
+		expect(await count()).toEqual({ count: 2, complete: true });
+		const pageAfter = (cursor: string | null) =>
+			budget.owner.query(api.transactions.list, {
+				bankChanges: true,
+				paginationOpts: { numItems: 1, cursor }
+			});
+		const first = await pageAfter(null);
+		const second = await pageAfter(first.continueCursor);
+		expect(
+			[first, second].map(({ page, isDone }) => ({
+				payees: page.map((row) => row.payeeName),
+				isDone
+			}))
+		).toEqual([
+			{ payees: ['SAMPLE PAYROLL'], isDone: false },
+			{ payees: ['SAMPLE GROCER 0193'], isDone: true }
+		]);
+
+		const importId = (await budget.row('SAMPLE GROCER 0193')).bankRows[0]?._id;
+		assert(importId !== undefined, 'No Bank Row');
+		await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'mine' });
+
+		expect(await listed()).toEqual(['SAMPLE PAYROLL']);
+		expect(await count()).toEqual({ count: 1, complete: true });
+	});
+
+	test('a bank change in one Account stays reachable behind a thousand in another, and the list runs newest date first', async () => {
+		const { owner, t, accounts } = await startBudget({
+			accounts: { Checking: ['cash', 0], Savings: ['cash', 0] }
+		});
+		await t.run(async (ctx) => {
+			const flag = async (accountId: Id<'accounts'>, date: string, bankText: string) => {
+				const transactionId = await ctx.db.insert('transactions', {
+					accountId,
+					date,
+					amount: -100,
+					cleared: 'cleared',
+					approved: true
+				});
+				await ctx.db.insert('imports', {
+					source: 'plaid',
+					accountId,
+					date,
+					amount: -150,
+					bankText,
+					transactionId,
+					matched: true,
+					state: 'changed'
+				});
+				await refreshDerivedFields(ctx, transactionId);
+			};
+			await flag(accounts.Checking, '2026-08-20', 'SAMPLE CAFE');
+			for (let n = 0; n < 2 * BANK_CHANGE_LIMIT; n++) {
+				await flag(accounts.Savings, '2026-08-12', `SAMPLE SHOP ${String(n)}`);
+			}
+		});
+		const count = (accountId?: Id<'accounts'>) =>
+			owner.query(api.transactions.bankChangeCount, accountId === undefined ? {} : { accountId });
+		const firstPage = async (accountId: Id<'accounts'> | undefined, numItems: number) =>
+			await owner.query(api.transactions.list, {
+				...(accountId === undefined ? {} : { accountId }),
+				bankChanges: true,
+				paginationOpts: { numItems, cursor: null }
+			});
+
+		expect(await count()).toEqual({ count: BANK_CHANGE_LIMIT, complete: false });
+		expect(await count(accounts.Checking)).toEqual({ count: 1, complete: true });
+		const checking = await firstPage(accounts.Checking, 50);
+		expect(checking.page.map((row) => row.date)).toEqual(['2026-08-20']);
+		expect(checking.isDone).toBe(true);
+		const newest = await firstPage(undefined, 2);
+		expect(newest.page.map(({ date, accountId }) => [date, accountId])).toEqual([
+			['2026-08-20', accounts.Checking],
+			['2026-08-12', accounts.Savings]
+		]);
+		expect(newest.isDone).toBe(false);
+	});
+
+	test('the backfill lists a bank change flagged before the list read its marker', async () => {
+		vi.useFakeTimers();
+		onTestFinished(() => {
+			vi.useRealTimers();
+		});
+		const { owner, t, accounts } = await startBudget({ accounts: { Checking: ['cash', 0] } });
+		await t.run(async (ctx) => {
+			const transactionId = await ctx.db.insert('transactions', {
+				accountId: accounts.Checking,
+				date: '2026-08-12',
+				amount: -100,
+				cleared: 'cleared',
+				approved: true
+			});
+			await ctx.db.insert('imports', {
+				source: 'plaid',
+				accountId: accounts.Checking,
+				date: '2026-08-12',
+				amount: -150,
+				bankText: 'SAMPLE CAFE',
+				transactionId,
+				matched: true,
+				state: 'changed'
+			});
+		});
+		const listed = async () =>
+			(
+				await owner.query(api.transactions.list, {
+					bankChanges: true,
+					paginationOpts: { numItems: 50, cursor: null }
+				})
+			).page.length;
+		expect(await listed()).toBe(0);
+
+		await t.mutation(internal.migrations.backfillDerivedFields, { cursor: null });
+		await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+
+		expect(await listed()).toBe(1);
+		expect(await owner.query(api.transactions.bankChangeCount, {})).toEqual({
+			count: 1,
+			complete: true
+		});
 	});
 });

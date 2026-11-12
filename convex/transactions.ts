@@ -6,6 +6,7 @@ import {
 } from 'convex/server';
 import { v, type Infer } from 'convex/values';
 
+import { BANK_CHANGE_LIMIT } from '../src/lib/domain/bankChanges';
 import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
 
 import type { Doc, Id } from './_generated/dataModel';
@@ -18,6 +19,7 @@ import {
 	deleteTransaction,
 	markApproved,
 	markCleared,
+	markUnapproved,
 	payeeNameOf,
 	requireUnlocked,
 	saveTransaction,
@@ -75,25 +77,33 @@ export const list = query({
 		approval: v.optional(approval),
 		search: v.optional(v.string()),
 		categoryId: v.optional(v.id('categories')),
+		uncategorized: v.optional(v.literal(true)),
 		payeeId: v.optional(v.id('payees')),
 		from: v.optional(v.string()),
 		to: v.optional(v.string()),
 		splitLines: v.optional(v.boolean()),
+		bankChanges: v.optional(v.literal(true)),
 		paginationOpts: paginationOptsValidator
 	},
 	returns: paginationResultValidator(transactionRow),
-	handler: async (ctx, { approval, paginationOpts, ...args }) => {
+	handler: async (ctx, { approval, bankChanges, paginationOpts, ...args }) => {
 		await requireOwner(ctx);
 		if (args.accountId !== undefined && (await ctx.db.get('accounts', args.accountId)) === null) {
 			throw publicError('NOT_FOUND');
 		}
 		const searching = (args.search ?? '').trim() !== '';
-		const filters = requireFilters(args, searching, approval);
+		const filters = requireFilters(args);
 
 		const searchOfOnlyPunctuation = searching && filters.search === '';
 		if (searchOfOnlyPunctuation) return { page: [], isDone: true, continueCursor: '' };
 
-		const result = await pageOf(ctx, filters, searching, approval, paginationOpts);
+		if (bankChanges === true && filters.splitLines) {
+			throw publicError('INVALID_INPUT', 'Bank changes list whole Transactions, not split lines.');
+		}
+		const result =
+			bankChanges === true
+				? await withBankChanges(ctx, filters, approval, paginationOpts)
+				: await pageOf(ctx, filters, searching, approval, paginationOpts);
 		return {
 			...result,
 			page: await Promise.all(result.page.map((transaction) => toRow(ctx, transaction)))
@@ -105,6 +115,7 @@ interface Filters {
 	accountId?: Id<'accounts'> | undefined;
 	search: string;
 	categoryId?: Id<'categories'> | undefined;
+	uncategorized?: true | undefined;
 	payeeId?: Id<'payees'> | undefined;
 	from?: string | undefined;
 	to?: string | undefined;
@@ -114,23 +125,15 @@ interface Filters {
 type Approval = Infer<typeof approval>;
 
 function requireFilters(
-	args: Omit<Filters, 'search' | 'splitLines'> & { search?: string; splitLines?: boolean },
-	searching: boolean,
-	approval: Approval | undefined
+	args: Omit<Filters, 'search' | 'splitLines'> & { search?: string; splitLines?: boolean }
 ): Filters {
 	const filters: Filters = {
 		...args,
 		search: searchTerms(args.search ?? ''),
 		splitLines: args.splitLines === true
 	};
-	const filtering =
-		searching ||
-		filters.categoryId !== undefined ||
-		filters.payeeId !== undefined ||
-		filters.from !== undefined ||
-		filters.to !== undefined;
-	if (approval !== undefined && filtering) {
-		throw publicError('INVALID_INPUT', 'Unapproved first takes no filter.');
+	if (filters.uncategorized === true && filters.categoryId !== undefined) {
+		throw publicError('INVALID_INPUT', 'Pick a Category or Uncategorized, not both.');
 	}
 	if (filters.splitLines && filters.categoryId === undefined) {
 		throw publicError('INVALID_INPUT', 'Pick the Category the split lines are in.');
@@ -147,12 +150,48 @@ async function pageOf(
 	approval: Approval | undefined,
 	paginationOpts: PaginationOptions
 ): Promise<PaginationResult<Doc<'transactions'>>> {
-	if (searching) return await searched(ctx, filters, paginationOpts);
-	if (filters.splitLines) return await withLinesIn(ctx, filters, paginationOpts);
-	if (approval === 'unapproved') {
+	if (searching) return await searched(ctx, filters, approval, paginationOpts);
+	if (filters.splitLines) return await withLinesIn(ctx, filters, approval, paginationOpts);
+	const narrowed =
+		filters.categoryId !== undefined ||
+		filters.uncategorized === true ||
+		filters.payeeId !== undefined ||
+		filters.from !== undefined ||
+		filters.to !== undefined;
+	if (approval === 'unapproved' && !narrowed) {
 		return await unapproved(ctx, filters.accountId).order('desc').paginate(paginationOpts);
 	}
-	return await filtered(ctx, filters, approval === 'approved', paginationOpts);
+	return await filtered(ctx, filters, approval, paginationOpts);
+}
+
+function isUncategorized(transaction: Doc<'transactions'>) {
+	return (
+		transaction.categoryId === undefined &&
+		transaction.split !== true &&
+		transaction.transferTransactionId === undefined
+	);
+}
+
+function hasApproval(transaction: Doc<'transactions'>, approval: Approval | undefined) {
+	if (approval === undefined) return true;
+	return approval === 'unapproved'
+		? transaction.approved === false
+		: transaction.approved !== false;
+}
+
+function wordsOf(text: string) {
+	return text
+		.toLowerCase()
+		.split(/[^\p{Alphabetic}\p{N}]+/u)
+		.filter((word) => word !== '');
+}
+
+function hasEveryTerm(searchText: string | undefined, search: string) {
+	const words = wordsOf(searchText ?? '');
+	const terms = wordsOf(search);
+	return terms.every((term, index) =>
+		index === terms.length - 1 ? words.some((word) => word.startsWith(term)) : words.includes(term)
+	);
 }
 
 const MAX_SEARCH_TERMS = 16;
@@ -168,7 +207,12 @@ function searchTerms(search: string) {
 const FIRST_DATE = '0000-01-01';
 const LAST_DATE = '9999-12-31';
 
-async function searched(ctx: QueryCtx, filters: Filters, paginationOpts: PaginationOptions) {
+async function searched(
+	ctx: QueryCtx,
+	filters: Filters,
+	approval: Approval | undefined,
+	paginationOpts: PaginationOptions
+) {
 	const { accountId, payeeId, categoryId, from, to } = filters;
 	const result = await ctx.db
 		.query('transactions')
@@ -184,6 +228,9 @@ async function searched(ctx: QueryCtx, filters: Filters, paginationOpts: Paginat
 	const page = [];
 	for (const transaction of result.page) {
 		if (transaction.date < (from ?? FIRST_DATE) || transaction.date > (to ?? LAST_DATE)) continue;
+		if (!hasEveryTerm(transaction.searchText, filters.search)) continue;
+		if (!hasApproval(transaction, approval)) continue;
+		if (filters.uncategorized === true && !isUncategorized(transaction)) continue;
 		if (filters.splitLines) {
 			const lines = await splitLinesOf(ctx, transaction._id);
 			if (!lines.some((line) => line.categoryId === categoryId)) continue;
@@ -193,7 +240,12 @@ async function searched(ctx: QueryCtx, filters: Filters, paginationOpts: Paginat
 	return { ...result, page };
 }
 
-async function withLinesIn(ctx: QueryCtx, filters: Filters, paginationOpts: PaginationOptions) {
+async function withLinesIn(
+	ctx: QueryCtx,
+	filters: Filters,
+	approval: Approval | undefined,
+	paginationOpts: PaginationOptions
+) {
 	const { categoryId, accountId, payeeId, from, to } = filters;
 	if (categoryId === undefined) throw publicError('INVALID_INPUT');
 	const lines = await ctx.db
@@ -216,6 +268,7 @@ async function withLinesIn(ctx: QueryCtx, filters: Filters, paginationOpts: Pagi
 		if (transaction === null) continue;
 		if (accountId !== undefined && transaction.accountId !== accountId) continue;
 		if (payeeId !== undefined && transaction.payeeId !== payeeId) continue;
+		if (!hasApproval(transaction, approval)) continue;
 		page.push(transaction);
 	}
 	return { ...lines, page };
@@ -223,26 +276,91 @@ async function withLinesIn(ctx: QueryCtx, filters: Filters, paginationOpts: Pagi
 
 async function filtered(
 	ctx: QueryCtx,
-	{ accountId, categoryId, payeeId, from, to }: Filters,
-	approvedOnly: boolean,
+	{ accountId, categoryId, uncategorized, payeeId, from, to }: Filters,
+	approval: Approval | undefined,
 	paginationOpts: PaginationOptions
 ) {
-	return await narrowestIndex(ctx, { accountId, categoryId, payeeId, from, to })
+	return await narrowestIndex(ctx, { accountId, categoryId, uncategorized, payeeId, from, to })
 		.order('desc')
 		// eslint-disable-next-line @convex-dev/no-filter-in-query
 		.filter((q) =>
 			q.and(
-				approvedOnly ? q.neq(q.field('approved'), false) : true,
+				approval === 'approved' ? q.neq(q.field('approved'), false) : true,
+				approval === 'unapproved' ? q.eq(q.field('approved'), false) : true,
 				accountId === undefined ? true : q.eq(q.field('accountId'), accountId),
-				categoryId === undefined ? true : q.eq(q.field('categoryId'), categoryId)
+				categoryId === undefined ? true : q.eq(q.field('categoryId'), categoryId),
+				uncategorized === true
+					? q.and(
+							q.eq(q.field('categoryId'), undefined),
+							q.neq(q.field('split'), true),
+							q.eq(q.field('transferTransactionId'), undefined)
+						)
+					: true
 			)
 		)
 		.paginate(paginationOpts);
 }
 
+function bankChanges(
+	ctx: QueryCtx,
+	accountId: Id<'accounts'> | undefined,
+	from = FIRST_DATE,
+	to = LAST_DATE
+) {
+	const transactions = ctx.db.query('transactions');
+	return accountId === undefined
+		? transactions.withIndex('by_bankChange_date', (q) =>
+				q.eq('bankChange', true).gte('date', from).lte('date', to)
+			)
+		: transactions.withIndex('by_accountId_bankChange_date', (q) =>
+				q.eq('accountId', accountId).eq('bankChange', true).gte('date', from).lte('date', to)
+			);
+}
+
+async function withBankChanges(
+	ctx: QueryCtx,
+	filters: Filters,
+	approval: Approval | undefined,
+	paginationOpts: PaginationOptions
+): Promise<PaginationResult<Doc<'transactions'>>> {
+	const { accountId, categoryId, uncategorized, payeeId, from, to, search } = filters;
+	const result = await bankChanges(ctx, accountId, from, to).order('desc').paginate(paginationOpts);
+	return {
+		...result,
+		page: result.page.filter(
+			(transaction) =>
+				hasApproval(transaction, approval) &&
+				(categoryId === undefined || transaction.categoryId === categoryId) &&
+				(uncategorized !== true || isUncategorized(transaction)) &&
+				(payeeId === undefined || transaction.payeeId === payeeId) &&
+				(search === '' || hasEveryTerm(transaction.searchText, search))
+		)
+	};
+}
+
+export const bankChangeCount = query({
+	args: { accountId: v.optional(v.id('accounts')) },
+	returns: v.object({ count: v.number(), complete: v.boolean() }),
+	handler: async (ctx, { accountId }) => {
+		await requireOwner(ctx);
+		const counted = (await bankChanges(ctx, accountId).take(BANK_CHANGE_LIMIT + 1)).length;
+		return {
+			count: Math.min(counted, BANK_CHANGE_LIMIT),
+			complete: counted <= BANK_CHANGE_LIMIT
+		};
+	}
+});
+
 function narrowestIndex(
 	ctx: QueryCtx,
-	{ accountId, categoryId, payeeId, from, to }: Omit<Filters, 'search' | 'splitLines'>
+	{
+		accountId,
+		categoryId,
+		uncategorized,
+		payeeId,
+		from,
+		to
+	}: Omit<Filters, 'search' | 'splitLines'>
 ) {
 	const first = from ?? FIRST_DATE;
 	const last = to ?? LAST_DATE;
@@ -252,7 +370,7 @@ function narrowestIndex(
 			q.eq('payeeId', payeeId).gte('date', first).lte('date', last)
 		);
 	}
-	if (categoryId !== undefined) {
+	if (categoryId !== undefined || uncategorized === true) {
 		return transactions.withIndex('by_category_date', (q) =>
 			q.eq('categoryId', categoryId).gte('date', first).lte('date', last)
 		);
@@ -383,14 +501,53 @@ export const approve = mutation({
 
 export const approveAll = mutation({
 	args: { accountId: v.optional(v.id('accounts')) },
-	returns: v.number(),
+	returns: v.array(v.id('transactions')),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
 		const boundedBatch = await unapproved(ctx, accountId).take(UNAPPROVED_COUNT_LIMIT);
 		for (const transaction of boundedBatch) {
 			await markApproved(ctx, transaction._id);
 		}
-		return boundedBatch.length;
+		return boundedBatch.map((transaction) => transaction._id);
+	}
+});
+
+export const approveMany = mutation({
+	args: { transactionIds: v.array(v.id('transactions')) },
+	returns: v.array(v.id('transactions')),
+	handler: async (ctx, { transactionIds }) => {
+		await requireOwner(ctx);
+		if (transactionIds.length > UNAPPROVED_COUNT_LIMIT) {
+			throw publicError('INVALID_INPUT', 'Too many Transactions to approve at once.');
+		}
+		const approved: Id<'transactions'>[] = [];
+		for (const transactionId of new Set(transactionIds)) {
+			const transaction = await ctx.db.get('transactions', transactionId);
+			if (transaction?.approved !== false) continue;
+			await markApproved(ctx, transactionId);
+			approved.push(transactionId);
+		}
+		return approved;
+	}
+});
+
+export const unapprove = mutation({
+	args: { transactionIds: v.array(v.id('transactions')) },
+	returns: v.number(),
+	handler: async (ctx, { transactionIds }) => {
+		await requireOwner(ctx);
+		if (transactionIds.length > UNAPPROVED_COUNT_LIMIT) {
+			throw publicError('INVALID_INPUT', 'Too many Transactions to unapprove at once.');
+		}
+		let restored = 0;
+		for (const transactionId of transactionIds) {
+			const transaction = await ctx.db.get('transactions', transactionId);
+			if (transaction === null || transaction.approved === false) continue;
+			if (transaction.cleared === 'reconciled') continue;
+			await markUnapproved(ctx, transactionId);
+			restored += 1;
+		}
+		return restored;
 	}
 });
 

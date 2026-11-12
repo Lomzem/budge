@@ -22,6 +22,7 @@ import type * as export_ from "../export.js";
 import type * as heldAccounts from "../heldAccounts.js";
 import type * as http from "../http.js";
 import type * as imports from "../imports.js";
+import type * as lib_accountKind from "../lib/accountKind.js";
 import type * as lib_accounts from "../lib/accounts.js";
 import type * as lib_bankChanges from "../lib/bankChanges.js";
 import type * as lib_categories from "../lib/categories.js";
@@ -69,6 +70,7 @@ declare const fullApi: ApiFromModules<{
   heldAccounts: typeof heldAccounts;
   http: typeof http;
   imports: typeof imports;
+  "lib/accountKind": typeof lib_accountKind;
   "lib/accounts": typeof lib_accounts;
   "lib/bankChanges": typeof lib_bankChanges;
   "lib/categories": typeof lib_categories;

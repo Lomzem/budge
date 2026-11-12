@@ -6,6 +6,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import SelectField from '$lib/components/select-field.svelte';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { isRepeatInterval, MAX_REPEAT_MONTHS } from '$lib/domain/budget';
@@ -132,16 +133,14 @@
 				</fieldset>
 				<div class="flex flex-col gap-2">
 					<Label for="target-due-day">Due day</Label>
-					<select
+					<SelectField
 						id="target-due-day"
 						bind:value={dueDay}
-						class="h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
-					>
-						<option value="">No due day</option>
-						{#each DAYS as day (day)}
-							<option value={String(day)}>The {ordinal(day)}</option>
-						{/each}
-					</select>
+						choices={[
+							{ value: '', label: 'No due day' },
+							...DAYS.map((day) => ({ value: String(day), label: `The ${ordinal(day)}` }))
+						]}
+					/>
 				</div>
 			{:else}
 				<div class="flex flex-col gap-2">
@@ -166,10 +165,7 @@
 				{/if}
 			{/if}
 
-			{#if error}
-				<p role="alert" class="text-sm text-destructive">{error}</p>
-			{/if}
-			<Dialog.Footer>
+			<Dialog.Footer {error}>
 				{#if category.target}
 					<Button
 						type="button"

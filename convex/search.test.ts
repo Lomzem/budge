@@ -68,6 +68,18 @@ describe('text search', () => {
 		expect(await find({ search: 'zeppelin' })).toEqual([]);
 	});
 
+	test('a search of several words finds only Transactions with every word', async () => {
+		const { add, find } = await budget();
+		const bookshop = await add({ payee: 'Sample Bookshop', memo: 'novels' });
+		await add({ payee: 'Sample Market' });
+		await add({ payee: 'Corner Bookshop' });
+
+		expect(await find({ search: 'SAMPLE BOOKSHOP' })).toEqual([bookshop]);
+		expect(await find({ search: 'sample book' })).toEqual([bookshop]);
+		expect(await find({ search: 'bookshop novels' })).toEqual([bookshop]);
+		expect(await find({ search: 'sample bakery' })).toEqual([]);
+	});
+
 	test('follows edits to the Payee, memo, and split lines', async () => {
 		const { owner, add, find, checking, groceries, household } = await budget();
 		const id = await add({ payee: 'Lantern Grocer', memo: 'weekly basket' });
@@ -213,7 +225,7 @@ describe('text search', () => {
 		});
 		expect(await find({ search: 'lantern' })).toEqual([]);
 
-		await t.mutation(internal.migrations.backfillSearchText, { cursor: null });
+		await t.mutation(internal.migrations.backfillDerivedFields, { cursor: null });
 		await t.finishAllScheduledFunctions(() => vi.runAllTimers());
 
 		for (const word of ['lantern', 'basket', 'grocer']) {
@@ -336,7 +348,27 @@ describe('filters', () => {
 		]);
 	});
 
-	test('split lines need a Category, and Unapproved first takes no filter', async () => {
+	test('Uncategorized takes whole Transactions with no Category, not splits or transfers', async () => {
+		const { owner, add, find, ids, checking, savings } = await filtered();
+		const loose = await add({ payee: 'Harbor Bakery', date: '2026-08-12' });
+		await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			date: '2026-08-13',
+			amount: -500,
+			payee: '',
+			memo: '',
+			transferAccountId: savings
+		});
+
+		expect(await find({ uncategorized: true })).toEqual([loose]);
+		expect(await find({ uncategorized: true, search: 'harbor' })).toEqual([loose]);
+		expect(await find({ uncategorized: true, from: '2026-08-13' })).toEqual([]);
+		expect(await find({ search: 'harbor' })).toEqual(
+			expect.arrayContaining([loose, ids.bakery, ids.split])
+		);
+	});
+
+	test('split lines need a Category, and Uncategorized takes no Category', async () => {
 		const { owner, groceries } = await filtered();
 		const paginationOpts = { numItems: 10, cursor: null };
 		expect(
@@ -347,7 +379,7 @@ describe('filters', () => {
 		expect(
 			await publicErrorCode(
 				owner.query(api.transactions.list, {
-					approval: 'unapproved',
+					uncategorized: true,
 					categoryId: groceries,
 					paginationOpts
 				})

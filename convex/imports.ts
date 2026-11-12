@@ -18,8 +18,12 @@ const candidate = v.object({
 });
 
 const previewRow = v.union(
-	v.object({ kind: v.literal('new'), candidates: v.optional(v.array(candidate)) }),
-	v.object({ kind: v.literal('skip') }),
+	v.object({
+		kind: v.literal('new'),
+		candidates: v.optional(v.array(candidate)),
+		alike: v.optional(candidate)
+	}),
+	v.object({ kind: v.literal('skip'), alike: v.optional(candidate) }),
 	v.object({
 		kind: v.literal('match'),
 		transaction: candidate,
@@ -57,6 +61,8 @@ export const preview = query({
 		};
 		const describeAll = async (candidates: Id<'transactions'>[] | undefined) =>
 			candidates === undefined ? {} : { candidates: await Promise.all(candidates.map(describe)) };
+		const describeAlike = async (alike: Id<'transactions'> | undefined) =>
+			alike === undefined ? {} : { alike: await describe(alike) };
 		return await Promise.all(
 			plan.decisions.map(async (decision) => {
 				switch (decision.kind) {
@@ -72,9 +78,13 @@ export const preview = query({
 							candidates: await Promise.all(decision.candidates.map(describe))
 						};
 					case 'new':
-						return { kind: decision.kind, ...(await describeAll(decision.candidates)) };
+						return {
+							kind: decision.kind,
+							...(await describeAll(decision.candidates)),
+							...(await describeAlike(decision.alike))
+						};
 					default:
-						return { kind: decision.kind };
+						return { kind: decision.kind, ...(await describeAlike(decision.alike)) };
 				}
 			})
 		);

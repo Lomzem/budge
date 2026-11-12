@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
+import { accountKind } from './lib/accountKind';
 import { webhookKeyValidator } from './lib/plaidWebhook';
 import { targetValidator } from './lib/targets';
 
@@ -11,7 +12,7 @@ export default defineSchema({
 
 	accounts: defineTable({
 		name: v.string(),
-		kind: v.union(v.literal('cash'), v.literal('creditCard')),
+		kind: accountKind,
 		position: v.number(),
 
 		lastReconciledOn: v.optional(v.string())
@@ -74,7 +75,9 @@ export default defineSchema({
 
 		kind: v.optional(v.literal('startingBalance')),
 
-		searchText: v.optional(v.string())
+		searchText: v.optional(v.string()),
+
+		bankChange: v.optional(v.literal(true))
 	})
 		.index('by_account_date', ['accountId', 'date'])
 		.index('by_accountId_and_kind', ['accountId', 'kind'])
@@ -86,6 +89,8 @@ export default defineSchema({
 
 		.index('by_approved_date', ['approved', 'date'])
 		.index('by_account_approved_date', ['accountId', 'approved', 'date'])
+		.index('by_bankChange_date', ['bankChange', 'date'])
+		.index('by_accountId_bankChange_date', ['accountId', 'bankChange', 'date'])
 
 		.searchIndex('search_text', {
 			searchField: 'searchText',
@@ -124,6 +129,7 @@ export default defineSchema({
 	})
 		.index('by_account_source_sourceId_date', ['accountId', 'source', 'sourceId', 'date'])
 		.index('by_transactionId_state', ['transactionId', 'state'])
+		.index('by_state_transactionId', ['state', 'transactionId'])
 		.index('by_connectionAccountId_state', ['connectionAccountId', 'state'])
 		.index('by_connectionAccountId_sourceId', ['connectionAccountId', 'sourceId']),
 
@@ -184,11 +190,14 @@ export default defineSchema({
 				externalId: v.string(),
 				name: v.optional(v.string()),
 				mask: v.optional(v.string()),
+
+				kind: v.optional(accountKind),
 				state: v.union(v.literal('held'), v.literal('ignored'))
 			})
 		)
 	)
 		.index('by_connection_externalId', ['connectionId', 'externalId'])
+		.index('by_connectionId_state', ['connectionId', 'state'])
 		.index('by_state', ['state'])
 		.index('by_accountId', ['accountId']),
 

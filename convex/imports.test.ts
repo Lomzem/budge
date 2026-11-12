@@ -88,7 +88,34 @@ describe('importing a bank file', () => {
 			await owner.mutation(api.imports.commit, {
 				accountId: checking,
 				source: 'csv',
-				rows: [coffee]
+				rows: [{ ...coffee, date: addDays(coffee.date, 1) }]
+			})
+		).toEqual({ added: 1, matched: 0, skipped: 0 });
+		expect((await rows()).filter((row) => row.amount === coffee.amount)).toHaveLength(2);
+	});
+
+	test('a CSV row on the day of a Transaction already imported from a CSV previews as its likely duplicate, skipped unless picked as new', async () => {
+		const { owner, checking, rows } = await budgetWithChecking();
+		await owner.mutation(api.imports.commit, {
+			accountId: checking,
+			source: 'csv',
+			rows: [coffee]
+		});
+		const relabelled = { ...coffee, bankText: 'SAMPLE COFFEE' };
+		const file = { accountId: checking, source: 'csv' as const, rows: [relabelled] };
+
+		const [held] = await owner.query(api.imports.preview, file);
+		assert(held?.kind === 'skip');
+		expect(held.alike).toMatchObject({ date: coffee.date, amount: coffee.amount });
+		expect(await owner.mutation(api.imports.commit, file)).toEqual({
+			added: 0,
+			matched: 0,
+			skipped: 1
+		});
+		expect(
+			await owner.mutation(api.imports.commit, {
+				...file,
+				rows: [{ ...relabelled, pick: 'new' as const }]
 			})
 		).toEqual({ added: 1, matched: 0, skipped: 0 });
 		expect((await rows()).filter((row) => row.amount === coffee.amount)).toHaveLength(2);
@@ -423,7 +450,38 @@ describe('importing a bank file', () => {
 });
 
 describe('approving', () => {
-	test('editing approves, and Approve all approves the rest; Unapproved list first', async () => {
+	test('Unapproved narrows with a date range or Uncategorized, and approved rows leave it', async () => {
+		const { owner, checking } = await budgetWithChecking();
+		await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			date: '2026-08-30',
+			amount: -1_000,
+			payee: 'Sample Market',
+			memo: ''
+		});
+		const { source, rows: bankRows } = decode(checkingCsv);
+		await owner.mutation(api.imports.commit, { accountId: checking, source, rows: bankRows });
+		const dates = async (filters: { from?: string; uncategorized?: true }) =>
+			(
+				await owner.query(api.transactions.list, {
+					approval: 'unapproved',
+					...filters,
+					paginationOpts: { numItems: 50, cursor: null }
+				})
+			).page.map((row) => row.date);
+
+		expect(await dates({ from: '2026-08-15' })).toEqual(['2026-08-16', '2026-08-16', '2026-08-15']);
+		expect(await dates({ uncategorized: true })).toEqual([
+			'2026-08-16',
+			'2026-08-16',
+			'2026-08-15',
+			'2026-08-14'
+		]);
+		await owner.mutation(api.transactions.approveAll, { accountId: checking });
+		expect(await dates({ uncategorized: true })).toEqual([]);
+	});
+
+	test('editing approves, Approve all approves the rest, Undo restores only those and Approve shown approves only the chosen; Unapproved list first', async () => {
 		const { owner, checking } = await budgetWithChecking();
 		await owner.mutation(api.transactions.create, {
 			accountId: checking,
@@ -468,9 +526,47 @@ describe('approving', () => {
 		await owner.mutation(api.transactions.approve, { transactionId: second._id });
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(2);
 
-		expect(await owner.mutation(api.transactions.approveAll, { accountId: checking })).toBe(2);
+		const approvedAll = await owner.mutation(api.transactions.approveAll, { accountId: checking });
+		expect(approvedAll).toHaveLength(2);
 		expect(await owner.query(api.transactions.unapprovedCount, {})).toBe(0);
 		expect(await list('unapproved')).toEqual([]);
+
+		expect(await owner.mutation(api.transactions.unapprove, { transactionIds: approvedAll })).toBe(
+			2
+		);
+		expect((await list('unapproved')).map((row) => row._id)).toEqual(
+			unapproved.slice(2).map((row) => row._id)
+		);
+
+		const [, , third, fourth] = unapproved;
+		assert(third !== undefined && fourth !== undefined, 'expected rows');
+		expect(
+			await owner.mutation(api.transactions.approveMany, {
+				transactionIds: [third._id, third._id, first._id]
+			})
+		).toEqual([third._id]);
+		expect((await list('unapproved')).map((row) => row._id)).toEqual([fourth._id]);
+		await expect(
+			owner.mutation(api.transactions.approveMany, {
+				transactionIds: Array.from({ length: UNAPPROVED_COUNT_LIMIT + 1 }, () => fourth._id)
+			})
+		).rejects.toThrow('Too many Transactions');
+	});
+
+	test('Approve shown passes over a Transaction from before approvals, so its Undo cannot unapprove it', async () => {
+		const { t, owner, checking } = await budgetWithChecking();
+		const legacy = await t.run((ctx) =>
+			ctx.db.insert('transactions', {
+				accountId: checking,
+				date: '2026-08-16',
+				amount: -100,
+				cleared: 'cleared'
+			})
+		);
+
+		expect(
+			await owner.mutation(api.transactions.approveMany, { transactionIds: [legacy] })
+		).toEqual([]);
 	});
 
 	test('counts Unapproved Transactions to one past the limit, so the count reads as at least', async () => {

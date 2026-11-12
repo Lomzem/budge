@@ -14,6 +14,7 @@ export class Accounts {
 	readonly cash = $derived(this.all.filter((account) => account.kind === 'cash'));
 	readonly credit = $derived(this.all.filter((account) => account.kind === 'creditCard'));
 	readonly loaded = $derived.by(() => this.#query.data !== undefined);
+	readonly error = $derived.by(() => this.#query.error);
 
 	readonly groups = $derived(
 		[

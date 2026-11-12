@@ -1,0 +1,14 @@
+diff --git a/dist/client.svelte.js b/dist/client.svelte.js
+index aea81b2150f83bf84e67d9ae6600055b13783b1c..3689d282a714634a43aac5f3de3afdfea42c9735 100644
+--- a/dist/client.svelte.js
++++ b/dist/client.svelte.js
+@@ -146,6 +146,9 @@ export function useQuery(query, args = {}, options = {}) {
+         }
+         // Touch reactive state.result so updates retrigger computations
+         void state.result;
++        // A new result equal to the old one (two nulls) leaves state.result
++        // unchanged; argsForLastResult is a fresh object on every response.
++        void state.argsForLastResult;
+         return value;
+     });
+     const result = $derived.by(() => {
