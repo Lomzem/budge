@@ -6,10 +6,12 @@ import { SvelteSet } from 'svelte/reactivity';
 import { api } from '$convex/_generated/api';
 import type { Id } from '$convex/_generated/dataModel';
 import { attempt } from '$lib/attempt';
+import { labelOf } from '$lib/components/bank/held';
 import { openPlaidLink } from '$lib/plaidLink';
 
 export type BankConnection = FunctionReturnType<typeof api.bankConnections.list>[number];
 export type HeldAccount = FunctionReturnType<typeof api.heldAccounts.list>[number];
+export type Feed = BankConnection['feeds'][number];
 export type SyncOutcome = FunctionReturnType<typeof api.bankConnections.syncNow>;
 
 const MINUTE = 60_000;
@@ -21,6 +23,10 @@ export function needsALook(connection: BankConnection) {
 		connection.overdue ||
 		connection.consentEndsAt !== null
 	);
+}
+
+export function feedNeedsYou(feed: Feed) {
+	return !feed.startingBalanceConfirmed || feed.historyIn !== null;
 }
 
 const shortDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
@@ -87,9 +93,7 @@ export class BankConnections {
 	readonly needingYou = $derived(
 		this.held.length +
 			this.all.filter(needsALook).length +
-			this.all
-				.flatMap((connection) => connection.feeds)
-				.filter((feed) => !feed.startingBalanceConfirmed).length
+			this.all.flatMap((connection) => connection.feeds).filter(feedNeedsYou).length
 	);
 	readonly broken = $derived(
 		this.all.some(
@@ -184,12 +188,16 @@ export class BankConnections {
 				};
 	}
 
-	async stopSyncing(connectionAccountId: Id<'connectionAccounts'>, name: string): Promise<Report> {
+	async stopSyncing(feed: Feed): Promise<Report> {
+		const { connectionAccountId } = feed;
 		const stopped = await attempt(() =>
 			this.#client.mutation(api.heldAccounts.stopSyncing, { connectionAccountId })
 		);
 		return stopped.ok
-			? { text: `Stopped syncing ${name}. Its Transactions stay.`, failed: false }
+			? {
+					text: `Stopped syncing ${labelOf({ name: feed.bankName, mask: feed.mask })}. Its Transactions stay in ${feed.name}.`,
+					failed: false
+				}
 			: {
 					text: stopped.error?.message ?? "Budge couldn't stop syncing. Try again.",
 					failed: true
@@ -201,7 +209,10 @@ export class BankConnections {
 			this.#client.mutation(api.heldAccounts.restore, { connectionAccountId })
 		);
 		return restored.ok
-			? { text: 'Brought back. Set it up to choose where its rows go.', failed: false }
+			? {
+					text: 'Brought back. Set it up to choose where its new transactions go.',
+					failed: false
+				}
 			: {
 					text: restored.error?.message ?? "Budge couldn't bring it back. Try again.",
 					failed: true

@@ -11,8 +11,10 @@
 	import { resolve } from '$app/paths';
 	import type { Id } from '$convex/_generated/dataModel';
 	import {
+		feedNeedsYou,
 		getBankConnections,
 		type BankConnection,
+		type Feed,
 		type HeldAccount,
 		type Report
 	} from '$lib/bankConnections.svelte';
@@ -84,7 +86,7 @@
 		}
 		return found;
 	});
-	const unconfirmed = $derived(connection.feeds.some((feed) => !feed.startingBalanceConfirmed));
+	const feedsNeedYou = $derived(connection.feeds.some(feedNeedsYou));
 	const synced = $derived(
 		connection.lastSyncedAt === null
 			? 'Never synced.'
@@ -163,9 +165,9 @@
 	let restoring = $state<Id<'connectionAccounts'> | null>(null);
 	let menuButton: HTMLButtonElement | null = $state(null);
 
-	async function stopSyncing(feed: BankConnection['feeds'][number]) {
+	async function stopSyncing(feed: Feed) {
 		result = null;
-		result = await bank.stopSyncing(feed.connectionAccountId, feed.name);
+		result = await bank.stopSyncing(feed);
 	}
 
 	async function restore(connectionAccountId: Id<'connectionAccounts'>) {
@@ -239,7 +241,7 @@
 				<DropdownMenu.Content align="end">
 					{#each connection.feeds as feed (feed.connectionAccountId)}
 						<DropdownMenu.Item onSelect={() => void stopSyncing(feed)}>
-							Stop syncing {feed.name}
+							Stop syncing {labelOf({ name: feed.bankName, mask: feed.mask })}
 						</DropdownMenu.Item>
 					{/each}
 					{#if connection.feeds.length > 0}
@@ -275,6 +277,21 @@
 									<span class="flex items-start gap-1.5 font-medium text-warning">
 										<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
 										<span class="min-w-0">Starting balance not confirmed</span>
+									</span>
+								{/if}
+								{#if feed.historyIn !== null}
+									<span class="flex items-start gap-1.5 font-medium text-warning">
+										<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+										<span class="min-w-0 break-words">
+											Its earlier Transactions are still in
+											<a
+												href={resolve('/(app)/accounts/[accountId]', {
+													accountId: feed.historyIn.accountId
+												})}
+												class="underline underline-offset-4 hover:no-underline"
+												>{feed.historyIn.name}</a
+											>. Only new ones come to {feed.name}.
+										</span>
 									</span>
 								{/if}
 							</div>
@@ -339,7 +356,7 @@
 							{#if result.failed}<span class="text-muted-foreground">{synced}</span>{/if}</span
 						>
 					{:else}
-						{#if problems.length === 0 && !unconfirmed}
+						{#if problems.length === 0 && !feedsNeedYou}
 							<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
 						{:else}
 							<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
@@ -433,8 +450,8 @@
 		>
 			<h4 id="ignored-{connection._id}" class="font-bold">Ignored bank Accounts</h4>
 			<p class="pb-1 text-sm text-muted-foreground">
-				Budge skips their transactions. Bring one back to set it up; it picks up new transactions
-				from the next sync.
+				Budge skips their transactions. Bring one back and set it up to choose where its new
+				transactions go, from the next sync. The ones it already brought in stay where they are.
 			</p>
 			<ul class="flex flex-col divide-y">
 				{#each connection.ignored as ignored (ignored.connectionAccountId)}

@@ -16,7 +16,8 @@
 	import { formatDate } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
 
-	type Imported = FunctionReturnType<typeof api.heldAccounts.startingBalanceEvidence>['imported'];
+	type Evidence = FunctionReturnType<typeof api.heldAccounts.startingBalanceEvidence>;
+	type Imported = Evidence['imported'];
 
 	let {
 		account,
@@ -38,12 +39,8 @@
 	const owed = $derived(account.kind === 'creditCard');
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? evidence.data?.since ?? null);
 	const since = $derived(cutoverDate === null ? null : formatDate(cutoverDate));
-	const feed = $derived(
-		bank.all
-			.flatMap((connection) =>
-				connection.feeds.map((one) => ({ ...one, connectionName: connection.name }))
-			)
-			.find((one) => one.accountId === account._id)
+	const fed = $derived(
+		bank.all.some((connection) => connection.feeds.some((one) => one.accountId === account._id))
 	);
 
 	const step = new DialogSession<object, 'suggest' | 'confirm'>();
@@ -53,9 +50,14 @@
 	let synced = $state(true);
 	let suggestion = $state('');
 	let error = $state('');
-	let asked = $state<{ bankBalance: number; imported: Imported } | null>(null);
+	let asked = $state<{
+		bankBalance: number;
+		imported: Imported;
+		source: NonNullable<Evidence['source']>;
+	} | null>(null);
 	let unasked = $state('Asking the bank…');
 	const imported = $derived(asked?.imported ?? evidence.data?.imported);
+	const source = $derived(asked?.source ?? evidence.data?.source);
 
 	onMount(() => {
 		step.open({});
@@ -101,7 +103,11 @@
 		}
 		const outcome = answer.value;
 		if (outcome.kind === 'suggested') {
-			asked = { bankBalance: outcome.bankBalance, imported: outcome.imported };
+			asked = {
+				bankBalance: outcome.bankBalance,
+				imported: outcome.imported,
+				source: outcome.source
+			};
 			const amount = typed(shown(outcome.startingBalance));
 			const basis =
 				'This is an estimate: open What it’s based on, and check it before you confirm.';
@@ -174,7 +180,7 @@
 		{/if}
 	</div>
 	<p role="status" class="text-sm text-muted-foreground">{suggestion}</p>
-	{#if feed !== undefined}
+	{#if fed}
 		<details class="group rounded-md bg-muted text-sm">
 			<summary
 				class="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md px-3 font-bold [&::-webkit-details-marker]:hidden"
@@ -189,7 +195,15 @@
 				<dl class="flex flex-col gap-2">
 					<div>
 						<dt class="text-muted-foreground">Bank Account</dt>
-						<dd>{labelOf({ name: feed.bankName, mask: feed.mask })} at {feed.connectionName}</dd>
+						<dd data-testid="bank-account">
+							{#if source === undefined}
+								Loading…
+							{:else if source === null}
+								Unknown.
+							{:else}
+								{labelOf({ name: source.bankName, mask: source.mask })} at {source.connectionName}
+							{/if}
+						</dd>
 					</div>
 					<div>
 						<dt class="text-muted-foreground">
@@ -201,7 +215,7 @@
 					</div>
 					<div>
 						<dt class="text-muted-foreground">When the bank measured it</dt>
-						<dd>Unknown. The bank doesn't say.</dd>
+						<dd>Unknown. Not available to Budge.</dd>
 					</div>
 					<div>
 						<dt class="text-muted-foreground">Imported since {since ?? 'the cutover date'}</dt>

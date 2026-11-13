@@ -344,6 +344,7 @@ export const accounts = {
 					);
 					await expect(dialog.getByTestId('bank-balance')).toHaveText(/^Unknown\. /);
 					await expect(dialog.getByTestId('imported-since')).toHaveText('None');
+					await expect(dialog).toContainText('Unknown. Not available to Budge.');
 					await expect(dialog).toContainText("Unknown. The bank doesn't say whether");
 					await expect(dialog).toContainText("A working connection doesn't prove it either.");
 				}
@@ -361,11 +362,19 @@ export const accounts = {
 				async () => {
 					await check.click();
 					await confirmStartingBalance(page, 'Starting balance', '1,000.00');
-					await expect(page.getByRole('status').filter({ hasText: /^Savings/ })).toHaveText(
+					const confirmed = page.getByRole('status').filter({ hasText: /^Savings/ });
+					await expect(confirmed).toHaveText(
 						"Savings's starting balance is confirmed. Categorize its Transactions"
 					);
 					await expect(savings).not.toContainText(unconfirmed);
-					await page.reload();
+					await confirmed.getByRole('link', { name: 'Categorize its Transactions' }).click();
+					await expect(
+						page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
+					).toBeVisible();
+					const filters = page.getByRole('search', { name: 'Search and filter Transactions' });
+					await expect(filters.getByLabel('Account', { exact: true })).toHaveText('Savings');
+					await expect(filters.getByLabel('Category', { exact: true })).toHaveText('Uncategorized');
+					await page.goto('/bank');
 					await expect(savings.getByRole('link', { name: 'Savings' })).toBeVisible();
 					await expect(savings).not.toContainText(unconfirmed);
 					await expect(savings.getByRole('button', { name: /starting balance$/ })).toHaveCount(0);
@@ -375,7 +384,7 @@ export const accounts = {
 	},
 	'setup-correct': {
 		title:
-			'a bank Account set up in the wrong Account is moved through Stop syncing and Bring back, and confirmed in its new one',
+			'a bank Account set up in the wrong Account is moved through Stop syncing and Bring back, confirmed in its new one, and its earlier Transactions are shown still in the old one',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const creditUnion = bankCard(page, 'Sample Credit Union');
@@ -402,18 +411,30 @@ export const accounts = {
 
 			await step('stop syncing it into Savings, and bring it back for setup', async () => {
 				await creditUnion.getByRole('button', { name: 'Sample Credit Union actions' }).click();
-				await page.getByRole('menuitem', { name: 'Stop syncing Savings' }).click();
+				await page
+					.getByRole('menuitem', { name: 'Stop syncing Sample Savings Plus ending 4417' })
+					.click();
 				await expect(intoSavings).toHaveCount(0);
+				await expect(creditUnion.getByRole('status')).toHaveText(
+					'Stopped syncing Sample Savings Plus ending 4417. Its Transactions stay in Savings.'
+				);
 				await creditUnion
 					.getByRole('button', { name: 'Bring back Sample Savings Plus ending 4417' })
 					.click();
+				await expect(creditUnion.getByRole('status')).toHaveText(
+					'Brought back. Set it up to choose where its new transactions go.'
+				);
 				await expect(
 					creditUnion.getByRole('button', { name: 'Set up Sample Savings Plus ending 4417' })
 				).toBeFocused();
 			});
 
+			const plus = feedOf(page, 'Sample Credit Union', 'Sample Savings Plus ending 4417');
+			const stillInSavings =
+				'Its earlier Transactions are still in Savings. Only new ones come to Savings Plus.';
+
 			await step(
-				'set it up as a new Account and confirm its starting balance, which links to categorizing',
+				'set it up as a new Account and confirm its starting balance: the card and the status say its earlier Transactions are still in Savings',
 				async () => {
 					await creditUnion
 						.getByRole('button', { name: 'Set up Sample Savings Plus ending 4417' })
@@ -423,22 +444,32 @@ export const accounts = {
 					await choose.getByLabel('Name').fill('Savings Plus');
 					await choose.getByRole('button', { name: 'Import its transactions' }).click();
 					await confirmStartingBalance(page, 'Starting balance', '500.00');
-					const plus = feedOf(page, 'Sample Credit Union', 'Sample Savings Plus ending 4417');
 					await expect(plus.getByRole('link', { name: 'Savings Plus' })).toBeVisible();
 					await expect(plus).not.toContainText(unconfirmed);
-					await page
-						.getByRole('status')
-						.filter({ hasText: /^Savings Plus/ })
-						.getByRole('link', { name: 'Categorize its Transactions' })
-						.click();
-					await expect(
-						page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
-					).toBeVisible();
-					const filters = page.getByRole('search', { name: 'Search and filter Transactions' });
-					await expect(filters.getByLabel('Account', { exact: true })).toHaveText('Savings Plus');
-					await expect(filters.getByLabel('Category', { exact: true })).toHaveText('Uncategorized');
+					await expect(plus).toContainText(stillInSavings);
+					await expect(page.getByRole('status').filter({ hasText: /^Savings Plus/ })).toHaveText(
+						"Savings Plus's starting balance is confirmed. Its bank Account's earlier Transactions are still in Savings. Open Savings"
+					);
+					await page.reload();
+					await expect(plus).toContainText(stillInSavings);
 				}
 			);
+
+			await step('its earlier Transactions are in Savings, and not in Savings Plus', async () => {
+				await plus.getByRole('link', { name: 'Savings', exact: true }).click();
+				await expect(
+					page.getByRole('heading', { level: 1, name: 'Savings', exact: true })
+				).toBeVisible();
+				const earlier = [/^SAMPLE INTEREST PAID/, /^SAMPLE TRANSFER IN 5512/];
+				for (const row of earlier) {
+					await expect(page.getByRole('button', { name: row })).toBeVisible();
+				}
+				await openAccount(page, 'Savings Plus');
+				await expect(page.getByRole('button', { name: /^Starting Balance/ })).toBeVisible();
+				for (const row of earlier) {
+					await expect(page.getByRole('button', { name: row })).toHaveCount(0);
+				}
+			});
 		}
 	},
 	'held-ignore': {

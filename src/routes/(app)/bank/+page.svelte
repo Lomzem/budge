@@ -11,6 +11,7 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import {
+		feedNeedsYou,
 		getBankConnections,
 		type BankConnection,
 		type HeldAccount
@@ -28,7 +29,8 @@
 	let heldDialog: { open: (account: HeldAccount) => void } | undefined = $state();
 	let startingBalance: { open: (account: Account) => void } | undefined = $state();
 	let result = $state('');
-	let next: { accountId: Id<'accounts'>; name: string } | null = $state(null);
+	let next: { to: 'categorize' | 'history'; accountId: Id<'accounts'>; name: string } | null =
+		$state(null);
 	let connectButton: HTMLButtonElement | null = $state(null);
 	let order: Id<'bankConnections'>[] = $state([]);
 	let cutoverUnsetOnArrival = $state(false);
@@ -50,7 +52,7 @@
 		if (connection.status === 'needsAttention' || connection.lastError !== null) return 0;
 		if (connection.consentEndsAt !== null || connection.overdue) return 1;
 		if (bank.heldFrom(connection._id).length > 0) return 2;
-		if (connection.feeds.some((feed) => !feed.startingBalanceConfirmed)) return 2;
+		if (connection.feeds.some(feedNeedsYou)) return 2;
 		if (!connection.bankLogin) return 3;
 		return 4;
 	}
@@ -109,8 +111,16 @@
 	}
 
 	function confirmed(account: { _id: Id<'accounts'>; name: string }) {
-		result = `${account.name}'s starting balance is confirmed.`;
-		next = { accountId: account._id, name: account.name };
+		const history = bank.all
+			.flatMap((connection) => connection.feeds)
+			.find((feed) => feed.accountId === account._id && feed.historyIn !== null)?.historyIn;
+		if (history) {
+			result = `${account.name}'s starting balance is confirmed. Its bank Account's earlier Transactions are still in ${history.name}.`;
+			next = { to: 'history', accountId: history.accountId, name: history.name };
+		} else {
+			result = `${account.name}'s starting balance is confirmed.`;
+			next = { to: 'categorize', accountId: account._id, name: account.name };
+		}
 	}
 </script>
 
@@ -214,11 +224,16 @@
 >
 	<p role="status" class="min-w-0 flex-1">
 		{result}
-		{#if result !== '' && next !== null}
+		{#if result !== '' && next?.to === 'categorize'}
 			<a
 				href="{resolve('/accounts')}?account={next.accountId}&category=uncategorized"
 				class="font-medium underline underline-offset-4 hover:no-underline"
 				>Categorize its Transactions</a
+			>
+		{:else if result !== '' && next?.to === 'history'}
+			<a
+				href={resolve('/(app)/accounts/[accountId]', { accountId: next.accountId })}
+				class="font-medium underline underline-offset-4 hover:no-underline">Open {next.name}</a
 			>
 		{/if}
 	</p>

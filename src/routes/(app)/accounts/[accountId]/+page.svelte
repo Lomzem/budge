@@ -4,7 +4,8 @@
 	import { resolve } from '$app/paths';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import { attempt } from '$lib/attempt';
-	import { attentionOf, getBankConnections } from '$lib/bankConnections.svelte';
+	import { attentionOf, getBankConnections, type Feed } from '$lib/bankConnections.svelte';
+	import { labelOf } from '$lib/components/bank/held';
 	import ReconcileDialog from '$lib/components/accounts/reconcile-dialog.svelte';
 	import RenameAccountDialog from '$lib/components/accounts/rename-account-dialog.svelte';
 	import StartingBalanceDialog from '$lib/components/accounts/starting-balance-dialog.svelte';
@@ -27,6 +28,11 @@
 			connection.feeds.some((feed) => feed.accountId === params.accountId)
 		)
 	);
+	const feeds = $derived(
+		bank.all.flatMap((connection) =>
+			connection.feeds.filter((feed) => feed.accountId === params.accountId)
+		)
+	);
 	let renameOpen = $state(false);
 	let reconcileOpen = $state(false);
 	let moveError = $state('');
@@ -42,20 +48,12 @@
 		actionsButton?.focus();
 	}
 
-	async function stopSyncing() {
-		const feed = feeder?.feeds.find((candidate) => candidate.accountId === params.accountId);
-		if (!feeder || !feed) return;
+	async function stopSyncing(feed: Feed) {
 		const accountId = params.accountId;
-		const bankName = feeder.name;
 		moveError = '';
-		const report = await bank.stopSyncing(feed.connectionAccountId, feed.name);
+		const report = await bank.stopSyncing(feed);
 		if (report.failed) moveError = report.text;
-		else {
-			notice = {
-				accountId,
-				message: `Stopped syncing from ${bankName}. Its Transactions stay; bring it back from the Bank page.`
-			};
-		}
+		else notice = { accountId, message: `${report.text} Bring it back from the Bank page.` };
 	}
 
 	function onReconciled(adjustment: number) {
@@ -126,12 +124,14 @@
 							>
 								Starting balance
 							</DropdownMenu.Item>
-							{#if feeder}
+							{#if feeds.length > 0}
 								<DropdownMenu.Separator />
-								<DropdownMenu.Item onSelect={() => void stopSyncing()}>
-									Stop syncing from {feeder.name}
-								</DropdownMenu.Item>
 							{/if}
+							{#each feeds as feed (feed.connectionAccountId)}
+								<DropdownMenu.Item onSelect={() => void stopSyncing(feed)}>
+									Stop syncing {labelOf({ name: feed.bankName, mask: feed.mask })}
+								</DropdownMenu.Item>
+							{/each}
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
 				</div>

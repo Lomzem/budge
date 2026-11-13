@@ -257,15 +257,15 @@ export const plaid = {
 		run: async (page, { step }) => {
 			const communityBank = card(page, 'Sample Community Bank');
 
-			await step('Savings stops syncing from Sample Community Bank', async () => {
+			await step('Savings stops syncing Sample Statement Savings', async () => {
 				await page.goto('/');
 				await openAccount(page, 'Savings');
 				await page.getByRole('button', { name: 'Savings actions' }).click();
 				await page
-					.getByRole('menuitem', { name: 'Stop syncing from Sample Community Bank' })
+					.getByRole('menuitem', { name: 'Stop syncing Sample Statement Savings ending 6604' })
 					.click();
 				await expect(page.getByRole('status').filter({ hasText: /^Stopped/ })).toHaveText(
-					'Stopped syncing from Sample Community Bank. Its Transactions stay; bring it back from the Bank page.'
+					'Stopped syncing Sample Statement Savings ending 6604. Its Transactions stay in Savings. Bring it back from the Bank page.'
 				);
 				await expect(page.getByTestId('account-sync')).not.toContainText('Sample Community Bank');
 			});
@@ -283,7 +283,7 @@ export const plaid = {
 					.getByRole('button', { name: 'Bring back Sample Statement Savings ending 6604' })
 					.click();
 				await expect(communityBank.getByRole('status')).toHaveText(
-					'Brought back. Set it up to choose where its rows go.'
+					'Brought back. Set it up to choose where its new transactions go.'
 				);
 				await expect(
 					communityBank.getByRole('region', { name: 'Ignored bank Accounts' })
