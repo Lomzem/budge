@@ -1,0 +1,37 @@
+import { chromium, expect } from '@playwright/test';
+import { withholdQueryResult } from '../../e2e/heldResponse';
+import { choose } from '../../e2e/journeys/journey';
+import { readFile, writeFile } from 'node:fs/promises';
+const { appUrl } = JSON.parse(await readFile('.local-app/running.json', 'utf8'));
+const browser = await chromium.launch();
+const dir = 'test-results/verify-budge/ticket-05-review-race';
+try {
+ const context = await browser.newContext({baseURL:appUrl,storageState:'.local-app/storage-state.json',viewport:{width:1280,height:800},timezoneId:'America/Los_Angeles'});
+ const page = await context.newPage();
+ const held = await withholdQueryResult(page,'transactions:transferCandidates');
+ await page.goto('/');
+ await expect(page.getByRole('heading',{level:1,name:'Budget',exact:true})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Assigned for Groceries'})).toBeVisible();
+ await page.goto('/accounts');
+ const original = page.getByRole('button',{name:/Category of SAMPLE PET SUPPLY 0311 on /}).first();
+ await expect(original).toBeVisible();
+ const id = await original.getAttribute('data-category');
+ const picker = page.getByRole('button').and(page.locator(`[data-category="${id}"]`));
+ await expect(picker).toBeVisible();
+ await page.screenshot({path:`${dir}/race-before.png`});
+ await choose(picker,'Transfer: Savings');
+ await expect(picker).toHaveAccessibleName(/^Saving,/);
+ await choose(picker,'Groceries');
+ await expect(picker).toHaveAccessibleName(/^Groceries,/);
+ await page.screenshot({path:`${dir}/race-newer-saved.png`});
+ await writeFile(`${dir}/race-newer-saved.aria.yml`,await page.locator('main').ariaSnapshot());
+ held.release();
+ await expect(picker).toHaveAccessibleName(/^To Savings,/);
+ await page.screenshot({path:`${dir}/race-overwritten.png`});
+ await page.reload();
+ // A Transfer no longer has a Payee; locate the persisted Transfer by its label.
+ await expect(page.getByRole('button',{name:/^To Savings, Category of Transfer on /}).first()).toBeVisible();
+ await page.screenshot({path:`${dir}/race-reloaded.png`});
+ await writeFile(`${dir}/race-reloaded.aria.yml`,await page.locator('main').ariaSnapshot());
+ console.log('VERIFIED: Groceries saved while Transfer lookup was held; releasing old lookup overwrote it with To Savings, persisted after reload.');
+} finally { await browser.close(); }
