@@ -11,12 +11,13 @@ Choose the date Budge begins accounting and prevent history from being cut off b
 
 - `Settings` Section (`/settings`) → `Cutover date` region; a configured budget offers Change.
 - First sign-in on an empty budget: the Budget shows the same Cutover date setup card, and keeps it on screen after the first save (it doesn't vanish under the pointer) until the next visit.
+- Bank page (`/bank`) with no cutover date: the same card sits above Connections (after the page notice, which asks for the date when Plaid is set up), and stays after the save until the next visit.
 
 ## Driving it with Playwright
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/settings.ts`, also run by `bun run test:e2e:local`):
 
-- `settings/start` (empty-budget): under a fixed browser clock in the journey zone (America/Los_Angeles), at 2026-11-01T06:59Z (October 31 locally, November 1 in UTC) the Budget proposes 2026-10-01 and at 07:01Z it proposes 2026-11-01; saving that proposal and importing a bank file into a new Account previews and imports only the 2026-11-01 row (the 2026-10-31 row never appears), leaving `Accounts 1 Unapproved`. A month worked out in UTC fails the first step on every machine.
+- `settings/start` (empty-budget): under a fixed browser clock in the journey zone (America/Los_Angeles), at 2026-11-01T06:59Z (October 31 locally, November 1 in UTC) the Budget proposes 2026-10-01 and at 07:01Z the Bank page proposes 2026-11-01; saving it there (focus moves to Change) and importing a bank file into a new Account previews and imports only the 2026-11-01 row (the 2026-10-31 row never appears), leaving `Accounts 1 Unapproved`. A month worked out in UTC fails the first step on every machine.
 - `settings/cutover` (empty-budget): before a date there is no Cancel and the sidebar's Add Account points to Budget; the first date saved on the Budget shows in Settings after a reload, when the Budget's card is gone; a cancelled change keeps the date and a saved one moves it; Previous month stops at the cutover month; moving the date past a Starting Balance shows `A Transaction is dated before that.` and keeps the saved date.
 
 Drive by hand: pre-cutover manual Transactions and file rows (see Constraint below).

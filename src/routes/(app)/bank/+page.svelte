@@ -5,7 +5,6 @@
 	import { tick, untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
-	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -16,6 +15,7 @@
 	} from '$lib/bankConnections.svelte';
 	import ConnectionCard from '$lib/components/bank/connection-card.svelte';
 	import HeldAccountDialog from '$lib/components/bank/held-account-dialog.svelte';
+	import CutoverDate from '$lib/components/settings/cutover-date.svelte';
 	import { Button } from '$lib/components/ui/button';
 
 	const bank = getBankConnections();
@@ -25,6 +25,11 @@
 	let result = $state('');
 	let connectButton: HTMLButtonElement | null = $state(null);
 	let order: Id<'bankConnections'>[] = $state([]);
+	let cutoverUnsetOnArrival = $state(false);
+
+	$effect(() => {
+		if (settings.data?.cutoverDate === null) cutoverUnsetOnArrival = true;
+	});
 
 	const ready = $derived(bank.loaded && settings.data !== undefined);
 	const blocker = $derived.by(() => {
@@ -130,10 +135,8 @@
 			</p>
 		{:else if blocker === 'cutover'}
 			<p id="bank-blocker" class="rounded-lg bg-warning-tint p-4">
-				Set the cutover date in <a
-					href={resolve('/settings')}
-					class="font-bold underline underline-offset-4 hover:no-underline">Settings</a
-				> before connecting a bank, so Budge knows which transactions to bring in.
+				Set the cutover date below before connecting a bank, so Budge knows which transactions to
+				bring in.
 			</p>
 		{:else if bank.service?.environment === 'sandbox'}
 			<p class="rounded-lg bg-muted p-4">
@@ -141,6 +144,12 @@
 				and sign in as <kbd class="font-bold">user_good</kbd> with password
 				<kbd class="font-bold">pass_good</kbd>.
 			</p>
+		{/if}
+
+		{#if cutoverUnsetOnArrival}
+			<div class="max-w-2xl rounded-lg border bg-card p-5 sm:p-6">
+				<CutoverDate />
+			</div>
 		{/if}
 
 		<section aria-labelledby="connections-heading" class="flex flex-col gap-3">

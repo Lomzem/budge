@@ -30,7 +30,7 @@ async function saveCutover(page: Page, date: string) {
 export const settings = {
 	start: {
 		title:
-			'a fresh budget proposes the first of the local month, not the UTC one, on each side of a month boundary, and a file import starts there',
+			'the Budget and the Bank page propose the first of the local month, not the UTC one, on each side of a month boundary, and a file import starts there',
 		fixture: 'empty-budget',
 		run: async (page, { step }) => {
 			const octobersLastLocalMinuteButNovemberInUtc = new Date('2026-11-01T06:59:00Z');
@@ -47,15 +47,20 @@ export const settings = {
 				}
 			);
 
-			await step('a minute after, the new month’s first day is proposed and saved', async () => {
-				await page.clock.setFixedTime(novembersFirstLocalMinute);
-				await openBudget(page);
-				await expect(region.getByLabel('Cutover date')).toHaveValue(start);
-				await region.getByRole('button', { name: 'Save' }).click();
-				await expectCutover(page, start);
-			});
+			await step(
+				'a minute after, the Bank page proposes the new month’s first day and saves it',
+				async () => {
+					await page.clock.setFixedTime(novembersFirstLocalMinute);
+					await page.goto('/bank');
+					await expect(region.getByLabel('Cutover date')).toHaveValue(start);
+					await region.getByRole('button', { name: 'Save' }).click();
+					await expectCutover(page, start);
+					await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
+				}
+			);
 
 			await step('a bank file into a new Account brings in only rows from the start', async () => {
+				await openBudget(page);
 				await page.getByRole('main').getByRole('button', { name: 'Add Account' }).click();
 				const addAccount = page.getByRole('dialog', { name: 'Add Account' });
 				await addAccount.getByLabel('Name').fill('Start Checking');
