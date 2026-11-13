@@ -1,4 +1,4 @@
-import { assert, describe, expect, test } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id, TableNames } from './_generated/dataModel';
@@ -6,7 +6,13 @@ import type { MutationCtx } from './_generated/server';
 import { LATER_CUTOVER_READS } from './lib/laterCutover';
 import { refreshDerivedFields } from './lib/transactions';
 import schema from './schema';
-import { newBackend, publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
+import {
+	newBackend,
+	publicErrorCode,
+	publicErrorMessage,
+	startBudget,
+	useOwnerEnv
+} from './test.helper';
 
 useOwnerEnv();
 
@@ -32,6 +38,7 @@ describe('the cutover date', () => {
 });
 
 type Backend = ReturnType<typeof newBackend>['t'];
+type Owner = ReturnType<typeof newBackend>['owner'];
 
 async function persisted(t: Backend) {
 	return await t.run(async (ctx) => {
@@ -604,3 +611,282 @@ describe('a later cutover date preview that can proceed', () => {
 		else expect(await fingerprint()).toBe(first);
 	});
 });
+
+describe('applying a confirmed later cutover date', () => {
+	beforeEach(() => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(new Date('2026-11-13T18:00:00Z'));
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	async function reviewedOn(owner: Owner, cutoverDate: string, on: string) {
+		const preview = await owner.query(api.settings.previewLaterCutover, { cutoverDate, today: on });
+		assert(preview.kind === 'ready', `expected a ready preview, got ${preview.kind}`);
+		return preview;
+	}
+
+	const reviewed = (owner: Owner, cutoverDate: string) => reviewedOn(owner, cutoverDate, today);
+
+	interface RefusalCase {
+		owner: Owner;
+		accounts: Readonly<Record<'Checking' | 'Card', Id<'accounts'>>>;
+		fingerprint: string;
+	}
+
+	async function accountingState(t: Backend) {
+		return await t.run(async (ctx) => {
+			const transactions = await ctx.db.query('transactions').collect();
+			return {
+				cutoverDate: (await ctx.db.query('settings').first())?.cutoverDate,
+				transactions: transactions
+					.map((row) => ({
+						accountId: row.accountId,
+						date: row.date,
+						amount: row.amount,
+						cleared: row.cleared,
+						approved: row.approved,
+						kind: row.kind ?? null
+					}))
+					.toSorted((a, b) =>
+						`${a.date}${String(a.amount)}`.localeCompare(`${b.date}${String(b.amount)}`)
+					),
+				splitLines: (await ctx.db.query('transactionSplits').collect()).length,
+				bankRows: (await ctx.db.query('imports').collect()).map((row) => ({
+					bankText: row.bankText,
+					transactionId: row.transactionId ?? null,
+					matched: row.matched
+				})),
+				assignments: (await ctx.db.query('assignments').collect()).map((row) => [
+					row.month,
+					row.categoryId,
+					row.amount
+				])
+			};
+		});
+	}
+
+	async function totalsKeptMatchRebuilt(t: Backend) {
+		const totals = () =>
+			t.run(async (ctx) =>
+				(await ctx.db.query('monthlyTotals').collect())
+					.map(({ month, accountId, bucket, amount, count }) => ({
+						month,
+						accountId,
+						bucket,
+						amount,
+						count
+					}))
+					.toSorted((a, b) =>
+						`${a.month}${a.accountId}${a.bucket}`.localeCompare(
+							`${b.month}${b.accountId}${b.bucket}`
+						)
+					)
+			);
+		const kept = await totals();
+		await t.mutation(internal.monthlyTotals.rebuild, {});
+		expect(kept).toEqual(await totals());
+	}
+
+	test('folds the earlier history into Starting Balances on the new date and leaves the budget the preview showed', async () => {
+		const { t, owner, accounts, categories } = await septemberBudget();
+		const { fingerprint } = await reviewed(owner, '2026-11-01');
+
+		await owner.mutation(api.settings.applyLaterCutover, {
+			cutoverDate: '2026-11-01',
+			today,
+			fingerprint,
+			unlockReconciled: true
+		});
+
+		expect(await accountingState(t)).toEqual({
+			cutoverDate: '2026-11-01',
+			transactions: [
+				{
+					accountId: accounts.Card,
+					date: '2026-11-01',
+					amount: -19_000,
+					cleared: 'cleared',
+					approved: true,
+					kind: 'startingBalance'
+				},
+				{
+					accountId: accounts.Checking,
+					date: '2026-11-01',
+					amount: 65_500,
+					cleared: 'cleared',
+					approved: true,
+					kind: 'startingBalance'
+				},
+				{
+					accountId: accounts.Checking,
+					date: '2026-11-05',
+					amount: -3_000,
+					cleared: 'uncleared',
+					approved: true,
+					kind: null
+				}
+			],
+			splitLines: 0,
+			bankRows: [{ bankText: 'SAMPLE COFFEE CART', transactionId: null, matched: false }],
+			assignments: [['2026-11', categories.Groceries, 5_000]]
+		});
+		const balances = await owner.query(api.accounts.list, {});
+		expect(balances.map((account) => [account.name, account.balance])).toEqual([
+			['Checking', 62_500],
+			['Card', -19_000]
+		]);
+		const november = await owner.query(api.budget.month, { month: '2026-11', today });
+		expect(november.readyToAssign.amount).toBe(60_500);
+		await totalsKeptMatchRebuilt(t);
+	});
+
+	test.each([
+		{
+			refusal: 'a preview that changed after the owner reviewed it',
+			message: /changed since you reviewed it/,
+			confirm: async ({ owner, accounts, fingerprint }: RefusalCase) => {
+				await owner.mutation(api.transactions.create, {
+					accountId: accounts.Card,
+					date: '2026-10-21',
+					amount: -1_000,
+					payee: 'Night Market',
+					memo: ''
+				});
+				return { cutoverDate: '2026-11-01', today, fingerprint, unlockReconciled: true };
+			}
+		},
+		{
+			refusal: 'Reconciled history the owner did not unlock',
+			message: /Reconciled/,
+			confirm: ({ fingerprint }: RefusalCase) =>
+				Promise.resolve({ cutoverDate: '2026-11-01', today, fingerprint, unlockReconciled: false })
+		},
+		{
+			refusal: 'a device date that is not yet today anywhere on Earth',
+			message: /device's date/,
+			confirm: async ({ owner }: RefusalCase) => {
+				const { fingerprint } = await reviewedOn(owner, '2026-11-01', '2026-11-15');
+				return {
+					cutoverDate: '2026-11-01',
+					today: '2026-11-15',
+					fingerprint,
+					unlockReconciled: true
+				};
+			}
+		}
+	])('refuses $refusal and changes nothing', async ({ message, confirm }) => {
+		const { t, owner, accounts } = await septemberBudget();
+		const { fingerprint } = await reviewed(owner, '2026-11-01');
+		const args = await confirm({ owner, accounts, fingerprint });
+		const before = await persisted(t);
+
+		expect(await publicErrorMessage(owner.mutation(api.settings.applyLaterCutover, args))).toMatch(
+			message
+		);
+
+		expect(await persisted(t)).toEqual(before);
+	});
+
+	test('confirming the same preview again, as a retry does, changes nothing more', async () => {
+		const { t, owner } = await septemberBudget();
+		const confirmed = {
+			cutoverDate: '2026-11-01',
+			today,
+			fingerprint: (await reviewed(owner, '2026-11-01')).fingerprint,
+			unlockReconciled: true
+		};
+		const moveId = await owner.mutation(api.settings.applyLaterCutover, confirmed);
+		const applied = await persisted(t);
+
+		expect(await owner.mutation(api.settings.applyLaterCutover, confirmed)).toBe(moveId);
+
+		expect(await persisted(t)).toEqual(applied);
+	});
+
+	test('undoing the move puts back the history, Starting Balances and assignments it replaced, once', async () => {
+		const { t, owner } = await septemberBudget();
+		const before = await ledger(t);
+		const moveId = await owner.mutation(api.settings.applyLaterCutover, {
+			cutoverDate: '2026-11-01',
+			today,
+			fingerprint: (await reviewed(owner, '2026-11-01')).fingerprint,
+			unlockReconciled: true
+		});
+		expect(await owner.query(api.settings.lastMove, {})).toMatchObject({
+			moveId,
+			from: '2026-09-01',
+			to: '2026-11-01'
+		});
+
+		await owner.mutation(api.settings.undoLaterCutover, { moveId });
+		const undone = await persisted(t);
+		await owner.mutation(api.settings.undoLaterCutover, { moveId });
+
+		expect(await persisted(t)).toEqual(undone);
+		expect(await ledger(t)).toEqual(before);
+		expect(await owner.query(api.settings.lastMove, {})).toBeNull();
+		await totalsKeptMatchRebuilt(t);
+	});
+
+	test('will not undo the move over a Starting Balance changed since, and changes nothing', async () => {
+		const { t, owner, accounts } = await septemberBudget();
+		const moveId = await owner.mutation(api.settings.applyLaterCutover, {
+			cutoverDate: '2026-11-01',
+			today,
+			fingerprint: (await reviewed(owner, '2026-11-01')).fingerprint,
+			unlockReconciled: true
+		});
+		await owner.mutation(api.accounts.setStartingBalance, {
+			accountId: accounts.Card,
+			startingBalance: -18_500
+		});
+		const edited = await persisted(t);
+
+		expect(
+			await publicErrorMessage(owner.mutation(api.settings.undoLaterCutover, { moveId }))
+		).toMatch(/Card's Starting Balance changed/);
+
+		expect(await persisted(t)).toEqual(edited);
+	});
+});
+
+async function ledger(t: Backend) {
+	return await t.run(async (ctx) => {
+		const transactions = await ctx.db.query('transactions').collect();
+		const accountOf = new Map(transactions.map((row) => [row._id, row.accountId]));
+		const bankRows = await ctx.db.query('imports').collect();
+		const lines = await ctx.db.query('transactionSplits').collect();
+		const byText = (a: string, b: string) => a.localeCompare(b);
+		return {
+			cutoverDate: (await ctx.db.query('settings').first())?.cutoverDate,
+			transactions: transactions
+				.map(({ _id, transferTransactionId, ...row }) =>
+					JSON.stringify({
+						...row,
+						_creationTime: null,
+						transferAccountId:
+							transferTransactionId === undefined ? null : accountOf.get(transferTransactionId),
+						lines: lines
+							.filter((line) => line.transactionId === _id)
+							.map((line) => [line.categoryId, line.amount, line.date, line.memo ?? null])
+							.toSorted(),
+						bankRows: bankRows
+							.filter((row) => row.transactionId === _id)
+							.map((row) => [row.bankText, row.matched, row.state])
+					})
+				)
+				.toSorted(byText),
+			detachedBankRows: bankRows.filter((row) => row.transactionId === undefined).length,
+			assignments: (await ctx.db.query('assignments').collect())
+				.map((row) => `${row.month} ${row.categoryId} ${String(row.amount)}`)
+				.toSorted(byText),
+			totals: (await ctx.db.query('monthlyTotals').collect())
+				.map((row) =>
+					[row.month, row.accountId, row.bucket, String(row.amount), String(row.count)].join(' ')
+				)
+				.toSorted(byText)
+		};
+	});
+}

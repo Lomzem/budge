@@ -1,17 +1,29 @@
+import type { WithoutSystemFields } from 'convex/server';
 import { v, type Infer } from 'convex/values';
 
 import { computeBudget, type Budget } from '../../src/lib/domain/budget';
 import { monthOf } from '../../src/lib/domain/dates';
 import type { Doc, Id } from '../_generated/dataModel';
-import type { QueryCtx } from '../_generated/server';
-import { startingBalanceOf } from './accounts';
+import type { MutationCtx, QueryCtx } from '../_generated/server';
+import { saveStartingBalance, startingBalanceOf } from './accounts';
 import { accountKind } from './accountKind';
 import { readBudgetInput, type BudgetInputs, type BudgetRead } from './budget';
 import { keyOf, lineCounted, type Counted } from './monthlyTotals';
 import { publicError } from './publicError';
 import { readWithin, type LimitedReads, type ReadRows } from './readLimits';
 import { readCutoverDate } from './settings';
-import { allBankRowsOf, payeeNameOf, splitLineRows } from './transactions';
+import {
+	allBankRowsOf,
+	deleteTransaction,
+	markApproved,
+	markCleared,
+	payeeNameOf,
+	removeEarlierHistory,
+	replaceTransaction,
+	restoreEarlierHistory,
+	splitLineRows,
+	type EarlierTransaction
+} from './transactions';
 
 type LaterCutoverRead = BudgetRead | 'transactions' | 'bankRows' | 'splitLines' | 'accounts';
 
@@ -167,6 +179,7 @@ interface Fold {
 	account: Doc<'accounts'>;
 	startingBalance: Doc<'transactions'> | null;
 	rows: FoldedTransaction[];
+	history: EarlierTransaction[];
 	blocked: boolean;
 	remapped: Map<Id<'accounts'>, { count: number; total: number }>;
 }
@@ -192,21 +205,248 @@ interface ProposedStartingBalance {
 	category: Pick<Counted, 'categoryId'> | null;
 }
 
+export interface LaterCutoverPlan {
+	history: EarlierTransaction[];
+	startingBalances: {
+		account: Doc<'accounts'>;
+		existing: Doc<'transactions'> | null;
+		amount: number;
+	}[];
+	earlierAssignments: Doc<'assignments'>[];
+}
+
 export async function previewLaterCutover(
 	ctx: QueryCtx,
 	to: string,
 	today: string
 ): Promise<LaterCutoverPreview> {
+	return (await planLaterCutover(ctx, to, today)).preview;
+}
+
+const HOUR = 60 * 60 * 1000;
+
+export async function applyLaterCutover(
+	ctx: MutationCtx,
+	{
+		to,
+		today,
+		fingerprint,
+		unlockReconciled
+	}: { to: string; today: string; fingerprint: string; unlockReconciled: boolean }
+): Promise<Id<'cutoverMoves'>> {
+	const last = await lastCutoverMove(ctx);
+	if (last !== null && last.to === to && last.fingerprint === fingerprint) return last._id;
+	requireTodaySomewhere(today, Date.now());
+	const planned = await planLaterCutover(ctx, to, today);
+	if (!('plan' in planned)) throw publicError('INVALID_INPUT', refusalOf(planned.preview));
+	if (planned.preview.fingerprint !== fingerprint) throw publicError('INVALID_INPUT', changedSince);
+	const { history, startingBalances, earlierAssignments } = planned.plan;
+	const reconciled =
+		history.some(({ transaction }) => transaction.cleared === 'reconciled') ||
+		startingBalances.some(({ existing }) => existing?.cleared === 'reconciled');
+	if (reconciled && !unlockReconciled) {
+		throw publicError(
+			'INVALID_INPUT',
+			'Some of this history is Reconciled. Confirm that you unlock it to fold it in.'
+		);
+	}
+
+	const settings = await ctx.db.query('settings').first();
+	if (settings === null) throw publicError('INVALID_INPUT', 'Set the cutover date first.');
+	await ctx.db.patch('settings', settings._id, { cutoverDate: to });
+	await removeEarlierHistory(ctx, history);
+	const saved: Doc<'cutoverMoves'>['startingBalances'] = [];
+	for (const { account, existing, amount } of startingBalances) {
+		if (existing !== null) {
+			await markCleared(ctx, existing._id, 'cleared');
+			await markApproved(ctx, existing._id);
+		}
+		saved.push({
+			accountId: account._id,
+			transactionId: await saveStartingBalance(ctx, account._id, amount),
+			amount,
+			before: existing === null ? null : storedForm(existing)
+		});
+	}
+	for (const row of earlierAssignments) await ctx.db.delete('assignments', row._id);
+
+	const moveId = await ctx.db.insert('cutoverMoves', {
+		from: planned.preview.from,
+		to,
+		fingerprint,
+		state: 'applied',
+		startingBalances: saved,
+		assignments: earlierAssignments.map(({ month, categoryId, amount }) => ({
+			month,
+			categoryId,
+			amount
+		}))
+	});
+	for (const { transaction, lines, bankRows } of history) {
+		await ctx.db.insert('cutoverMoveHistory', {
+			moveId,
+			transactionId: transaction._id,
+			transaction: storedForm(transaction),
+			lines: lines.map(({ categoryId, amount, memo }) =>
+				memo === undefined ? { categoryId, amount } : { categoryId, amount, memo }
+			),
+			bankRows: bankRows.map(({ _id, matched }) => ({ bankRowId: _id, matched }))
+		});
+	}
+	return moveId;
+}
+
+export async function lastCutoverMove(ctx: QueryCtx) {
+	const last = await ctx.db.query('cutoverMoves').order('desc').first();
+	if (last?.state !== 'applied') return null;
+	return (await readCutoverDate(ctx)) === last.to ? last : null;
+}
+
+const cannotUndo = "so the move can't be undone.";
+
+export async function undoLaterCutover(ctx: MutationCtx, moveId: Id<'cutoverMoves'>) {
+	const move = await ctx.db.get('cutoverMoves', moveId);
+	if (move === null) throw publicError('NOT_FOUND');
+	if (move.state === 'undone') return;
+	if ((await lastCutoverMove(ctx))?._id !== moveId) {
+		throw publicError('INVALID_INPUT', `The cutover date has moved again since, ${cannotUndo}`);
+	}
+	const history = await ctx.db
+		.query('cutoverMoveHistory')
+		.withIndex('by_moveId', (q) => q.eq('moveId', moveId))
+		.take(LATER_CUTOVER_READS.transactions);
+	const startingBalances = await startingBalancesToPutBack(ctx, move);
+	await requireStillThere(ctx, move, history);
+
+	const settings = await ctx.db.query('settings').first();
+	if (settings === null) throw publicError('INVALID_INPUT', 'Set the cutover date first.');
+	await ctx.db.patch('settings', settings._id, { cutoverDate: move.from });
+	await restoreEarlierHistory(ctx, history);
+	for (const { current, before } of startingBalances) {
+		if (before === null) await deleteTransaction(ctx, current);
+		else
+			await replaceTransaction(
+				ctx,
+				current,
+				{ ...before, approved: before.approved !== false },
+				[]
+			);
+	}
+	for (const row of move.assignments) await ctx.db.insert('assignments', row);
+	await ctx.db.patch('cutoverMoves', moveId, { state: 'undone' });
+}
+
+async function startingBalancesToPutBack(ctx: QueryCtx, move: Doc<'cutoverMoves'>) {
+	const found = [];
+	for (const { accountId, transactionId, amount, before } of move.startingBalances) {
+		const current = await ctx.db.get('transactions', transactionId);
+		const name = (await ctx.db.get('accounts', accountId))?.name ?? 'An Account';
+		if (
+			current?.kind !== 'startingBalance' ||
+			current.accountId !== accountId ||
+			current.date !== move.to ||
+			current.amount !== amount
+		) {
+			throw publicError('INVALID_INPUT', `${name}'s Starting Balance changed since, ${cannotUndo}`);
+		}
+		if (current.cleared === 'reconciled') {
+			throw publicError(
+				'INVALID_INPUT',
+				`${name}'s Starting Balance is Reconciled. Unlock it in its Account to undo the move.`
+			);
+		}
+		found.push({ current, before });
+	}
+	return found;
+}
+
+async function requireStillThere(
+	ctx: QueryCtx,
+	move: Doc<'cutoverMoves'>,
+	history: readonly Doc<'cutoverMoveHistory'>[]
+) {
+	const categoryIds = new Set<Id<'categories'>>();
+	for (const { transaction, lines } of history) {
+		if (transaction.categoryId !== undefined) categoryIds.add(transaction.categoryId);
+		for (const line of lines) categoryIds.add(line.categoryId);
+	}
+	for (const { categoryId } of move.assignments) categoryIds.add(categoryId);
+	for (const { before } of move.startingBalances) {
+		if (before?.categoryId !== undefined) categoryIds.add(before.categoryId);
+	}
+	for (const categoryId of categoryIds) {
+		if ((await ctx.db.get('categories', categoryId)) === null) {
+			throw publicError(
+				'INVALID_INPUT',
+				`A Category this history used was deleted since, ${cannotUndo}`
+			);
+		}
+	}
+	for (const { bankRows } of history) {
+		for (const { bankRowId } of bankRows) {
+			const bankRow = await ctx.db.get('imports', bankRowId);
+			if (bankRow === null || bankRow.transactionId !== undefined) {
+				throw publicError(
+					'INVALID_INPUT',
+					`A bank row behind this history has been matched again since, ${cannotUndo}`
+				);
+			}
+		}
+	}
+	const assigned = await ctx.db
+		.query('assignments')
+		.withIndex('by_month_category', (q) => q.lt('month', monthOf(move.to)))
+		.first();
+	if (assigned !== null) {
+		throw publicError(
+			'INVALID_INPUT',
+			`Amounts were assigned before ${monthOf(move.to)} since, ${cannotUndo}`
+		);
+	}
+}
+
+function storedForm(transaction: Doc<'transactions'>): WithoutSystemFields<Doc<'transactions'>> {
+	const fields: WithoutSystemFields<Doc<'transactions'>> &
+		Partial<Pick<Doc<'transactions'>, '_id' | '_creationTime'>> = { ...transaction };
+	delete fields._id;
+	delete fields._creationTime;
+	return fields;
+}
+
+const changedSince =
+	'What the preview shows has changed since you reviewed it. Look it over again, then confirm.';
+
+function refusalOf(preview: Exclude<LaterCutoverPreview, { kind: 'ready' }>) {
+	if (preview.kind === 'unsupported') return preview.message;
+	if (preview.kind === 'blocked') return `${changedSince} Some of it must be resolved first.`;
+	return changedSince;
+}
+
+function requireTodaySomewhere(today: string, now: number) {
+	const dateAt = (time: number) => new Date(time).toISOString().slice(0, 10);
+	if (today < dateAt(now - 12 * HOUR) || today > dateAt(now + 14 * HOUR)) {
+		throw publicError(
+			'INVALID_INPUT',
+			"Your device's date looks wrong. Set its date and time, then try again."
+		);
+	}
+}
+
+type Planned =
+	| { preview: Exclude<LaterCutoverPreview, { kind: 'ready' }> }
+	| { preview: Extract<LaterCutoverPreview, { kind: 'ready' }>; plan: LaterCutoverPlan };
+
+async function planLaterCutover(ctx: QueryCtx, to: string, today: string): Promise<Planned> {
 	const limits = readWithin(LATER_CUTOVER_READS);
 	const checked = await readEarlier(ctx, { to, today, limits });
-	if (!('earlier' in checked)) return checked;
+	if (!('earlier' in checked)) return { preview: checked };
 	const { from, earlier } = checked;
 
 	const month = monthOf(to);
 	const budgetInput = await readBudgetInput(ctx, month, today, limits.read);
 	const lookups = await lookupsOf(ctx, budgetInput.categories, limits.read);
 	const tooManyToLookUp = tooManyRead(limits);
-	if (tooManyToLookUp !== null) return tooManyToLookUp;
+	if (tooManyToLookUp !== null) return { preview: tooManyToLookUp };
 	const { ordered, blockers, replaced, splitLines, accountOf } = await foldEarlier(ctx, {
 		earlier,
 		to,
@@ -214,20 +454,22 @@ export async function previewLaterCutover(
 		lookups
 	});
 	const tooManyToFold = tooManyRead(limits);
-	if (tooManyToFold !== null) return tooManyToFold;
+	if (tooManyToFold !== null) return { preview: tooManyToFold };
 	const cautions = ordered.flatMap((fold) => cautionsOf(fold, accountOf));
 
 	if (blockers.length > 0) {
 		return {
-			kind: 'blocked',
-			from,
-			to,
-			accounts: ordered.map((fold) => ({
-				...accountView(fold),
-				proposedStartingBalance: fold.blocked ? null : proposedAmountOf(fold)
-			})),
-			mustResolve: blockers,
-			cautions
+			preview: {
+				kind: 'blocked',
+				from,
+				to,
+				accounts: ordered.map((fold) => ({
+					...accountView(fold),
+					proposedStartingBalance: fold.blocked ? null : proposedAmountOf(fold)
+				})),
+				mustResolve: blockers,
+				cautions
+			}
 		};
 	}
 
@@ -236,7 +478,8 @@ export async function previewLaterCutover(
 		amount: proposedAmountOf(fold),
 		category: startingBalanceCategory(fold, budgetInput.categories)
 	}));
-	const removed = budgetInput.assignments.filter((row) => row.month < month && row.amount !== 0);
+	const earlierAssignments = budgetInput.assignments.filter((row) => row.month < month);
+	const removed = earlierAssignments.filter((row) => row.amount !== 0);
 	const before = computeBudget(budgetInput);
 	const after = computeBudget({
 		...budgetInput,
@@ -270,7 +513,18 @@ export async function previewLaterCutover(
 			}
 		}
 	};
-	return { ...reviewed, fingerprint: await fingerprintOfWhatItShows(reviewed) };
+	return {
+		preview: { ...reviewed, fingerprint: await fingerprintOfWhatItShows(reviewed) },
+		plan: {
+			history: ordered.flatMap((fold) => fold.history),
+			startingBalances: proposed.map(({ fold, amount }) => ({
+				account: fold.account,
+				existing: fold.startingBalance,
+				amount
+			})),
+			earlierAssignments
+		}
+	};
 }
 
 async function readEarlier(
@@ -373,13 +627,16 @@ async function foldEarlier(
 			fold.startingBalance = transaction;
 			continue;
 		}
-		if (transaction.split === true) {
-			splitLines.set(
-				transaction._id,
-				await read('splitLines', splitLineRows(ctx, transaction._id))
-			);
-		}
-		const found = await foldTransaction(ctx, { lookups, read }, { fold, transaction, folded });
+		const lines =
+			transaction.split === true
+				? await read('splitLines', splitLineRows(ctx, transaction._id))
+				: [];
+		if (transaction.split === true) splitLines.set(transaction._id, lines);
+		const found = await foldTransaction(
+			ctx,
+			{ lookups, read },
+			{ fold, transaction, lines, folded }
+		);
 		if (found.length > 0) {
 			fold.blocked = true;
 			blockers.push(...found);
@@ -407,7 +664,14 @@ async function foldEarlier(
 }
 
 function emptyFold(account: Doc<'accounts'>): Fold {
-	return { account, startingBalance: null, rows: [], blocked: false, remapped: new Map() };
+	return {
+		account,
+		startingBalance: null,
+		rows: [],
+		history: [],
+		blocked: false,
+		remapped: new Map()
+	};
 }
 
 async function foldTransaction(
@@ -416,14 +680,21 @@ async function foldTransaction(
 	{
 		fold,
 		transaction,
+		lines,
 		folded
 	}: {
 		fold: Fold;
 		transaction: Doc<'transactions'>;
+		lines: Doc<'transactionSplits'>[];
 		folded: ReadonlyMap<Id<'transactions'>, Doc<'transactions'>>;
 	}
 ): Promise<MustResolve[]> {
-	const { fromBank, feedsElsewhere } = await bankOriginOf(ctx, { lookups, read }, transaction);
+	const { fromBank, feedsElsewhere, bankRows } = await bankOriginOf(
+		ctx,
+		{ lookups, read },
+		transaction
+	);
+	fold.history.push({ transaction, lines, bankRows });
 	if (feedsElsewhere !== null) {
 		const moved = fold.remapped.get(feedsElsewhere) ?? { count: 0, total: 0 };
 		fold.remapped.set(feedsElsewhere, {
@@ -471,7 +742,8 @@ async function bankOriginOf(
 ) {
 	let fromBank = false;
 	let feedsElsewhere: Id<'accounts'> | null = null;
-	for (const bankRow of await read('bankRows', allBankRowsOf(ctx, transaction._id))) {
+	const bankRows = await read('bankRows', allBankRowsOf(ctx, transaction._id));
+	for (const bankRow of bankRows) {
 		if (bankRow.state !== 'linked' && bankRow.state !== 'changed') continue;
 		fromBank = true;
 		if (bankRow.connectionAccountId === undefined) continue;
@@ -480,7 +752,7 @@ async function bankOriginOf(
 			feedsElsewhere = feed.accountId;
 		}
 	}
-	return { fromBank, feedsElsewhere };
+	return { fromBank, feedsElsewhere, bankRows };
 }
 
 async function transferOf(

@@ -77,6 +77,21 @@ async function seedEveryTable(ctx: MutationCtx) {
 		matched: true,
 		state: 'linked'
 	});
+	const moveId = await ctx.db.insert('cutoverMoves', {
+		from: '2026-07-01',
+		to: '2026-08-01',
+		fingerprint: 'synthetic-fingerprint',
+		state: 'applied',
+		startingBalances: [{ accountId, transactionId, amount: -120_000, before: null }],
+		assignments: [{ month: '2026-07', categoryId, amount: 120_000 }]
+	});
+	await ctx.db.insert('cutoverMoveHistory', {
+		moveId,
+		transactionId,
+		transaction: { accountId, date: '2026-07-02', amount: -5_000, cleared: 'cleared' },
+		lines: [],
+		bankRows: []
+	});
 	await ctx.db.insert('monthlyTotals', {
 		month: '2026-08',
 		accountId,
@@ -98,7 +113,9 @@ const seededTables = [
 	'transactionSplits',
 	'imports',
 	'bankConnections',
-	'connectionAccounts'
+	'connectionAccounts',
+	'cutoverMoves',
+	'cutoverMoveHistory'
 ];
 
 function keysAnywhere(value: unknown): string[] {

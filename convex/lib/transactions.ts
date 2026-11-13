@@ -1,11 +1,18 @@
 import { internal } from '../_generated/api';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
+import type { WithoutSystemFields } from 'convex/server';
 import { addDays, monthOf } from '../../src/lib/domain/dates';
 import { MATCH_WINDOW_DAYS } from '../../src/lib/domain/matcher';
 import { SPLIT_LINE_LIMIT } from '../../src/lib/domain/splits';
 import { requireCents } from './input';
-import { countTransaction, lineCounted, rebuildTotals } from './monthlyTotals';
+import {
+	countTransaction,
+	countTransactions,
+	lineCounted,
+	rebuildTotals,
+	type Counted
+} from './monthlyTotals';
 import { payeeNamed, rememberCategory, rememberRename } from './payees';
 import { requireCutoverDate, requireIsoDate } from './settings';
 import { publicError } from './publicError';
@@ -657,9 +664,97 @@ async function deleteOne(ctx: MutationCtx, existing: Doc<'transactions'>) {
 	await ctx.db.delete('transactions', existing._id);
 	const detached: Id<'imports'>[] = [];
 	for await (const bankRow of allBankRowsOf(ctx, existing._id)) detached.push(bankRow._id);
-	for (const bankRowId of detached) {
+	await keepAsBankMemory(ctx, detached);
+}
+
+async function keepAsBankMemory(ctx: MutationCtx, bankRowIds: readonly Id<'imports'>[]) {
+	for (const bankRowId of bankRowIds) {
 		await ctx.db.patch('imports', bankRowId, { transactionId: undefined, matched: false });
 	}
+}
+
+export interface EarlierTransaction {
+	transaction: Doc<'transactions'>;
+	lines: readonly Doc<'transactionSplits'>[];
+	bankRows: readonly Doc<'imports'>[];
+}
+
+export async function removeEarlierHistory(
+	ctx: MutationCtx,
+	history: readonly EarlierTransaction[]
+) {
+	const removed = new Set(history.map(({ transaction }) => transaction._id));
+	const oneSided = history.some(
+		({ transaction: { transferTransactionId } }) =>
+			transferTransactionId !== undefined && !removed.has(transferTransactionId)
+	);
+	if (oneSided) {
+		throw publicError('INVALID_INPUT', 'Both sides of a Transfer must fold in together.');
+	}
+	await countTransactions(
+		ctx,
+		history.flatMap(({ transaction, lines }) =>
+			transaction.split === true
+				? lines.map((line) => lineCounted(transaction, line))
+				: [transaction]
+		),
+		-1
+	);
+	for (const { transaction, lines, bankRows } of history) {
+		for (const line of lines) await ctx.db.delete('transactionSplits', line._id);
+		await ctx.db.delete('transactions', transaction._id);
+		await keepAsBankMemory(
+			ctx,
+			bankRows.map(({ _id }) => _id)
+		);
+	}
+}
+
+export interface RestoredTransaction {
+	transactionId: Id<'transactions'>;
+	transaction: WithoutSystemFields<Doc<'transactions'>>;
+	lines: readonly SplitLine[];
+	bankRows: readonly { bankRowId: Id<'imports'>; matched: boolean }[];
+}
+
+export async function restoreEarlierHistory(
+	ctx: MutationCtx,
+	history: readonly RestoredTransaction[]
+) {
+	const restored = new Set(history.map(({ transactionId }) => transactionId));
+	const oneSided = history.some(
+		({ transaction: { transferTransactionId } }) =>
+			transferTransactionId !== undefined && !restored.has(transferTransactionId)
+	);
+	if (oneSided) {
+		throw publicError('INVALID_INPUT', 'Both sides of a Transfer must come back together.');
+	}
+	const newIdOf = new Map<Id<'transactions'>, Id<'transactions'>>();
+	for (const { transactionId, transaction } of history) {
+		const fields: WithoutSystemFields<Doc<'transactions'>> = { ...transaction };
+		delete fields.transferTransactionId;
+		newIdOf.set(transactionId, await ctx.db.insert('transactions', fields));
+	}
+	const counted: Counted[] = [];
+	for (const { transactionId, transaction, lines, bankRows } of history) {
+		const id = newIdOf.get(transactionId);
+		if (id === undefined) continue;
+		const otherId = transaction.transferTransactionId;
+		if (otherId !== undefined) {
+			await ctx.db.patch('transactions', id, { transferTransactionId: newIdOf.get(otherId) });
+		}
+		for (const line of lines) {
+			const written = { ...line, transactionId: id, date: transaction.date };
+			await ctx.db.insert('transactionSplits', written);
+			counted.push(lineCounted(transaction, written));
+		}
+		counted.push(transaction);
+		for (const { bankRowId, matched } of bankRows) {
+			await ctx.db.patch('imports', bankRowId, { transactionId: id, matched });
+		}
+	}
+	await countTransactions(ctx, counted, 1);
+	for (const id of newIdOf.values()) await refreshDerivedFields(ctx, id);
 }
 
 export function allBankRowsOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {

@@ -5,6 +5,32 @@ import { accountKind } from './lib/accountKind';
 import { webhookKeyValidator } from './lib/plaidWebhook';
 import { targetValidator } from './lib/targets';
 
+const transactionFields = {
+	accountId: v.id('accounts'),
+	date: v.string(),
+	amount: v.number(),
+	payeeId: v.optional(v.id('payees')),
+
+	categoryId: v.optional(v.id('categories')),
+
+	split: v.optional(v.literal(true)),
+	memo: v.optional(v.string()),
+
+	cleared: v.union(v.literal('uncleared'), v.literal('cleared'), v.literal('reconciled')),
+
+	approved: v.optional(v.boolean()),
+
+	transferTransactionId: v.optional(v.id('transactions')),
+
+	kind: v.optional(v.literal('startingBalance')),
+
+	searchText: v.optional(v.string()),
+
+	bankChange: v.optional(v.literal(true))
+};
+
+const storedTransaction = v.object(transactionFields);
+
 export default defineSchema({
 	settings: defineTable({
 		cutoverDate: v.string()
@@ -56,29 +82,7 @@ export default defineSchema({
 		payeeId: v.id('payees')
 	}).index('by_bankText', ['bankText']),
 
-	transactions: defineTable({
-		accountId: v.id('accounts'),
-		date: v.string(),
-		amount: v.number(),
-		payeeId: v.optional(v.id('payees')),
-
-		categoryId: v.optional(v.id('categories')),
-
-		split: v.optional(v.literal(true)),
-		memo: v.optional(v.string()),
-
-		cleared: v.union(v.literal('uncleared'), v.literal('cleared'), v.literal('reconciled')),
-
-		approved: v.optional(v.boolean()),
-
-		transferTransactionId: v.optional(v.id('transactions')),
-
-		kind: v.optional(v.literal('startingBalance')),
-
-		searchText: v.optional(v.string()),
-
-		bankChange: v.optional(v.literal(true))
-	})
+	transactions: defineTable(transactionFields)
 		.index('by_account_date', ['accountId', 'date'])
 		.index('by_accountId_and_kind', ['accountId', 'kind'])
 
@@ -203,6 +207,34 @@ export default defineSchema({
 		.index('by_connectionId_state', ['connectionId', 'state'])
 		.index('by_state', ['state'])
 		.index('by_accountId', ['accountId']),
+
+	cutoverMoves: defineTable({
+		from: v.string(),
+		to: v.string(),
+		fingerprint: v.string(),
+		state: v.union(v.literal('applied'), v.literal('undone')),
+		startingBalances: v.array(
+			v.object({
+				accountId: v.id('accounts'),
+				transactionId: v.id('transactions'),
+				amount: v.number(),
+				before: v.union(storedTransaction, v.null())
+			})
+		),
+		assignments: v.array(
+			v.object({ month: v.string(), categoryId: v.id('categories'), amount: v.number() })
+		)
+	}),
+
+	cutoverMoveHistory: defineTable({
+		moveId: v.id('cutoverMoves'),
+		transactionId: v.id('transactions'),
+		transaction: storedTransaction,
+		lines: v.array(
+			v.object({ categoryId: v.id('categories'), amount: v.number(), memo: v.optional(v.string()) })
+		),
+		bankRows: v.array(v.object({ bankRowId: v.id('imports'), matched: v.boolean() }))
+	}).index('by_moveId', ['moveId']),
 
 	monthlyTotals: defineTable({
 		month: v.string(),

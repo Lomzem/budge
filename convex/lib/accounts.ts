@@ -54,7 +54,7 @@ export async function saveStartingBalance(
 			},
 			[]
 		);
-		return;
+		return existing._id;
 	}
 	const fields = await transactionFields(ctx, {
 		accountId,
@@ -68,7 +68,7 @@ export async function saveStartingBalance(
 					(await createPaymentCategory(ctx, account))),
 		memo: ''
 	});
-	await insertTransaction(ctx, {
+	return await insertTransaction(ctx, {
 		...fields,
 		kind: 'startingBalance',
 		cleared: 'cleared',
