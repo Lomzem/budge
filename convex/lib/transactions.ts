@@ -183,22 +183,29 @@ function requireStartingBalanceEditable(
 	if (refused !== undefined) throw publicError('INVALID_INPUT', refused[1]);
 }
 
+function editableInput(
+	existing: Doc<'transactions'> | null,
+	given: Omit<TransactionInput, 'transferAccountId' | 'transferTransactionId'>,
+	transferAccountId: Id<'accounts'> | undefined
+) {
+	if (existing?.kind !== 'startingBalance') return given;
+	requireStartingBalanceEditable(existing, { ...given, transferAccountId });
+	return { ...given, payee: '' };
+}
+
 export async function saveTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'> | null,
-	{ transferAccountId, transferTransactionId, ...given }: TransactionInput
+	{ transferAccountId, transferTransactionId, ...given }: TransactionInput,
+	{ approve = true }: { approve?: boolean } = {}
 ): Promise<Id<'transactions'>> {
-	const startingBalance = existing?.kind === 'startingBalance' ? existing : null;
-	if (startingBalance !== null) {
-		requireStartingBalanceEditable(startingBalance, { ...given, transferAccountId });
-	}
-	const input = startingBalance === null ? given : { ...given, payee: '' };
+	const input = editableInput(existing, given, transferAccountId);
 	const lines = await splitLines(ctx, input);
 	const fields: TransactionFields = {
 		...(await transactionFields(ctx, input)),
 		...(lines.length === 0 ? {} : { split: true }),
 		cleared: existing?.cleared ?? 'uncleared',
-		approved: true
+		approved: approve || existing?.approved !== false
 	};
 	requireLockKept(existing, fields);
 	await rememberPayee(ctx, existing, fields);
@@ -230,6 +237,36 @@ export async function saveTransaction(
 		ctx,
 		{ existing, fields },
 		{ existing: otherSide.existing, fields: other }
+	);
+}
+
+export type CategoryChoice =
+	| { kind: 'uncategorized' }
+	| { kind: 'category'; categoryId: Id<'categories'> }
+	| { kind: 'transfer'; accountId: Id<'accounts'> };
+
+export async function categorizeTransaction(
+	ctx: MutationCtx,
+	existing: Doc<'transactions'>,
+	choice: CategoryChoice
+) {
+	if (existing.split === true) {
+		throw publicError('INVALID_INPUT', 'A split Transaction takes its Categories on its lines.');
+	}
+	const payee = choice.kind === 'transfer' ? '' : ((await payeeNameOf(ctx, existing)) ?? '');
+	await saveTransaction(
+		ctx,
+		existing,
+		{
+			accountId: existing.accountId,
+			date: existing.date,
+			amount: existing.amount,
+			payee,
+			memo: existing.memo ?? '',
+			...(choice.kind === 'category' ? { categoryId: choice.categoryId } : {}),
+			...(choice.kind === 'transfer' ? { transferAccountId: choice.accountId } : {})
+		},
+		{ approve: false }
 	);
 }
 

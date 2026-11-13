@@ -60,6 +60,7 @@ function sampleArgs(ids: {
 		'transactions:list': { paginationOpts: { numItems: 10, cursor: null } },
 		'transactions:create': entry,
 		'transactions:update': { transactionId, ...entry },
+		'transactions:categorize': { transactionId, choice: { kind: 'uncategorized' } },
 		'transactions:remove': { transactionId },
 		'transactions:setCleared': { transactionId, cleared: true },
 		'transactions:unlock': { transactionId },

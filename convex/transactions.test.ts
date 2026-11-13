@@ -1,5 +1,5 @@
 import type { FunctionReturnType } from 'convex/server';
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -9,7 +9,8 @@ useOwnerEnv();
 
 async function budgetWithTwoAccounts() {
 	const backend = await startBudget({
-		accounts: { Checking: ['cash', 100_000], Card: ['creditCard', 0] }
+		accounts: { Checking: ['cash', 100_000], Card: ['creditCard', 0] },
+		groups: { Everyday: ['Groceries', 'Dining'] }
 	});
 	const { owner } = backend;
 	const { Checking: checking, Card: card } = backend.accounts;
@@ -157,6 +158,89 @@ describe('changing a Transaction', () => {
 		expect(
 			await publicErrorCode(owner.mutation(api.transactions.remove, { transactionId: id }))
 		).toBe('NOT_FOUND');
+	});
+});
+
+describe('categorizing a Transaction in place', () => {
+	async function unapprovedClearedGroceries() {
+		const budget = await budgetWithTwoAccounts();
+		const { owner, checking } = budget;
+		const transactionId = await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			...groceries
+		});
+		await owner.mutation(api.transactions.setCleared, { transactionId, cleared: true });
+		await owner.mutation(api.transactions.unapprove, { transactionIds: [transactionId] });
+		return { ...budget, transactionId };
+	}
+
+	test('changes only its Category and leaves it Unapproved', async () => {
+		const { owner, checking, categories, transactionId, page } = await unapprovedClearedGroceries();
+		const untouched = {
+			date: '2026-08-14',
+			amount: -4_250,
+			payeeName: 'Corner Grocer',
+			memo: 'Weekly shop',
+			cleared: true,
+			approved: false
+		};
+
+		await owner.mutation(api.transactions.categorize, {
+			transactionId,
+			choice: { kind: 'category', categoryId: categories.Groceries }
+		});
+		expect((await page(checking))[0]).toMatchObject({
+			...untouched,
+			categoryId: categories.Groceries
+		});
+
+		await owner.mutation(api.transactions.categorize, {
+			transactionId,
+			choice: { kind: 'uncategorized' }
+		});
+		expect((await page(checking))[0]).toMatchObject({ ...untouched, categoryId: null });
+	});
+
+	test('a Transfer choice pays the card from the Cash Account', async () => {
+		const { owner, checking, card, transactionId, balanceOf, page } =
+			await unapprovedClearedGroceries();
+
+		await owner.mutation(api.transactions.categorize, {
+			transactionId,
+			choice: { kind: 'transfer', accountId: card }
+		});
+
+		expect(await balanceOf(checking)).toBe(95_750);
+		expect(await balanceOf(card)).toBe(4_250);
+		expect((await page(checking))[0]).toMatchObject({
+			payeeName: null,
+			categoryId: null,
+			transfer: { accountId: card },
+			approved: false
+		});
+	});
+
+	test('refuses a split Transaction and a Transfer for a starting balance', async () => {
+		const { owner, checking, card, categories, page } = await budgetWithTwoAccounts();
+		const splitId = await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			...groceries,
+			splits: [
+				{ categoryId: categories.Groceries, amount: -3_000, memo: '' },
+				{ categoryId: categories.Dining, amount: -1_250, memo: '' }
+			]
+		});
+		const startingBalance = (await page(checking)).find((row) => row.startingBalance);
+		assert(startingBalance, 'the Account has a starting balance');
+
+		for (const refused of [
+			{ transactionId: splitId, choice: { kind: 'category', categoryId: categories.Dining } },
+			{ transactionId: startingBalance._id, choice: { kind: 'transfer', accountId: card } }
+		] as const) {
+			expect(await publicErrorCode(owner.mutation(api.transactions.categorize, refused))).toBe(
+				'INVALID_INPUT'
+			);
+		}
 	});
 });
 

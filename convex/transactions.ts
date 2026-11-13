@@ -16,6 +16,7 @@ import { publicError } from './lib/publicError';
 import { requireIsoDate } from './lib/settings';
 import { toRow } from './lib/transactionRows';
 import {
+	categorizeTransaction,
 	deleteTransaction,
 	markApproved,
 	markCleared,
@@ -416,6 +417,23 @@ export const update = mutation({
 	handler: async (ctx, { transactionId, ...input }) => {
 		await requireOwner(ctx);
 		await saveTransaction(ctx, await requireTransaction(ctx, transactionId), input);
+		return null;
+	}
+});
+
+export const categorize = mutation({
+	args: {
+		transactionId: v.id('transactions'),
+		choice: v.union(
+			v.object({ kind: v.literal('uncategorized') }),
+			v.object({ kind: v.literal('category'), categoryId: v.id('categories') }),
+			v.object({ kind: v.literal('transfer'), accountId: v.id('accounts') })
+		)
+	},
+	returns: v.null(),
+	handler: async (ctx, { transactionId, choice }) => {
+		await requireOwner(ctx);
+		await categorizeTransaction(ctx, await requireTransaction(ctx, transactionId), choice);
 		return null;
 	}
 });

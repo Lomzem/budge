@@ -6,6 +6,7 @@ Enter, edit, categorize, clear, approve, and delete movements of money in an Acc
 
 - `txn-create`, `txn-cancel`: save a new Transaction or discard a draft.
 - `txn-edit`, `txn-clear`, `txn-delete`: persisted edits, bank confirmation, and removal.
+- `txn-categorize`: change one Transaction's Category or Transfer in place (`transactions.categorize`), leaving its approval as it was.
 - `txn-list`: paginated Account and Accounts-page views; Uncategorized and Unapproved counts.
 
 ## How to get to it (user POV)
@@ -45,4 +46,4 @@ Preconditions:
 
 - Amounts follow the selected Direction; changing a field without Save is not persistence.
 - Reconciled rows restrict edits until Unlock. A seeded list may not exceed a page: report pagination blocked if Show more cannot be reached with current data.
-- Sources: ticket 03, 05, 14, 16; public `transactions.list/create/update/remove/setCleared/approve/approveAll/approveMany/unapprove/unapprovedCount/bankChangeCount`.
+- Sources: ticket 03, 05, 14, 16; public `transactions.list/create/update/categorize/remove/setCleared/approve/approveAll/approveMany/unapprove/unapprovedCount/bankChangeCount`.
