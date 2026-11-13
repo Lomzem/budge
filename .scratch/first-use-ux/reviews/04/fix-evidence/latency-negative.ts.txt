@@ -1,0 +1,77 @@
+import { chromium, expect, type Browser, type Page } from '@playwright/test';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { journeyTimeZone, useJourneyTimeZone } from '../../e2e/journeys';
+import { openAccount } from '../../e2e/journeys/journey';
+import { watchUnpromptedLayoutShifts } from '../../e2e/journeys/layoutShift';
+const root = process.cwd();
+useJourneyTimeZone();
+const app = JSON.parse(readFileSync('.local-app/running.json', 'utf8'));
+const dir = root + '/test-results/cutover-review/latency-negative';
+mkdirSync(dir, { recursive: true });
+const settle = (ms: number) => new Promise((done) => setTimeout(done, ms));
+async function slowPage(browser: Browser, latency: number) {
+	const context = await browser.newContext({ baseURL: app.appUrl, storageState: root + '/.local-app/storage-state.json', timezoneId: journeyTimeZone, viewport: { width: 1280, height: 800 } });
+	const page = await context.newPage();
+	if (latency > 0) await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => { const server = socket.connectToServer(); socket.onMessage((f) => server.send(f)); server.onMessage((f) => setTimeout(() => socket.send(f), latency)); });
+	return page;
+}
+async function verdict(name: string, page: Page, watcher: Awaited<ReturnType<typeof watchUnpromptedLayoutShifts>>, expectCaught: boolean) {
+	await page.screenshot({ path: `${dir}/${name}.png` });
+	let message = 'no shift reported';
+	try { await watcher.assertNone(); } catch (error) { message = error instanceof Error ? error.message : String(error); }
+	const caught = message !== 'no shift reported';
+	const line = `${name}: ${caught ? 'CAUGHT' : 'NOT CAUGHT'} (expected ${expectCaught ? 'CAUGHT' : 'NOT CAUGHT'}) ${caught === expectCaught ? 'OK' : 'WRONG'}\n${message}`;
+	console.log(line);
+	writeFileSync(`${dir}/${name}.txt`, line);
+}
+const browser = await chromium.launch();
+try {
+	execFileSync('bun', ['run', 'app', 'seed', 'budget-with-accounts'], { stdio: 'pipe' });
+
+	const quiet = await slowPage(browser, 800);
+	const quietWatcher = await watchUnpromptedLayoutShifts(quiet);
+	await quiet.goto('/');
+	await openAccount(quiet, 'Checking');
+	await expect(quiet.getByRole('row').nth(2)).toBeVisible();
+	await settle(3000);
+	await verdict('control-no-change', quiet, quietWatcher, false);
+
+	const watched = await slowPage(browser, 800);
+	const watcher = await watchUnpromptedLayoutShifts(watched);
+	await watched.goto('/');
+	await openAccount(watched, 'Checking');
+	await expect(watched.getByRole('row').nth(2)).toBeVisible();
+	await settle(3000);
+	const elsewhere = await slowPage(browser, 0);
+	await elsewhere.goto('/');
+	await openAccount(elsewhere, 'Checking');
+	await elsewhere.getByRole('button', { name: 'Add Transaction' }).click();
+	const dialog = elsewhere.getByRole('dialog', { name: 'Add Transaction' });
+	await dialog.getByLabel('Payee').fill('Background Shift Probe');
+	await dialog.getByLabel('Amount').fill('5.00');
+	await dialog.getByRole('button', { name: 'Save' }).click();
+	await expect(dialog).toBeHidden();
+	await expect(watched.getByRole('row').filter({ hasText: 'Background Shift Probe' })).toBeVisible({ timeout: 10000 });
+	await settle(1000);
+	await verdict('background-change-from-another-tab', watched, watcher, true);
+
+	const injected = await slowPage(browser, 800);
+	const injectedWatcher = await watchUnpromptedLayoutShifts(injected);
+	await injected.goto('/');
+	await openAccount(injected, 'Checking');
+	await expect(injected.getByRole('row').nth(2)).toBeVisible();
+	await settle(3000);
+	await injected.evaluate(() => {
+		setTimeout(() => {
+			const banner = document.createElement('div');
+			banner.style.height = '120px';
+			banner.textContent = 'Injected unprompted content';
+			document.querySelector('main')?.prepend(banner);
+		}, 1000);
+	});
+	await settle(2500);
+	await verdict('injected-insert-with-nothing-pending', injected, injectedWatcher, true);
+} finally {
+	await browser.close();
+}

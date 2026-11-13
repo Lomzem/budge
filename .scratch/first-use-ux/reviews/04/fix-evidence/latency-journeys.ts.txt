@@ -1,0 +1,22 @@
+import { chromium } from '@playwright/test';
+import { readFileSync,writeFileSync,mkdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { journeys, journeyTimeZone, useJourneyTimeZone } from '../../e2e/journeys';
+const root=process.cwd();
+useJourneyTimeZone();
+const app=JSON.parse(readFileSync('.local-app/running.json','utf8'));
+const browser=await chromium.launch();
+try {
+ for(const name of ['bank-changes/take-the-banks','transfers/import-link']) {
+ const journey=journeys.find(j=>j.name===name)!;
+ execFileSync('bun',['run','app','seed',journey.fixture],{stdio:'pipe'});
+ const context=await browser.newContext({baseURL:app.appUrl,storageState:root+'/.local-app/storage-state.json',timezoneId:journeyTimeZone,viewport:{width:1280,height:800}});
+ const page=await context.newPage(); const cdp=await context.newCDPSession(page);
+ await page.routeWebSocket(/\/api\/[^/]+\/sync$/, socket=>{const server=socket.connectToServer();socket.onMessage(frame=>server.send(frame));server.onMessage(frame=>setTimeout(()=>socket.send(frame),800));});
+ const dir=root+'/test-results/cutover-review/latency-clean/'+name; mkdirSync(dir,{recursive:true}); let count=0;
+ const step=async(name:string,run:()=>Promise<unknown>)=>{const result=await run(); count++; await page.screenshot({path:dir+'/'+count+'.png'});writeFileSync(dir+'/'+count+'.aria.yml',await page.locator('body').ariaSnapshot());return result;};
+ try { await journey.run(page,{step,keepAsEvidence:()=>{}} as never); console.log(name+' PASS with 800ms response latency'); }
+ catch(error) {const message=error instanceof Error?error.message:String(error);console.log(name+' FAIL '+message);writeFileSync(dir+'/error.txt',message);}
+ await context.close();
+ }
+} finally {await browser.close();}

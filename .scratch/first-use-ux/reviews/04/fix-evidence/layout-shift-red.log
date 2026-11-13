@@ -1,0 +1,15 @@
+# Red: reviewer's latency-journeys.ts (800 ms server->client delay) before the fix
+# Reviewer, at 1f16135 (review.md, latency-clean.log): bank-changes/take-the-banks failed the layout observer:
+#   form controls moved 198 px as the bank-change banner disappeared/reappeared; register rows moved 125 px.
+# Implementer, at 45d0a9f + import-dialog readiness fix (adff400), with the old 500 ms-after-input rule:
+#   bank-changes/take-the-banks failed the same way (register blanking on accounts/payees resubscribe + banner removal while closing).
+# Implementer, after mutation attribution, paginated-by-value wrapper and banner freeze, before File-field readiness in journeys:
+transfers/import-link FAIL expect(locator).toHaveText(expected) failed
+Locator: getByRole('dialog', { name: 'Import a bank file' }).getByRole('status')
+Expected pattern: /^1 new Transaction/
+Error: element(s) not found      <- journey picked a file while the File field was still disabled (settings loading)
+# After journeys wait for the File field to be enabled, before input-started query attribution:
+bank-changes/take-the-banks PASS with 800ms response latency
+transfers/import-link FAIL The page shifted without user input or a requested operation's result:
+  /accounts/... moved by 0.0075: <div> Memo [433.0,534.0,400.0,66.0 → 433.0,656.0,400.0,66.0]; <section> Bank Text SAMPLE E2E XFER OUT [433.0,616.0,400.0,56.0 → 433.0,738.0,400.0,30.0]
+#   = the "Other side" link choices arriving 1.6 s after the user picked "Transfer: Savings" (transferCandidates query the choice started).

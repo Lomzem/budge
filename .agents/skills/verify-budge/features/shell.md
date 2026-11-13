@@ -23,7 +23,7 @@ Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, 
 - `shell/navigate`: Budget landing, every sidebar Section, a wheel over the Budget table and the sidebar scrolling the page, then the 320 px tab bar to every Section and an Account (`shell-nav`).
 - `shell/phone-pages`: at 390 px, every Section and the Checking register load and scroll to the end (`shell-stable`).
 
-Every journey runs under the layout-shift guard (`e2e/journeys/layoutShift.ts`): a shift not caused by recent input fails the journey and names the elements that moved.
+Every journey runs under the layout-shift guard (`e2e/journeys/layoutShift.ts`): a shift fails the journey and names the elements that moved unless it comes within 500 ms of input, or while a request sent within 500 ms of input is pending and up to 500 ms after its result arrives (a mutation once the page has synced its commit, a new query once its first result lands). Background updates and page loads with no input still fail.
 
 The recipes below cover what the journeys leave out.
 
