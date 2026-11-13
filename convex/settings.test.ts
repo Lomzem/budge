@@ -1,7 +1,7 @@
 import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { api, internal } from './_generated/api';
-import type { Id, TableNames } from './_generated/dataModel';
+import type { Doc, Id, TableNames } from './_generated/dataModel';
 import type { MutationCtx } from './_generated/server';
 import { LATER_CUTOVER_READS } from './lib/laterCutover';
 import { refreshDerivedFields } from './lib/transactions';
@@ -817,6 +817,34 @@ describe('applying a confirmed later cutover date', () => {
 		expect(await persisted(t)).toEqual(before);
 	});
 
+	test.each([
+		{ now: '2026-11-01T11:59:00Z', on: '2026-10-31', confirms: true },
+		{ now: '2026-11-01T12:00:00Z', on: '2026-10-31', confirms: false },
+		{ now: '2026-11-01T09:59:00Z', on: '2026-11-02', confirms: false },
+		{ now: '2026-11-01T10:00:00Z', on: '2026-11-02', confirms: true }
+	])(
+		'at $now, takes a device date of $on as today somewhere on Earth: $confirms',
+		async ({ now, on, confirms }) => {
+			vi.setSystemTime(new Date(now));
+			const { owner } = await startBudget({
+				cutoverDate: '2026-09-01',
+				accounts: { Checking: ['cash', 10_000] }
+			});
+			const { fingerprint } = await reviewedOn(owner, '2026-10-01', on);
+
+			const refusal = await publicErrorMessage(
+				owner.mutation(api.settings.applyLaterCutover, {
+					cutoverDate: '2026-10-01',
+					today: on,
+					fingerprint,
+					unlockReconciled: false
+				})
+			);
+
+			expect(refusal).toEqual(confirms ? undefined : expect.stringMatching(/device's date/));
+		}
+	);
+
 	test('confirming the same preview again, as a retry does, changes nothing more', async () => {
 		const { t, owner } = await septemberBudget();
 		const confirmed = {
@@ -858,25 +886,159 @@ describe('applying a confirmed later cutover date', () => {
 		await totalsKeptMatchRebuilt(t);
 	});
 
-	test('will not undo the move over a Starting Balance changed since, and changes nothing', async () => {
-		const { t, owner, accounts } = await septemberBudget();
-		const moveId = await owner.mutation(api.settings.applyLaterCutover, {
+	interface StartingBalanceEdit {
+		owner: Owner;
+		accounts: Readonly<Record<'Checking' | 'Card', Id<'accounts'>>>;
+		categories: Readonly<Record<'Groceries' | 'Dining', Id<'categories'>>>;
+		startingBalance: Doc<'transactions'>;
+	}
+
+	async function movedToNovember() {
+		const budget = await septemberBudget();
+		const moveId = await budget.owner.mutation(api.settings.applyLaterCutover, {
 			cutoverDate: '2026-11-01',
 			today,
-			fingerprint: (await reviewed(owner, '2026-11-01')).fingerprint,
+			fingerprint: (await reviewed(budget.owner, '2026-11-01')).fingerprint,
 			unlockReconciled: true
 		});
-		await owner.mutation(api.accounts.setStartingBalance, {
-			accountId: accounts.Card,
-			startingBalance: -18_500
+		const startingBalance = await budget.t.run((ctx) =>
+			ctx.db
+				.query('transactions')
+				.withIndex('by_accountId_and_kind', (q) =>
+					q.eq('accountId', budget.accounts.Checking).eq('kind', 'startingBalance')
+				)
+				.unique()
+		);
+		assert(startingBalance !== null);
+		return { ...budget, moveId, startingBalance };
+	}
+
+	const editStartingBalance = (
+		{ owner, accounts, startingBalance }: StartingBalanceEdit,
+		change: { memo: string; categoryId: Id<'categories'> }
+	) =>
+		owner.mutation(api.transactions.update, {
+			transactionId: startingBalance._id,
+			accountId: accounts.Checking,
+			date: startingBalance.date,
+			amount: startingBalance.amount,
+			payee: '',
+			...change
 		});
-		const edited = await persisted(t);
+
+	test.each([
+		{
+			change: 'its amount',
+			message: /Checking's Starting Balance changed since the move \(its amount\)/,
+			edit: ({ owner, accounts }: StartingBalanceEdit) =>
+				owner.mutation(api.accounts.setStartingBalance, {
+					accountId: accounts.Checking,
+					startingBalance: 65_000
+				})
+		},
+		{
+			change: 'its Category and memo',
+			message: /Checking's Starting Balance changed since the move \(its Category and memo\)/,
+			edit: (edit: StartingBalanceEdit) =>
+				editStartingBalance(edit, { categoryId: edit.categories.Dining, memo: 'opening float' })
+		},
+		{
+			change: 'its Cleared state',
+			message: /Checking's Starting Balance changed since the move \(its Cleared state\)/,
+			edit: ({ owner, startingBalance }: StartingBalanceEdit) =>
+				owner.mutation(api.transactions.setCleared, {
+					transactionId: startingBalance._id,
+					cleared: false
+				})
+		},
+		{
+			change: 'its approval',
+			message: /Checking's Starting Balance changed since the move \(its approval\)/,
+			edit: ({ owner, startingBalance }: StartingBalanceEdit) =>
+				owner.mutation(api.transactions.unapprove, { transactionIds: [startingBalance._id] })
+		},
+		{
+			change: 'its deletion',
+			message: /Checking's Starting Balance was deleted since the move/,
+			edit: ({ owner, startingBalance }: StartingBalanceEdit) =>
+				owner.mutation(api.transactions.remove, { transactionId: startingBalance._id })
+		}
+	])(
+		'will not undo the move over $change since, which Undo would overwrite, and changes nothing',
+		async ({ message, edit }) => {
+			const moved = await movedToNovember();
+			await edit(moved);
+			const edited = await persisted(moved.t);
+
+			expect(
+				await publicErrorMessage(
+					moved.owner.mutation(api.settings.undoLaterCutover, { moveId: moved.moveId })
+				)
+			).toMatch(message);
+
+			expect(await persisted(moved.t)).toEqual(edited);
+		}
+	);
+
+	test('undoes the move past later edits it does not overwrite, and keeps them', async () => {
+		const { t, owner, accounts, categories, moveId } = await movedToNovember();
+		const later = await owner.mutation(api.transactions.create, {
+			accountId: accounts.Checking,
+			date: '2026-11-04',
+			amount: -321,
+			payee: 'Hardware Store',
+			memo: 'hinges',
+			categoryId: categories.Dining
+		});
+		await owner.mutation(api.budget.setAssigned, {
+			month: '2026-11',
+			categoryId: categories.Dining,
+			amount: 2_000
+		});
+
+		await owner.mutation(api.settings.undoLaterCutover, { moveId });
+
+		expect(await owner.query(api.settings.get, {})).toEqual({ cutoverDate: '2026-09-01' });
+		expect(await t.run((ctx) => ctx.db.get('transactions', later))).toMatchObject({
+			date: '2026-11-04',
+			amount: -321,
+			memo: 'hinges',
+			categoryId: categories.Dining
+		});
+		const balances = await owner.query(api.accounts.list, {});
+		expect(balances.find((account) => account.name === 'Checking')?.balance).toBe(
+			100_000 - 12_000 - 4_500 - 10_000 - 8_000 - 3_000 - 321
+		);
+		const november = await owner.query(api.budget.month, { month: '2026-11', today });
+		expect(
+			november.groups
+				.flatMap((group) => group.categories)
+				.find((category) => category.id === categories.Dining)?.assigned
+		).toBe(2_000);
+		await totalsKeptMatchRebuilt(t);
+	});
+
+	test('will not undo an earlier move once the cutover date has moved again, even after undoing the later move', async () => {
+		const { t, owner, moveId } = await movedToNovember();
+		const second = await owner.mutation(api.settings.applyLaterCutover, {
+			cutoverDate: '2026-11-02',
+			today,
+			fingerprint: (await reviewed(owner, '2026-11-02')).fingerprint,
+			unlockReconciled: true
+		});
+		const movedAgain = await persisted(t);
 
 		expect(
 			await publicErrorMessage(owner.mutation(api.settings.undoLaterCutover, { moveId }))
-		).toMatch(/Card's Starting Balance changed/);
+		).toMatch(/moved again/);
+		expect(await persisted(t)).toEqual(movedAgain);
 
-		expect(await persisted(t)).toEqual(edited);
+		await owner.mutation(api.settings.undoLaterCutover, { moveId: second });
+		const secondUndone = await persisted(t);
+		expect(
+			await publicErrorMessage(owner.mutation(api.settings.undoLaterCutover, { moveId }))
+		).toMatch(/moved again/);
+		expect(await persisted(t)).toEqual(secondUndone);
 	});
 });
 

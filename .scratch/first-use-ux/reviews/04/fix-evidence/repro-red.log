@@ -1,0 +1,57 @@
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} vitest run convex/review-cutover.test.ts
+
+ RUN  v5.0.5 /home/lomzem/proj/budge
+
+(node:71766) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ |convex| convex/review-cutover.test.ts (13 tests | 5 failed) 181ms
+   × undo refuses overwriting postmove Starting Balance memo 58ms
+   × undo refuses overwriting postmove Starting Balance category 13ms
+   × undo refuses overwriting postmove Starting Balance cleared 13ms
+   × undo refuses overwriting postmove Starting Balance approval 13ms
+   × a bank modification received while folded remains visible after undo 23ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |convex| convex/review-cutover.test.ts > undo refuses overwriting postmove Starting Balance memo
+AssertionError: expected undefined to be defined
+ ❯ convex/review-cutover.test.ts:23:102
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  |convex| convex/review-cutover.test.ts > undo refuses overwriting postmove Starting Balance category
+ FAIL  |convex| convex/review-cutover.test.ts > undo refuses overwriting postmove Starting Balance cleared
+ FAIL  |convex| convex/review-cutover.test.ts > undo refuses overwriting postmove Starting Balance approval
+AssertionError: expected undefined to be defined
+ ❯ convex/review-cutover.test.ts:23:102
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  |convex| convex/review-cutover.test.ts > a bank modification received while folded remains visible after undo
+AssertionError: expected -1000 to be -1500 // Object.is equality
+
+- Expected
++ Received
+
+- -1500
++ -1000
+
+ ❯ convex/review-cutover.test.ts:60:39
+     58|  const result=await b.owner.query(api.transactions.list,{accountId:b.a…
+     59|  const restored=result.page.find(t=>t.payeeName==='SYNTHETIC'); assert…
+     60|  expect(restored.bankRows[0]?.amount).toBe(-1500);
+       |                                       ^
+     61|  expect(restored.bankRows[0]?.state).toBe('changed');
+     62| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 8 passed (13)
+   Start at  13:00:42
+   Duration  681ms (import 40%, tests 30%, transform 21%, environment 8%, worker 1%)
+
+error: script "test" exited with code 1

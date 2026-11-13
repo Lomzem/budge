@@ -82,7 +82,20 @@ async function seedEveryTable(ctx: MutationCtx) {
 		to: '2026-08-01',
 		fingerprint: 'synthetic-fingerprint',
 		state: 'applied',
-		startingBalances: [{ accountId, transactionId, amount: -120_000, before: null }],
+		startingBalances: [
+			{
+				transactionId,
+				before: null,
+				after: {
+					accountId,
+					date: '2026-08-01',
+					amount: -120_000,
+					cleared: 'cleared',
+					approved: true,
+					kind: 'startingBalance'
+				}
+			}
+		],
 		assignments: [{ month: '2026-07', categoryId, amount: 120_000 }]
 	});
 	await ctx.db.insert('cutoverMoveHistory', {

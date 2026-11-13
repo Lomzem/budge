@@ -259,17 +259,8 @@ export async function applyLaterCutover(
 	await ctx.db.patch('settings', settings._id, { cutoverDate: to });
 	await removeEarlierHistory(ctx, history);
 	const saved: Doc<'cutoverMoves'>['startingBalances'] = [];
-	for (const { account, existing, amount } of startingBalances) {
-		if (existing !== null) {
-			await markCleared(ctx, existing._id, 'cleared');
-			await markApproved(ctx, existing._id);
-		}
-		saved.push({
-			accountId: account._id,
-			transactionId: await saveStartingBalance(ctx, account._id, amount),
-			amount,
-			before: existing === null ? null : storedForm(existing)
-		});
+	for (const startingBalance of startingBalances) {
+		saved.push(await moveStartingBalance(ctx, startingBalance));
 	}
 	for (const row of earlierAssignments) await ctx.db.delete('assignments', row._id);
 
@@ -297,6 +288,24 @@ export async function applyLaterCutover(
 		});
 	}
 	return moveId;
+}
+
+async function moveStartingBalance(
+	ctx: MutationCtx,
+	{ account, existing, amount }: LaterCutoverPlan['startingBalances'][number]
+): Promise<Doc<'cutoverMoves'>['startingBalances'][number]> {
+	if (existing !== null) {
+		await markCleared(ctx, existing._id, 'cleared');
+		await markApproved(ctx, existing._id);
+	}
+	const transactionId = await saveStartingBalance(ctx, account._id, amount);
+	const after = await ctx.db.get('transactions', transactionId);
+	if (after === null) throw publicError('NOT_FOUND');
+	return {
+		transactionId,
+		before: existing === null ? null : storedForm(existing),
+		after: storedForm(after)
+	};
 }
 
 export async function lastCutoverMove(ctx: QueryCtx) {
@@ -341,16 +350,14 @@ export async function undoLaterCutover(ctx: MutationCtx, moveId: Id<'cutoverMove
 
 async function startingBalancesToPutBack(ctx: QueryCtx, move: Doc<'cutoverMoves'>) {
 	const found = [];
-	for (const { accountId, transactionId, amount, before } of move.startingBalances) {
+	for (const { transactionId, before, after } of move.startingBalances) {
 		const current = await ctx.db.get('transactions', transactionId);
-		const name = (await ctx.db.get('accounts', accountId))?.name ?? 'An Account';
-		if (
-			current?.kind !== 'startingBalance' ||
-			current.accountId !== accountId ||
-			current.date !== move.to ||
-			current.amount !== amount
-		) {
-			throw publicError('INVALID_INPUT', `${name}'s Starting Balance changed since, ${cannotUndo}`);
+		const name = (await ctx.db.get('accounts', after.accountId))?.name ?? 'An Account';
+		if (current?.kind !== 'startingBalance') {
+			throw publicError(
+				'INVALID_INPUT',
+				`${name}'s Starting Balance was deleted since the move, ${cannotUndo}`
+			);
 		}
 		if (current.cleared === 'reconciled') {
 			throw publicError(
@@ -358,9 +365,52 @@ async function startingBalancesToPutBack(ctx: QueryCtx, move: Doc<'cutoverMoves'
 				`${name}'s Starting Balance is Reconciled. Unlock it in its Account to undo the move.`
 			);
 		}
+		const changed = changedSinceMove(storedForm(current), after);
+		if (changed.length > 0) {
+			throw publicError(
+				'INVALID_INPUT',
+				`${name}'s Starting Balance changed since the move (its ${listed(changed)}). Change it back to undo the move.`
+			);
+		}
 		found.push({ current, before });
 	}
 	return found;
+}
+
+type StoredTransaction = Doc<'cutoverMoves'>['startingBalances'][number]['after'];
+
+const fieldUndoOverwrites = {
+	accountId: 'Account',
+	date: 'date',
+	amount: 'amount',
+	payeeId: 'Payee',
+	categoryId: 'Category',
+	split: 'split',
+	memo: 'memo',
+	cleared: 'Cleared state',
+	approved: 'approval',
+	transferTransactionId: 'Transfer',
+	kind: 'kind'
+} as const satisfies Record<Exclude<keyof StoredTransaction, 'searchText' | 'bankChange'>, string>;
+
+function changedSinceMove(current: StoredTransaction, after: StoredTransaction) {
+	const changed: string[] = [];
+	for (const [field, label] of Object.entries(fieldUndoOverwrites) as [
+		keyof typeof fieldUndoOverwrites,
+		string
+	][]) {
+		const same =
+			field === 'approved'
+				? (current.approved !== false) === (after.approved !== false)
+				: current[field] === after[field];
+		if (!same) changed.push(label);
+	}
+	return changed;
+}
+
+function listed(words: readonly string[]) {
+	if (words.length <= 1) return words.join('');
+	return `${words.slice(0, -1).join(', ')} and ${words.at(-1) ?? ''}`;
 }
 
 async function requireStillThere(
@@ -385,17 +435,7 @@ async function requireStillThere(
 			);
 		}
 	}
-	for (const { bankRows } of history) {
-		for (const { bankRowId } of bankRows) {
-			const bankRow = await ctx.db.get('imports', bankRowId);
-			if (bankRow === null || bankRow.transactionId !== undefined) {
-				throw publicError(
-					'INVALID_INPUT',
-					`A bank row behind this history has been matched again since, ${cannotUndo}`
-				);
-			}
-		}
-	}
+	await requireBankRowsToPutBack(ctx, move, history);
 	const assigned = await ctx.db
 		.query('assignments')
 		.withIndex('by_month_category', (q) => q.lt('month', monthOf(move.to)))
@@ -405,6 +445,31 @@ async function requireStillThere(
 			'INVALID_INPUT',
 			`Amounts were assigned before ${monthOf(move.to)} since, ${cannotUndo}`
 		);
+	}
+}
+
+async function requireBankRowsToPutBack(
+	ctx: QueryCtx,
+	move: Doc<'cutoverMoves'>,
+	history: readonly Doc<'cutoverMoveHistory'>[]
+) {
+	for (const { bankRows } of history) {
+		for (const { bankRowId } of bankRows) {
+			const bankRow = await ctx.db.get('imports', bankRowId);
+			if (bankRow === null || bankRow.transactionId !== undefined) {
+				throw publicError(
+					'INVALID_INPUT',
+					`A bank row behind this history has been matched again since, ${cannotUndo}`
+				);
+			}
+			const removedOrMovedBeforeTheMove = bankRow.state === 'removed';
+			if (removedOrMovedBeforeTheMove) {
+				throw publicError(
+					'INVALID_INPUT',
+					`The bank removed ${bankRow.bankText} (${bankRow.date}) or moved it before ${move.to} since the move, ${cannotUndo}`
+				);
+			}
+		}
 	}
 }
 

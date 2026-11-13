@@ -215,10 +215,9 @@ export default defineSchema({
 		state: v.union(v.literal('applied'), v.literal('undone')),
 		startingBalances: v.array(
 			v.object({
-				accountId: v.id('accounts'),
 				transactionId: v.id('transactions'),
-				amount: v.number(),
-				before: v.union(storedTransaction, v.null())
+				before: v.union(storedTransaction, v.null()),
+				after: storedTransaction
 			})
 		),
 		assignments: v.array(

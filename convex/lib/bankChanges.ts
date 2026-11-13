@@ -53,7 +53,8 @@ export async function applyBankChange(
 	const values = { date: row.date, amount: row.amount, bankText: row.bankText };
 	const transaction = await linkedTransaction(ctx, bankRow);
 	if (transaction === null) {
-		await updateBankRow(ctx, bankRow, values);
+		const flagged = datedOrAmountChanged && bankRow.state === 'linked';
+		await updateBankRow(ctx, bankRow, { ...values, ...(flagged ? { state: 'changed' } : {}) });
 		return;
 	}
 	if (await changesQuietly(ctx, bankRow, transaction)) {

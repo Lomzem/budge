@@ -865,7 +865,7 @@ async function applyBankChanges(
 	for (const { externalAccountId, ...row } of modified) {
 		const checked = requireBankRow(row, cutoverDate);
 		const target = await connectionAccountOf(ctx, connectionId, externalAccountId);
-		if (await changeHeldRow(ctx, target._id, checked)) continue;
+		if (await changeUnlinkedRow(ctx, target._id, checked, payees)) continue;
 		if (target.state !== 'mapped') {
 			if (target.state === 'held') totals.held += await holdRows(ctx, target._id, [checked]);
 			continue;
@@ -902,14 +902,18 @@ async function applyBankRemovals(
 	}
 }
 
-async function changeHeldRow(
+async function changeUnlinkedRow(
 	ctx: MutationCtx,
 	connectionAccountId: Id<'connectionAccounts'>,
-	row: IncomingRow
+	row: IncomingRow,
+	payees: ImportedPayees
 ) {
 	const held = await importOf(ctx, connectionAccountId, row.sourceId);
 	if (held === null || held.transactionId !== undefined) return false;
-	if (held.state !== 'held') return true;
+	if (held.state !== 'held') {
+		await applyBankChange(ctx, held, row, payees);
+		return true;
+	}
 	await updateBankRow(ctx, held, {
 		date: row.date,
 		amount: row.amount,
