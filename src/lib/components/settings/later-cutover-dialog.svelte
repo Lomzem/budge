@@ -17,7 +17,8 @@
 	let { onmoved, onclosed }: { onmoved: () => void; onclosed: () => void } = $props();
 
 	const setCutoverDate = useMutation(api.settings.setCutoverDate);
-	const dialog = new DialogSession<Opening, 'move'>();
+	const applyLaterCutover = useMutation(api.settings.applyLaterCutover);
+	const dialog = new DialogSession<Opening, 'move' | 'apply'>();
 	let error = $state('');
 
 	export function open(from: string, to: string) {
@@ -30,6 +31,24 @@
 		const moved = await dialog.run('move', () => setCutoverDate({ cutoverDate: session.to }));
 		if (!moved.ok) {
 			error = moved.error?.message ?? "Budge couldn't move the date. Try again.";
+			return;
+		}
+		onmoved();
+		dialog.close(session);
+	}
+
+	async function confirm(session: Opening, fingerprint: string, unlockReconciled: boolean) {
+		error = '';
+		const applied = await dialog.run('apply', () =>
+			applyLaterCutover({
+				cutoverDate: session.to,
+				today: session.today,
+				fingerprint,
+				unlockReconciled
+			})
+		);
+		if (!applied.ok) {
+			error = applied.error?.message ?? "Budge couldn't move the date. Try again.";
 			return;
 		}
 		onmoved();
@@ -58,8 +77,10 @@
 					to={session.to}
 					today={session.today}
 					{error}
-					moving={dialog.pending('move')}
+					moving={dialog.pending('move') || dialog.pending('apply')}
 					onmove={() => move(session)}
+					onconfirm={(fingerprint: string, unlock: boolean) =>
+						confirm(session, fingerprint, unlock)}
 					oncancel={() => {
 						dialog.close(session);
 					}}

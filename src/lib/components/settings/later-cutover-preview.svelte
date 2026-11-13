@@ -5,7 +5,9 @@
 
 	import { api } from '$convex/_generated/api';
 	import { Button } from '$lib/components/ui/button';
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import { Label } from '$lib/components/ui/label';
 	import * as Table from '$lib/components/ui/table';
 	import { formatDate, formatMonth } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
@@ -24,6 +26,7 @@
 		error,
 		moving,
 		onmove,
+		onconfirm,
 		oncancel
 	}: {
 		from: string;
@@ -32,12 +35,22 @@
 		error: string;
 		moving: boolean;
 		onmove: () => void;
+		onconfirm: (fingerprint: string, unlockReconciled: boolean) => void;
 		oncancel: () => void;
 	} = $props();
 
 	const preview = useQuery(api.settings.previewLaterCutover, () => ({ cutoverDate: to, today }));
 	const shown = $derived(preview.data);
 	const newDate = $derived(formatDate(to));
+	const needsUnlock = $derived(
+		shown?.kind === 'ready' &&
+			shown.accounts.some(
+				(account) =>
+					account.startingBalance?.cleared === 'reconciled' ||
+					account.transactions.some((row) => row.cleared === 'reconciled')
+			)
+	);
+	let unlocked = $state(false);
 
 	function transactions(count: number) {
 		return `${String(count)} ${count === 1 ? 'Transaction' : 'Transactions'}`;
@@ -92,7 +105,7 @@
 		if (caution.kind === 'reconciled') {
 			return `${caution.accountName}: ${what} you reconciled become part of the Starting Balance.`;
 		}
-		return `${caution.accountName}: ${what} that haven't cleared count in the Starting Balance as if they had.`;
+		return `${caution.accountName}: ${what} that haven't cleared count in the Starting Balance as if they had, so the cleared balance changes by ${formatCents(caution.total)}.`;
 	}
 
 	function monthsText(months: readonly string[]) {
@@ -109,7 +122,7 @@
 <Dialog.Header>
 	<Dialog.Title>Start on {newDate}?</Dialog.Title>
 	<Dialog.Description>
-		A preview of moving the cutover date from {formatDate(from)}. It changes nothing.
+		A preview of moving the cutover date from {formatDate(from)}. Nothing changes until you move it.
 	</Dialog.Description>
 </Dialog.Header>
 
@@ -244,11 +257,42 @@
 			</ul>
 		</section>
 	{/if}
+
+	{#if shown.kind === 'ready'}
+		{#if needsUnlock}
+			<div class="flex items-start gap-3 rounded-md border p-3">
+				<div class="pt-0.5">
+					<Checkbox
+						id="unlock-reconciled"
+						aria-describedby="unlock-reconciled-detail"
+						bind:checked={unlocked}
+					/>
+				</div>
+				<div class="flex min-w-0 flex-col gap-1">
+					<Label for="unlock-reconciled">Unlock the Reconciled history</Label>
+					<p id="unlock-reconciled-detail" class="text-sm text-muted-foreground">
+						Reconciled Transactions and Starting Balances above fold into new Starting Balances,
+						which are cleared but not reconciled.
+					</p>
+				</div>
+			</div>
+		{/if}
+		<p class="text-muted-foreground">Settings offers Undo move until the date moves again.</p>
+	{/if}
 {/if}
 
 <Dialog.Footer {error}>
 	<Button variant="outline" type="button" onclick={oncancel}>Cancel</Button>
 	{#if shown?.kind === 'nothingBefore'}
 		<Button type="button" disabled={moving} onclick={onmove}>Move start date</Button>
+	{:else if shown?.kind === 'ready'}
+		{@const fingerprint = shown.fingerprint}
+		<Button
+			type="button"
+			disabled={moving || (needsUnlock && !unlocked)}
+			onclick={() => {
+				onconfirm(fingerprint, needsUnlock && unlocked);
+			}}>Move start date</Button
+		>
 	{/if}
 </Dialog.Footer>

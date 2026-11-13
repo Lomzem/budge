@@ -8,7 +8,15 @@ import {
 	localToday,
 	monthOf
 } from '../../src/lib/domain/dates';
-import { expectClearOf, expectNothingPastTheRightEdge, openBudget, type Journey } from './journey';
+import {
+	centsIn,
+	expectClearOf,
+	expectNothingPastTheRightEdge,
+	openAccount,
+	openBudget,
+	typed,
+	type Journey
+} from './journey';
 
 function inventedCapitalOneCheckingCsv(rows: { date: string; description: string }[]) {
 	return [
@@ -187,7 +195,7 @@ export const settings = {
 	},
 	'later-start': {
 		title:
-			'a later cutover date opens a read-only preview of the Starting Balances and budget it would leave; Cancel and Escape change nothing',
+			'a later cutover date opens a preview of the Starting Balances and budget it would leave; Cancel and Escape change nothing',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			const region = cutoverRegion(page);
@@ -196,14 +204,14 @@ export const settings = {
 			const preview = previewDialog(page, firstOfThisMonth);
 			let saved = '';
 
-			await step('a later date opens a readable preview that changes nothing', async () => {
+			await step('a later date opens a readable preview', async () => {
 				await page.goto('/settings');
 				saved = (await region.locator('time').getAttribute('datetime')) ?? '';
 				expect(saved < firstOfThisMonth).toBe(true);
 				await region.getByRole('button', { name: 'Change' }).click();
 				await saveCutover(page, firstOfThisMonth);
 				await expect(preview).toContainText(
-					`A preview of moving the cutover date from ${formatDate(saved)}. It changes nothing.`
+					`A preview of moving the cutover date from ${formatDate(saved)}. Nothing changes until you move it.`
 				);
 				await expect(
 					preview.getByRole('heading', {
@@ -224,7 +232,6 @@ export const settings = {
 				});
 				await expect(budget.getByRole('row', { name: /^Ready to Assign/ })).toBeVisible();
 				await expect(budget).toContainText('starts with nothing carried over');
-				await expect(preview.getByRole('button', { name: /Apply|Move start date/ })).toHaveCount(0);
 			});
 
 			await step('halfway down the preview, its Cancel button is wholly on screen', async () => {
@@ -285,6 +292,111 @@ export const settings = {
 					await expectCutover(page, saved);
 				}
 			);
+		}
+	},
+	'later-move': {
+		title:
+			'confirming a later cutover date with Reconciled history needs its unlock, folds the history in, and Settings undoes it',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			const region = cutoverRegion(page);
+			const firstOfThisMonth = dayOfMonth(monthOf(localToday()), 1);
+			const firstOfLastMonth = dayOfMonth(monthOf(addDays(firstOfThisMonth, -1)), 1);
+			const preview = previewDialog(page, firstOfThisMonth);
+			const undo = region.getByRole('button', { name: 'Undo move' });
+			let saved = '';
+
+			await step('reconcile Card and leave one earlier Checking row uncleared', async () => {
+				await page.setViewportSize({ width: 1280, height: 800 });
+				await page.goto('/');
+				await openAccount(page, 'Card');
+				await page.getByRole('button', { name: 'Reconcile' }).click();
+				const reconcile = page.getByRole('dialog');
+				const cleared = reconcile.getByTestId('cleared-balance');
+				await expect(cleared).toHaveText(/\$/);
+				const owed = await centsIn(cleared);
+				await reconcile.getByLabel('Amount owed, per the bank').fill(typed(owed));
+				await reconcile.getByRole('button', { name: 'Reconcile', exact: true }).click();
+				await expect(reconcile).toBeHidden();
+				await openAccount(page, 'Checking');
+				const earlier = page
+					.getByRole('checkbox', {
+						name: new RegExp(`^Cleared: .+, ${formatDate(firstOfLastMonth)}$`)
+					})
+					.first();
+				await earlier.click();
+				await expect(earlier).not.toBeChecked();
+			});
+
+			await step(
+				'the preview names the cleared-balance change and asks for the unlock',
+				async () => {
+					await page.goto('/settings');
+					saved = (await region.locator('time').getAttribute('datetime')) ?? '';
+					await region.getByRole('button', { name: 'Change' }).click();
+					await saveCutover(page, firstOfThisMonth);
+					await expect(preview).toContainText(
+						/Checking: 1 Transaction \((\S+)\) that haven't cleared count in the Starting Balance as if they had, so the cleared balance changes by \1\./
+					);
+					await expect(preview).toContainText(/Card: \d+ Transactions \(\S+\) you reconciled/);
+					const move = preview.getByRole('button', { name: 'Move start date' });
+					await expect(move).toBeDisabled();
+					const unlock = preview.getByRole('checkbox', { name: 'Unlock the Reconciled history' });
+					await unlock.focus();
+					await page.keyboard.press('Space');
+					await expect(unlock).toBeChecked();
+					await expect(move).toBeEnabled();
+				}
+			);
+
+			await step(
+				'Move start date folds the history in and Settings offers the undo on return',
+				async () => {
+					await preview.getByRole('button', { name: 'Move start date' }).click();
+					await expect(preview).toBeHidden();
+					await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
+					await expectCutover(page, firstOfThisMonth);
+					await openAccount(page, 'Checking');
+					await expect(
+						page.getByRole('checkbox', {
+							name: new RegExp(`^Cleared: .+, ${formatDate(firstOfLastMonth)}$`)
+						})
+					).toHaveCount(0);
+					await page.goto('/settings');
+					await expectCutover(page, firstOfThisMonth);
+					await expect(region).toContainText(
+						`Moved from ${formatDate(saved)}, with the history before ${formatDate(firstOfThisMonth)} folded into Starting Balances.`
+					);
+				}
+			);
+
+			await step('on a 320 px phone, the undo stays within the screen', async () => {
+				await page.setViewportSize({ width: 320, height: 640 });
+				await expect(undo).toBeVisible();
+				await expectNothingPastTheRightEdge(page);
+			});
+
+			await step('Undo move by keyboard puts the date and the history back', async () => {
+				await page.setViewportSize({ width: 1280, height: 800 });
+				await page.goto('/settings');
+				await undo.focus();
+				await page.keyboard.press('Enter');
+				await expect(region.getByRole('status')).toHaveText(
+					`The start date is back on ${formatDate(saved)}, with its history.`
+				);
+				await expectCutover(page, saved);
+				await expect(undo).toHaveCount(0);
+				await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
+				await page.reload();
+				await expectCutover(page, saved);
+				await expect(undo).toHaveCount(0);
+				await openAccount(page, 'Checking');
+				await expect(
+					page.getByRole('checkbox', {
+						name: new RegExp(`^Cleared: .+, ${formatDate(firstOfLastMonth)}$`)
+					})
+				).not.toHaveCount(0);
+			});
 		}
 	}
 } satisfies Record<string, Journey>;

@@ -3,6 +3,7 @@
 	import { tick } from 'svelte';
 
 	import { api } from '$convex/_generated/api';
+	import type { Id } from '$convex/_generated/dataModel';
 	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -12,12 +13,20 @@
 
 	const settings = useQuery(api.settings.get, {});
 	const setCutoverDate = useMutation(api.settings.setCutoverDate);
+	const lastMove = useQuery(api.settings.lastMove, {});
+	const undoLaterCutover = useMutation(api.settings.undoLaterCutover);
+	const undoable = $derived.by(() => {
+		const move = lastMove.data ?? null;
+		return move !== null && move.to === cutoverDate ? move : null;
+	});
 
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? null);
 	let changing = $state(false);
 	let date = $state(dayOfMonth(monthOf(localToday()), 1));
 	let error = $state('');
 	let saving = $state(false);
+	let undoing = $state(false);
+	let undone = $state('');
 	let dateInput: HTMLInputElement | null = $state(null);
 	let changeButton: HTMLElement | null = $state(null);
 	let preview: { open: (from: string, to: string) => void } | undefined = $state();
@@ -25,6 +34,7 @@
 	async function startChange() {
 		if (cutoverDate !== null) date = cutoverDate;
 		error = '';
+		undone = '';
 		changing = true;
 		await tick();
 		dateInput?.focus();
@@ -32,6 +42,21 @@
 
 	async function stopChange() {
 		changing = false;
+		await tick();
+		changeButton?.focus();
+	}
+
+	async function undoMove(moveId: Id<'cutoverMoves'>, from: string) {
+		undoing = true;
+		error = '';
+		undone = '';
+		const result = await attempt(() => undoLaterCutover({ moveId }));
+		undoing = false;
+		if (!result.ok) {
+			error = result.error?.message ?? "Budge couldn't undo the move. Try again.";
+			return;
+		}
+		undone = `The start date is back on ${formatDate(from)}, with its history.`;
 		await tick();
 		changeButton?.focus();
 	}
@@ -106,6 +131,21 @@
 			</p>
 			<Button variant="outline" bind:ref={changeButton} onclick={startChange}>Change</Button>
 		</div>
+		{#if undoable !== null}
+			{@const move = undoable}
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+				<p class="text-muted-foreground">
+					Moved from <time datetime={move.from}>{formatDate(move.from)}</time>, with the history
+					before {formatDate(move.to)} folded into Starting Balances.
+				</p>
+				<Button
+					variant="outline"
+					disabled={undoing}
+					onclick={() => undoMove(move.moveId, move.from)}>Undo move</Button
+				>
+			</div>
+		{/if}
+		<p role="status" class={['text-sm', undone === '' && 'sr-only']}>{undone}</p>
 	{/if}
 	<p role="alert" class={['text-sm text-destructive', error === '' && '-mt-3']}>{error}</p>
 </section>
