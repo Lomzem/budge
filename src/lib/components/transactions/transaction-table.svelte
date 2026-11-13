@@ -4,7 +4,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UploadIcon from '@lucide/svelte/icons/upload';
 	import type { FunctionReturnType } from 'convex/server';
-	import { useMutation, usePaginatedQuery, useQuery } from 'convex-svelte';
+	import { useMutation, useQuery } from 'convex-svelte';
 	import { tick } from 'svelte';
 
 	import { replaceState } from '$app/navigation';
@@ -23,6 +23,7 @@
 	import { BANK_CHANGE_LIMIT } from '$lib/domain/bankChanges';
 	import { formatUnapprovedCount, UNAPPROVED_COUNT_LIMIT } from '$lib/domain/unapproved';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+	import { usePaginatedQuery } from '$lib/paginatedQuery.svelte';
 
 	import ImportDialog from './import-dialog.svelte';
 	import TransactionDialog from './transaction-dialog.svelte';
