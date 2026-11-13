@@ -35,7 +35,7 @@ Every picker is a shadcn-svelte Select: a `combobox` button labeled like the old
 | [Search](search.md)                 | Payee/memo/split/Bank Text, all filters, empty/reset                     | 16         |
 | [Bank changes](bank-changes.md)     | Held, quiet changes/removals, accept/keep resolutions (`bank-sync`)      | 19, 21     |
 | [Plaid](plaid.md)                   | Status, Sync now, needs-attention, consent, reconnect, webhook/daily     | 17, 18, 20 |
-| [Settings](settings.md)             | Cutover first use/change/cancel/constraints                              | 03, 23     |
+| [Settings](settings.md)             | Cutover first-of-month default, first use/change/cancel/constraints      | 03, 23     |
 | [Auth](auth.md)                     | Sign-in/out, owner gate, expired session, GitHub/email                   | 02, 23     |
 | [Export](export.md)                 | JSON/CSV completeness and exclusions                                     | 13         |
 | [Shell](shell.md)                   | Routes, responsive navigation, theme, Home Screen/device checks          | 02, 04, 23 |

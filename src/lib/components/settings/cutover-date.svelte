@@ -6,14 +6,14 @@
 	import { attempt } from '$lib/attempt';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import { formatDate, localIsoDate } from '$lib/domain/dates';
+	import { dayOfMonth, formatDate, localToday, monthOf } from '$lib/domain/dates';
 
 	const settings = useQuery(api.settings.get, {});
 	const setCutoverDate = useMutation(api.settings.setCutoverDate);
 
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? null);
 	let changing = $state(false);
-	let date = $state(localIsoDate(new Date()));
+	let date = $state(dayOfMonth(monthOf(localToday()), 1));
 	let error = $state('');
 	let saving = $state(false);
 	let dateInput: HTMLInputElement | null = $state(null);
@@ -48,7 +48,8 @@
 	<div class="flex flex-col gap-1">
 		<h2 id="cutover-heading" class="text-lg font-bold">Cutover date</h2>
 		<p class="text-muted-foreground">
-			Budge tracks money from this date on. Starting balances are dated on it.
+			Budge tracks money from this date on. Bank transactions dated earlier aren't brought in, and
+			each Account's starting balance is its balance on this date.
 		</p>
 	</div>
 	{#if settings.error}

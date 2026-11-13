@@ -1,7 +1,23 @@
 import { expect, type Page } from '@playwright/test';
 
-import { addDays, formatMonth, localToday, monthOf } from '../../src/lib/domain/dates';
+import {
+	addDays,
+	formatMonth,
+	localIsoDate,
+	localToday,
+	monthOf
+} from '../../src/lib/domain/dates';
 import { openBudget, type Journey } from './journey';
+
+function inventedCapitalOneCheckingCsv(rows: { date: string; description: string }[]) {
+	return [
+		'Account Number,Transaction Description,Transaction Date,Transaction Type,Transaction Amount,Balance',
+		...rows.map(({ date, description }) => {
+			const [year, month, day] = date.split('-');
+			return `0000,${description},${month ?? ''}/${day ?? ''}/${year ?? ''},Debit,12.00,100.00`;
+		})
+	].join('\n');
+}
 
 function cutoverRegion(page: Page) {
 	return page.getByRole('region', { name: 'Cutover date', exact: true });
@@ -18,6 +34,71 @@ async function saveCutover(page: Page, date: string) {
 }
 
 export const settings = {
+	start: {
+		title:
+			'a fresh budget proposes the first of the local month on each side of a month boundary, and a file import starts there',
+		fixture: 'empty-budget',
+		run: async (page, { step }) => {
+			const now = new Date();
+			const thisMonthBegins = new Date(now.getFullYear(), now.getMonth(), 1);
+			const lastMonthBegins = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+			const minute = 60_000;
+			const region = cutoverRegion(page);
+
+			await step(
+				'a minute before the month turns, last month’s first day is proposed',
+				async () => {
+					await page.clock.setFixedTime(thisMonthBegins.getTime() - minute);
+					await openBudget(page);
+					await expect(region.getByLabel('Cutover date')).toHaveValue(
+						localIsoDate(lastMonthBegins)
+					);
+				}
+			);
+
+			await step('a minute after, the new month’s first day is proposed and saved', async () => {
+				await page.clock.setFixedTime(thisMonthBegins.getTime() + minute);
+				await openBudget(page);
+				await expect(region.getByLabel('Cutover date')).toHaveValue(localIsoDate(thisMonthBegins));
+				await region.getByRole('button', { name: 'Save' }).click();
+				await expectCutover(page, localIsoDate(thisMonthBegins));
+			});
+
+			await step('a bank file into a new Account brings in only rows from the start', async () => {
+				const start = localIsoDate(thisMonthBegins);
+				const dayBefore = addDays(start, -1);
+				await page.getByRole('main').getByRole('button', { name: 'Add Account' }).click();
+				const addAccount = page.getByRole('dialog', { name: 'Add Account' });
+				await addAccount.getByLabel('Name').fill('Start Checking');
+				await addAccount.getByLabel('Cash, such as checking or savings').check();
+				await addAccount.getByLabel('Current balance').fill('100');
+				await addAccount.getByRole('button', { name: 'Add Account' }).click();
+				await expect(page.getByRole('heading', { level: 1, name: 'Start Checking' })).toBeVisible();
+
+				await page.getByRole('button', { name: 'Import file' }).click();
+				const importing = page.getByRole('dialog', { name: 'Import a bank file' });
+				await importing.getByLabel('File').setInputFiles({
+					name: 'checking.csv',
+					mimeType: 'text/csv',
+					buffer: Buffer.from(
+						inventedCapitalOneCheckingCsv([
+							{ date: dayBefore, description: 'SAMPLE E2E BEFORE START' },
+							{ date: start, description: 'SAMPLE E2E ON START' }
+						])
+					)
+				});
+				await expect(importing.getByRole('status')).toHaveText(/^1 new Transaction, 0 Matches/);
+				await expect(importing.getByText('SAMPLE E2E BEFORE START')).toHaveCount(0);
+				await importing.getByRole('button', { name: 'Import 1 row' }).click();
+				await expect(importing).toBeHidden();
+				await expect(
+					page
+						.getByRole('navigation', { name: 'Sections and Accounts' })
+						.getByRole('link', { name: 'Accounts 1 Unapproved' })
+				).toBeVisible();
+			});
+		}
+	},
 	cutover: {
 		title:
 			'the first cutover date gates Add Account, survives reload and cancel, bounds the months, and refuses to pass a Transaction',
