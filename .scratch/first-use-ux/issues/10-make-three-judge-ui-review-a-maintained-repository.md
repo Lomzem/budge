@@ -57,3 +57,9 @@ Principles that changed choices:
 - Separate Before Serializing Shared State: use separate worktrees/backends or exclusive sequential sessions, rather than treating browser contexts as isolation.
 
 Remaining handoff: parent fast-forwards these documentation commits to main. Integration-stage `/correct` analysis belongs to the parent after landing; no production/UI suggestion was implemented here. Ticket 11 is the first real UI use of the maintained workflow. No unresolved implementation questions.
+
+### Corrections (`/correct`, Sol analysis; Opus decisions)
+
+1. Incomplete review provenance (bank-sync rounds 1–2 lack per-judge SHA, coverage, evidence): **no change.** The new report template already requires these fields; a field validator would reward filled-in prose without proving a judge observed the app.
+2. Copied review procedure (bank-sync spec, first-use ticket plan, pre-`bff5319` ticket 11): **no change.** `bff5319` already made the protocol the one owner; prose-similarity checks would reject legitimate scope and miss paraphrase.
+3. Approval freshness (round 12 fixes after approval): **declined.** One documented risk, not two incidents; the protocol already requires approval on the final reviewed SHA.
