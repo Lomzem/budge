@@ -29,48 +29,89 @@ async function budgetWithChecking() {
 
 const lunch = { date: '2026-08-10', amount: -1_850, payee: 'Sample Noodle Bar', memo: '' };
 
+type Budget = Awaited<ReturnType<typeof budgetWithChecking>>;
+type Row = Awaited<ReturnType<Budget['rows']>>[number];
+
+const editsByControl = [
+	{
+		control: 'the Transaction dialog',
+		edit: (budget: Budget, row: Row, categoryId: Id<'categories'>, remember: boolean) =>
+			budget.owner.mutation(api.transactions.update, {
+				transactionId: row._id,
+				accountId: budget.checking,
+				date: row.date,
+				amount: row.amount,
+				payee: row.payeeName ?? '',
+				categoryId,
+				memo: '',
+				...(remember ? { rememberCategory: true } : {})
+			})
+	},
+	{
+		control: "the row's Category",
+		edit: (budget: Budget, row: Row, categoryId: Id<'categories'>, remember: boolean) =>
+			budget.owner.mutation(api.transactions.categorize, {
+				transactionId: row._id,
+				choice: { kind: 'category', categoryId, ...(remember ? { remember: true } : {}) }
+			})
+	}
+];
+
+const byDate = <Row extends { date: string }>(rows: Row[], date: string) =>
+	rows.find((row) => row.date === date);
+
+describe.each(editsByControl)('remembering a Category through $control', ({ edit }) => {
+	test('a one-off Category changes only its Transaction, and only an explicit remember changes what later imports arrive as', async () => {
+		const budget = await budgetWithChecking();
+		const { dining, groceries, rows, importCsv } = budget;
+		const imported = async (date: string, amount: number) => {
+			await importCsv([{ date, amount, bankText: 'SAMPLE NOODLE 0042' }]);
+			const row = byDate(await rows(), date);
+			assert(row !== undefined, `no import on ${date}`);
+			return row;
+		};
+
+		const first = await imported('2026-08-10', -1_100);
+		await edit(budget, first, dining, false);
+		const second = await imported('2026-08-11', -1_200);
+		expect(second).toMatchObject({ categoryId: null, approved: false });
+
+		await edit(budget, second, dining, true);
+		const exception = await imported('2026-08-12', -1_300);
+		expect(exception).toMatchObject({ categoryId: dining, approved: false });
+
+		await edit(budget, exception, groceries, false);
+		expect(await imported('2026-08-13', -1_400)).toMatchObject({
+			categoryId: dining,
+			approved: false
+		});
+
+		await edit(budget, exception, groceries, true);
+		expect(await imported('2026-08-14', -1_500)).toMatchObject({
+			categoryId: groceries,
+			approved: false
+		});
+
+		expect(Object.fromEntries((await rows()).map((row) => [row.date, row.categoryId]))).toEqual({
+			'2026-08-10': dining,
+			'2026-08-11': dining,
+			'2026-08-12': groceries,
+			'2026-08-13': dining,
+			'2026-08-14': groceries
+		});
+	});
+});
+
 describe('Payee memory', () => {
-	test("remembers the Category a Payee's Transaction was last given", async () => {
-		const { owner, checking, dining, groceries, lastCategory } = await budgetWithChecking();
-
-		expect(await lastCategory('Sample Noodle Bar')).toBeNull();
-		const id = await owner.mutation(api.transactions.create, {
-			accountId: checking,
-			...lunch,
-			categoryId: dining
-		});
-		expect(await lastCategory('Sample Noodle Bar')).toBe(dining);
-		expect(await lastCategory('  Sample Noodle Bar ')).toBe(dining);
-
-		await owner.mutation(api.transactions.update, {
-			transactionId: id,
-			accountId: checking,
-			...lunch,
-			categoryId: groceries
-		});
-		expect(await lastCategory('Sample Noodle Bar')).toBe(groceries);
-	});
-
-	test('an Uncategorized Transaction leaves the memory alone', async () => {
-		const { owner, checking, dining, lastCategory } = await budgetWithChecking();
-		await owner.mutation(api.transactions.create, {
-			accountId: checking,
-			...lunch,
-			categoryId: dining
-		});
-
-		await owner.mutation(api.transactions.create, { accountId: checking, ...lunch });
-
-		expect(await lastCategory('Sample Noodle Bar')).toBe(dining);
-	});
-
 	test('forgets a Category once it is deleted', async () => {
 		const { owner, checking, dining, groceries, lastCategory } = await budgetWithChecking();
 		await owner.mutation(api.transactions.create, {
 			accountId: checking,
 			...lunch,
-			categoryId: dining
+			categoryId: dining,
+			rememberCategory: true
 		});
+		expect(await lastCategory('Sample Noodle Bar')).toBe(dining);
 
 		await owner.mutation(api.categories.remove, { categoryId: dining, destinationId: groceries });
 
@@ -83,7 +124,8 @@ describe('Payee memory', () => {
 			accountId: checking,
 			...lunch,
 			payee: 'SAMPLE NOODLE BAR 17',
-			categoryId: dining
+			categoryId: dining,
+			rememberCategory: true
 		});
 
 		await importCsv([{ date: '2026-08-20', amount: -2_100, bankText: 'SAMPLE NOODLE BAR 17' }]);
@@ -151,13 +193,11 @@ describe('rename memory', () => {
 			amount: imported.amount,
 			payee: 'Sample Noodle Bar',
 			categoryId: dining,
-			memo: ''
+			memo: '',
+			rememberCategory: true
 		});
 		return { ...budget, imported };
 	}
-
-	const byDate = <Row extends { date: string }>(rows: Row[], date: string) =>
-		rows.find((row) => row.date === date);
 
 	test('a second file with the same Bank Text arrives with the renamed Payee and its last Category', async () => {
 		const { dining, rows, importCsv } = await renameFirstImport();
@@ -222,7 +262,8 @@ describe('rename memory', () => {
 			amount: imported.amount,
 			payee: 'Sample Noodle Market',
 			categoryId: groceries,
-			memo: ''
+			memo: '',
+			rememberCategory: true
 		});
 
 		await importCsv([{ date: '2026-08-19', amount: -1_350, bankText: 'SQ *SAMPLE NOODLE 0042' }]);

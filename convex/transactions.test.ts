@@ -220,7 +220,7 @@ describe('categorizing a Transaction in place', () => {
 		});
 	});
 
-	test('refuses a split Transaction and a Transfer for a starting balance', async () => {
+	test('refuses a split Transaction, a Transfer for a starting balance, and remembering a Category for no Payee', async () => {
 		const { owner, checking, card, categories, page } = await budgetWithTwoAccounts();
 		const splitId = await owner.mutation(api.transactions.create, {
 			accountId: checking,
@@ -232,10 +232,19 @@ describe('categorizing a Transaction in place', () => {
 		});
 		const startingBalance = (await page(checking)).find((row) => row.startingBalance);
 		assert(startingBalance, 'the Account has a starting balance');
+		const payeeless = await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			...groceries,
+			payee: ''
+		});
 
 		for (const refused of [
 			{ transactionId: splitId, choice: { kind: 'category', categoryId: categories.Dining } },
-			{ transactionId: startingBalance._id, choice: { kind: 'transfer', accountId: card } }
+			{ transactionId: startingBalance._id, choice: { kind: 'transfer', accountId: card } },
+			{
+				transactionId: payeeless,
+				choice: { kind: 'category', categoryId: categories.Dining, remember: true }
+			}
 		] as const) {
 			expect(await publicErrorCode(owner.mutation(api.transactions.categorize, refused))).toBe(
 				'INVALID_INPUT'

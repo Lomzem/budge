@@ -152,21 +152,26 @@ async function takeBankValues(
 		transaction.transferTransactionId === undefined
 			? null
 			: await ctx.db.get('transactions', transaction.transferTransactionId);
-	await saveTransaction(ctx, transaction, {
-		accountId: transaction.accountId,
-		date: bankRow.date,
-		amount: bankRow.amount,
-		payee: (await payeeNameOf(ctx, transaction)) ?? '',
-		categoryId: transaction.categoryId,
-		memo: transaction.memo ?? '',
-		splits: lines.map((line) => ({
-			categoryId: line.categoryId,
-			amount: line.amount,
-			memo: line.memo ?? ''
-		})),
-		transferAccountId: counterpart?.accountId,
-		transferTransactionId: counterpart?._id
-	});
+	await saveTransaction(
+		ctx,
+		transaction,
+		{
+			accountId: transaction.accountId,
+			date: bankRow.date,
+			amount: bankRow.amount,
+			payee: (await payeeNameOf(ctx, transaction)) ?? '',
+			categoryId: transaction.categoryId,
+			memo: transaction.memo ?? '',
+			splits: lines.map((line) => ({
+				categoryId: line.categoryId,
+				amount: line.amount,
+				memo: line.memo ?? ''
+			})),
+			transferAccountId: counterpart?.accountId,
+			transferTransactionId: counterpart?._id
+		},
+		{ rememberCategory: false }
+	);
 	if (counterpart !== null) await flagDisagreeingRows(ctx, counterpart._id);
 }
 

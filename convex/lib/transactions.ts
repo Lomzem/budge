@@ -193,11 +193,17 @@ function editableInput(
 	return { ...given, payee: '' };
 }
 
+export interface SaveOptions {
+	approve?: boolean;
+
+	rememberCategory: boolean;
+}
+
 export async function saveTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'> | null,
 	{ transferAccountId, transferTransactionId, ...given }: TransactionInput,
-	{ approve = true }: { approve?: boolean } = {}
+	{ approve = true, rememberCategory }: SaveOptions
 ): Promise<Id<'transactions'>> {
 	const input = editableInput(existing, given, transferAccountId);
 	const lines = await splitLines(ctx, input);
@@ -208,7 +214,7 @@ export async function saveTransaction(
 		approved: approve || existing?.approved !== false
 	};
 	requireLockKept(existing, fields);
-	await rememberPayee(ctx, existing, fields);
+	await rememberPayee(ctx, existing, fields, rememberCategory);
 	const counterpart =
 		existing?.transferTransactionId === undefined
 			? null
@@ -242,7 +248,7 @@ export async function saveTransaction(
 
 export type CategoryChoice =
 	| { kind: 'uncategorized' }
-	| { kind: 'category'; categoryId: Id<'categories'> }
+	| { kind: 'category'; categoryId: Id<'categories'>; remember?: boolean | undefined }
 	| { kind: 'transfer'; accountId: Id<'accounts'> };
 
 export async function categorizeTransaction(
@@ -266,18 +272,24 @@ export async function categorizeTransaction(
 			...(choice.kind === 'category' ? { categoryId: choice.categoryId } : {}),
 			...(choice.kind === 'transfer' ? { transferAccountId: choice.accountId } : {})
 		},
-		{ approve: false }
+		{ approve: false, rememberCategory: choice.kind === 'category' && choice.remember === true }
 	);
 }
 
 async function rememberPayee(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'> | null,
-	fields: TransactionFields
+	fields: TransactionFields,
+	rememberItsCategory: boolean
 ) {
 	const { payeeId, categoryId } = fields;
+	if (rememberItsCategory) {
+		if (payeeId === undefined || categoryId === undefined) {
+			throw publicError('INVALID_INPUT', 'Only a Category given to a Payee can be remembered.');
+		}
+		await rememberCategory(ctx, payeeId, categoryId);
+	}
 	if (payeeId === undefined) return;
-	if (categoryId !== undefined) await rememberCategory(ctx, payeeId, categoryId);
 	if (existing === null || existing.payeeId === payeeId) return;
 	for await (const bankRow of allBankRowsOf(ctx, existing._id)) {
 		await rememberRename(ctx, bankRow.bankText, payeeId);

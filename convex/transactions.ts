@@ -35,6 +35,7 @@ const transactionRow = v.object({
 	date: v.string(),
 	amount: v.number(),
 	payeeName: v.union(v.string(), v.null()),
+	rememberedCategoryId: v.union(v.id('categories'), v.null()),
 	startingBalance: v.boolean(),
 	categoryId: v.union(v.id('categories'), v.null()),
 
@@ -399,24 +400,28 @@ const transactionInput = {
 
 	transferAccountId: v.optional(v.id('accounts')),
 
-	transferTransactionId: v.optional(v.id('transactions'))
+	transferTransactionId: v.optional(v.id('transactions')),
+
+	rememberCategory: v.optional(v.boolean())
 };
 
 export const create = mutation({
 	args: transactionInput,
 	returns: v.id('transactions'),
-	handler: async (ctx, input) => {
+	handler: async (ctx, { rememberCategory = false, ...input }) => {
 		await requireOwner(ctx);
-		return await saveTransaction(ctx, null, input);
+		return await saveTransaction(ctx, null, input, { rememberCategory });
 	}
 });
 
 export const update = mutation({
 	args: { transactionId: v.id('transactions'), ...transactionInput },
 	returns: v.null(),
-	handler: async (ctx, { transactionId, ...input }) => {
+	handler: async (ctx, { transactionId, rememberCategory = false, ...input }) => {
 		await requireOwner(ctx);
-		await saveTransaction(ctx, await requireTransaction(ctx, transactionId), input);
+		await saveTransaction(ctx, await requireTransaction(ctx, transactionId), input, {
+			rememberCategory
+		});
 		return null;
 	}
 });
@@ -426,7 +431,11 @@ export const categorize = mutation({
 		transactionId: v.id('transactions'),
 		choice: v.union(
 			v.object({ kind: v.literal('uncategorized') }),
-			v.object({ kind: v.literal('category'), categoryId: v.id('categories') }),
+			v.object({
+				kind: v.literal('category'),
+				categoryId: v.id('categories'),
+				remember: v.optional(v.boolean())
+			}),
 			v.object({ kind: v.literal('transfer'), accountId: v.id('accounts') })
 		)
 	},
