@@ -26,6 +26,7 @@
 	let error = $state('');
 	let saving = $state(false);
 	let undoing = $state(false);
+	let previewing = $state(false);
 	let undone = $state('');
 	let dateInput: HTMLInputElement | null = $state(null);
 	let changeButton: HTMLElement | null = $state(null);
@@ -65,6 +66,7 @@
 		event.preventDefault();
 		if (cutoverDate !== null && date > cutoverDate) {
 			error = '';
+			previewing = true;
 			preview?.open(cutoverDate, date);
 			return;
 		}
@@ -89,7 +91,7 @@
 		<p role="alert" class="flex h-9 items-center text-destructive">
 			Budge couldn't load the cutover date. Try reloading the page.
 		</p>
-	{:else if settings.data === undefined}
+	{:else if settings.data === undefined || (lastMove.data === undefined && !lastMove.error)}
 		<p role="status" class="h-9 text-muted-foreground">Loading…</p>
 	{:else if changing || cutoverDate === null}
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -97,7 +99,7 @@
 			class="flex flex-wrap items-center gap-2"
 			onsubmit={submit}
 			onkeydown={(event) => {
-				if (event.key !== 'Escape' || cutoverDate === null) return;
+				if (event.key !== 'Escape' || cutoverDate === null || previewing) return;
 				event.preventDefault();
 				error = '';
 				void stopChange();
@@ -156,6 +158,7 @@
 		changing = false;
 	}}
 	onclosed={async () => {
+		previewing = false;
 		await tick();
 		(changing ? dateInput : changeButton)?.focus();
 	}}
