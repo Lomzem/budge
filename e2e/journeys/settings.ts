@@ -8,7 +8,7 @@ import {
 	localToday,
 	monthOf
 } from '../../src/lib/domain/dates';
-import { openBudget, type Journey } from './journey';
+import { expectClearOf, openBudget, type Journey } from './journey';
 
 function inventedCapitalOneCheckingCsv(rows: { date: string; description: string }[]) {
 	return [
@@ -225,6 +225,16 @@ export const settings = {
 				await expect(budget.getByRole('row', { name: /^Ready to Assign/ })).toBeVisible();
 				await expect(budget).toContainText('starts with nothing carried over');
 				await expect(preview.getByRole('button', { name: /Apply|Move start date/ })).toHaveCount(0);
+			});
+
+			await step('halfway down the preview, its Cancel button is wholly on screen', async () => {
+				const body = preview.locator('[data-slot="dialog-body"]');
+				const scrolledHalfway = await body.evaluate((scroller) => {
+					scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) / 2;
+					return scroller.scrollTop > 0;
+				});
+				expect(scrolledHalfway).toBe(true);
+				await expectClearOf(preview.getByRole('button', { name: 'Cancel' }));
 			});
 
 			await step('Cancel and Escape close it and keep the date', async () => {
