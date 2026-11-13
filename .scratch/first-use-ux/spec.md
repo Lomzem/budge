@@ -15,6 +15,8 @@ Implementation authorized by the user on 2026-11-12 (`/implement`). Tickets: `is
 
 ### Planned evidence before any implementation is called complete
 
+Before shipping these user-facing flows, use the [maintained three-judge UI review protocol](../../docs/quality/ui-review/README.md). Ticket 11 supplies the focused scope and journeys.
+
 - A fresh setup offers this month's boundary before import and does not create a pre-start review backlog.
 - The existing-data repair is based on inspected inputs; previewed balance/budget changes can be checked before applying it, and later sync does not reintroduce excluded history.
 - A mixed-purpose Payee supports selecting a subset, searching for a Category, saving with or without approval, and undoing the bulk action.

@@ -1,6 +1,6 @@
 # UI review — <feature>, round <N>
 
-Use [the protocol](README.md) and [rubric](rubric.md). Copy this template into the feature's issue directory. Replace placeholders with observed facts; leave missing proof explicitly blocked/unverified.
+Use [the protocol](../../../docs/quality/ui-review/README.md) and [rubric](../../../docs/quality/ui-review/rubric.md). These links also resolve when this template is copied into `.scratch/<feature>/issues/`; adjust them if using another depth. Replace placeholders with observed facts; leave missing proof explicitly blocked/unverified.
 
 ## Coordinator brief
 
