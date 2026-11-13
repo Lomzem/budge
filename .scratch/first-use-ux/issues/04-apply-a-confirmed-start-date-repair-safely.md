@@ -34,3 +34,11 @@ Owner decisions recorded 2026-11-13 from the ticket 03 review. They bind this ti
   - Apply must not re-confirm feeds itself.
 - **The new Starting Balance's state.** It is cleared, approved and unreconciled. `saveStartingBalance` already writes `cleared: 'cleared'` and `approved: true`.
 - **Uncleared rows.** The preview must state that folding uncleared rows changes the cleared balance. Today's caution reads "… that haven't cleared count in the Starting Balance as if they had". Keep that caution, and name the cleared-balance change it causes.
+
+### Time-zone policy for the apply (recorded 2026-11-13, before implementing it)
+
+Budge stores no time zone: the owner's day is the browser's local date, as for every other date the app proposes. The apply therefore takes the browser's `today`, but trusts it only as far as server time allows:
+
+- `today` must be a real date, and it must be the calendar date somewhere on Earth at the server's clock when the mutation runs: from the UTC date at `Date.now()` − 12 hours to the UTC date at `Date.now()` + 14 hours (UTC−12 to UTC+14). Any other `today` refuses with a message that the device's date looks wrong, and changes nothing.
+- The new cutover date must be on or before that `today` (the preview's `notYet` rule). So no device clock can start a budget on a day that has not begun anywhere.
+- The recomputed preview uses the same validated `today`, so its fingerprint matches the one the owner reviewed when nothing else changed. A device whose date rolls over between preview and confirm sees the preview change, which is the stale-preview path.
