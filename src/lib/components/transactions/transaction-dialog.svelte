@@ -94,7 +94,13 @@
 
 	const locked = $derived(transaction?.reconciled === true && !unlocked);
 	const startingBalance = $derived(transaction?.startingBalance === true);
-	const flagged = $derived(transaction?.bankRows.filter((row) => row.state !== 'linked') ?? []);
+	let bankChangeAsActedOn = untrack(() => transaction);
+	const bankChangeShown = $derived.by(() => {
+		if (saving || !open) return bankChangeAsActedOn;
+		bankChangeAsActedOn = transaction;
+		return transaction;
+	});
+	const flagged = $derived(bankChangeShown?.bankRows.filter((row) => row.state !== 'linked') ?? []);
 	let bankChange: HTMLElement | null = $state(null);
 
 	const payeeMemory = useQuery(
@@ -491,12 +497,12 @@
 										>
 										on {formatDate(bankRow.date)}.
 									</p>
-									{#if transaction}
+									{#if bankChangeShown}
 										<p>
 											You have <strong class="tabular-nums"
-												>{formatCents(transaction.amount)}</strong
+												>{formatCents(bankChangeShown.amount)}</strong
 											>
-											on {formatDate(transaction.date)}.
+											on {formatDate(bankChangeShown.date)}.
 										</p>
 									{/if}
 								</div>
