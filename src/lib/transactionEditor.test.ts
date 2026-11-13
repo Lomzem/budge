@@ -19,6 +19,7 @@ import {
 	optionOf,
 	recallQuery,
 	removeLine,
+	rowTransferAccounts,
 	type Saved,
 	view,
 	type World
@@ -483,6 +484,18 @@ describe('transferring between Accounts', () => {
 			field: { kind: 'category' }
 		});
 	});
+
+	test.each([
+		{ row: 'a Checking outflow', from: checking, amount: -4000, offered: [savings, visa] },
+		{ row: 'a Checking inflow', from: checking, amount: 4000, offered: [savings] },
+		{ row: 'a card payment received', from: visa, amount: 4000, offered: [checking, savings] },
+		{ row: 'a card charge', from: visa, amount: -4000, offered: [] }
+	])(
+		'$row offers in place only the Transfers that keep its amount',
+		({ from, amount, offered }) => {
+			expect(rowTransferAccounts({ accountId: from._id, amount }, accounts)).toEqual(offered);
+		}
+	);
 
 	describe('linking the other side of an import', () => {
 		const imported = savedRow({ bankRows: [{}], payeeName: 'Transfer to savings' });

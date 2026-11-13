@@ -3,6 +3,7 @@ import { expect } from '@playwright/test';
 import { holdResponseTo } from '../heldResponse';
 import {
 	centsIn,
+	choose,
 	expectClearOf,
 	expectNothingPastTheRightEdge,
 	openAccount,
@@ -113,6 +114,139 @@ export const transactions = {
 				await expect(editing).toHaveAttribute('data-state', 'open');
 				await expect(editing.getByLabel('Payee')).toHaveValue('Sample Landlord');
 				await expect(editing.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
+			});
+		}
+	},
+	categorize: {
+		title:
+			'a Category or Transfer is searched for and saved from its row, by keyboard and on a 320 px phone, survives reload, and leaves the row Unapproved',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			const categoryOf = (payee: string) =>
+				page.getByRole('button', { name: new RegExp(`Category of ${payee} on `) }).first();
+			const unapproved = (payee: string) =>
+				page.getByRole('button', { name: new RegExp(`^${payee}, Unapproved, edit Transaction`) });
+			const listbox = page.getByRole('listbox');
+			const options = () => listbox.getByRole('option').allInnerTexts();
+
+			await step(
+				'typing on an Unapproved row’s Category opens a search that finds Groceries, and Enter saves it',
+				async () => {
+					await page.goto('/accounts');
+					const category = categoryOf('SAMPLE HARDWARE 2208');
+					await expect(category).toHaveAccessibleName(/^Uncategorized, /);
+					await category.focus();
+					await page.keyboard.type('groc');
+					await expect(page.getByRole('combobox', { name: 'Search Categories' })).toHaveValue(
+						'groc'
+					);
+					await expect.poll(options).toEqual(['Groceries']);
+					await page.keyboard.press('Enter');
+					await expect(listbox).toBeHidden();
+					await expect(category).toHaveAccessibleName(/^Groceries, /);
+					await expect(category).toBeFocused();
+					await expect(unapproved('SAMPLE HARDWARE 2208')).toBeVisible();
+				}
+			);
+
+			await step('after reload the row keeps Groceries and stays Unapproved', async () => {
+				await page.reload();
+				await expect(categoryOf('SAMPLE HARDWARE 2208')).toHaveAccessibleName(/^Groceries, /);
+				await expect(unapproved('SAMPLE HARDWARE 2208')).toBeVisible();
+			});
+
+			await step(
+				'a Checking outflow offers Ready to Assign with the Categories and its Transfers in their own section, and Transfer: Card pays the card',
+				async () => {
+					const cardBalance = await (async () => {
+						await openAccount(page, 'Card');
+						return centsIn(page.getByTestId('account-balance'));
+					})();
+					await openAccount(page, 'Checking');
+					const id = await categoryOf('Sample Landlord').getAttribute('data-category');
+					const category = page
+						.getByRole('button')
+						.and(page.locator(`[data-category="${String(id)}"]`));
+					await category.click();
+					const all = await options();
+					expect(all.slice(0, 2)).toEqual(['Uncategorized', 'Ready to Assign']);
+					await expect(
+						listbox.getByRole('group', { name: 'Transfer to or from' }).getByRole('option')
+					).toHaveText(['Transfer: Savings', 'Transfer: Card']);
+					await page.keyboard.type('card');
+					await expect.poll(options).toEqual(['Transfer: Card']);
+					await page.keyboard.press('Enter');
+					await expect(category).toHaveAccessibleName(/^To Card, /);
+					await openAccount(page, 'Card');
+					await expect(
+						page.getByRole('button', { name: /^From Checking, Category of / }).first()
+					).toBeVisible();
+					await expect
+						.poll(() => centsIn(page.getByTestId('account-balance')))
+						.toBeGreaterThan(cardBalance);
+				}
+			);
+
+			await step(
+				'on a 320 px phone the Category opens above the tab bar, fits the screen, and saves a search',
+				async () => {
+					await page.setViewportSize({ width: 320, height: 640 });
+					await page.goto('/accounts');
+					const category = categoryOf('Sample Coffee Shop');
+					await category.scrollIntoViewIfNeeded();
+					await expectClearOf(
+						category,
+						page.getByRole('navigation', { name: 'Sections', exact: true })
+					);
+					await category.click();
+					await expectClearOf(
+						listbox,
+						page.getByRole('navigation', { name: 'Sections', exact: true })
+					);
+					await expectNothingPastTheRightEdge(page);
+					await page.getByRole('combobox', { name: 'Search Categories' }).fill('coff');
+					await listbox.getByRole('option', { name: 'Coffee', exact: true }).click();
+					await expect(category).toHaveAccessibleName(/^Coffee, /);
+					await expect(unapproved('Sample Coffee Shop')).toBeVisible();
+				}
+			);
+		}
+	},
+	'categorize-late': {
+		title:
+			'a Category picked while the row’s earlier pick is still saving wins, and the earlier save landing late does not put it back',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			const categorize = await holdResponseTo(page, 'transactions:categorize');
+			const category = page
+				.getByRole('button', { name: /Category of Sample Utility Co on / })
+				.first();
+
+			await step('pick Coffee for a Checking row and hold its save', async () => {
+				await page.goto('/');
+				await openAccount(page, 'Checking');
+				await choose(category, 'Coffee');
+				await categorize.held;
+				await expect(category).toHaveAccessibleName(/^Saving, /);
+				await expect(category).toHaveText('Coffee');
+			});
+
+			await step(
+				'pick Dining Out, then let the Coffee save land: the row still shows Dining Out',
+				async () => {
+					await choose(category, 'Dining Out');
+					await expect(category).toHaveText('Dining Out');
+					categorize.landEarliest();
+					await expect(category).toHaveAccessibleName(/^Saving, /);
+					await expect(category).toHaveText('Dining Out');
+				}
+			);
+
+			await step('let the Dining Out save land, and it is kept after reload', async () => {
+				categorize.release();
+				await expect(category).toHaveAccessibleName(/^Dining Out, /);
+				await page.reload();
+				await expect(category).toHaveAccessibleName(/^Dining Out, /);
 			});
 		}
 	},

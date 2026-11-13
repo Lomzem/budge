@@ -136,7 +136,7 @@ function directionOf(cents: number): Direction {
 	return cents < 0 ? 'outflow' : 'inflow';
 }
 
-function choiceOf(saved: Saved): Choice {
+function choiceOf(saved: Pick<Saved, 'transfer' | 'splits' | 'categoryId'>): Choice {
 	if (saved.transfer) return { kind: 'transfer', accountId: saved.transfer.accountId };
 	if (saved.splits) return { kind: 'split' };
 	if (saved.categoryId !== null) return { kind: 'category', categoryId: saved.categoryId };
@@ -291,6 +291,33 @@ function transferAccountsOf(draft: Draft, accounts: readonly AccountChoice[]) {
 function isCardPayment(draft: Draft, selection: Selection, accounts: readonly AccountChoice[]) {
 	if (selection.kind !== 'transfer') return false;
 	return !(isCash(accounts, draft.accountId) && isCash(accounts, selection.accountId));
+}
+
+export type RowChoice = Exclude<Choice, { readonly kind: 'split' }>;
+
+export function savedOptionOf(saved: Pick<Saved, 'transfer' | 'splits' | 'categoryId'>): string {
+	return optionOf(choiceOf(saved));
+}
+
+export function rowChoiceFor(option: string): RowChoice | undefined {
+	if (option === UNCATEGORIZED_OPTION) return { kind: 'uncategorized' };
+	if (option === SPLIT_OPTION || option === UNRESOLVED_OPTION) return undefined;
+	if (option.startsWith(TRANSFER_OPTION)) {
+		return { kind: 'transfer', accountId: option.slice(TRANSFER_OPTION.length) as Id<'accounts'> };
+	}
+	return { kind: 'category', categoryId: option as Id<'categories'> };
+}
+
+export function rowTransferAccounts(
+	row: { readonly accountId: string; readonly amount: number },
+	accounts: readonly AccountChoice[]
+): AccountChoice[] {
+	const fromCash = isCash(accounts, row.accountId);
+	return accounts.filter((account) => {
+		if (account._id === row.accountId) return false;
+		if (fromCash) return account.kind === 'cash' || row.amount <= 0;
+		return account.kind === 'cash' && row.amount >= 0;
+	});
 }
 
 export function choose(draft: Draft, option: string, world: World): Draft {

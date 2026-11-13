@@ -4,8 +4,10 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UploadIcon from '@lucide/svelte/icons/upload';
 	import type { FunctionReturnType } from 'convex/server';
-	import { useMutation, useQuery } from 'convex-svelte';
+	import type { ClassValue } from 'svelte/elements';
+	import { useConvexClient, useMutation, useQuery } from 'convex-svelte';
 	import { tick } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	import { replaceState } from '$app/navigation';
 	import type { ResolvedPathname } from '$app/types';
@@ -14,6 +16,7 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
 	import { attempt } from '$lib/attempt';
+	import CategoryPicker from '$lib/components/category-picker.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Checkbox } from '$lib/components/ui/checkbox';
@@ -25,6 +28,14 @@
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { usePaginatedQuery } from '$lib/paginatedQuery.svelte';
 
+	import {
+		optionOf,
+		rowChoiceFor,
+		rowTransferAccounts,
+		savedOptionOf
+	} from '$lib/transactionEditor';
+
+	import { categoryChoices, transferChoices } from './categoryChoices';
 	import ImportDialog from './import-dialog.svelte';
 	import TransactionDialog from './transaction-dialog.svelte';
 	import {
@@ -82,7 +93,7 @@
 	});
 
 	const accounts = getAccounts();
-	const categoryChoices = useQuery(api.categories.list, {});
+	const categoryList = useQuery(api.categories.list, {});
 	const payeeChoices = useQuery(api.payees.list, {});
 	function idsOf<T>(query: { data: T | undefined }, ids: (data: T) => string[]) {
 		return query.data === undefined ? undefined : ids(query.data);
@@ -90,7 +101,7 @@
 	const offered = $derived(
 		offeredFilters(filterValues, {
 			accountIds: accounts.loaded ? accounts.all.map((account) => account._id) : undefined,
-			categoryIds: idsOf(categoryChoices, (data) => [
+			categoryIds: idsOf(categoryList, (data) => [
 				...(data.readyToAssignId === null ? [] : [data.readyToAssignId]),
 				...data.groups.flatMap((group) => group.categories.map((category) => category._id))
 			]),
@@ -99,7 +110,7 @@
 	);
 	const applied = $derived(offered ?? noFilters);
 	const unchecked = $derived(
-		offered === undefined && Boolean(categoryChoices.error ?? payeeChoices.error)
+		offered === undefined && Boolean(categoryList.error ?? payeeChoices.error)
 	);
 	$effect(() => {
 		if (offered === undefined) return;
@@ -173,6 +184,11 @@
 	const approveAll = useMutation(api.transactions.approveAll);
 	const approveMany = useMutation(api.transactions.approveMany);
 	const unapprove = useMutation(api.transactions.unapprove);
+	const categorize = useMutation(api.transactions.categorize);
+	const convex = useConvexClient();
+	const picked = new SvelteMap<Id<'transactions'>, string>();
+	const latestPick = new SvelteMap<Id<'transactions'>, number>();
+	let preset = $state<string | undefined>();
 	const resolveBankChange = useMutation(api.imports.resolveBankChange);
 	let resolving = $state(false);
 	const removal = new DialogSession<{ row: Row; importId: Id<'imports'>; payee: string }>();
@@ -281,6 +297,7 @@
 
 	function add() {
 		editingSnapshot = undefined;
+		preset = undefined;
 		dialogOpen = true;
 	}
 
@@ -311,11 +328,75 @@
 		edit(row);
 	}
 
-	function edit(row: Row) {
+	function edit(row: Row, option?: string) {
+		preset = option;
 		deletedId = null;
 		editingSnapshot = row;
 		editingAt = rows.findIndex((other) => other._id === row._id);
 		dialogOpen = true;
+	}
+
+	function choicesFor(row: Row) {
+		const saved =
+			row.categoryId === null ? undefined : { id: row.categoryId, name: row.categoryName ?? '' };
+		return [
+			{ value: optionOf({ kind: 'uncategorized' }), label: 'Uncategorized' },
+			...categoryChoices(categoryList.data, saved),
+			...(row.startingBalance ? [] : transferChoices(rowTransferAccounts(row, accounts.all)))
+		];
+	}
+
+	const categoryPickerOf = (row: Row | undefined) =>
+		row === undefined ? undefined : shownOf(`[data-category="${row._id}"]`);
+
+	async function linksAnImport(row: Row, option: string) {
+		const choice = rowChoiceFor(option);
+		if (choice?.kind !== 'transfer' || row.bankRows.length === 0) return false;
+		if (row.transfer?.accountId === choice.accountId) return false;
+		const found = await attempt(() =>
+			convex.query(api.transactions.transferCandidates, {
+				transferAccountId: choice.accountId,
+				date: row.date,
+				amount: row.amount
+			})
+		);
+		return !found.ok || found.value.length > 0;
+	}
+
+	async function pickCategory(row: Row, option: string, payee: string) {
+		const choice = rowChoiceFor(option);
+		if (choice === undefined || option === (picked.get(row._id) ?? savedOptionOf(row))) return;
+		rowError = '';
+		const pick = (latestPick.get(row._id) ?? 0) + 1;
+		latestPick.set(row._id, pick);
+		picked.set(row._id, option);
+		const at = rows.findIndex((other) => other._id === row._id);
+		if (await linksAnImport(row, option)) {
+			if (latestPick.get(row._id) !== pick) return;
+			picked.delete(row._id);
+			edit(row, option);
+			return;
+		}
+		const saved = await attempt(() => categorize({ transactionId: row._id, choice }));
+		if (latestPick.get(row._id) !== pick) return;
+		picked.delete(row._id);
+		if (!saved.ok) {
+			rowError = "Budge couldn't change the Category. Try again.";
+			return;
+		}
+		const label = choicesFor(row)
+			.flatMap((entry) => ('group' in entry ? entry.choices : [entry]))
+			.find((entry) => entry.value === option)?.label;
+		announce(`${label ?? 'Category'} saved for ${payee}`);
+		await tick();
+		if (document.activeElement === document.body) focusAfterCategorize(row, at);
+	}
+
+	function focusAfterCategorize(row: Row, at: number) {
+		const target = [row, rows[at], rows[at - 1]]
+			.map((candidate) => categoryPickerOf(candidate) ?? editButtonOf(candidate))
+			.find((element) => element !== undefined);
+		(target ?? addButton)?.focus();
 	}
 
 	async function toggleCleared(row: Row, cleared: boolean) {
@@ -442,7 +523,6 @@
 
 {#snippet transactionRow(row: (typeof rows)[number])}
 	{@const payee = row.payeeName ?? (row.transfer ? 'Transfer' : 'No Payee')}
-	{@const category = categoryOf(row)}
 	{@const flag = bankFlag(row)}
 	{@const bankChange = bankChangeOf(row)}
 	{@const categoryClass =
@@ -489,7 +569,7 @@
 				<time datetime={row.date} class="shrink-0 tabular-nums @2xl:hidden">
 					{formatDate(row.date, 'short')}
 				</time>
-				<span class={['min-w-0 break-words @4xl:hidden', categoryClass]}>{category}</span>
+				{@render rowCategory(row, payee, ['@4xl:hidden', categoryClass])}
 			</span>
 			{#if allAccounts}
 				<span class="block text-xs font-normal break-words text-muted-foreground @5xl:hidden">
@@ -548,7 +628,7 @@
 			{/if}
 		</Table.Cell>
 		<Table.Cell showFrom="4xl">
-			<span class={['block truncate', categoryClass]}>{category}</span>
+			{@render rowCategory(row, payee, categoryClass)}
 		</Table.Cell>
 		<Table.Cell showFrom={memoFrom}>
 			<span class="block truncate">{row.memo ?? ''}</span>
@@ -592,6 +672,29 @@
 			{/if}
 		</Table.Cell>
 	</Table.Row>
+{/snippet}
+
+{#snippet rowCategory(row: Row, payee: string, className: ClassValue | undefined)}
+	{@const category = categoryOf(row)}
+	{#if row.splits}
+		<span class={['min-w-0 break-words', className]}>{category}</span>
+	{:else}
+		{@const pending = picked.get(row._id)}
+		<span class={['min-w-0', className]}>
+			<CategoryPicker
+				inline
+				data-category={row._id}
+				aria-label="{pending === undefined
+					? category
+					: 'Saving'}, Category of {payee} on {formatDate(row.date)}"
+				searchLabel={row.startingBalance ? 'Search Categories' : 'Search Categories and Transfers'}
+				value={pending ?? savedOptionOf(row)}
+				shown={pending === undefined ? category : undefined}
+				choices={choicesFor(row)}
+				onValueChange={(option: string) => pickCategory(row, option, payee)}
+			/>
+		</span>
+	{/if}
 {/snippet}
 
 {#snippet cleared(row: (typeof rows)[number], payee: string)}
@@ -711,6 +814,7 @@
 <TransactionDialog
 	bind:open={dialogOpen}
 	transaction={editing}
+	{preset}
 	defaultAccountId={accountId}
 	{returnFocus}
 	ondone={announce}

@@ -53,6 +53,14 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 			for (const sent of queued.splice(0, through + 1)) browser?.send(sent);
 			return callOf(frame);
 		},
+		landEarliest(): number {
+			const responses = queued.flatMap((frame, index) => (callOf(frame) === -1 ? [] : [index]));
+			const [earliest, next] = responses;
+			const frame = earliest === undefined ? undefined : queued[earliest];
+			if (frame === undefined) throw new Error(`No ${udfPath} response is held`);
+			for (const sent of queued.splice(0, next ?? queued.length)) browser?.send(sent);
+			return callOf(frame);
+		},
 		release() {
 			holding = false;
 			released = true;

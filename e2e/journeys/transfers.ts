@@ -91,10 +91,13 @@ export const transfers = {
 			});
 
 			await step(
-				"making Checking's import a Transfer offers to link the Savings import",
+				"making Checking's import a Transfer from its row opens it with that Transfer and offers to link the Savings import",
 				async () => {
-					await page.getByRole('button', { name: /^SAMPLE E2E XFER OUT/ }).click();
-					await choose(dialog.getByLabel('Category or Transfer'), 'Transfer: Savings');
+					await choose(
+						page.getByRole('button', { name: /Category of SAMPLE E2E XFER OUT on / }),
+						'Transfer: Savings'
+					);
+					await expect(dialog.getByLabel('Category or Transfer')).toHaveText('Transfer: Savings');
 					await expect(
 						dialog.getByRole('radio', { name: /^Link the import SAMPLE E2E XFER IN/ })
 					).toBeChecked();
