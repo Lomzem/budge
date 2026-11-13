@@ -115,6 +115,7 @@ each shape once (the counts are deterministic) and exits 1 with
 when any call reaches a full limit.
 
 Measured 2026-11-13 at 250 Transactions, 250 bank rows and 250 split lines: the
-apply's largest use was 2,641 of 4,096 index ranges (64%) and 15,575 of 32,000
-documents read (49%); every delete and patch counts as an index range. At 500
+apply's largest use was 2,641 of 4,096 index ranges (64%) and 15,775 of 32,000
+documents read (49%), and the undo's was 2,335 index ranges (57%); every delete
+and patch counts as an index range. At 500
 Transactions the apply exceeded 4,096 index ranges, which set the lower bounds.

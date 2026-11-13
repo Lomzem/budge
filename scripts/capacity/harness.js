@@ -263,7 +263,7 @@ export const cutoverHistory = mutation({
 					bankText,
 					transactionId,
 					matched: row === 0,
-					state: row === 0 ? 'linked' : 'removed'
+					state: 'linked'
 				});
 			}
 		}

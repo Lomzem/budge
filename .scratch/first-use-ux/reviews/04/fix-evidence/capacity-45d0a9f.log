@@ -1,0 +1,1178 @@
+Preparing worktree (detached HEAD 45d0a9f)
+HEAD is now at 45d0a9f Undo refuses over any later change to a Starting Balance it would overwrite, and a bank change to folded history comes back with it after Undo
+bun install v1.4.4 (38afee6c8)
+Resolving dependencies
+Resolved, downloaded and extracted [1]
+
+$ (bun run sync || echo '') && (lefthook install || echo '')
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-kit sync
+sync hooks: ✔️(pre-push, pre-commit)
+
++ @clerk/testing@2.2.52
++ @convex-dev/eslint-plugin@5.0.0
++ @edge-runtime/vm@5.0.0
++ @effect/language-service@0.87.5
++ @effect/tsgo@0.62.0
++ @effect/vitest@4.0.6
++ @eslint/js@10.0.1
++ @fontsource-variable/inter@5.3.0
++ @internationalized/date@3.12.4
++ @lucide/svelte@1.62.0
++ @playwright/test@1.64.1
++ @shadcn/lint@0.2.3
++ @sveltejs/adapter-vercel@6.3.4
++ @sveltejs/kit@2.70.3
++ @sveltejs/vite-plugin-svelte@7.3.1
++ @tailwindcss/vite@4.3.3
++ @types/node@24.19.2
++ bits-ui@2.20.2
++ cn@0.5.0
++ convex-test@0.0.66
++ eslint@10.13.0
++ eslint-config-prettier@10.1.8
++ eslint-plugin-svelte@3.23.1
++ globals@17.13.0
++ lefthook@2.2.2
++ prettier@3.9.10
++ prettier-plugin-svelte@4.1.1
++ prettier-plugin-tailwindcss@0.8.1
++ shadcn-svelte@1.7.1
++ svelte@5.57.3
++ svelte-check@4.7.7
++ svelte-eslint-parser@1.10.0
++ tailwind-variants@3.3.1
++ tailwindcss@4.3.3
++ tw-animate-css@1.4.0
++ typescript@6.0.3
++ typescript-eslint@8.72.1
++ vite@8.3.5
++ vitest@5.0.5
++ @fontsource-variable/atkinson-hyperlegible-next@5.3.0
++ convex@1.48.0
++ convex-svelte@0.15.1
++ effect@4.0.6
++ svelte-clerk@1.2.0
+
+292 packages installed [906.00ms]
+$ bun --no-env-file scripts/app.ts up
+app: starting the local anonymous backend…
+✔ Successfully set CLERK_JWT_ISSUER_DOMAIN
+✔ Successfully set BUDGE_OWNER_SUBJECT
+app: starting Vite…
+app: next, `bun run app login` and `bun run app seed <fixture>`.
+app: up at http://127.0.0.1:5173 (backend http://127.0.0.1:3210).
+$ bun run codegen:check && bun run format:check && bun run lint && bun run lint:ui && bun run typecheck && bun run test && bun run capacity:check
+$ bun run codegen && git diff --exit-code -- convex/_generated
+$ bun scripts/codegen.js
+Temporary directory '/tmp' and project directory 'convex/_generated' are on different filesystems.
+  If you're running into errors with other tools watching the project directory, override the temporary directory location with the CONVEX_TMPDIR environment variable.
+  Be sure to pick a temporary directory that's on the same filesystem as your project.
+$ prettier --check .
+Checking formatting...
+All matched files use Prettier code style!
+$ eslint --max-warnings 0 .
+$ eslint --config eslint.ui.config.js --max-warnings 0 .
+$ bun run typecheck:app && bun run typecheck:convex
+$ bun run sync && PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-check --tsconfig ./tsconfig.json --fail-on-warnings
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-kit sync
+1794604172334 START "/home/lomzem/proj/budge-t04-capacity"
+1794604172339 COMPLETED 1663 FILES 0 ERRORS 0 WARNINGS 0 FILES_WITH_PROBLEMS
+$ effect-tsgo tsc@7.0.2 --project convex/tsconfig.json
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} vitest run
+
+ RUN  v5.0.5 /home/lomzem/proj/budge-t04-capacity
+
+(node:79581) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79616) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79580) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79579) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79583) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79578) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79576) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79582) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79627) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79584) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79577) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79664) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79700) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79706) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79712) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79721) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79722) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79735) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79748) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79755) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79764) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79789) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79790) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79783) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79809) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79818) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+app: SIGINT; stopping what this start launched…
+(node:81133) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  58 passed (58)
+      Tests  898 passed (898)
+   Start at  13:09:34
+   Duration  29.11s (tests 67%, import 21%, transform 8%, environment 3%)
+
+$ bun run capacity --check
+$ bun --no-env-file scripts/capacity/run.js --check
+Saved PUBLIC_CONVEX_URL and PUBLIC_CONVEX_SITE_URL to .env.local
+▌ Developing against deployment:
+▌ └─ http://127.0.0.1:3210
+- Preparing Convex functions...
+
+[32m√[39m 13:10:04 Convex functions ready! (1.04s)
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete |
+--------------------------------------
+accounts           | 0      | 0 of 0 |
+assignments        | 0      | 0 of 0 |
+bankConnections    | 0      | 0 of 0 |
+categories         | 0      | 0 of 0 |
+categoryGroups     | 0      | 0 of 0 |
+connectionAccounts | 0      | 0 of 0 |
+cutoverMoveHistory | 0      | 0 of 0 |
+cutoverMoves       | 0      | 0 of 0 |
+imports            | 0      | 0 of 0 |
+monthlyTotals      | 0      | 0 of 0 |
+payeeRenames       | 0      | 0 of 0 |
+payees             | 0      | 0 of 0 |
+settings           | 0      | 0 of 0 |
+transactionSplits  | 0      | 0 of 0 |
+transactions       | 0      | 0 of 0 |
+webhookKeyLookups  | 0      | 0 of 0 |
+webhookKeys        | 0      | 0 of 0 |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"qfx","count":250,"run":1,"function":"preview","metrics":{"bytesRead":{"remaining":16524815,"used":252401},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":2810,"used":1286},"documentsRead":{"remaining":30988,"used":1012},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.352790579}
+{"scenario":"qfx","count":250,"run":1,"function":"commit","metrics":{"bytesRead":{"remaining":15614753,"used":1162463},"bytesWritten":{"remaining":16159076,"used":618140},"databaseQueries":{"remaining":2068,"used":2028},"documentsRead":{"remaining":28750,"used":3250},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.616292505}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 1 of 1         |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"qfx","count":250,"run":2,"function":"preview","metrics":{"bytesRead":{"remaining":16524815,"used":252401},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":2810,"used":1286},"documentsRead":{"remaining":30988,"used":1012},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.335690772}
+{"scenario":"qfx","count":250,"run":2,"function":"commit","metrics":{"bytesRead":{"remaining":15614753,"used":1162463},"bytesWritten":{"remaining":16159076,"used":618140},"databaseQueries":{"remaining":2068,"used":2028},"documentsRead":{"remaining":28750,"used":3250},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.596987367}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 1 of 1         |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"qfx","count":250,"run":3,"function":"preview","metrics":{"bytesRead":{"remaining":16524815,"used":252401},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":2810,"used":1286},"documentsRead":{"remaining":30988,"used":1012},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.343930453}
+{"scenario":"qfx","count":250,"run":3,"function":"commit","metrics":{"bytesRead":{"remaining":15614753,"used":1162463},"bytesWritten":{"remaining":16159076,"used":618140},"databaseQueries":{"remaining":2068,"used":2028},"documentsRead":{"remaining":28750,"used":3250},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.595342406}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 1 of 1         |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"qfx-diverse","count":250,"run":1,"function":"preview","metrics":{"bytesRead":{"remaining":16159605,"used":617611},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":2220,"used":1876},"documentsRead":{"remaining":30398,"used":1602},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.404904947}
+{"scenario":"qfx-diverse","count":250,"run":1,"function":"commit","metrics":{"bytesRead":{"remaining":15637645,"used":1139571},"bytesWritten":{"remaining":16159076,"used":618140},"databaseQueries":{"remaining":2009,"used":2087},"documentsRead":{"remaining":28868,"used":3132},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.529253998}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 60 of 60       |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"qfx-diverse","count":250,"run":2,"function":"preview","metrics":{"bytesRead":{"remaining":16159605,"used":617611},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":2220,"used":1876},"documentsRead":{"remaining":30398,"used":1602},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.502962342}
+{"scenario":"qfx-diverse","count":250,"run":2,"function":"commit","metrics":{"bytesRead":{"remaining":15637645,"used":1139571},"bytesWritten":{"remaining":16159076,"used":618140},"databaseQueries":{"remaining":2009,"used":2087},"documentsRead":{"remaining":28868,"used":3132},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.57747853}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 60 of 60       |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"qfx-diverse","count":250,"run":3,"function":"preview","metrics":{"bytesRead":{"remaining":16159605,"used":617611},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":2220,"used":1876},"documentsRead":{"remaining":30398,"used":1602},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.353694004}
+{"scenario":"qfx-diverse","count":250,"run":3,"function":"commit","metrics":{"bytesRead":{"remaining":15637645,"used":1139571},"bytesWritten":{"remaining":16159076,"used":618140},"databaseQueries":{"remaining":2009,"used":2087},"documentsRead":{"remaining":28868,"used":3132},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.539685855}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 60 of 60       |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"csv","count":250,"run":1,"function":"preview","metrics":{"bytesRead":{"remaining":16524815,"used":252401},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":3059,"used":1037},"documentsRead":{"remaining":30988,"used":1012},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.282259129}
+{"scenario":"csv","count":250,"run":1,"function":"commit","metrics":{"bytesRead":{"remaining":15620393,"used":1156823},"bytesWritten":{"remaining":16164716,"used":612500},"databaseQueries":{"remaining":2317,"used":1779},"documentsRead":{"remaining":28750,"used":3250},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.510678984}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 1 of 1         |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"csv","count":250,"run":2,"function":"preview","metrics":{"bytesRead":{"remaining":16524815,"used":252401},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":3059,"used":1037},"documentsRead":{"remaining":30988,"used":1012},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.303589513}
+{"scenario":"csv","count":250,"run":2,"function":"commit","metrics":{"bytesRead":{"remaining":15620393,"used":1156823},"bytesWritten":{"remaining":16164716,"used":612500},"databaseQueries":{"remaining":2317,"used":1779},"documentsRead":{"remaining":28750,"used":3250},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.579136726}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 1 of 1         |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"csv","count":250,"run":3,"function":"preview","metrics":{"bytesRead":{"remaining":16524815,"used":252401},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":3059,"used":1037},"documentsRead":{"remaining":30988,"used":1012},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.3093287}
+{"scenario":"csv","count":250,"run":3,"function":"commit","metrics":{"bytesRead":{"remaining":15620393,"used":1156823},"bytesWritten":{"remaining":16164716,"used":612500},"databaseQueries":{"remaining":2317,"used":1779},"documentsRead":{"remaining":28750,"used":3250},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.611291076}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 1 of 1         |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"csv-diverse","count":250,"run":1,"function":"preview","metrics":{"bytesRead":{"remaining":16159605,"used":617611},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":2469,"used":1627},"documentsRead":{"remaining":30398,"used":1602},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.407700004}
+{"scenario":"csv-diverse","count":250,"run":1,"function":"commit","metrics":{"bytesRead":{"remaining":15643285,"used":1133931},"bytesWritten":{"remaining":16164716,"used":612500},"databaseQueries":{"remaining":2258,"used":1838},"documentsRead":{"remaining":28868,"used":3132},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.595576454}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 60 of 60       |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"csv-diverse","count":250,"run":2,"function":"preview","metrics":{"bytesRead":{"remaining":16159605,"used":617611},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":2469,"used":1627},"documentsRead":{"remaining":30398,"used":1602},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.334519024}
+{"scenario":"csv-diverse","count":250,"run":2,"function":"commit","metrics":{"bytesRead":{"remaining":15643285,"used":1133931},"bytesWritten":{"remaining":16164716,"used":612500},"databaseQueries":{"remaining":2258,"used":1838},"documentsRead":{"remaining":28868,"used":3132},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.536691508}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 60 of 60       |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"csv-diverse","count":250,"run":3,"function":"preview","metrics":{"bytesRead":{"remaining":16159605,"used":617611},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":2469,"used":1627},"documentsRead":{"remaining":30398,"used":1602},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.341223725}
+{"scenario":"csv-diverse","count":250,"run":3,"function":"commit","metrics":{"bytesRead":{"remaining":15643285,"used":1133931},"bytesWritten":{"remaining":16164716,"used":612500},"databaseQueries":{"remaining":2258,"used":1838},"documentsRead":{"remaining":28868,"used":3132},"documentsWritten":{"remaining":15000,"used":1000},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":0.575307526}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 1 of 1         |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1 of 1         |
+categoryGroups     | 0      | 1 of 1         |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 0 of 0         |
+cutoverMoves       | 0      | 0 of 0         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 60 of 60       |
+payeeRenames       | 0      | 1,000 of 1,000 |
+payees             | 0      | 1,000 of 1,000 |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 1,250 of 1,250 |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"cutover-startingBalances","count":250,"run":1,"function":"cutoverPreview","metrics":{"bytesRead":{"remaining":14023753,"used":2753463},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":3957,"used":139},"documentsRead":{"remaining":19327,"used":12673},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":2.599105905}
+{"scenario":"cutover-startingBalances","count":250,"run":1,"function":"cutoverApply","metrics":{"bytesRead":{"remaining":12426354,"used":4350862},"bytesWritten":{"remaining":15594033,"used":1183183},"databaseQueries":{"remaining":1455,"used":2641},"documentsRead":{"remaining":16225,"used":15775},"documentsWritten":{"remaining":14198,"used":1802},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":3.047779086}
+{"scenario":"cutover-startingBalances","count":250,"run":1,"function":"cutoverUndo","error":"ConvexError: [Request ID: b672e5ac216e8107] Server Error\nUncaught ConvexError: {\"code\":\"INVALID_INPUT\",\"message\":\"The bank removed Invented Cutover Payee 000000 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (2020-01-01) or moved it before 2024-01-01 since the move, so the move can't be undone.\"}\n    at publicError (../../convex/lib/publicError.ts:6:0)\n    at requireBankRowsToPutBack (../../convex/lib/laterCutover.ts:467:5)\n    at async requireStillThere (../../convex/lib/laterCutover.ts:443:2)\n    at async undoLaterCutover (../../convex/lib/laterCutover.ts:332:1)\n    at async handler (../convex/settings.ts:96:1)\n\n    at async handler (../convex/capacity.js:327:34)\n","duration":0.200786588}
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /home/lomzem/proj/budge-t04-capacity/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete         |
+----------------------------------------------
+accounts           | 0      | 200 of 200     |
+assignments        | 0      | 0 of 0         |
+bankConnections    | 0      | 0 of 0         |
+categories         | 0      | 1,000 of 1,000 |
+categoryGroups     | 0      | 21 of 21       |
+connectionAccounts | 0      | 0 of 0         |
+cutoverMoveHistory | 0      | 50 of 50       |
+cutoverMoves       | 0      | 1 of 1         |
+imports            | 0      | 250 of 250     |
+monthlyTotals      | 0      | 9,850 of 9,850 |
+payeeRenames       | 0      | 0 of 0         |
+payees             | 0      | 50 of 50       |
+settings           | 0      | 1 of 1         |
+transactionSplits  | 0      | 0 of 0         |
+transactions       | 0      | 200 of 200     |
+webhookKeyLookups  | 0      | 0 of 0         |
+webhookKeys        | 0      | 0 of 0         |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing "settings"
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+[32m√[39m Added 0 documents to table "settings".
+{"scenario":"cutover-splitLines","count":250,"run":1,"function":"cutoverPreview","metrics":{"bytesRead":{"remaining":13798469,"used":2978747},"bytesWritten":{"remaining":16777216,"used":0},"databaseQueries":{"remaining":3385,"used":711},"documentsRead":{"remaining":19101,"used":12899},"documentsWritten":{"remaining":16000,"used":0},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":2.749070112}
+{"scenario":"cutover-splitLines","count":250,"run":1,"function":"cutoverApply","metrics":{"bytesRead":{"remaining":13019760,"used":3757456},"bytesWritten":{"remaining":16153118,"used":624098},"databaseQueries":{"remaining":1515,"used":2581},"documentsRead":{"remaining":17201,"used":14799},"documentsWritten":{"remaining":14199,"used":1801},"fileReadBytes":{"remaining":16777216,"used":0},"fileWriteBytes":{"remaining":16777216,"used":0},"filesRead":{"remaining":10,"used":0},"filesWritten":{"remaining":10,"used":0},"functionsScheduled":{"remaining":1000,"used":0},"scheduledFunctionArgsBytes":{"remaining":16777216,"used":0}},"duration":2.866143402}
+{"scenario":"cutover-splitLines","count":250,"run":1,"function":"cutoverUndo","error":"ConvexError: [Request ID: e887f56357d82a4f] Server Error\nUncaught ConvexError: {\"code\":\"INVALID_INPUT\",\"message\":\"The bank removed Invented Cutover Payee 000020 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (2021-09-21) or moved it before 2024-01-01 since the move, so the move can't be undone.\"}\n    at publicError (../../convex/lib/publicError.ts:6:0)\n    at requireBankRowsToPutBack (../../convex/lib/laterCutover.ts:467:5)\n    at async requireStillThere (../../convex/lib/laterCutover.ts:443:2)\n    at async undoLaterCutover (../../convex/lib/laterCutover.ts:332:1)\n    at async handler (../convex/settings.ts:96:1)\n\n    at async handler (../convex/capacity.js:327:34)\n","duration":0.119558475}
+Later cutover capacity contract failed; reduce LATER_CUTOVER_READS or reduce measured preview/apply/undo work.
+{"check":{"passed":false,"maxFileRows":250,"cutover":{"passed":false,"belowHalf":false,"bounds":{"transactions":250,"bankRows":250,"splitLines":250,"accounts":200,"categoryGroups":200,"categories":1000,"assignments":5000,"monthlyTotals":10000,"transactionsAfterToday":1000,"earlierAssignments":500}},"seconds":104.15879177500001}}
+Removed the CONVEX_DEPLOYMENT environment variable from .env.local
+▌ Developing against deployment:
+▌ └─ http://127.0.0.1:3210
+- Preparing Convex functions...
+
+[32m√[39m 13:11:49 Convex functions ready! (1.7s)
+error: script "capacity" exited with code 1
+error: script "capacity:check" exited with code 1
+error: script "check" exited with code 1
+$ bun --no-env-file scripts/app.ts down
+app: down.
+check exit=1
+2026-11-13T21-10-03.538Z
