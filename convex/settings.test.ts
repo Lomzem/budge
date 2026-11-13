@@ -2,6 +2,8 @@ import { assert, describe, expect, test } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import type { Id, TableNames } from './_generated/dataModel';
+import type { MutationCtx } from './_generated/server';
+import { LATER_CUTOVER_READS } from './lib/laterCutover';
 import { refreshDerivedFields } from './lib/transactions';
 import schema from './schema';
 import { newBackend, publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
@@ -119,6 +121,25 @@ async function septemberBudget() {
 }
 
 const today = '2026-11-13';
+
+interface FingerprintCase {
+	owner: ReturnType<typeof newBackend>['owner'];
+	accounts: Readonly<Record<'Checking' | 'Savings', Id<'accounts'>>>;
+	checking: Id<'transactions'>;
+	savings: Id<'transactions'>;
+	entry: (
+		account: 'Checking' | 'Savings',
+		date: string,
+		amount: number
+	) => {
+		accountId: Id<'accounts'>;
+		date: string;
+		amount: number;
+		payee: string;
+		memo: string;
+	};
+	readyToAssignId: Id<'categories'>;
+}
 
 describe('previewing a later cutover date', () => {
 	test('folds each Account’s earlier Transactions into a Starting Balance on the new date, shows the budget it leaves, and changes nothing', async () => {
@@ -303,6 +324,38 @@ describe('previewing a later cutover date', () => {
 			{ name: 'Checking', startingBalance: null, proposedStartingBalance: null }
 		]);
 	});
+	test('folds into a Starting Balance dated on the new date, which is not after it', async () => {
+		const { owner, accounts, categories } = await startBudget({
+			cutoverDate: '2026-09-01',
+			accounts: { Checking: ['cash', 100_000] },
+			groups: { Everyday: ['Groceries'] }
+		});
+		await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-08-01' });
+		await owner.mutation(api.transactions.create, {
+			accountId: accounts.Checking,
+			date: '2026-08-10',
+			amount: -2_500,
+			payee: 'Corner Grocer',
+			categoryId: categories.Groceries,
+			memo: ''
+		});
+
+		const preview = await owner.query(api.settings.previewLaterCutover, {
+			cutoverDate: '2026-09-01',
+			today
+		});
+
+		assert(preview.kind === 'ready', `expected a ready preview, got ${preview.kind}`);
+		expect(preview.accounts).toMatchObject([
+			{
+				name: 'Checking',
+				startingBalance: { amount: 100_000, date: '2026-09-01' },
+				transactions: [{ date: '2026-08-10', amount: -2_500 }],
+				proposedStartingBalance: 97_500
+			}
+		]);
+		expect(preview.budget.readyToAssign.after).toBe(97_500);
+	});
 });
 
 describe('a later cutover date preview it cannot work out', () => {
@@ -331,32 +384,71 @@ describe('a later cutover date preview it cannot work out', () => {
 		).toMatchObject({ kind: 'unsupported', reason: 'noCutoverDate' });
 	});
 
-	test('names its limit rather than previewing part of a large history', async () => {
-		const { t, owner, accounts } = await startBudget({
-			cutoverDate: '2026-09-01',
-			accounts: { Checking: ['cash', 100_000] }
-		});
-		await t.run(async (ctx) => {
-			for (let n = 0; n < 500; n++) {
-				await ctx.db.insert('transactions', {
-					accountId: accounts.Checking,
+	test.each([
+		{
+			read: 'Transactions dated before the new date',
+			limit: LATER_CUTOVER_READS.transactions,
+			named: 'Transactions are dated before that day',
+			crowd: async (ctx: MutationCtx, checking: Id<'accounts'>) => {
+				for (let n = 0; n <= LATER_CUTOVER_READS.transactions; n++) {
+					await ctx.db.insert('transactions', {
+						accountId: checking,
+						date: '2026-10-01',
+						amount: -100,
+						cleared: 'uncleared',
+						approved: true
+					});
+				}
+			}
+		},
+		{
+			read: 'bank rows behind one earlier Transaction',
+			limit: LATER_CUTOVER_READS.bankRows,
+			named: 'bank rows',
+			crowd: async (ctx: MutationCtx, checking: Id<'accounts'>) => {
+				const transactionId = await ctx.db.insert('transactions', {
+					accountId: checking,
 					date: '2026-10-01',
 					amount: -100,
 					cleared: 'uncleared',
 					approved: true
 				});
+				for (let n = 0; n <= LATER_CUTOVER_READS.bankRows; n++) {
+					await ctx.db.insert('imports', {
+						source: 'csv',
+						accountId: checking,
+						date: '2026-10-01',
+						amount: -100,
+						bankText: `SAMPLE ROW ${String(n)}`,
+						transactionId,
+						matched: false,
+						state: 'linked'
+					});
+				}
 			}
-		});
+		}
+	])(
+		'names its limit on $read rather than previewing part of it',
+		async ({ limit, named, crowd }) => {
+			const { t, owner, accounts } = await startBudget({
+				cutoverDate: '2026-09-01',
+				accounts: { Checking: ['cash', 100_000] }
+			});
+			await t.run((ctx) => crowd(ctx, accounts.Checking));
 
-		const preview = await owner.query(api.settings.previewLaterCutover, {
-			cutoverDate: '2026-11-01',
-			today
-		});
+			const preview = await owner.query(api.settings.previewLaterCutover, {
+				cutoverDate: '2026-11-01',
+				today
+			});
 
-		assert(preview.kind === 'unsupported', `expected an unsupported preview, got ${preview.kind}`);
-		expect(preview.reason).toBe('tooMany');
-		expect(preview.message).toContain('More than 500 Transactions');
-	});
+			assert(
+				preview.kind === 'unsupported',
+				`expected an unsupported preview, got ${preview.kind}`
+			);
+			expect(preview.reason).toBe('tooMany');
+			expect(preview.message).toContain(`More than ${String(limit)} ${named}`);
+		}
+	);
 
 	test.each(['2026-11-01', '2026-12-01'])(
 		'with nothing dated before %s, says there is nothing to fold, even after today',
@@ -431,20 +523,70 @@ describe('a later cutover date preview that can proceed', () => {
 		});
 	});
 
-	test('identifies the history it folds: a change there gives another fingerprint, a later one does not', async () => {
-		const { owner, accounts } = await startBudget({
+	test.each([
+		{
+			change: 'an earlier Transaction’s amount',
+			reviewed: 'changes',
+			edit: async ({ owner, checking, entry }: FingerprintCase) => {
+				await owner.mutation(api.transactions.update, {
+					transactionId: checking,
+					...entry('Checking', '2026-10-03', -2_700)
+				});
+			}
+		},
+		{
+			change: 'income after the new date, which Ready to Assign shows',
+			reviewed: 'changes',
+			edit: async ({ owner, entry, readyToAssignId }: FingerprintCase) => {
+				await owner.mutation(api.transactions.create, {
+					...entry('Checking', '2026-11-03', 20_000),
+					categoryId: readyToAssignId
+				});
+			}
+		},
+		{
+			change: 'which Account holds each of two equal earlier Transactions',
+			reviewed: 'changes',
+			edit: async ({ owner, checking, savings, entry }: FingerprintCase) => {
+				await owner.mutation(api.transactions.update, {
+					transactionId: checking,
+					...entry('Savings', '2026-10-03', -2_500)
+				});
+				await owner.mutation(api.transactions.update, {
+					transactionId: savings,
+					...entry('Checking', '2026-10-03', -2_500)
+				});
+			}
+		},
+		{
+			change: 'only the order the Accounts are listed in',
+			reviewed: 'stays',
+			edit: async ({ owner, accounts }: FingerprintCase) => {
+				await owner.mutation(api.accounts.reorder, {
+					accountIds: [accounts.Savings, accounts.Checking]
+				});
+			}
+		}
+	])('identifies what it shows: $change $reviewed the fingerprint', async ({ reviewed, edit }) => {
+		const { owner, accounts, readyToAssignId } = await startBudget({
 			cutoverDate: '2026-09-01',
-			accounts: { Checking: ['cash', 100_000] }
+			accounts: { Checking: ['cash', 100_000], Savings: ['cash', 50_000] }
 		});
-		const entry = (date: string, amount: number) => ({
-			accountId: accounts.Checking,
+		const entry = (account: keyof typeof accounts, date: string, amount: number) => ({
+			accountId: accounts[account],
 			date,
 			amount,
 			payee: 'Corner Grocer',
 			memo: ''
 		});
-		const folded = await owner.mutation(api.transactions.create, entry('2026-10-03', -2_500));
-		const later = await owner.mutation(api.transactions.create, entry('2026-11-03', -1_500));
+		const checking = await owner.mutation(
+			api.transactions.create,
+			entry('Checking', '2026-10-03', -2_500)
+		);
+		const savings = await owner.mutation(
+			api.transactions.create,
+			entry('Savings', '2026-10-03', -2_500)
+		);
 		const fingerprint = async () => {
 			const preview = await owner.query(api.settings.previewLaterCutover, {
 				cutoverDate: '2026-11-01',
@@ -454,17 +596,11 @@ describe('a later cutover date preview that can proceed', () => {
 			return preview.fingerprint;
 		};
 		const first = await fingerprint();
+		expect(await fingerprint()).toBe(first);
 
-		expect(await fingerprint()).toBe(first);
-		await owner.mutation(api.transactions.update, {
-			transactionId: later,
-			...entry('2026-11-03', -1_700)
-		});
-		expect(await fingerprint()).toBe(first);
-		await owner.mutation(api.transactions.update, {
-			transactionId: folded,
-			...entry('2026-10-03', -2_700)
-		});
-		expect(await fingerprint()).not.toBe(first);
+		await edit({ owner, accounts, checking, savings, entry, readyToAssignId });
+
+		if (reviewed === 'changes') expect(await fingerprint()).not.toBe(first);
+		else expect(await fingerprint()).toBe(first);
 	});
 });

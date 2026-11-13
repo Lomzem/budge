@@ -6,13 +6,39 @@ import type { Doc, Id } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
 import { startingBalanceOf } from './accounts';
 import { accountKind } from './accountKind';
-import { readBudgetInput, type BudgetInputs } from './budget';
+import { readBudgetInput, type BudgetInputs, type BudgetRead } from './budget';
 import { keyOf, lineCounted, type Counted } from './monthlyTotals';
 import { publicError } from './publicError';
+import { readWithin, type LimitedReads, type ReadRows } from './readLimits';
 import { readCutoverDate } from './settings';
-import { allBankRowsOf, payeeNameOf, splitLinesOf } from './transactions';
+import { allBankRowsOf, payeeNameOf, splitLineRows } from './transactions';
 
-export const LATER_CUTOVER_LIMIT = 500;
+type LaterCutoverRead = BudgetRead | 'transactions' | 'bankRows' | 'splitLines' | 'accounts';
+
+export const LATER_CUTOVER_READS = {
+	transactions: 500,
+	bankRows: 1_000,
+	splitLines: 1_000,
+	accounts: 200,
+	categoryGroups: 200,
+	categories: 1_000,
+	assignments: 5_000,
+	monthlyTotals: 10_000,
+	transactionsAfterToday: 1_000
+} as const satisfies Record<LaterCutoverRead, number>;
+
+const closer = 'Pick a date closer to the current cutover date.';
+const tooManyOf: Record<LaterCutoverRead, string> = {
+	transactions: `Transactions are dated before that day. ${closer}`,
+	bankRows: `bank rows lie behind the Transactions dated before that day. ${closer}`,
+	splitLines: `split lines are in the Transactions dated before that day. ${closer}`,
+	accounts: 'Accounts are in this budget.',
+	categoryGroups: 'Category groups are in this budget.',
+	categories: 'Categories are in this budget.',
+	assignments: 'Assigned amounts are in this budget across its months.',
+	monthlyTotals: 'months of Category and Account totals are in this budget.',
+	transactionsAfterToday: 'Transactions dated after today count toward Ready to Assign.'
+};
 
 const clearedState = v.union(v.literal('uncleared'), v.literal('cleared'), v.literal('reconciled'));
 
@@ -155,6 +181,7 @@ interface Lookups {
 interface Earlier {
 	ordered: Fold[];
 	blockers: MustResolve[];
+	replaced: Doc<'transactions'>[];
 	splitLines: Map<Id<'transactions'>, Doc<'transactionSplits'>[]>;
 	accountOf: Lookups['accountOf'];
 }
@@ -170,17 +197,24 @@ export async function previewLaterCutover(
 	to: string,
 	today: string
 ): Promise<LaterCutoverPreview> {
-	const checked = await readEarlier(ctx, to, today);
+	const limits = readWithin(LATER_CUTOVER_READS);
+	const checked = await readEarlier(ctx, { to, today, limits });
 	if (!('earlier' in checked)) return checked;
 	const { from, earlier } = checked;
 
 	const month = monthOf(to);
-	const budgetInput = await readBudgetInput(ctx, month, today);
-	const { ordered, blockers, splitLines, accountOf } = await foldEarlier(
-		ctx,
+	const budgetInput = await readBudgetInput(ctx, month, today, limits.read);
+	const lookups = await lookupsOf(ctx, budgetInput.categories, limits.read);
+	const tooManyToLookUp = tooManyRead(limits);
+	if (tooManyToLookUp !== null) return tooManyToLookUp;
+	const { ordered, blockers, replaced, splitLines, accountOf } = await foldEarlier(ctx, {
 		earlier,
-		await lookupsOf(ctx, budgetInput.categories)
-	);
+		to,
+		read: limits.read,
+		lookups
+	});
+	const tooManyToFold = tooManyRead(limits);
+	if (tooManyToFold !== null) return tooManyToFold;
 	const cautions = ordered.flatMap((fold) => cautionsOf(fold, accountOf));
 
 	if (blockers.length > 0) {
@@ -208,7 +242,7 @@ export async function previewLaterCutover(
 		...budgetInput,
 		cutoverDate: to,
 		monthlyTotals: projectedTotals(budgetInput.monthlyTotals, {
-			earlier,
+			replaced,
 			splitLines,
 			proposed,
 			to
@@ -216,22 +250,10 @@ export async function previewLaterCutover(
 		assignments: budgetInput.assignments.filter((row) => row.month >= month)
 	});
 
-	return {
-		kind: 'ready',
+	const reviewed = {
+		kind: 'ready' as const,
 		from,
 		to,
-		fingerprint: fingerprintOf([
-			from,
-			to,
-			earlier.map((transaction) => transactionFingerprint(transaction, splitLines)),
-			proposed.map(({ fold, amount, category }) => [
-				fold.account._id,
-				fold.startingBalance?._id ?? null,
-				amount,
-				category?.categoryId ?? null
-			]),
-			removed.map((row) => [row._id, row.month, row.categoryId, row.amount])
-		]),
 		accounts: proposed.map(({ fold, amount }) => ({
 			...accountView(fold),
 			proposedStartingBalance: amount
@@ -248,12 +270,12 @@ export async function previewLaterCutover(
 			}
 		}
 	};
+	return { ...reviewed, fingerprint: await fingerprintOfWhatItShows(reviewed) };
 }
 
 async function readEarlier(
 	ctx: QueryCtx,
-	to: string,
-	today: string
+	{ to, today, limits }: { to: string; today: string; limits: LimitedReads<LaterCutoverRead> }
 ): Promise<
 	| Unsupported
 	| { kind: 'nothingBefore'; from: string; to: string }
@@ -262,16 +284,12 @@ async function readEarlier(
 	const from = await readCutoverDate(ctx);
 	if (from === null) return unsupported('noCutoverDate', 'Set the cutover date first.');
 	if (to <= from) return unsupported('notLater', 'Pick a date after the current cutover date.');
-	const earlier = await ctx.db
-		.query('transactions')
-		.withIndex('by_date', (q) => q.lt('date', to))
-		.take(LATER_CUTOVER_LIMIT + 1);
-	if (earlier.length > LATER_CUTOVER_LIMIT) {
-		return unsupported(
-			'tooMany',
-			`More than ${String(LATER_CUTOVER_LIMIT)} Transactions are dated before that day, more than Budge can preview at once. Pick a date closer to the current cutover date.`
-		);
-	}
+	const earlier = await limits.read(
+		'transactions',
+		ctx.db.query('transactions').withIndex('by_date', (q) => q.lt('date', to))
+	);
+	const tooManyEarlier = tooManyRead(limits);
+	if (tooManyEarlier !== null) return tooManyEarlier;
 	if (earlier.length === 0) return { kind: 'nothingBefore', from, to };
 	if (to > today) {
 		return unsupported(
@@ -286,12 +304,23 @@ function unsupported(reason: Unsupported['reason'], message: string): Unsupporte
 	return { kind: 'unsupported', reason, message };
 }
 
+function tooManyRead(limits: LimitedReads<LaterCutoverRead>): Unsupported | null {
+	const reached = limits.reached();
+	if (reached === null) return null;
+	return unsupported(
+		'tooMany',
+		`More than ${String(reached.limit)} ${tooManyOf[reached.read]} That is more than Budge can preview at once.`
+	);
+}
+
 async function lookupsOf(
 	ctx: QueryCtx,
-	categories: readonly { id: Id<'categories'>; name: string }[]
+	categories: readonly { id: Id<'categories'>; name: string }[],
+	read: ReadRows<LaterCutoverRead>
 ): Promise<Lookups> {
-	const accounts = new Map<Id<'accounts'>, Doc<'accounts'>>();
-	for await (const account of ctx.db.query('accounts')) accounts.set(account._id, account);
+	const accounts = new Map(
+		(await read('accounts', ctx.db.query('accounts'))).map((account) => [account._id, account])
+	);
 	const categoryNames = new Map(categories.map((c) => [c.id, c.name]));
 	const payees = new Map<Id<'payees'>, Promise<Doc<'payees'> | null>>();
 	const feeds = new Map<Id<'connectionAccounts'>, Promise<Doc<'connectionAccounts'> | null>>();
@@ -318,13 +347,23 @@ async function lookupsOf(
 
 async function foldEarlier(
 	ctx: QueryCtx,
-	earlier: readonly Doc<'transactions'>[],
-	lookups: Lookups
+	{
+		earlier,
+		to,
+		read,
+		lookups
+	}: {
+		earlier: readonly Doc<'transactions'>[];
+		to: string;
+		read: ReadRows<LaterCutoverRead>;
+		lookups: Lookups;
+	}
 ): Promise<Earlier> {
 	const folded = new Map(earlier.map((transaction) => [transaction._id, transaction]));
 	const folds = new Map<Id<'accounts'>, Fold>();
 	const splitLines = new Map<Id<'transactions'>, Doc<'transactionSplits'>[]>();
 	const blockers: MustResolve[] = [];
+	const replaced = [...earlier];
 
 	for (const transaction of earlier) {
 		const fold =
@@ -335,9 +374,12 @@ async function foldEarlier(
 			continue;
 		}
 		if (transaction.split === true) {
-			splitLines.set(transaction._id, await splitLinesOf(ctx, transaction._id));
+			splitLines.set(
+				transaction._id,
+				await read('splitLines', splitLineRows(ctx, transaction._id))
+			);
 		}
-		const found = await foldTransaction(ctx, lookups, { fold, transaction, folded });
+		const found = await foldTransaction(ctx, { lookups, read }, { fold, transaction, folded });
 		if (found.length > 0) {
 			fold.blocked = true;
 			blockers.push(...found);
@@ -347,16 +389,21 @@ async function foldEarlier(
 	const ordered = [...folds.values()].toSorted((a, b) => a.account.position - b.account.position);
 	for (const fold of ordered) {
 		if (fold.startingBalance !== null) continue;
-		const later = await startingBalanceOf(ctx, fold.account._id);
-		if (later === null) continue;
+		const existing = await startingBalanceOf(ctx, fold.account._id);
+		if (existing === null) continue;
+		if (existing.date === to) {
+			fold.startingBalance = existing;
+			replaced.push(existing);
+			continue;
+		}
 		fold.blocked = true;
 		blockers.push({
 			kind: 'startingBalanceLater',
 			accountName: fold.account.name,
-			date: later.date
+			date: existing.date
 		});
 	}
-	return { ordered, blockers, splitLines, accountOf: lookups.accountOf };
+	return { ordered, blockers, replaced, splitLines, accountOf: lookups.accountOf };
 }
 
 function emptyFold(account: Doc<'accounts'>): Fold {
@@ -365,7 +412,7 @@ function emptyFold(account: Doc<'accounts'>): Fold {
 
 async function foldTransaction(
 	ctx: QueryCtx,
-	lookups: Lookups,
+	{ lookups, read }: { lookups: Lookups; read: ReadRows<LaterCutoverRead> },
 	{
 		fold,
 		transaction,
@@ -376,7 +423,7 @@ async function foldTransaction(
 		folded: ReadonlyMap<Id<'transactions'>, Doc<'transactions'>>;
 	}
 ): Promise<MustResolve[]> {
-	const { fromBank, feedsElsewhere } = await bankOriginOf(ctx, lookups, transaction);
+	const { fromBank, feedsElsewhere } = await bankOriginOf(ctx, { lookups, read }, transaction);
 	if (feedsElsewhere !== null) {
 		const moved = fold.remapped.get(feedsElsewhere) ?? { count: 0, total: 0 };
 		fold.remapped.set(feedsElsewhere, {
@@ -417,10 +464,14 @@ async function foldTransaction(
 	return found;
 }
 
-async function bankOriginOf(ctx: QueryCtx, lookups: Lookups, transaction: Doc<'transactions'>) {
+async function bankOriginOf(
+	ctx: QueryCtx,
+	{ lookups, read }: { lookups: Lookups; read: ReadRows<LaterCutoverRead> },
+	transaction: Doc<'transactions'>
+) {
 	let fromBank = false;
 	let feedsElsewhere: Id<'accounts'> | null = null;
-	for await (const bankRow of allBankRowsOf(ctx, transaction._id)) {
+	for (const bankRow of await read('bankRows', allBankRowsOf(ctx, transaction._id))) {
 		if (bankRow.state !== 'linked' && bankRow.state !== 'changed') continue;
 		fromBank = true;
 		if (bankRow.connectionAccountId === undefined) continue;
@@ -514,12 +565,12 @@ function startingBalanceCategory(
 function projectedTotals(
 	current: BudgetInputs['monthlyTotals'],
 	{
-		earlier,
+		replaced,
 		splitLines,
 		proposed,
 		to
 	}: {
-		earlier: readonly Doc<'transactions'>[];
+		replaced: readonly Doc<'transactions'>[];
 		splitLines: Earlier['splitLines'];
 		proposed: readonly ProposedStartingBalance[];
 		to: string;
@@ -539,7 +590,7 @@ function projectedTotals(
 		total.count += sign;
 		totals.set(id, total);
 	};
-	for (const transaction of earlier) {
+	for (const transaction of replaced) {
 		const lines = splitLines.get(transaction._id);
 		if (lines === undefined) count(transaction, -1);
 		else for (const line of lines) count(lineCounted(transaction, line), -1);
@@ -571,33 +622,23 @@ function categoriesOf<C extends string, G extends string>(budget: Budget<C, G>) 
 	return [...budget.groups.flatMap((group) => group.categories), ...budget.hidden];
 }
 
-function transactionFingerprint(
-	transaction: Doc<'transactions'>,
-	splitLines: Earlier['splitLines']
+async function fingerprintOfWhatItShows(
+	reviewed: Omit<Extract<LaterCutoverPreview, { kind: 'ready' }>, 'fingerprint'>
 ) {
-	return [
-		transaction._id,
-		transaction.date,
-		transaction.amount,
-		transaction.categoryId ?? null,
-		transaction.transferTransactionId ?? null,
-		transaction.cleared,
-		transaction.bankChange === true,
-		(splitLines.get(transaction._id) ?? []).map((line) => [line._id, line.categoryId, line.amount])
-	];
+	const bytes = new TextEncoder().encode(canonicalWithEveryListAsASet(reviewed));
+	const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+	return [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function fingerprintOf(value: unknown): string {
-	const text = JSON.stringify(value);
-	let h1 = 0xdeadbeef;
-	let h2 = 0x41c6ce57;
-	for (let i = 0; i < text.length; i++) {
-		const code = text.charCodeAt(i);
-		h1 = Math.imul(h1 ^ code, 2654435761);
-		h2 = Math.imul(h2 ^ code, 1597334677);
+function canonicalWithEveryListAsASet(value: unknown): string {
+	if (Array.isArray(value))
+		return `[${value.map(canonicalWithEveryListAsASet).toSorted().join(',')}]`;
+	if (value !== null && typeof value === 'object') {
+		const fields: [string, unknown][] = Object.entries(value);
+		return `{${fields
+			.toSorted(([a], [b]) => (a < b ? -1 : 1))
+			.map(([key, field]) => `${JSON.stringify(key)}:${canonicalWithEveryListAsASet(field)}`)
+			.join(',')}}`;
 	}
-	h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-	h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-	const hex = (n: number) => (n >>> 0).toString(16).padStart(8, '0');
-	return `${hex(h2)}${hex(h1)}`;
+	return JSON.stringify(value);
 }

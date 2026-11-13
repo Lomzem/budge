@@ -626,10 +626,13 @@ async function takeOut(ctx: MutationCtx, existing: Doc<'transactions'>) {
 }
 
 export async function splitLinesOf(ctx: QueryCtx, transactionId: Id<'transactions'>) {
-	return await ctx.db
+	return await splitLineRows(ctx, transactionId).take(SPLIT_LINE_LIMIT);
+}
+
+export function splitLineRows(ctx: QueryCtx, transactionId: Id<'transactions'>) {
+	return ctx.db
 		.query('transactionSplits')
-		.withIndex('by_transaction', (q) => q.eq('transactionId', transactionId))
-		.take(SPLIT_LINE_LIMIT);
+		.withIndex('by_transaction', (q) => q.eq('transactionId', transactionId));
 }
 
 export async function deleteTransaction(ctx: MutationCtx, existing: Doc<'transactions'>) {
