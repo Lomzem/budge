@@ -1,6 +1,6 @@
 # 04: Apply a confirmed start-date repair safely
 
-**Status:** landed — review pending
+**Status:** done
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -144,3 +144,53 @@ Budge stores no time zone: the owner's day is the browser's local date, as for e
 - On a phone, saving a later date already wraps the form to two lines, and the moved row wraps the same way. No journey moves the date at phone width.
 
 **Cleanup.** The worktree's app was stopped with `bun run app down`, and the worktree and the kept E2E temp directories were removed. No app process from this ticket is running.
+
+### Review fixes 2026-11-13 (commits 45d0a9f..5e8d2c9 on `feat/first-use-ux`)
+
+These commits answer the review in `.scratch/first-use-ux/reviews/04/review.md` and the owner's six decisions. Evidence logs are in `.scratch/first-use-ux/reviews/04/fix-evidence/`. Browser evidence is in the main checkout's gitignored `test-results/`.
+
+**Findings and their fixes**
+
+1. **P1: Undo overwrote later changes to a Starting Balance. Fixed in 45d0a9f.** The move now records each new Starting Balance's full post-move state. Undo refuses, changing nothing, when any field it would overwrite has changed since the move, or when the row was deleted. Tests cover each of these changes: Payee, Category and memo, amount, Cleared state, approval, and deletion. Reconciling the row was already refused. Undo still works after unrelated later edits.
+   - Red: `p1-red.log`, with 6 settings tests failing. `repro-red.log` is the reviewer's probe, with 5 of 13 failing.
+   - Green: `p1-green.log`, then `p1-p2-green.log` (157 passed across the owner and sibling suites).
+2. **P2: Sync dropped bank modifications to folded rows. Fixed in 45d0a9f.** While a move can still be undone, a bank modification to a folded Bank Row is kept on the row, not consumed. After Undo, the restored Transaction shows it as a bank change. A modification that moves the row before the new cutover stops the move from being undone. The regression runs move, then sync through `internal.bankConnections.apply`, then Undo (`convex/bankConnections.test.ts`).
+   - Red: `p2-red.log`, with 3 bankChanges tests failing.
+   - Green: `p1-p2-green.log`.
+   - The capacity seed broke on this guard at 45d0a9f (`capacity-45d0a9f.log`), because it attached bank rows that were already removed. ab73619 seeds only linked rows, which is the shape a fold can meet. It now passes (`capacity-linked-bank-rows.log`). Undo uses at most 2,335 of 4,096 index ranges.
+3. **Layout-shift attribution. Fixed in 539824f, 93bba43, 3091461 and fe03b0a.** No guard was turned off, and no wait was added.
+   - 539824f: the register no longer blanks when an Account or Payee query changes. Its pages now resubscribe only when their arguments' values change, through `src/lib/paginatedQuery.svelte.ts`.
+   - 93bba43: a closing Transaction dialog keeps showing the bank change it acted on, so the banner no longer collapses.
+   - fe03b0a: `e2e/journeys/layoutShift.ts` credits a shift to a request that the user's input sent, until 500 ms after its result is on screen:
+     - a Mutation, once the page has synced through its commit;
+     - an Action, once it responds;
+     - a new query subscription, once its first result arrives.
+
+     Shifts during background updates and page loads with no input still fail.
+   - Red: `layout-shift-red.log`. This is the reviewer's `latency-journeys.ts` (`latency-journeys.ts.txt`), with an 800 ms delay.
+   - Green: `layout-shift-green.log`.
+   - Negative controls: `layout-shift-negative-controls.log` (script `latency-negative.ts.txt`). With 800 ms latency, both controls still fail the guard: a change made from another tab, and an insert injected while no request is pending.
+4. **Import dialog readiness. Fixed in adff400 and 3091461.**
+   - adff400: the File field stays disabled until the cutover date has loaded. "Set the cutover date before importing" shows only when settings say there is no cutover date. `imports/approve` withholds `settings:get` and expects the field to be disabled meanwhile. That expectation went red against the old dialog (`t04-fix-import-red-withheld`).
+   - 3091461: journeys pick a file through `chooseBankFile`, which waits until the field accepts one.
+5. **AGENTS.md enforced-rules row. Added in 582580b.** The row names `LATER_CUTOVER_READS` and `bun run capacity:check`, which runs in `bun run check` and in CI's Import capacity contract step.
+6. **Phone move and Undo. Added in 5e8d2c9.** `settings/later-move` now confirms the move and undoes it at 320 and 390 px. It reaches Settings through the tab bar and checks `expectClearOf` (tab bar and dialog bar) and `expectNothingPastTheRightEdge`. The feature map entry is updated. Evidence: `later-move-phone.log`, `test-results/verify-budge/t04-later-move-phone-{a,b}`.
+
+**Checks**
+
+- `bun run check` with P1 and P2: 58 files and 898 tests passed (`check-p1p2.log`). It passed again before every later commit, through the pre-commit and pre-push hooks.
+- `bun run app verify` on the 24 journeys these changes touch: all passed (`test-results/verify-budge/t04-fix-layout`).
+- `bun run test:e2e:local` at 5e8d2c9: 49 passed in 8.4 min, exit 0.
+- `capacity:check` in a temporary worktree at the final commit: passed, including both cutover shapes (`capacity-final.log`, `test-results/capacity/2026-11-13T22-02-51.268Z`). Apply used at most 2,641 index ranges and Undo at most 2,335, both of 4,096.
+- `clock-envelope-mutant.log`: the device-date envelope in `laterCutover.ts` was widened by one hour on each side. The two just-outside cases of the "somewhere on Earth" tests then failed, and they pass on the real code.
+
+**Deferred, with reasons**
+
+- **Development-only font race.** On a dev-server full load, the Atkinson font can arrive inside its `font-display: optional` block period. When it does, the bold tab labels narrow (Categories went from 69 to 62 px) and the guard reports the shift. Production-build runs have not shown it. The phone step navigates with the tab bar as a phone user would, so it never reloads. The two first `later-move-phone` runs show the race (`later-move-phone.log`). This replaces the earlier "Categories label shifted once in development" entry.
+- **No permanent register-blanking test.** Blanking shows only under response latency. The latency harness runs prove the fix. A permanent latency run would add a slow journey to the suite for this one regression.
+- **Optional lint restriction.** A rule could make code import `usePaginatedQuery` only through `$lib/paginatedQuery.svelte`. It was not added, because the wrapper has one caller today.
+- **Navigation-load attribution.** Under slow responses, a page load that a navigation click started within 500 ms is exempt until its first result arrives. At normal latency nothing changes, and loads with no input still fail. The owner should confirm this is acceptable.
+- **Positive missing-date message.** "Set the cutover date before importing" cannot appear through the UI, because the app routes a budget with no cutover date to setup before the import dialog can open. No journey shows it.
+- **Resolved earlier deferrals.** The AGENTS.md row (item 5) and the phone-width move (item 6) are now done.
+
+**Cleanup.** The verify worktree's app was stopped with `bun run app down`, its evidence was copied to the main checkout, and the worktree was removed. The capacity worktree stopped its app and removed itself. No app process from this fix is running.
