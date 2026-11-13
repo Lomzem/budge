@@ -433,6 +433,34 @@ describe('a later cutover date preview it cannot work out', () => {
 					});
 				}
 			}
+		},
+		{
+			read: 'amounts assigned in the months before the new date',
+			limit: LATER_CUTOVER_READS.earlierAssignments,
+			named: 'Assigned amounts are in the months before that date',
+			crowd: async (ctx: MutationCtx, checking: Id<'accounts'>) => {
+				await ctx.db.insert('transactions', {
+					accountId: checking,
+					date: '2026-10-01',
+					amount: -100,
+					cleared: 'uncleared',
+					approved: true
+				});
+				const groupId = await ctx.db.insert('categoryGroups', {
+					name: 'Everyday',
+					position: 1,
+					kind: 'normal'
+				});
+				for (let n = 0; n <= LATER_CUTOVER_READS.earlierAssignments; n++) {
+					const categoryId = await ctx.db.insert('categories', {
+						groupId,
+						name: `Envelope ${String(n)}`,
+						position: n,
+						kind: 'normal'
+					});
+					await ctx.db.insert('assignments', { month: '2026-10', categoryId, amount: 100 });
+				}
+			}
 		}
 	])(
 		'names its limit on $read rather than previewing part of it',

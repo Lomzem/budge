@@ -25,18 +25,20 @@ import {
 	type EarlierTransaction
 } from './transactions';
 
-type LaterCutoverRead = BudgetRead | 'transactions' | 'bankRows' | 'splitLines' | 'accounts';
+type LaterCutoverRead =
+	BudgetRead | 'transactions' | 'bankRows' | 'splitLines' | 'accounts' | 'earlierAssignments';
 
 export const LATER_CUTOVER_READS = {
-	transactions: 500,
-	bankRows: 1_000,
-	splitLines: 1_000,
+	transactions: 250,
+	bankRows: 250,
+	splitLines: 250,
 	accounts: 200,
 	categoryGroups: 200,
 	categories: 1_000,
 	assignments: 5_000,
 	monthlyTotals: 10_000,
-	transactionsAfterToday: 1_000
+	transactionsAfterToday: 1_000,
+	earlierAssignments: 500
 } as const satisfies Record<LaterCutoverRead, number>;
 
 const closer = 'Pick a date closer to the current cutover date.';
@@ -49,7 +51,8 @@ const tooManyOf: Record<LaterCutoverRead, string> = {
 	categories: 'Categories are in this budget.',
 	assignments: 'Assigned amounts are in this budget across its months.',
 	monthlyTotals: 'months of Category and Account totals are in this budget.',
-	transactionsAfterToday: 'Transactions dated after today count toward Ready to Assign.'
+	transactionsAfterToday: 'Transactions dated after today count toward Ready to Assign.',
+	earlierAssignments: `Assigned amounts are in the months before that date. ${closer}`
 };
 
 const clearedState = v.union(v.literal('uncleared'), v.literal('cleared'), v.literal('reconciled'));
@@ -453,6 +456,10 @@ async function planLaterCutover(ctx: QueryCtx, to: string, today: string): Promi
 		read: limits.read,
 		lookups
 	});
+	const earlierAssignments = await limits.read(
+		'earlierAssignments',
+		ctx.db.query('assignments').withIndex('by_month_category', (q) => q.lt('month', month))
+	);
 	const tooManyToFold = tooManyRead(limits);
 	if (tooManyToFold !== null) return { preview: tooManyToFold };
 	const cautions = ordered.flatMap((fold) => cautionsOf(fold, accountOf));
@@ -478,7 +485,6 @@ async function planLaterCutover(ctx: QueryCtx, to: string, today: string): Promi
 		amount: proposedAmountOf(fold),
 		category: startingBalanceCategory(fold, budgetInput.categories)
 	}));
-	const earlierAssignments = budgetInput.assignments.filter((row) => row.month < month);
 	const removed = earlierAssignments.filter((row) => row.amount !== 0);
 	const before = computeBudget(budgetInput);
 	const after = computeBudget({

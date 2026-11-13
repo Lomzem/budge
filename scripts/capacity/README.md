@@ -99,3 +99,22 @@ measured calls, including temporary deployment and seed work, excluding final
 restoration). This fits the roughly three-minute budget, so CI runs it against its
 existing anonymous E2E backend before Playwright. CI runtime remains to be measured.
 `capacity:check` requires that backend; it never silently skips missing setup.
+
+## Later cutover contract
+
+A confirmed later cutover date is applied in one atomic mutation, so its reads are
+bounded by `LATER_CUTOVER_READS` (`convex/lib/laterCutover.ts`) and a bigger
+history is refused before preview. `bun run capacity cutover` seeds two worst-case
+shapes from those bounds: 200 reconciled Starting Balances plus the remaining
+Transactions with every bank row, and 10 Accounts with Transfer pairs and every
+split line and bank row, each with 500 earlier Assigned amounts and 9,900 monthly
+totals. It previews, applies and undoes each shape three times, checks the applied
+and undone counts against the seed, and saves the metrics. `capacity:check` runs
+each shape once (the counts are deterministic) and exits 1 with
+`Later cutover capacity contract failed; reduce LATER_CUTOVER_READS or reduce measured preview/apply/undo work.`
+when any call reaches a full limit.
+
+Measured 2026-11-13 at 250 Transactions, 250 bank rows and 250 split lines: the
+apply's largest use was 2,641 of 4,096 index ranges (64%) and 15,575 of 32,000
+documents read (49%); every delete and patch counts as an index range. At 500
+Transactions the apply exceeded 4,096 index ranges, which set the lower bounds.
