@@ -33,6 +33,8 @@ Before checking UI or behavior, use [verify-budge](.agents/skills/verify-budge/S
 
 ## Every ticket
 
+Before shipping a user-facing flow change, run the [three-judge UI review](docs/quality/ui-review/README.md) after feature checks and corrections. Documentation-only work is exempt from UI judging.
+
 Run these for each ticket, scoped to the ticket's diff. A ticket is not done until each step has run and its findings are fixed, answered, or deferred with a reason in the ticket:
 
 1. **Principles:** run `/principles` before designing, before writing tests, and before calling the ticket done, and read every matching reference in full.
