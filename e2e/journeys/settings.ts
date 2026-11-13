@@ -281,7 +281,7 @@ export const settings = {
 					await saveCutover(page, firstOfThisMonth);
 					await expect(preview).toBeVisible();
 					const lists = preview.locator('details');
-					expect(await lists.count()).toBeGreaterThan(0);
+					await expect(lists.first()).toBeVisible();
 					for (const list of await lists.all()) {
 						await list.locator('summary').click();
 						await expect(list).toHaveAttribute('open', '');
@@ -365,7 +365,10 @@ export const settings = {
 					await page.goto('/settings');
 					await expectCutover(page, firstOfThisMonth);
 					await expect(region).toContainText(
-						`Moved from ${formatDate(saved)}, with the history before ${formatDate(firstOfThisMonth)} folded into Starting Balances.`
+						`Starts on ${formatDate(firstOfThisMonth)}, moved from ${formatDate(saved)}.`
+					);
+					await expect(undo).toHaveAccessibleDescription(
+						`Puts the start date back on ${formatDate(saved)}, with the Transactions before ${formatDate(firstOfThisMonth)} back in their Accounts.`
 					);
 				}
 			);

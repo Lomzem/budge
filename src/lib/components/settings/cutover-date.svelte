@@ -124,30 +124,34 @@
 		</form>
 	{:else}
 		<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-			<p class="flex h-9 items-center">
+			<p class="flex min-h-9 items-center">
 				<span
-					>Budge starts on <time datetime={cutoverDate} class="font-bold"
-						>{formatDate(cutoverDate)}</time
-					>.</span
+					>{undoable === null ? 'Budge starts' : 'Starts'} on
+					<time datetime={cutoverDate} class="font-bold">{formatDate(cutoverDate)}</time
+					>{#if undoable !== null}<span class="text-muted-foreground"
+							>, moved from <time datetime={undoable.from}>{formatDate(undoable.from)}</time></span
+						>{/if}.</span
 				>
 			</p>
-			<Button variant="outline" bind:ref={changeButton} onclick={startChange}>Change</Button>
-		</div>
-		{#if undoable !== null}
-			{@const move = undoable}
-			<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-				<p class="text-muted-foreground">
-					Moved from <time datetime={move.from}>{formatDate(move.from)}</time>, with the history
-					before {formatDate(move.to)} folded into Starting Balances.
-				</p>
-				<Button
-					variant="outline"
-					disabled={undoing}
-					onclick={() => undoMove(move.moveId, move.from)}>Undo move</Button
-				>
+			<div class="flex flex-wrap gap-2">
+				<Button variant="outline" bind:ref={changeButton} onclick={startChange}>Change</Button>
+				{#if undoable !== null}
+					{@const move = undoable}
+					<Button
+						variant="outline"
+						aria-describedby="undo-move-detail"
+						disabled={undoing}
+						onclick={() => undoMove(move.moveId, move.from)}>Undo move</Button
+					>
+					<span id="undo-move-detail" class="sr-only">
+						Puts the start date back on {formatDate(move.from)}, with the Transactions before {formatDate(
+							move.to
+						)} back in their Accounts.
+					</span>
+				{/if}
 			</div>
-		{/if}
-		<p role="status" class={['text-sm', undone === '' && 'sr-only']}>{undone}</p>
+		</div>
+		<p role="status" class="sr-only">{undone}</p>
 	{/if}
 	<p role="alert" class={['text-sm text-destructive', error === '' && '-mt-3']}>{error}</p>
 </section>
