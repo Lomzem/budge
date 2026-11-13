@@ -214,7 +214,9 @@ export const settings = {
 					await expect(preview.getByRole('region', { name, exact: true })).toBeVisible();
 				}
 				const checking = preview.getByRole('region', { name: 'Checking', exact: true });
-				await expect(checking).toContainText(`Starting Balance on ${formatDate(saved)}, plus`);
+				await expect(checking).toContainText(
+					new RegExp(`Its Starting Balance of \\$[\\d,.]+ on ${formatDate(saved)}, plus`)
+				);
 				await checking.getByText(/Transactions? that fold in/).click();
 				await expect(checking.getByRole('listitem').first()).toBeVisible();
 				const budget = preview.getByRole('region', {

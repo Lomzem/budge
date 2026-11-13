@@ -67,7 +67,7 @@
 		const count = transactions(account.transactions.length);
 		if (account.startingBalance === null) return `${count} dated before ${newDate}.`;
 		const { amount, date } = account.startingBalance;
-		return `Its ${balance(account, amount)} Starting Balance on ${formatDate(date)}, plus ${count} dated before ${newDate}.`;
+		return `Its Starting Balance of ${balance(account, amount)} on ${formatDate(date)}, plus ${count} dated before ${newDate}.`;
 	}
 
 	function mustResolveText(item: MustResolve) {
@@ -100,6 +100,12 @@
 	}
 </script>
 
+{#snippet nowOnPhone(amount: number)}
+	<span class="block text-xs text-muted-foreground tabular-nums @lg:hidden">
+		Now {formatCents(amount)}
+	</span>
+{/snippet}
+
 <Dialog.Header>
 	<Dialog.Title>Start on {newDate}?</Dialog.Title>
 	<Dialog.Description>
@@ -121,7 +127,7 @@
 	{#if shown.kind === 'blocked'}
 		<section
 			aria-labelledby="must-resolve-heading"
-			class="flex flex-col gap-2 rounded-md border border-destructive/50 p-3"
+			class="flex min-w-0 flex-col gap-2 rounded-md border border-destructive/50 p-3"
 		>
 			<h3 id="must-resolve-heading" class="font-bold">Resolve these first</h3>
 			<ul class="flex list-disc flex-col gap-1 pl-5">
@@ -132,7 +138,7 @@
 		</section>
 	{/if}
 
-	<section aria-labelledby="balances-heading" class="flex flex-col gap-3">
+	<section aria-labelledby="balances-heading" class="flex min-w-0 flex-col gap-3">
 		<h3 id="balances-heading" class="font-bold">Starting Balances on {newDate}</h3>
 		{#each shown.accounts as account (account.accountId)}
 			{@const headingId = `preview-account-${account.accountId}`}
@@ -161,13 +167,13 @@
 							{#each account.transactions as row (row.transactionId)}
 								<li class="flex gap-3 border-t py-2 first:border-t-0">
 									<div class="flex min-w-0 flex-1 flex-col">
-										<span class="truncate">{describe(row)}</span>
+										<span class="break-words">{describe(row)}</span>
 										<span class="text-muted-foreground">
 											<time datetime={row.date}>{formatDate(row.date)}</time
 											>{#if detailsOf(row) !== ''}, {detailsOf(row)}{/if}
 										</span>
 									</div>
-									<span class="text-right tabular-nums">{formatCents(row.amount)}</span>
+									<span class="shrink-0 text-right tabular-nums">{formatCents(row.amount)}</span>
 								</li>
 							{/each}
 						</ul>
@@ -179,31 +185,43 @@
 
 	{#if shown.kind === 'ready'}
 		{@const budget = shown.budget}
-		<section aria-labelledby="budget-heading" class="flex flex-col gap-2">
+		<section aria-labelledby="budget-heading" class="flex min-w-0 flex-col gap-2">
 			<h3 id="budget-heading" class="font-bold">{formatMonth(budget.month)} budget</h3>
-			<Table.Root>
-				<Table.Header>
-					<Table.Row>
-						<Table.Head width="fill">Available</Table.Head>
-						<Table.Head align="end" width="amount-compact">Now</Table.Head>
-						<Table.Head align="end" width="amount-compact">After</Table.Head>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
-					<Table.Row>
-						<Table.Cell width="fill"><span class="font-bold">Ready to Assign</span></Table.Cell>
-						<Table.Cell align="end" numeric>{formatCents(budget.readyToAssign.before)}</Table.Cell>
-						<Table.Cell align="end" numeric>{formatCents(budget.readyToAssign.after)}</Table.Cell>
-					</Table.Row>
-					{#each budget.categories as category (category.categoryId)}
+			<div class="@container">
+				<Table.Root>
+					<Table.Header>
 						<Table.Row>
-							<Table.Cell width="fill">{category.name}</Table.Cell>
-							<Table.Cell align="end" numeric>{formatCents(category.before)}</Table.Cell>
-							<Table.Cell align="end" numeric>{formatCents(category.after)}</Table.Cell>
+							<Table.Head width="fill">Available</Table.Head>
+							<Table.Head align="end" width="fit" showFrom="lg">Now</Table.Head>
+							<Table.Head align="end" width="fit">After</Table.Head>
 						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
+					</Table.Header>
+					<Table.Body>
+						<Table.Row>
+							<Table.Cell width="fill">
+								<span class="block font-bold break-words whitespace-normal">Ready to Assign</span>
+								{@render nowOnPhone(budget.readyToAssign.before)}
+							</Table.Cell>
+							<Table.Cell align="end" numeric showFrom="lg">
+								{formatCents(budget.readyToAssign.before)}
+							</Table.Cell>
+							<Table.Cell align="end" numeric>{formatCents(budget.readyToAssign.after)}</Table.Cell>
+						</Table.Row>
+						{#each budget.categories as category (category.categoryId)}
+							<Table.Row>
+								<Table.Cell width="fill">
+									<span class="block break-words whitespace-normal">{category.name}</span>
+									{@render nowOnPhone(category.before)}
+								</Table.Cell>
+								<Table.Cell align="end" numeric showFrom="lg"
+									>{formatCents(category.before)}</Table.Cell
+								>
+								<Table.Cell align="end" numeric>{formatCents(category.after)}</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</div>
 			<p class="text-muted-foreground">
 				{#if budget.removedAssignments.count === 0}
 					No Category has money assigned before {formatMonth(budget.month)}.
@@ -217,7 +235,7 @@
 	{/if}
 
 	{#if shown.cautions.length > 0}
-		<section aria-labelledby="cautions-heading" class="flex flex-col gap-2">
+		<section aria-labelledby="cautions-heading" class="flex min-w-0 flex-col gap-2">
 			<h3 id="cautions-heading" class="font-bold">Worth checking</h3>
 			<ul class="flex list-disc flex-col gap-1 pl-5">
 				{#each shown.cautions as caution (caution)}
