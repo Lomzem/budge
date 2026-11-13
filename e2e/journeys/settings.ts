@@ -295,7 +295,7 @@ export const settings = {
 	},
 	'later-move': {
 		title:
-			'confirming a later cutover date with Reconciled history needs its unlock, folds the history in, and Settings undoes it',
+			'confirming a later cutover date with Reconciled history needs its unlock, folds the history in, and Settings undoes it, on desktop and on 320 and 390 px phones',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			const region = cutoverRegion(page);
@@ -372,12 +372,6 @@ export const settings = {
 				}
 			);
 
-			await step('on a 320 px phone, the undo stays within the screen', async () => {
-				await page.setViewportSize({ width: 320, height: 640 });
-				await expect(undo).toBeVisible();
-				await expectNothingPastTheRightEdge(page);
-			});
-
 			await step('Undo move by keyboard puts the date and the history back', async () => {
 				await page.setViewportSize({ width: 1280, height: 800 });
 				await page.goto('/settings');
@@ -399,6 +393,41 @@ export const settings = {
 					})
 				).not.toHaveCount(0);
 			});
+
+			for (const width of [320, 390]) {
+				await step(
+					`on a ${String(width)} px phone, the move and its Undo stay on screen and clear of the tab bar and the dialog's header`,
+					async () => {
+						await page.setViewportSize({ width, height: 640 });
+						const tabs = page.getByRole('navigation', { name: 'Sections', exact: true });
+						await tabs.getByRole('link', { name: 'Settings' }).click();
+						await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
+						const pinned = preview.locator('[data-slot="dialog-bar"]');
+						const unlock = preview.getByRole('checkbox', { name: 'Unlock the Reconciled history' });
+						const move = preview.getByRole('button', { name: 'Move start date' });
+						await region.getByRole('button', { name: 'Change' }).click();
+						await saveCutover(page, firstOfThisMonth);
+						await expectNothingPastTheRightEdge(page);
+						for (const control of [unlock, move]) {
+							await control.scrollIntoViewIfNeeded();
+							await expectClearOf(control, pinned);
+						}
+						await unlock.check();
+						await move.click();
+						await expect(preview).toBeHidden();
+						await expectCutover(page, firstOfThisMonth);
+						await undo.scrollIntoViewIfNeeded();
+						await expectClearOf(undo, tabs);
+						await expectNothingPastTheRightEdge(page);
+						await undo.click();
+						await expect(region.getByRole('status')).toHaveText(
+							`The start date is back on ${formatDate(saved)}, with its history.`
+						);
+						await expectCutover(page, saved);
+						await expectNothingPastTheRightEdge(page);
+					}
+				);
+			}
 		}
 	}
 } satisfies Record<string, Journey>;
