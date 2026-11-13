@@ -1,12 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
-import {
-	addDays,
-	formatMonth,
-	localIsoDate,
-	localToday,
-	monthOf
-} from '../../src/lib/domain/dates';
+import { addDays, formatMonth, localToday, monthOf } from '../../src/lib/domain/dates';
 import { openBudget, type Journey } from './journey';
 
 function inventedCapitalOneCheckingCsv(rows: { date: string; description: string }[]) {
@@ -36,37 +30,32 @@ async function saveCutover(page: Page, date: string) {
 export const settings = {
 	start: {
 		title:
-			'a fresh budget proposes the first of the local month on each side of a month boundary, and a file import starts there',
+			'a fresh budget proposes the first of the local month, not the UTC one, on each side of a month boundary, and a file import starts there',
 		fixture: 'empty-budget',
 		run: async (page, { step }) => {
-			const now = new Date();
-			const thisMonthBegins = new Date(now.getFullYear(), now.getMonth(), 1);
-			const lastMonthBegins = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-			const minute = 60_000;
+			const octobersLastLocalMinuteButNovemberInUtc = new Date('2026-11-01T06:59:00Z');
+			const novembersFirstLocalMinute = new Date('2026-11-01T07:01:00Z');
 			const region = cutoverRegion(page);
+			const start = '2026-11-01';
 
 			await step(
 				'a minute before the month turns, last month’s first day is proposed',
 				async () => {
-					await page.clock.setFixedTime(thisMonthBegins.getTime() - minute);
+					await page.clock.setFixedTime(octobersLastLocalMinuteButNovemberInUtc);
 					await openBudget(page);
-					await expect(region.getByLabel('Cutover date')).toHaveValue(
-						localIsoDate(lastMonthBegins)
-					);
+					await expect(region.getByLabel('Cutover date')).toHaveValue('2026-10-01');
 				}
 			);
 
 			await step('a minute after, the new month’s first day is proposed and saved', async () => {
-				await page.clock.setFixedTime(thisMonthBegins.getTime() + minute);
+				await page.clock.setFixedTime(novembersFirstLocalMinute);
 				await openBudget(page);
-				await expect(region.getByLabel('Cutover date')).toHaveValue(localIsoDate(thisMonthBegins));
+				await expect(region.getByLabel('Cutover date')).toHaveValue(start);
 				await region.getByRole('button', { name: 'Save' }).click();
-				await expectCutover(page, localIsoDate(thisMonthBegins));
+				await expectCutover(page, start);
 			});
 
 			await step('a bank file into a new Account brings in only rows from the start', async () => {
-				const start = localIsoDate(thisMonthBegins);
-				const dayBefore = addDays(start, -1);
 				await page.getByRole('main').getByRole('button', { name: 'Add Account' }).click();
 				const addAccount = page.getByRole('dialog', { name: 'Add Account' });
 				await addAccount.getByLabel('Name').fill('Start Checking');
@@ -82,7 +71,7 @@ export const settings = {
 					mimeType: 'text/csv',
 					buffer: Buffer.from(
 						inventedCapitalOneCheckingCsv([
-							{ date: dayBefore, description: 'SAMPLE E2E BEFORE START' },
+							{ date: '2026-10-31', description: 'SAMPLE E2E BEFORE START' },
 							{ date: start, description: 'SAMPLE E2E ON START' }
 						])
 					)

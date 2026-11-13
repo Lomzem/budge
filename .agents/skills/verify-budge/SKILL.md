@@ -48,7 +48,7 @@ bun run app verify --list
 bun run app verify budget/assign shell/navigate --run budget-check
 ```
 
-Each feature file lists its journeys by name (`<feature>/<key>`). The verb drives the app recorded by `up` with the storage state saved by `login`; it starts no server and signs in no one. Before each journey it reseeds the local backend with that journey's fixture, so it destroys earlier changes in this checkout, exactly as `seed` does.
+Each feature file lists its journeys by name (`<feature>/<key>`). The verb drives the app recorded by `up` with the storage state saved by `login`; it starts no server and signs in no one. Before each journey it reseeds the local backend with that journey's fixture, so it destroys earlier changes in this checkout, exactly as `seed` does. Journeys run their browser and their own date arithmetic in `journeyTimeZone` (America/Los_Angeles, `e2e/journeys/timeZone.ts`); a journey fails before its first step under a runner that doesn't set it. For a manual recipe that depends on dates, pass `timezoneId: journeyTimeZone` to `newContext`.
 
 Evidence goes to `test-results/verify-budge/<run>/` (`--run` names it; the default is the start time, and an existing name is refused):
 

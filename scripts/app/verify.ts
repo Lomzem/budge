@@ -4,7 +4,12 @@ import { stripVTControlCharacters } from 'node:util';
 
 import { chromium, type Browser, type Download, type Page } from '@playwright/test';
 
-import { journeys, type NamedJourney } from '../../e2e/journeys';
+import {
+	journeys,
+	journeyTimeZone,
+	useJourneyTimeZone,
+	type NamedJourney
+} from '../../e2e/journeys';
 import { findCheckout, git } from '../local/checkout';
 import { requireLocalAnonymousDeployment } from '../local/deployment';
 import { redact } from '../local/redaction';
@@ -131,7 +136,8 @@ async function runJourney(
 	};
 	const context = await browser.newContext({
 		baseURL: options.appUrl,
-		viewport: { width: 1280, height: 800 }
+		viewport: { width: 1280, height: 800 },
+		timezoneId: journeyTimeZone
 	});
 	await context.setStorageState(options.storageState);
 	await context.tracing.start({
@@ -215,6 +221,7 @@ export const verify: Verb = {
 		if (existsSync(runDir)) throw new Error(`${runDir} exists; pass a new --run name.`);
 		mkdirSync(runDir, { recursive: true });
 
+		useJourneyTimeZone();
 		const records: JourneyRecord[] = [];
 		const browser = await chromium.launch();
 		try {

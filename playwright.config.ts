@@ -1,5 +1,9 @@
 import { defineConfig } from '@playwright/test';
 
+import { journeyTimeZone, useJourneyTimeZone } from './e2e/journeys/timeZone';
+
+useJourneyTimeZone();
+
 const port = Number(process.env.E2E_PREVIEW_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535)
 	throw new Error('E2E_PREVIEW_PORT must be an integer from 1 to 65535.');
@@ -11,6 +15,7 @@ export default defineConfig({
 	forbidOnly: !!process.env.CI,
 
 	workers: 1,
+	use: { timezoneId: journeyTimeZone },
 	reporter: process.env.CI ? 'github' : 'list',
 	webServer: {
 		command: `bun run build && bun scripts/local/preview.ts ${String(port)}`,
