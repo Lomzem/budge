@@ -15,7 +15,7 @@ import {
 } from './_generated/server';
 import { findConnectionAccount, liveLayer, toPublicError } from './bankConnections';
 import { accountKind } from './lib/accountKind';
-import { insertAccount } from './lib/accounts';
+import { bankImports, bankImportsSince, insertAccount } from './lib/accounts';
 import { applyBankRows, planBankRows, type IncomingRow } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { ImportedPayees } from './lib/payees';
@@ -28,7 +28,7 @@ import {
 	suggestStartingBalance as suggest,
 	syncConnection
 } from './lib/sync';
-import { allBankRowsOf, dropHeldBankRow } from './lib/transactions';
+import { dropHeldBankRow } from './lib/transactions';
 
 export const HELD_BATCH = 200;
 const MAX_COUNTED = 1_000;
@@ -163,7 +163,12 @@ export const forget = internalMutation({
 export const suggestStartingBalance = action({
 	args: { accountId: v.id('accounts') },
 	returns: v.union(
-		v.object({ kind: v.literal('suggested'), startingBalance: v.number() }),
+		v.object({
+			kind: v.literal('suggested'),
+			startingBalance: v.number(),
+			bankBalance: v.number(),
+			imported: bankImports
+		}),
 		v.object({ kind: v.literal('notSynced') }),
 		v.object({ kind: v.literal('importing') }),
 		v.object({ kind: v.literal('noBalance') })
@@ -176,6 +181,17 @@ export const suggestStartingBalance = action({
 		});
 		if (unfinished) return { kind: 'importing' as const };
 		return await runEffect(suggest(accountId).pipe(Effect.provide(liveLayer(ctx))), toPublicError);
+	}
+});
+
+export const startingBalanceEvidence = query({
+	args: { accountId: v.id('accounts') },
+	returns: v.object({ since: v.string(), imported: bankImports }),
+	handler: async (ctx, { accountId }) => {
+		await requireOwner(ctx);
+		if ((await ctx.db.get('accounts', accountId)) === null) throw publicError('NOT_FOUND');
+		const since = await requireCutoverDate(ctx);
+		return { since, imported: await bankImportsSince(ctx, accountId, since) };
 	}
 });
 
@@ -264,18 +280,7 @@ export const startingBalanceBasis = internalQuery({
 			if ((await heldRows(ctx, mapped._id, 1)).length > 0) return { kind: 'importing' as const };
 		}
 
-		const cutoverDate = await requireCutoverDate(ctx);
-		let imported = 0;
-		const since = ctx.db
-			.query('transactions')
-			.withIndex('by_account_date', (q) => q.eq('accountId', accountId).gte('date', cutoverDate));
-		for await (const transaction of since) {
-			for await (const row of allBankRowsOf(ctx, transaction._id)) {
-				if (row.state === 'removed') continue;
-				imported += transaction.amount;
-				break;
-			}
-		}
+		const imported = await bankImportsSince(ctx, accountId, await requireCutoverDate(ctx));
 		return {
 			kind: 'synced' as const,
 			itemId: connection.provider.itemId,
@@ -335,7 +340,7 @@ function bankAccountsOf(ctx: QueryCtx, accountId: Id<'accounts'>) {
 }
 
 async function heldRows(
-	ctx: MutationCtx | Parameters<typeof allBankRowsOf>[0],
+	ctx: QueryCtx,
 	connectionAccountId: Id<'connectionAccounts'>,
 	limit: number
 ) {

@@ -1,3 +1,5 @@
+import { v, type Infer } from 'convex/values';
+
 import type { Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { createPaymentCategory, ensureReadyToAssign, readPaymentCategory } from './categories';
@@ -5,6 +7,7 @@ import { requireCents, requireName } from './input';
 import { publicError } from './publicError';
 import { requireCutoverDate } from './settings';
 import {
+	allBankRowsOf,
 	insertTransaction,
 	replaceTransaction,
 	requireUnlocked,
@@ -73,6 +76,22 @@ export async function saveStartingBalance(
 	});
 }
 
+export async function confirmStartingBalance(
+	ctx: MutationCtx,
+	accountId: Id<'accounts'>,
+	startingBalance: number
+) {
+	await saveStartingBalance(ctx, accountId, startingBalance);
+	const feeds = ctx.db
+		.query('connectionAccounts')
+		.withIndex('by_accountId', (q) => q.eq('accountId', accountId));
+	for await (const feed of feeds) {
+		if (feed.state === 'mapped' && feed.startingBalanceConfirmed !== true) {
+			await ctx.db.patch('connectionAccounts', feed._id, { startingBalanceConfirmed: true });
+		}
+	}
+}
+
 export function startingBalanceOf(ctx: QueryCtx, accountId: Id<'accounts'>) {
 	return ctx.db
 		.query('transactions')
@@ -80,4 +99,34 @@ export function startingBalanceOf(ctx: QueryCtx, accountId: Id<'accounts'>) {
 			q.eq('accountId', accountId).eq('kind', 'startingBalance')
 		)
 		.unique();
+}
+
+export const bankImports = v.object({
+	count: v.number(),
+	total: v.number(),
+	first: v.union(v.string(), v.null()),
+	last: v.union(v.string(), v.null())
+});
+export type BankImports = Infer<typeof bankImports>;
+
+export async function bankImportsSince(
+	ctx: QueryCtx,
+	accountId: Id<'accounts'>,
+	since: string
+): Promise<BankImports> {
+	const imported: BankImports = { count: 0, total: 0, first: null, last: null };
+	const dated = ctx.db
+		.query('transactions')
+		.withIndex('by_account_date', (q) => q.eq('accountId', accountId).gte('date', since));
+	for await (const transaction of dated) {
+		for await (const row of allBankRowsOf(ctx, transaction._id)) {
+			if (row.state === 'removed') continue;
+			imported.count += 1;
+			imported.total += transaction.amount;
+			imported.first ??= transaction.date;
+			imported.last = transaction.date;
+			break;
+		}
+	}
+	return imported;
 }

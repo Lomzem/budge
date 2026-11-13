@@ -85,6 +85,7 @@ function sampleArgs(ids: {
 		'heldAccounts:stopSyncing': { connectionAccountId },
 		'heldAccounts:restore': { connectionAccountId },
 		'heldAccounts:suggestStartingBalance': { accountId },
+		'heldAccounts:startingBalanceEvidence': { accountId },
 		'payees:lastCategory': { name: 'Corner Grocer' },
 		'payees:list': {},
 		'payees:rename': { payeeId, name: 'Corner Market' },

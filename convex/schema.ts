@@ -183,7 +183,9 @@ export default defineSchema({
 				name: v.optional(v.string()),
 				mask: v.optional(v.string()),
 				state: v.literal('mapped'),
-				accountId: v.id('accounts')
+				accountId: v.id('accounts'),
+
+				startingBalanceConfirmed: v.optional(v.literal(true))
 			}),
 			v.object({
 				connectionId: v.id('bankConnections'),

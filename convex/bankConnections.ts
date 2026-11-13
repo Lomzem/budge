@@ -92,7 +92,10 @@ export const list = query({
 				v.object({
 					connectionAccountId: v.id('connectionAccounts'),
 					accountId: v.id('accounts'),
-					name: v.string()
+					name: v.string(),
+					bankName: v.union(v.string(), v.null()),
+					mask: v.union(v.string(), v.null()),
+					startingBalanceConfirmed: v.boolean()
 				})
 			),
 			ignored: v.array(
@@ -136,6 +139,9 @@ async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>
 		connectionAccountId: Id<'connectionAccounts'>;
 		accountId: Id<'accounts'>;
 		name: string;
+		bankName: string | null;
+		mask: string | null;
+		startingBalanceConfirmed: boolean;
 	}[] = [];
 	const ignored: {
 		connectionAccountId: Id<'connectionAccounts'>;
@@ -153,7 +159,14 @@ async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>
 		if (row.state !== 'mapped') continue;
 		const account = await ctx.db.get('accounts', row.accountId);
 		if (account !== null) {
-			feeds.push({ connectionAccountId: row._id, accountId: account._id, name: account.name });
+			feeds.push({
+				connectionAccountId: row._id,
+				accountId: account._id,
+				name: account.name,
+				bankName: row.name ?? null,
+				mask: row.mask ?? null,
+				startingBalanceConfirmed: row.startingBalanceConfirmed === true
+			});
 		}
 	}
 	return { feeds, ignored };
