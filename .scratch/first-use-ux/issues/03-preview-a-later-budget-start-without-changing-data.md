@@ -1,6 +1,6 @@
 # 03: Preview a later budget start without changing data
 
-**Status:** landed — review pending
+**Status:** done
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -103,3 +103,85 @@ Commits: `e65ea5c` (server preview and owner tests), `894c037` (a future date wi
 - `startingBalanceConfirmedFor` is tied to the cutover date. Should apply ask for bank feeds to be confirmed again?
 - What cleared state should the new Starting Balance get?
 - Mid-scroll, the shared sticky dialog footer hangs 24px below the dialog edge at desktop height. This comes from the shared primitive and was left unchanged.
+
+### Review and corrections (Opus 5.5, 2026-11-13)
+
+This covers the independent Sol review, the `/correct` analysis, and the owner's decisions on both. Evidence files are in the session scratchpad (`/tmp/claude-1000/-home-lomzem-proj-budge/35d35561-c3a7-4b79-a12a-2870181ceaa7/scratchpad/`).
+
+**1. The fingerprint identifies what the user reviewed (P2): fixed in `b84ea04`.**
+
+- **What it is now.** The fingerprint is a SHA-256 of the ready preview without its fingerprint. Object keys are sorted, and every list is sorted as a set by its canonical form (`canonicalWithEveryListAsASet` in `convex/lib/laterCutover.ts`). Ticket 04 can recompute and compare it the same way.
+- **What it replaces.** The old 64-bit hash covered only the folded Transactions. Its test required later activity to leave the fingerprint unchanged; a `test.each` replaces that test.
+- **Owner cases.** `identifies what it shows: $change $reviewed the fingerprint`:
+  - an earlier amount changes it;
+  - income after the new date changes it;
+  - swapping which Account holds two equal Transactions changes it;
+  - `accounts.reorder` alone leaves it unchanged.
+- **Red.** In `red-review-owner.txt`, income and swap gave the same fingerprint, and reorder changed it.
+
+**2. Every read is bounded (P2): fixed in `b84ea04`.**
+
+- **The limits.** `readWithin` (`convex/lib/readLimits.ts`) gives each dependency its own limit in `LATER_CUTOVER_READS`:
+  - transactions 500;
+  - bank rows 1,000;
+  - split lines 1,000;
+  - accounts 200;
+  - category groups 200;
+  - categories 1,000;
+  - assignments 5,000;
+  - monthly totals 10,000;
+  - Transactions after today 1,000.
+- **How a limit stops the preview.** Past its limit, a read returns nothing more. The preview then returns `unsupported('tooMany')` with a message naming the read, e.g. "More than 1000 bank rows lie behind…".
+- **Headroom.** The worst case is under 23,000 documents and 3,500 queries, against Convex's 32,000 documents, 16 MiB and 4,096 queries.
+- **No unbounded scan left.** `readBudgetInput` takes the read function. The budget page keeps the unbounded default.
+- **Owner test.** `names its limit on $read rather than previewing part of it`. Its new case is one folded Transaction plus 1,001 linked `imports` rows.
+- **Red.** In `red-review-owner.txt` it was ready rather than unsupported. Removing the `tooManyToFold` check turns it red again.
+
+**3. A Starting Balance on the selected date (P2): fixed in `b84ea04`.**
+
+- **The change.** That Starting Balance is not after the date. The earlier Transactions fold into it, and its totals are replaced rather than counted twice (`Earlier.replaced`).
+- **Message.** The `startingBalanceLater` message ("Move the cutover date to X or later") is now accurate.
+- **Owner test.** "folds into a Starting Balance dated on the new date, which is not after it".
+- **Red.** In `red-review-owner.txt` the preview was blocked.
+- **Green.** `green-review-owner.txt`: 43 passed.
+
+**4. Phone containment (accepted `/correct`): done in `4cdeea3`.**
+
+- **The assertion.** `expectNothingPastTheRightEdge` in `e2e/journeys/journey.ts` fails in either case:
+  - a visible element ends past the screen;
+  - a box that clips sideways hides content.
+
+  It exempts content inside a box that clips on purpose: a sideways-only ScrollArea (tables, the Attention strip), ellipsis truncation, or `sr-only`.
+- **Why it checks hidden content too.** The first version checked only the screen edge. At `7353fe7` it caught nothing but a 2px footer overhang, because the overflowing content was clipped inside the dialog.
+- **Where it runs.** `settings/later-start` gains a 320 px step with every list open. The scroll-width checks in `categories/manage`, `search/phone` and `shell/navigate` give way to it. `transactions/approve-phone` adds it next to its table check. The table checks stay, because they guard a different contract: columns drop.
+- **Red at `7353fe7`.** `red-phone-7353fe7.txt`: "dialog-body hides 53 px of its content to the right". This used `7353fe7` plus the new harness and step.
+- **Green now.** `phone-journeys.txt`: 11 passed.
+- **Records.** A new AGENTS.md enforced-rules row; the feature map is updated.
+
+**5. Sticky dialog footer: fixed in `58bee86`.**
+
+- **Root cause.** `146fc1a` moved the body padding inside the ScrollArea viewport, so `-bottom-5`/`sm:-bottom-6` pushed the footer below the scrollport.
+- **Fix.** `bottom-0` in `dialog-footer.svelte`.
+- **Regression step.** `settings/later-start` adds "halfway down the preview, its Cancel button is wholly on screen".
+- **Red.** `red-footer.txt`: viewport ratio 0.83.
+- **Green.** `green-footer.txt`.
+
+**6. Ticket 04 decisions: recorded in `38a2c4e`.**
+
+- The decisions are under ticket 04's Comments.
+- The bank-feed rule was verified against `convex/lib/accounts.ts` and `heldAccounts.test.ts`.
+- This answers the open questions above.
+
+**Also fixed.** `a884263` adds `readLimits` to `convex/_generated/api.d.ts`, after `codegen:check` caught that it was missing.
+
+**Checks (at `a884263`)**
+
+- `bun run check` steps in the main checkout passed: codegen, format, lint, lint:ui, typecheck, and vitest (58 files, 877 tests).
+- `bun run capacity:check` passed in a temporary worktree via `bun run app up` (`maxFileRows` 250).
+- Full `bun run test:e2e:local`: 48 passed (`e2e-full.txt`).
+- verify-budge results, under `test-results/verify-budge/` (gitignored):
+  - `first-use-03-review/`: `settings/later-start`, `settings/cutover`, `categories/manage`, `transactions/approve-phone`, `shell/navigate` and `search/phone` passed.
+  - `first-use-03-review-manual/`: the later-start preview and Edit Transaction, measured halfway and at the end at 1280×800 and 320×640. The footer bottom minus the scroll-area bottom was 0 px (±0.5) everywhere. Screenshots and `notes.txt` are there.
+- The app was stopped and the worktrees removed.
+
+**Not run (per the brief):** local `code-review`, `/correct` and the three-judge UI review.
