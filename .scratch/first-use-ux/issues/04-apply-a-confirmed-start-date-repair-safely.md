@@ -194,3 +194,9 @@ These commits answer the review in `.scratch/first-use-ux/reviews/04/review.md` 
 - **Resolved earlier deferrals.** The AGENTS.md row (item 5) and the phone-width move (item 6) are now done.
 
 **Cleanup.** The verify worktree's app was stopped with `bun run app down`, its evidence was copied to the main checkout, and the worktree was removed. The capacity worktree stopped its app and removed itself. No app process from this fix is running.
+
+### Owner answers to the fix stage's open questions (2026-11-13)
+
+- **Guard exemption under slow responses:** accepted. A page the user's click opened may settle once its first result arrives; the ticket 11 judges look at slow-network loading on the reviewed screens.
+- **Dev-server font race:** deferred to ticket 11. It occurs only on the dev server; the judges' review decides whether font loading needs work for production.
+- **Lint rule for `usePaginatedQuery`:** not now. One past mistake is not yet a class; revisit if a second component resubscribes the register.
