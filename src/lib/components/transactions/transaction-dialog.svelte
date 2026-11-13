@@ -11,6 +11,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import CategoryPicker from '$lib/components/category-picker.svelte';
 	import type { Choices } from '$lib/components/choices';
 	import SelectField from '$lib/components/select-field.svelte';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
@@ -18,6 +19,8 @@
 	import { formatCents } from '$lib/domain/money';
 	import { SPLIT_LINE_LIMIT } from '$lib/domain/splits';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+
+	import { categoryChoices, transferChoices } from './categoryChoices';
 	import {
 		addLine,
 		choose,
@@ -34,7 +37,6 @@
 		recallQuery,
 		removeLine,
 		savedCategoryOf,
-		unlisted,
 		view,
 		type World
 	} from '$lib/transactionEditor';
@@ -44,6 +46,7 @@
 	let {
 		open = $bindable(false),
 		transaction,
+		preset,
 		defaultAccountId,
 		returnFocus,
 		ondone,
@@ -52,6 +55,7 @@
 		open?: boolean;
 
 		transaction?: Row | undefined;
+		preset?: string | undefined;
 		defaultAccountId?: Id<'accounts'> | undefined;
 
 		returnFocus?: () => HTMLElement | undefined;
@@ -142,6 +146,7 @@
 		unlocked = false;
 		draft = freshDraft();
 		pristine = JSON.stringify(draft);
+		if (preset !== undefined) draft = choose(draft, preset, world);
 	}
 
 	function changed() {
@@ -201,19 +206,6 @@
 		if (added) document.getElementById(`split-category-${String(added.key)}`)?.focus();
 	}
 
-	function categoryChoices(savedId: string | undefined, savedName: string | undefined): Choices {
-		const data = categories.data;
-		const saved = savedId !== undefined && (!data || unlisted(data, savedId));
-		return [
-			...(saved ? [{ value: savedId, label: savedName ?? '' }] : []),
-			...(data?.readyToAssignId ? [{ value: data.readyToAssignId, label: 'Ready to Assign' }] : []),
-			...(data?.groups ?? []).map((group) => ({
-				group: group.name,
-				choices: group.categories.map((category) => ({ value: category._id, label: category.name }))
-			}))
-		];
-	}
-
 	function selectionChoices(): Choices {
 		const { selection, transferAccounts } = shown;
 		const looking = selection.kind === 'recalling' || selection.kind === 'recallFailed';
@@ -235,20 +227,10 @@
 				? []
 				: [{ value: optionOf({ kind: 'split' }), label: 'Split across Categories' }]),
 			...categoryChoices(
-				transaction?.categoryId ?? undefined,
-				transaction?.categoryName ?? undefined
+				categories.data,
+				savedCategoryOf(transaction, transaction?.categoryId ?? '')
 			),
-			...(transferAccounts.length > 0 && !startingBalance
-				? [
-						{
-							group: 'Transfer to or from',
-							choices: transferAccounts.map((account) => ({
-								value: optionOf({ kind: 'transfer', accountId: account._id }),
-								label: `Transfer: ${account.name}`
-							}))
-						}
-					]
-				: [])
+			...(startingBalance ? [] : transferChoices(transferAccounts))
 		];
 	}
 
@@ -372,13 +354,13 @@
 					<div class="flex flex-wrap items-end gap-2">
 						<div class="flex min-w-40 flex-1 flex-col gap-1">
 							<Label for={`split-category-${String(line.key)}`}>Line {number} Category</Label>
-							<SelectField
+							<CategoryPicker
 								id={`split-category-${String(line.key)}`}
 								required
 								bind:value={line.categoryId}
 								{...marked(`split-category-${String(line.key)}`)}
 								placeholder="Pick a Category"
-								choices={categoryChoices(saved?.id, saved?.name)}
+								choices={categoryChoices(categories.data, saved)}
 							/>
 						</div>
 						<div class="flex w-28 flex-col gap-1">
@@ -633,8 +615,9 @@
 				<Label for="transaction-category"
 					>{startingBalance ? 'Category' : 'Category or Transfer'}</Label
 				>
-				<SelectField
+				<CategoryPicker
 					id="transaction-category"
+					searchLabel={startingBalance ? 'Search Categories' : 'Search Categories and Transfers'}
 					bind:value={
 						() => optionOf(shown.selection),
 						(option: string) => {

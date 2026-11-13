@@ -29,5 +29,12 @@ export const generatedUiIgnores = [
 	'!src/lib/components/ui/select/select-item.svelte',
 	'!src/lib/components/ui/select/select-group-heading.svelte',
 	'!src/lib/components/ui/scroll-area/scroll-area.svelte',
-	'!src/lib/components/ui/scroll-area/scroll-area-scrollbar.svelte'
+	'!src/lib/components/ui/scroll-area/scroll-area-scrollbar.svelte',
+	'!src/lib/components/ui/command/command.svelte',
+	'!src/lib/components/ui/command/command-input.svelte',
+	'!src/lib/components/ui/command/command-list.svelte',
+	'!src/lib/components/ui/command/command-group.svelte',
+	'!src/lib/components/ui/command/command-item.svelte',
+	'!src/lib/components/ui/popover/popover-content.svelte',
+	'!src/lib/components/ui/popover/popover-trigger.svelte'
 ];
