@@ -1,6 +1,6 @@
 # 01: Choose the budget start before connecting a bank
 
-**Status:** landed — review pending
+**Status:** done
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -53,3 +53,38 @@ Proof: the primary new contract is the onboarding journey's default, save, and i
 - Manual 320×640 phone check (fresh `empty-budget`, real clock): proposal is 2026-11-01, Enter in the date field saves it, the card shows "Budge starts on Nov 1, 2026" with Change focused, and Settings shows the saved date after reload; `test-results/verify-budge/first-use-01-manual/01-phone-proposal.png`, `02-phone-saved-keyboard.png`, `03-phone-settings.png`.
 
 **Not run here (per the shared brief):** local `code-review` and `/correct`; the parent commissions them. The `principles` skill is not installed; the principles README and the required references were read directly.
+
+### Review and corrections (Opus 5.5, 2026-11-12)
+
+Commits: `e87c5c0` (journey zone and explicit instants), `fb66e2d` (Bank page card), and this record.
+
+**1. Finding (P2): `settings/start` let a UTC-computed month pass on a UTC runner. Fixed.**
+
+- `e2e/journeys/timeZone.ts` holds `journeyTimeZone` (`America/Los_Angeles`). `playwright.config.ts` and `scripts/app/verify.ts` both set it, as the context's `timezoneId` and as the driving process's `TZ` (that process also does the journeys' date arithmetic and seeding). The `e2e/journeys/index.ts` wrapper, which every journey passes through under both runners, calls `requireJourneyTimeZone`. It fails the journey before its first step if the browser or the process is in any other zone. The journey has no seam of its own.
+- `settings/start` now fixes the clock at `2026-11-01T06:59Z` and expects `2026-10-01`, then at `2026-11-01T07:01Z` and expects `2026-11-01`. The import rows are `2026-10-31` and `2026-11-01`. These dates are stated literally and are not computed by Node.
+- Red/green, all run with `TZ=UTC bun run test:e2e:local -g settings/start`, so the machine zone is UTC like CI:
+  - Component mutated to take the month in UTC (`new Date().toISOString().slice(0, 7)`): step 1 fails with `Expected: "2026-10-01" Received: "2026-11-01"`.
+  - Pre-feature component from `5a3bc8b`: step 1 fails with `Expected: "2026-10-01" Received: "2026-10-31"` (the old today default).
+  - Both zone settings removed from `playwright.config.ts`: fails with `Journeys run in America/Los_Angeles, but the browser runs in UTC and this process in UTC…`. Removing only `timezoneId` still passes, because Chromium inherits the process `TZ`. The guard checks the zone each journey actually gets.
+  - Green with everything restored. Component and config were restored and diffed clean.
+
+**2. `/correct`: loose assertions that accept materially wrong behavior. Accepted, and made structural.**
+
+A fixed zone is a rule for every date-sensitive journey, and `budget`, `imports`, `targets` and `transfers` already work out today in Node. A zone set for one journey only would have left those journeys disagreeing with the browser on a UTC runner. So the zone is the default for every journey, in both browser and process, and is enforced by the wrapper guard above. Added an AGENTS.md enforced-rules row. Added a sentence to the verify-budge SKILL.md on the journey zone and manual recipes. Lint and types can't express a calendar expectation, so the explicit instants in `settings/start` remain the behavioral proof.
+
+**3b. Bank page sends a start-less user to Settings. Done.**
+
+- `src/routes/(app)/bank/+page.svelte` now shows the same `CutoverDate` card above Connections when no cutover date is set on arrival. It uses the Budget page's latch, so the card stays after Save with Change focused. The `cutover` notice now says "below" instead of linking to Settings. `settings/start` step 2 now proposes and saves on `/bank`, and step 3 imports against that saved start.
+- Red: against the previous Bank page, step 2 fails because no Cutover date field is found. Green after the change.
+- Limit: the local server has no Plaid credentials, so neither E2E nor the local app can show the `cutover` notice's new wording or `Connect a bank` becoming enabled after Save. The `unavailable` notice takes precedence there. The card appears and saves in both cases.
+- Feature map: `settings.md` and `plaid.md` updated.
+
+**3c. "Cutover date" heading. Kept**, per the owner. No copy change.
+
+**Checks**
+
+- `bun run check` (main checkout): codegen, format, lint, lint:ui, typecheck and vitest (58 files, 856 tests) passed. `capacity:check` refuses there (non-anonymous backend), so it ran in a detached worktree under `bun run app up`: passed (`maxFileRows` 250).
+- `TZ=UTC bun run test:e2e:local -g settings/`: 2 passed.
+- Full `TZ=UTC bun run test:e2e:local`: 45 passed (7.6 min).
+- verify-budge, in the worktree, with the app stopped afterwards: `bun run app verify settings/start settings/cutover plaid/status --run first-use-01-review` passed all three. Evidence is in `test-results/verify-budge/first-use-01-review/`.
+- Manual check on a fresh `empty-budget` at 1280×800 and 320×640 in the journey zone, under the real clock: `/bank` proposes 2026-11-01, Connect stays `aria-disabled`, Enter saves, Change gets focus, the card is gone after reload, and Settings shows 2026-11-01. Evidence and the script are in `test-results/verify-budge/first-use-01-review-manual/`.
