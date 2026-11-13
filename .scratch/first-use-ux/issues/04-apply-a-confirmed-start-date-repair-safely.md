@@ -17,3 +17,20 @@ Proof: the repair owner is primary for before/after persistent accounting state,
 - Demonstrate regressions failing pre-fix for the intended reason, then passing. Report unavailable baseline proof honestly. Baseline failures are not grounds to remove tests.
 - Use verify-budge for running-app evidence, update its feature map for changed features, and follow the repository's auth, lifecycle, and cleanup requirements. Record focused owner/sibling checks and changed test runtime; complete required repository checks.
 - Run the repository's per-ticket principles, test-audit, local code-review, and corrections workflow. Findings must be fixed, answered, or deferred with a reason. Follow the one-integration-PR policy and the explicit no-CodeRabbit exception for this spec. Implementation of all tickets was authorized on 2026-11-12. Ticket 12 owns shipping; a live data repair still requires approval of its concrete preview and recovery plan.
+
+## Comments
+
+### Decisions from ticket 03 review
+
+Owner decisions recorded 2026-11-13 from the ticket 03 review. They bind this ticket's apply step.
+
+- **Recompute, then compare.** Applying recomputes the proposal inside the same mutation, with the read limits in `LATER_CUTOVER_READS` (`convex/lib/laterCutover.ts`). It then compares the recomputed fingerprint with the one the user confirmed. A mismatch rejects the apply and changes nothing, so the user previews again. The fingerprint is a SHA-256 of the ready preview's canonical form, with object keys sorted and every list sorted as a set. Any change to what the preview shows changes it; a presentation-only reorder does not.
+- **Server time, not the client's `today`.** The mutation validates the date against server time under a defined time-zone policy, not against the `today` argument the preview query takes from the client. Write the policy down here before implementing it.
+- **Explicit unlock for reconciled history.** Replacing a reconciled Starting Balance, or folding reconciled Transactions, requires an explicit unlock from the user. Without it, the apply refuses.
+- **Bank-feed confirmations become unconfirmed after the move.** This is already the ticket-02 rule, verified 2026-11-13:
+  - `confirmStartingBalance` keys `connectionAccounts.startingBalanceConfirmedFor` to the cutover date.
+  - `isStartingBalanceConfirmed` (`convex/lib/accounts.ts`) compares that key with the current cutover date, so moving the date unconfirms every feed.
+  - The owner test is `convex/heldAccounts.test.ts`: "a confirmed starting balance is unconfirmed again once the cutover date changes, until the owner sets it for the new date".
+  - Apply must not re-confirm feeds itself.
+- **The new Starting Balance's state.** It is cleared, approved and unreconciled. `saveStartingBalance` already writes `cleared: 'cleared'` and `approved: true`.
+- **Uncleared rows.** The preview must state that folding uncleared rows changes the cleared balance. Today's caution reads "… that haven't cleared count in the Starting Balance as if they had". Keep that caution, and name the cleared-balance change it causes.
