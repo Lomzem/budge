@@ -1,6 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 
-import { addDays, formatMonth, localToday, monthOf } from '../../src/lib/domain/dates';
+import {
+	addDays,
+	dayOfMonth,
+	formatDate,
+	formatMonth,
+	localToday,
+	monthOf
+} from '../../src/lib/domain/dates';
 import { openBudget, type Journey } from './journey';
 
 function inventedCapitalOneCheckingCsv(rows: { date: string; description: string }[]) {
@@ -19,6 +26,10 @@ function cutoverRegion(page: Page) {
 
 async function expectCutover(page: Page, date: string) {
 	await expect(cutoverRegion(page).locator(`time[datetime="${date}"]`)).toBeVisible();
+}
+
+function previewDialog(page: Page, date: string) {
+	return page.getByRole('dialog', { name: `Start on ${formatDate(date)}?` });
 }
 
 async function saveCutover(page: Page, date: string) {
@@ -95,7 +106,7 @@ export const settings = {
 	},
 	cutover: {
 		title:
-			'the first cutover date gates Add Account, survives reload and cancel, bounds the months, and refuses to pass a Transaction',
+			'the first cutover date gates Add Account, survives reload and cancel, bounds the months, and moves later through a preview when nothing is dated before',
 		fixture: 'empty-budget',
 		run: async (page, { step }) => {
 			const cutover = addDays(localToday(), -40);
@@ -154,22 +165,93 @@ export const settings = {
 				await expect(previous).toBeDisabled();
 			});
 
-			await step('moving the date past a Starting Balance is refused', async () => {
-				await page.getByRole('main').getByRole('button', { name: 'Add Account' }).click();
-				const dialog = page.getByRole('dialog', { name: 'Add Account' });
-				await dialog.getByLabel('Name').fill('Research Checking');
-				await dialog.getByLabel('Cash, such as checking or savings').check();
-				await dialog.getByLabel('Current balance').fill('100');
-				await dialog.getByRole('button', { name: 'Add Account' }).click();
-				await expect(
-					page.getByRole('heading', { level: 1, name: 'Research Checking' })
-				).toBeVisible();
+			await step(
+				'a later date with nothing dated before it moves through its preview',
+				async () => {
+					await page.goto('/settings');
+					await region.getByRole('button', { name: 'Change' }).click();
+					await saveCutover(page, cutover);
+					const preview = previewDialog(page, cutover);
+					await expect(preview).toContainText(
+						`Nothing is dated before ${formatDate(cutover)}, so moving the date changes no balance and no Transaction.`
+					);
+					await preview.getByRole('button', { name: 'Move start date' }).click();
+					await expect(preview).toBeHidden();
+					await expectCutover(page, cutover);
+					await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
+					await page.reload();
+					await expectCutover(page, cutover);
+				}
+			);
+		}
+	},
+	'later-start': {
+		title:
+			'a later cutover date opens a read-only preview of the Starting Balances and budget it would leave; Cancel and Escape change nothing',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			const region = cutoverRegion(page);
+			const today = localToday();
+			const firstOfThisMonth = dayOfMonth(monthOf(today), 1);
+			const preview = previewDialog(page, firstOfThisMonth);
+			let saved = '';
+
+			await step('a later date opens a readable preview that changes nothing', async () => {
 				await page.goto('/settings');
+				saved = (await region.locator('time').getAttribute('datetime')) ?? '';
+				expect(saved < firstOfThisMonth).toBe(true);
 				await region.getByRole('button', { name: 'Change' }).click();
-				await saveCutover(page, cutover);
-				await expect(region.getByRole('alert')).toHaveText('A Transaction is dated before that.');
+				await saveCutover(page, firstOfThisMonth);
+				await expect(preview).toContainText(
+					`A preview of moving the cutover date from ${formatDate(saved)}. It changes nothing.`
+				);
+				await expect(
+					preview.getByRole('heading', {
+						name: `Starting Balances on ${formatDate(firstOfThisMonth)}`
+					})
+				).toBeVisible();
+				for (const name of ['Checking', 'Savings', 'Card']) {
+					await expect(preview.getByRole('region', { name, exact: true })).toBeVisible();
+				}
+				const checking = preview.getByRole('region', { name: 'Checking', exact: true });
+				await expect(checking).toContainText(`Starting Balance on ${formatDate(saved)}, plus`);
+				await checking.getByText(/Transactions? that fold in/).click();
+				await expect(checking.getByRole('listitem').first()).toBeVisible();
+				const budget = preview.getByRole('region', {
+					name: `${formatMonth(monthOf(firstOfThisMonth))} budget`
+				});
+				await expect(budget.getByRole('row', { name: /^Ready to Assign/ })).toBeVisible();
+				await expect(budget).toContainText('starts with nothing carried over');
+				await expect(preview.getByRole('button', { name: /Apply|Move start date/ })).toHaveCount(0);
+			});
+
+			await step('Cancel and Escape close it and keep the date', async () => {
+				await preview.getByRole('button', { name: 'Cancel' }).click();
+				await expect(preview).toBeHidden();
+				await expect(region.getByLabel('Cutover date')).toBeFocused();
+				await region.getByRole('button', { name: 'Save' }).click();
+				await expect(preview).toBeVisible();
+				await page.keyboard.press('Escape');
+				await expect(preview).toBeHidden();
+				await expect(region.getByLabel('Cutover date')).toBeFocused();
+				await page.keyboard.press('Escape');
+				await expectCutover(page, saved);
 				await page.reload();
-				await expectCutover(page, dayEarlier);
+				await expectCutover(page, saved);
+			});
+
+			await step('a date after today says why it has no preview', async () => {
+				const tomorrow = addDays(today, 1);
+				await region.getByRole('button', { name: 'Change' }).click();
+				await saveCutover(page, tomorrow);
+				const unsupported = previewDialog(page, tomorrow);
+				await expect(unsupported).toContainText(
+					'Pick today or an earlier date. Budge can only work out a Starting Balance for a day that has come.'
+				);
+				await unsupported.getByRole('button', { name: 'Cancel' }).click();
+				await expect(unsupported).toBeHidden();
+				await page.keyboard.press('Escape');
+				await expectCutover(page, saved);
 			});
 		}
 	}

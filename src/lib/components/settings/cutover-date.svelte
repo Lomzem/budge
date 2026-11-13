@@ -8,6 +8,8 @@
 	import { Input } from '$lib/components/ui/input';
 	import { dayOfMonth, formatDate, localToday, monthOf } from '$lib/domain/dates';
 
+	import LaterCutoverDialog from './later-cutover-dialog.svelte';
+
 	const settings = useQuery(api.settings.get, {});
 	const setCutoverDate = useMutation(api.settings.setCutoverDate);
 
@@ -18,6 +20,7 @@
 	let saving = $state(false);
 	let dateInput: HTMLInputElement | null = $state(null);
 	let changeButton: HTMLElement | null = $state(null);
+	let preview: { open: (from: string, to: string) => void } | undefined = $state();
 
 	async function startChange() {
 		if (cutoverDate !== null) date = cutoverDate;
@@ -35,6 +38,11 @@
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
+		if (cutoverDate !== null && date > cutoverDate) {
+			error = '';
+			preview?.open(cutoverDate, date);
+			return;
+		}
 		saving = true;
 		error = '';
 		const saved = await attempt(() => setCutoverDate({ cutoverDate: date }));
@@ -101,3 +109,14 @@
 	{/if}
 	<p role="alert" class={['text-sm text-destructive', error === '' && '-mt-3']}>{error}</p>
 </section>
+
+<LaterCutoverDialog
+	bind:this={preview}
+	onmoved={() => {
+		changing = false;
+	}}
+	onclosed={async () => {
+		await tick();
+		(changing ? dateInput : changeButton)?.focus();
+	}}
+/>
