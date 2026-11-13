@@ -40,6 +40,7 @@ function sampleArgs(ids: {
 		'export:page': { table: 'accounts', paginationOpts: { numItems: 10, cursor: null } },
 		'settings:get': {},
 		'settings:setCutoverDate': { cutoverDate: '2026-08-01' },
+		'settings:previewLaterCutover': { cutoverDate: '2026-08-15', today: '2026-08-20' },
 		'accounts:list': {},
 		'accounts:create': { name: 'Wallet', kind: 'cash', startingBalance: 0 },
 		'accounts:rename': { accountId, name: 'Wallet' },

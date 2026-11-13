@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 
 import { mutation, query } from './_generated/server';
 import { ensureReadyToAssign } from './lib/categories';
+import { laterCutoverPreview, previewLaterCutover as preview } from './lib/laterCutover';
 import { readCutoverDate, requireIsoDate } from './lib/settings';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
@@ -30,5 +31,16 @@ export const setCutoverDate = mutation({
 		if (settings === null) await ctx.db.insert('settings', { cutoverDate });
 		else await ctx.db.patch('settings', settings._id, { cutoverDate });
 		return null;
+	}
+});
+
+export const previewLaterCutover = query({
+	args: { cutoverDate: v.string(), today: v.string() },
+	returns: laterCutoverPreview,
+	handler: async (ctx, { cutoverDate, today }) => {
+		await requireOwner(ctx);
+		requireIsoDate(cutoverDate);
+		requireIsoDate(today);
+		return await preview(ctx, cutoverDate, today);
 	}
 });

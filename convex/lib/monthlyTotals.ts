@@ -2,13 +2,13 @@ import { addMonths, monthOf } from '../../src/lib/domain/dates';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
-type Counted = Pick<
+export type Counted = Pick<
 	Doc<'transactions'>,
 	'accountId' | 'date' | 'amount' | 'categoryId' | 'transferTransactionId' | 'split'
 >;
 type Key = Pick<Doc<'monthlyTotals'>, 'month' | 'accountId' | 'bucket'>;
 
-function keyOf(transaction: Counted): Key {
+export function keyOf(transaction: Counted): Key {
 	return {
 		month: monthOf(transaction.date),
 		accountId: transaction.accountId,

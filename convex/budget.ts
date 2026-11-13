@@ -4,10 +4,11 @@ import { isIsoDate, isIsoMonth, monthOf } from '../src/lib/domain/dates';
 import { computeBudget } from '../src/lib/domain/budget';
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
+import { readBudgetInput } from './lib/budget';
 import { requireCents } from './lib/input';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
-import { readCutoverDate, requireCutoverDate } from './lib/settings';
+import { requireCutoverDate } from './lib/settings';
 import { targetValidator } from './lib/targets';
 
 const totals = { assigned: v.number(), activity: v.number(), available: v.number() };
@@ -83,66 +84,7 @@ export const month = query({
 });
 
 async function readBudget(ctx: QueryCtx, month: string, today: string) {
-	const groups = [];
-	for await (const group of ctx.db.query('categoryGroups')) groups.push(group);
-	const categories = [];
-	for await (const category of ctx.db.query('categories')) categories.push(category);
-	const assignments = [];
-	for await (const row of ctx.db.query('assignments')) assignments.push(row);
-	const monthlyTotals = [];
-	for await (const row of ctx.db.query('monthlyTotals')) monthlyTotals.push(row);
-
-	const transactionsAfterToday = [];
-	const readyToAssign = categories.filter((c) => c.kind === 'readyToAssign').map((c) => c._id);
-	for (const categoryId of [undefined, ...readyToAssign]) {
-		const later = ctx.db
-			.query('transactions')
-			.withIndex('by_category_date', (q) => q.eq('categoryId', categoryId).gt('date', today));
-		for await (const transaction of later) {
-			const isTransferSideOrSplit =
-				transaction.transferTransactionId !== undefined || transaction.split === true;
-			if (isTransferSideOrSplit) continue;
-			transactionsAfterToday.push({
-				date: transaction.date,
-				amount: transaction.amount,
-				categoryId: transaction.categoryId ?? null
-			});
-		}
-	}
-	for (const categoryId of readyToAssign) {
-		const later = ctx.db
-			.query('transactionSplits')
-			.withIndex('by_category_date', (q) => q.eq('categoryId', categoryId).gt('date', today));
-		for await (const line of later) {
-			transactionsAfterToday.push({ date: line.date, amount: line.amount, categoryId });
-		}
-	}
-
-	return computeBudget<Id<'categories'>, Id<'categoryGroups'>, Id<'accounts'>>({
-		month,
-		today,
-		cutoverDate: await readCutoverDate(ctx),
-		groups: groups.map((g) => ({
-			id: g._id,
-			name: g.name,
-			position: g.position,
-			kind: g.kind,
-			hidden: g.hidden
-		})),
-		categories: categories.map((c) => ({
-			id: c._id,
-			groupId: c.groupId,
-			name: c.name,
-			position: c.position,
-			kind: c.kind,
-			hidden: c.hidden,
-			target: c.target,
-			accountId: c.accountId
-		})),
-		assignments,
-		monthlyTotals,
-		transactionsAfterToday
-	});
+	return computeBudget(await readBudgetInput(ctx, month, today));
 }
 
 async function readCategoryBudget(ctx: QueryCtx, month: string, categoryId: Id<'categories'>) {
