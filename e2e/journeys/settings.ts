@@ -8,7 +8,7 @@ import {
 	localToday,
 	monthOf
 } from '../../src/lib/domain/dates';
-import { expectClearOf, openBudget, type Journey } from './journey';
+import { expectClearOf, expectNothingPastTheRightEdge, openBudget, type Journey } from './journey';
 
 function inventedCapitalOneCheckingCsv(rows: { date: string; description: string }[]) {
 	return [
@@ -265,6 +265,26 @@ export const settings = {
 				await page.keyboard.press('Escape');
 				await expectCutover(page, saved);
 			});
+
+			await step(
+				'on a 320 px phone, the preview with every list open stays within the screen',
+				async () => {
+					await page.setViewportSize({ width: 320, height: 640 });
+					await region.getByRole('button', { name: 'Change' }).click();
+					await saveCutover(page, firstOfThisMonth);
+					await expect(preview).toBeVisible();
+					const lists = preview.locator('details');
+					expect(await lists.count()).toBeGreaterThan(0);
+					for (const list of await lists.all()) {
+						await list.locator('summary').click();
+						await expect(list).toHaveAttribute('open', '');
+					}
+					await expectNothingPastTheRightEdge(page);
+					await preview.getByRole('button', { name: 'Cancel' }).click();
+					await page.keyboard.press('Escape');
+					await expectCutover(page, saved);
+				}
+			);
 		}
 	}
 } satisfies Record<string, Journey>;

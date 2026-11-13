@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { openBudget, type Journey } from './journey';
+import { expectNothingPastTheRightEdge, openBudget, type Journey } from './journey';
 
 const SECTIONS = ['Budget', 'Accounts', 'Bank', 'Categories', 'Settings'] as const;
 
@@ -62,9 +62,7 @@ export const shell = {
 						await tab.click();
 						await expect(page.getByRole('heading', { level: 1, name, exact: true })).toBeVisible();
 						await expect(tab).toHaveAttribute('aria-current', 'page');
-						expect(
-							await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
-						).toBe(true);
+						await expectNothingPastTheRightEdge(page);
 					}
 					await tabs.getByRole('link', { name: /^Accounts/ }).click();
 					await page.getByText('Your Accounts').click();

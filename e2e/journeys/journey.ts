@@ -72,3 +72,51 @@ export async function expectClearOf(subject: Locator, ...others: Locator[]) {
 		);
 	}
 }
+
+export async function expectNothingPastTheRightEdge(page: Page) {
+	const past = await page.locator('body').evaluate((body) => {
+		const screenRight = document.documentElement.clientWidth;
+		const clipsOnPurpose = (element: Element) => {
+			const style = getComputedStyle(element);
+			const scrollsOnlySideways =
+				['auto', 'scroll'].includes(style.overflowX) &&
+				['hidden', 'clip'].includes(style.overflowY);
+			const visuallyHidden = style.clipPath === 'inset(50%)';
+			return scrollsOnlySideways || visuallyHidden || style.textOverflow === 'ellipsis';
+		};
+		const insideAClipOnPurpose = (element: Element) => {
+			for (let box = element.parentElement; box !== null; box = box.parentElement) {
+				if (clipsOnPurpose(box)) return true;
+			}
+			return false;
+		};
+		const named = (element: Element) => {
+			const slot = element.getAttribute('data-slot');
+			const text = element.textContent.trim().slice(0, 40);
+			return `<${element.localName}${slot === null ? '' : ` data-slot="${slot}"`}> "${text}"`;
+		};
+		return [...body.querySelectorAll('*')]
+			.filter((element) => element.checkVisibility({ visibilityProperty: true }))
+			.filter((element) => !insideAClipOnPurpose(element))
+			.flatMap((element) => {
+				const box = element.getBoundingClientRect();
+				if (box.width === 0 || box.height === 0) return [];
+				if (box.right > screenRight + 0.5)
+					return [`${named(element)} ends at ${String(box.right)}, past the screen`];
+				const hidesContentAcross =
+					getComputedStyle(element).overflowX !== 'visible' &&
+					!clipsOnPurpose(element) &&
+					element.scrollWidth > element.clientWidth + 1;
+				return hidesContentAcross
+					? [
+							`${named(element)} hides ${String(element.scrollWidth - element.clientWidth)} px of its content to the right`
+						]
+					: [];
+			})
+			.slice(0, 5);
+	});
+	expect(
+		past,
+		`content past the right edge of a ${String(page.viewportSize()?.width)} px viewport`
+	).toEqual([]);
+}

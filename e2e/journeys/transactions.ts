@@ -1,7 +1,13 @@
 import { expect } from '@playwright/test';
 
 import { holdResponseTo } from '../heldResponse';
-import { centsIn, expectClearOf, openAccount, type Journey } from './journey';
+import {
+	centsIn,
+	expectClearOf,
+	expectNothingPastTheRightEdge,
+	openAccount,
+	type Journey
+} from './journey';
 
 export const transactions = {
 	create: {
@@ -219,6 +225,7 @@ export const transactions = {
 				expect(
 					await table.evaluate((container) => container.scrollWidth <= container.clientWidth)
 				).toBe(true);
+				await expectNothingPastTheRightEdge(page);
 			});
 
 			await step('the first Transaction shows above the tab bar without scrolling', async () => {
