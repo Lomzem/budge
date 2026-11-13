@@ -10,6 +10,7 @@ import {
 } from '../../src/lib/domain/dates';
 import {
 	centsIn,
+	chooseBankFile,
 	expectClearOf,
 	expectNothingPastTheRightEdge,
 	openAccount,
@@ -90,16 +91,14 @@ export const settings = {
 
 				await page.getByRole('button', { name: 'Import file' }).click();
 				const importing = page.getByRole('dialog', { name: 'Import a bank file' });
-				await importing.getByLabel('File').setInputFiles({
-					name: 'checking.csv',
-					mimeType: 'text/csv',
-					buffer: Buffer.from(
-						inventedCapitalOneCheckingCsv([
-							{ date: '2026-10-31', description: 'SAMPLE E2E BEFORE START' },
-							{ date: start, description: 'SAMPLE E2E ON START' }
-						])
-					)
-				});
+				await chooseBankFile(
+					page,
+					'checking.csv',
+					inventedCapitalOneCheckingCsv([
+						{ date: '2026-10-31', description: 'SAMPLE E2E BEFORE START' },
+						{ date: start, description: 'SAMPLE E2E ON START' }
+					])
+				);
 				await expect(importing.getByRole('status')).toHaveText(/^1 new Transaction, 0 Matches/);
 				await expect(importing.getByText('SAMPLE E2E BEFORE START')).toHaveCount(0);
 				await importing.getByRole('button', { name: 'Import 1 row' }).click();

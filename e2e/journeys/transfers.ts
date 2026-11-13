@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import { localToday } from '../../src/lib/domain/dates';
-import { centsIn, choose, openAccount, type Journey } from './journey';
+import { centsIn, choose, chooseBankFile, openAccount, type Journey } from './journey';
 
 const balance = (page: Page) => () => centsIn(page.getByTestId('account-balance'));
 
@@ -14,11 +14,7 @@ async function importRow(page: Page, bankText: string, type: 'Debit' | 'Credit')
 	await page.getByRole('button', { name: 'Import file' }).click();
 	const dialog = page.getByRole('dialog', { name: 'Import a bank file' });
 	await expect(dialog.getByLabel('Account')).not.toHaveText('Pick an Account');
-	await dialog.getByLabel('File').setInputFiles({
-		name: 'bank.csv',
-		mimeType: 'text/csv',
-		buffer: Buffer.from(csv)
-	});
+	await chooseBankFile(page, 'bank.csv', csv);
 	await expect(dialog.getByRole('status')).toHaveText(/^1 new Transaction/);
 	await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
 	await expect(dialog).toBeHidden();

@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test';
 
 import { localToday } from '../../src/lib/domain/dates';
 import { holdResponseTo, withholdQueryResult } from '../heldResponse';
-import { openAccount, type Journey } from './journey';
+import { chooseBankFile, openAccount, type Journey } from './journey';
 
 function inventedCapitalOneCheckingAndSavingsCsv(description: string, amount: string) {
 	const [year, month, day] = localToday().split('-');
@@ -14,11 +14,7 @@ function inventedCapitalOneCheckingAndSavingsCsv(description: string, amount: st
 
 async function chooseFile(page: Page, csv: string) {
 	const dialog = page.getByRole('dialog', { name: 'Import a bank file' });
-	await dialog.getByLabel('File').setInputFiles({
-		name: 'savings.csv',
-		mimeType: 'text/csv',
-		buffer: Buffer.from(csv)
-	});
+	await chooseBankFile(page, 'savings.csv', csv);
 	await expect(dialog.getByRole('status')).toHaveText(/^1 new Transaction, 0 Matches/);
 }
 
@@ -43,13 +39,11 @@ export const imports = {
 
 			await step('the same row, relabelled, names its visible picker by its label', async () => {
 				await page.getByRole('button', { name: 'Import file' }).click();
-				await dialog.getByLabel('File').setInputFiles({
-					name: 'savings.csv',
-					mimeType: 'text/csv',
-					buffer: Buffer.from(
-						inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E TWIN RELABELLED', '12.34')
-					)
-				});
+				await chooseBankFile(
+					page,
+					'savings.csv',
+					inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E TWIN RELABELLED', '12.34')
+				);
 				await expect(twin).toBeVisible();
 				await expect(twin).toHaveText('Skip this row');
 			});

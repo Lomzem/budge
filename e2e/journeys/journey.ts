@@ -53,6 +53,12 @@ export async function openAccount(page: Page, name: string) {
 	await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
 
+export async function chooseBankFile(page: Page, name: string, csv: string) {
+	const field = page.getByRole('dialog', { name: 'Import a bank file' }).getByLabel('File');
+	await expect(field).toBeEnabled();
+	await field.setInputFiles({ name, mimeType: 'text/csv', buffer: Buffer.from(csv) });
+}
+
 export async function openBudget(page: Page) {
 	await page.goto('/');
 	await expect(page.getByRole('heading', { level: 1, name: 'Budget', exact: true })).toBeVisible();
