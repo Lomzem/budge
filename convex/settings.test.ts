@@ -358,13 +358,18 @@ describe('a later cutover date preview it cannot work out', () => {
 		expect(preview.message).toContain('More than 500 Transactions');
 	});
 
-	test('with nothing dated before the new date, says there is nothing to fold', async () => {
-		const { owner } = await startBudget({ cutoverDate: '2026-09-01' });
+	test.each(['2026-11-01', '2026-12-01'])(
+		'with nothing dated before %s, says there is nothing to fold, even after today',
+		async (cutoverDate) => {
+			const { owner } = await startBudget({ cutoverDate: '2026-09-01' });
 
-		expect(
-			await owner.query(api.settings.previewLaterCutover, { cutoverDate: '2026-11-01', today })
-		).toEqual({ kind: 'nothingBefore', from: '2026-09-01', to: '2026-11-01' });
-	});
+			expect(await owner.query(api.settings.previewLaterCutover, { cutoverDate, today })).toEqual({
+				kind: 'nothingBefore',
+				from: '2026-09-01',
+				to: cutoverDate
+			});
+		}
+	);
 });
 
 describe('a later cutover date preview that can proceed', () => {

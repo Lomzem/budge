@@ -262,12 +262,6 @@ async function readEarlier(
 	const from = await readCutoverDate(ctx);
 	if (from === null) return unsupported('noCutoverDate', 'Set the cutover date first.');
 	if (to <= from) return unsupported('notLater', 'Pick a date after the current cutover date.');
-	if (to > today) {
-		return unsupported(
-			'notYet',
-			'Pick today or an earlier date. Budge can only work out a Starting Balance for a day that has come.'
-		);
-	}
 	const earlier = await ctx.db
 		.query('transactions')
 		.withIndex('by_date', (q) => q.lt('date', to))
@@ -279,6 +273,12 @@ async function readEarlier(
 		);
 	}
 	if (earlier.length === 0) return { kind: 'nothingBefore', from, to };
+	if (to > today) {
+		return unsupported(
+			'notYet',
+			'Pick today or an earlier date. Budge can only work out a Starting Balance for a day that has come.'
+		);
+	}
 	return { from, earlier };
 }
 
