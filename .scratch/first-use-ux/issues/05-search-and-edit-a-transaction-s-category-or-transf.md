@@ -1,6 +1,6 @@
 # 05: Search and edit a Transaction's Category or Transfer in place
 
-**Status:** landed — review pending
+**Status:** done
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -101,3 +101,43 @@ Proof: the primary new contract is the browser interaction through search, selec
 1. Each row renders two pickers, one for the narrow layout and one for the wide one, and CSS hides one. Should it be a single instance moved by layout?
 2. The dialog still offers every Transfer and refuses an invalid card direction when you save. The row hides those choices instead. Is that difference acceptable?
 3. On touch, the search waits for a tap. Should it focus at once?
+
+### Review fixes 2026-11-13 (commit 92837d3 on `feat/first-use-ux`)
+
+Review: `.scratch/first-use-ux/reviews/05/review.md`.
+
+**P1: a stale Transfer-link search overwrote a newer saved Category. Fixed.**
+
+- **Cause.** In `pickCategory`, the generation check ran only when the search for a Transfer to link found a candidate. A Transfer pick whose search came back empty after a newer pick still fell through to `categorize`.
+- **Fix.** Following the `/correct` analysis, a row pick is now one continuation, in `src/lib/components/transactions/transaction-table.svelte`:
+  - It awaits the search's decision into a local (`handOff`).
+  - It then passes a single `latestPick` gate before either side effect, the dialog handoff or `categorize`.
+  - The completion guard for a write already sent is unchanged.
+  - No other row handler in the file reads before it writes.
+- **Journey.** `transactions/categorize-late` now runs on `bank-sync`, a superset of `budget-with-accounts`, and keeps its delayed-save steps.
+  - It then withholds `transactions:transferCandidates` and reloads. The newest WebSocket route takes the page's next connection.
+  - On the imported SAMPLE PET SUPPLY 0311 row, it picks `Transfer: Savings`, then `Groceries`, which saves.
+  - It releases the search and waits for `dropped`, which is new on `withholdQueryResult` in `e2e/heldResponse.ts`. `dropped` resolves when the page drops the answered query, so the stale continuation has already run.
+  - A later save on another row then lands. The client sends mutations in order, so this barrier means any stale write would already show.
+  - The imported row must keep Groceries before and after reload.
+- **Red** (before the fix), `To Savings, Category of Transfer` instead of Groceries:
+  - `test-results/verify-budge/t05fix-red`
+  - `test-results/verify-budge/t05fix-red-final` (the final journey text)
+- **Green:**
+  - `test-results/verify-budge/t05fix-green`
+  - `test-results/verify-budge/t05fix-final`: categorize-late, categorize, transfers/import-link, transfers/pair, payees/last-category, splits/lines, accounts/start-edit
+- **Reviewer's `race.ts`.** It was run unchanged from a scratch location against the fix and now fails at its own `To Savings` expectation. The row kept Groceries: `.scratch/first-use-ux/reviews/05/evidence/race-after-fix.log`, full output `test-results/ticket-05-fix/race-after-fix.log`.
+- **Feature map.** The `transactions/categorize-late` entry in `.agents/skills/verify-budge/features/transactions.md` was updated.
+
+**Open questions, answered by the owner (no code change)**
+
+1. The shared snippet keeps its two picker instances.
+2. The dialog may offer broader Transfer choices than the row, because it can change direction. Server validation stays.
+3. On touch, the search still waits for a tap.
+
+**Checks**
+
+- `bun run check` passed in a temporary worktree, with capacity:check: 905 tests (`test-results/ticket-05-fix/check.log`).
+- Lint, Prettier and gitleaks hooks passed on commit.
+- Full `bun run test:e2e:local` at 92837d3: 51 passed (8.9 min).
+- The app was stopped (`app down`) and the worktree removed.

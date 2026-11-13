@@ -1,0 +1,5 @@
+race.ts (unchanged, from race.ts.txt) run against the fix in a temporary worktree on bank-sync, 2026-11-13T23:32:28Z.
+exit 1: it fails where it awaited the stale Transfer:
+Expected pattern: /^To Savings,/
+Received string:  "Groceries, Category of SAMPLE PET SUPPLY 0311 on Nov 7, 2026"
+The row kept Groceries for the 5 s timeout after the held transferCandidates result was released; transactions/categorize-late proves the same ordering after reload.
