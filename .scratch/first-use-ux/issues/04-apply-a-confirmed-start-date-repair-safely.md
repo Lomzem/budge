@@ -1,6 +1,6 @@
 # 04: Apply a confirmed start-date repair safely
 
-**Status:** ready-for-agent
+**Status:** landed — review pending
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -42,3 +42,105 @@ Budge stores no time zone: the owner's day is the browser's local date, as for e
 - `today` must be a real date, and it must be the calendar date somewhere on Earth at the server's clock when the mutation runs: from the UTC date at `Date.now()` − 12 hours to the UTC date at `Date.now()` + 14 hours (UTC−12 to UTC+14). Any other `today` refuses with a message that the device's date looks wrong, and changes nothing.
 - The new cutover date must be on or before that `today` (the preview's `notYet` rule). So no device clock can start a budget on a day that has not begun anywhere.
 - The recomputed preview uses the same validated `today`, so its fingerprint matches the one the owner reviewed when nothing else changed. A device whose date rolls over between preview and confirm sees the preview change, which is the stale-preview path.
+
+### Landed 2026-11-13 (commits dc02b22..HEAD on `feat/first-use-ux`)
+
+**Decisions**
+
+- **One atomic mutation.** `settings.applyLaterCutover` recomputes the preview with `LATER_CUTOVER_READS` and compares fingerprints. It then folds the history, writes Starting Balances through `saveStartingBalance`, removes earlier Assigned amounts, and moves the date, all in one transaction. A stale fingerprint, an unsupported or blocked preview, Reconciled history without `unlockReconciled`, and a device date outside the recorded time-zone policy each refuse and change nothing. Owned writes go through `convex/lib/transactions.ts` (`removeEarlierHistory`, `restoreEarlierHistory`) and `convex/lib/monthlyTotals.ts`.
+- **Measured bounds.** The bounds were measured, not chosen. At 500 Transactions the apply passed 4,096 index ranges, because every delete and patch counts as one. The bounds are now:
+  - 250 Transactions, 250 bank rows and 250 split lines;
+  - a new bound of 500 earlier Assigned amounts, which the apply deletes.
+
+  `capacity:check` now runs two worst-case shapes through preview, apply and undo.
+
+  | Call | Index ranges | Documents read |
+  | --- | --- | --- |
+  | Apply | 2,641 of 4,096 | 15,575 of 32,000 |
+  | Undo | 2,335 | |
+  | Preview | 711 | 12,899 |
+
+  A bigger history is refused before the preview with the limit named. A batched apply was rejected because it would give up atomicity and the stale check.
+- **Retry.** A repeat with the same date and fingerprint returns the same move and writes nothing, because the last move (`cutoverMoves`) records both.
+- **Transfers.** `removeEarlierHistory` refuses to fold one side of a Transfer, and the preview already blocks a Transfer that straddles the date.
+- **Recovery.** `settings.undoLaterCutover` undoes the last move, until the date moves again. Settings offers it as `Undo move`.
+  - It restores the date, the folded Transactions (with new ids), their split lines, Transfer links, Bank Row links and matched flags, the earlier Starting Balances in their prior state, the earlier Assigned amounts, and the monthly totals.
+  - It refuses, changing nothing, when a new Starting Balance has changed or been reconciled, a Category it needs has been deleted, a Bank Row has been matched again, amounts have been assigned before the month, or the date has moved again.
+  - It cannot restore the old Transaction ids. Bank-feed confirmations stay unconfirmed, by design.
+- **Sync boundary: no new regression.** Folded bank rows stay as bank memory through the same `keepAsBankMemory` path a Transaction delete uses. Imports and syncs refuse rows dated before the cutover (`convex/lib/imports.ts`, owner test `imports.test.ts` "a date before the cutover"). The existing delete and bank-row tests cover the dedup against kept rows. The apply changes only the cutover value those checks read, so a separate regression would duplicate them.
+- **UI.**
+  - The preview ends in `Move start date`. When Reconciled history is in the preview, the button stays disabled until the user checks "Unlock the Reconciled history".
+  - The uncleared caution now names the cleared-balance change.
+  - After a move, the Cutover date row reads `Starts on <date>, moved from <date>.` with `Undo move` beside `Change`. The button's description names what it puts back.
+  - The undo shares the date row, so neither the move nor the undo pushes the sections below. The undo result is announced in a screen-reader-only status line.
+
+**Changed files**
+
+- Server:
+  - `convex/settings.ts`, `convex/schema.ts` (`cutoverMoves`, `cutoverMoveHistory`);
+  - `convex/lib/laterCutover.ts`, `convex/lib/transactions.ts`, `convex/lib/monthlyTotals.ts`, `convex/lib/accounts.ts`.
+- Tests:
+  - `convex/settings.test.ts`, `convex/owner.test.ts`, `convex/export.test.ts`;
+  - `eslint.config.js`, `eslint/rules/owned-writes-config.test.js`.
+- Capacity: `scripts/capacity/{harness.js,run.js,README.md}`.
+- UI: `src/lib/components/settings/{cutover-date,later-cutover-dialog,later-cutover-preview}.svelte` and `src/routes/(app)/settings/+page.svelte`.
+- Journeys: `e2e/journeys/{settings,export}.ts`.
+- Feature map: `.agents/skills/verify-budge/features/settings.md`.
+
+**Tests, with contract and red/green evidence.** Each refusal and guard was shown red by disabling only that guard, then green.
+
+- "folds the earlier history into Starting Balances on the new date and leaves the budget the preview showed". It reuses the monthly-cache proof: the kept totals equal `monthlyTotals.rebuild`.
+  - Red, with the fold-totals guard off: `[['Checking', 28000], …]` instead of `[['Checking', 62500], …]`.
+- `refuses $refusal and changes nothing`: a stale preview, Reconciled history without the unlock, and a device date that isn't today anywhere. Each case compares every table before and after.
+  - Red for each case: the call did not throw, so `toMatch` received undefined.
+- "confirming the same preview again, as a retry does, changes nothing more".
+  - Red: the second call failed with "Pick a date after the current cutover date."
+- "undoing the move puts back the history, Starting Balances and assignments it replaced, once".
+  - Red, with the Transfer relink off: the restored state differed from the seeded state.
+- "will not undo the move over a Starting Balance changed since, and changes nothing".
+  - Red: the call did not throw.
+- Unsupported preview case "amounts assigned in the months before the new date".
+  - Red: "expected an unsupported preview, got ready".
+- Journey `settings/later-move` covers the preview-to-confirm path, the unlock by keyboard, Undo move by keyboard, reload, and a 320 px phone. It failed under the production build with "The page shifted without user input" (Theme moved 270→374 px when the separate undo row appeared). The fix moved the undo into the date row, and the journey now passes. The guard's root cause was content appearing in a new row after an asynchronous mutation; the status line was the same pattern and is now screen-reader-only.
+- Generated tests ran red first for the new public functions and tables:
+  - `owner.test.ts`, the public-function guard;
+  - `export.test.ts`, the table list;
+  - `featureMap.test.ts`;
+  - `owned-writes-config.test.js`.
+
+**Checks**
+
+- `bun run check` at e3d8036 in a separate worktree: exit 0, 58 files and 885 tests. `capacity:check` passed, including the cutover shapes, in 106.6 s.
+- Capacity evidence, copied to the main checkout: `test-results/capacity/2026-11-13T19-30-56.296Z` (3 runs per shape) and `…T19-42-38.397Z`.
+- `bun run test:e2e:local`:
+  - Run 1: 3 failures. `export/files` lacked the new tables, `later-start`'s Escape closed the form under the opening dialog, and `later-move` shifted. All three were fixed.
+  - Run 2: 48 passed, 1 failed (the later-move shift).
+  - Run 3, after the in-row undo: 45 passed, 4 failed.
+    - `shell/phone-pages`: Settings at 390 px shifted 44 px. c3cf29a had made the Cutover date section show `Loading…` until the last move arrived, and at 390 px the loaded row wraps to two lines. The Settings card now waits for the last move as well as the settings, so the section mounts with both and paints its loaded height first.
+    - `later-start`: the 320 px step counted the preview's lists before the preview had loaded. That race came from ticket 03; the step now waits for the first list.
+    - `bank-changes/take-the-banks` and `transfers/import-link`: register and import-preview shifts in code this ticket does not touch. Both passed on rerun (`t04-ui-10`).
+  - Run 4 did not start: `convex dev` found its port taken (`Requested port 39216 is not available`).
+  - Run 5, at 31810a7's content: 49 passed in 8.9 min.
+- `bun run check` at 31810a7's content, in the worktree: exit 0. 58 test files and 885 tests passed, and `capacity:check` passed (cutover shapes included) in 105.0 s (`test-results/capacity/2026-11-13T20-37-12.745Z`).
+
+**verify-budge evidence** (`bun run app verify … --run <name>` in a separate worktree, copied to `test-results/verify-budge/` in the main checkout before the worktree was removed):
+
+- `t04-ui-6`: later-start, later-move, settings/cutover and export/files pass.
+- `t04-ui-8`: later-move, later-start and settings/cutover pass after the shift fix. The screenshots show the row at 1280 px (53 px to spare) and at 320 px.
+- `t04-ui-10`: later-move, later-start, settings/cutover, shell/phone-pages, bank-changes/take-the-banks and transfers/import-link pass after the Settings card gate and the later-start wait.
+
+**Not done here: the real owner's November repair.** Nothing ran against production or real data. To prepare it, someone with approval would need:
+
+1. A read-only export of the owner's deployment: settings, Accounts, Transactions before 2026-11-01, split lines, bank rows, `connectionAccounts`, and Assigned amounts.
+2. Its counts against `LATER_CUTOVER_READS`.
+3. The preview for 2026-11-01, run against that state (or an imported copy on a throwaway local backend), and its blocked items resolved.
+4. Approval of that concrete preview and of the undo scope above, before any confirm on the live deployment.
+
+**Deferred or open**
+
+- Ticket 03's limit list (500 and 1,000) is historical. The live bounds are in `laterCutover.ts` and `scripts/capacity/README.md`.
+- An AGENTS.md enforced-rules row for "the later cutover bounds fit one atomic apply and undo (`bun run capacity:check`)" is not added. Adding it needs the writing-for-agents pass.
+- At 320 px, the tab bar's "Categories" label shifted once in development after a resize. It was not reproduced in production runs.
+- On a phone, saving a later date already wraps the form to two lines, and the moved row wraps the same way. No journey moves the date at phone width.
+
+**Cleanup.** The worktree's app was stopped with `bun run app down`, and the worktree and the kept E2E temp directories were removed. No app process from this ticket is running.
