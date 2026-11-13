@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { holdResponseTo } from '../heldResponse';
+import { holdResponseTo, withholdQueryResult } from '../heldResponse';
 import {
 	centsIn,
 	choose,
@@ -214,8 +214,8 @@ export const transactions = {
 	},
 	'categorize-late': {
 		title:
-			'a Category picked while the row’s earlier pick is still saving wins, and the earlier save landing late does not put it back',
-		fixture: 'budget-with-accounts',
+			'a Category picked while the row’s earlier pick is still saving, or still looking for a Transfer to link, wins, and the earlier pick finishing late does not put it back',
+		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const categorize = await holdResponseTo(page, 'transactions:categorize');
 			const category = page
@@ -248,6 +248,40 @@ export const transactions = {
 				await page.reload();
 				await expect(category).toHaveAccessibleName(/^Dining Out, /);
 			});
+
+			const lookup = await withholdQueryResult(page, 'transactions:transferCandidates');
+
+			const imported = await step(
+				'reload so searches for a Transfer to link are held, then on an imported row pick Transfer: Savings and, while its search is held, Groceries, which saves',
+				async () => {
+					await page.reload();
+					const id = await page
+						.getByRole('button', { name: /Category of SAMPLE PET SUPPLY 0311 on / })
+						.first()
+						.getAttribute('data-category');
+					const picker = page
+						.getByRole('button')
+						.and(page.locator(`[data-category="${String(id)}"]`));
+					await choose(picker, 'Transfer: Savings');
+					await expect(picker).toHaveAccessibleName(/^Saving, /);
+					await choose(picker, 'Groceries');
+					await expect(picker).toHaveAccessibleName(/^Groceries, /);
+					return picker;
+				}
+			);
+
+			await step(
+				'the search lands with nothing to link, a later save on another row lands, and the imported row keeps Groceries after reload',
+				async () => {
+					lookup.release();
+					await lookup.dropped;
+					await choose(category, 'Coffee');
+					await expect(category).toHaveAccessibleName(/^Coffee, /);
+					await expect(imported).toHaveAccessibleName(/^Groceries, /);
+					await page.reload();
+					await expect(imported).toHaveAccessibleName(/^Groceries, /);
+				}
+			);
 		}
 	},
 	'approve-all-undo': {

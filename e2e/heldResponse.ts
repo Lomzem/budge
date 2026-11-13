@@ -129,6 +129,7 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 	let browser: WebSocketRoute | undefined;
 	let lastVersion: unknown;
 	let withholding = true;
+	const { promise: dropped, resolve: markDropped } = Promise.withResolvers<undefined>();
 
 	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => {
 		browser = socket;
@@ -141,6 +142,7 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 			if (message.type === 'ModifyQuerySet') {
 				for (const change of message.modifications ?? []) {
 					if (change.type === 'Add' && change.udfPath === udfPath) queryIds.add(change.queryId);
+					if (change.type === 'Remove' && queryIds.has(change.queryId)) markDropped(undefined);
 				}
 			}
 			server.send(frame);
@@ -164,6 +166,7 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 	});
 
 	return {
+		dropped,
 		release() {
 			withholding = false;
 			if (withheld.size === 0) return;

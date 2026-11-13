@@ -371,8 +371,9 @@
 		latestPick.set(row._id, pick);
 		picked.set(row._id, option);
 		const at = rows.findIndex((other) => other._id === row._id);
-		if (await linksAnImport(row, option)) {
-			if (latestPick.get(row._id) !== pick) return;
+		const handOff = await linksAnImport(row, option);
+		if (latestPick.get(row._id) !== pick) return;
+		if (handOff) {
 			picked.delete(row._id);
 			edit(row, option);
 			return;
