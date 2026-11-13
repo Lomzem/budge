@@ -34,8 +34,10 @@
 	const evidence = useQuery(api.heldAccounts.startingBalanceEvidence, () => ({
 		accountId: account._id
 	}));
+	const settings = useQuery(api.settings.get, {});
 	const owed = $derived(account.kind === 'creditCard');
-	const since = $derived(evidence.data === undefined ? null : formatDate(evidence.data.since));
+	const cutoverDate = $derived(settings.data?.cutoverDate ?? evidence.data?.since ?? null);
+	const since = $derived(cutoverDate === null ? null : formatDate(cutoverDate));
 	const feed = $derived(
 		bank.all
 			.flatMap((connection) =>
@@ -172,7 +174,7 @@
 		{/if}
 	</div>
 	<p role="status" class="text-sm text-muted-foreground">{suggestion}</p>
-	{#if feed !== undefined && imported !== undefined && since !== null}
+	{#if feed !== undefined}
 		<details class="group rounded-md bg-muted text-sm">
 			<summary
 				class="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md px-3 font-bold [&::-webkit-details-marker]:hidden"
@@ -202,12 +204,18 @@
 						<dd>Unknown. The bank doesn't say.</dd>
 					</div>
 					<div>
-						<dt class="text-muted-foreground">Imported since {since}</dt>
+						<dt class="text-muted-foreground">Imported since {since ?? 'the cutover date'}</dt>
 						<dd data-testid="imported-since">
-							{imported.count === 0 ? 'None' : `${transactions(imported.count)}${dated(imported)}`}
+							{#if imported === undefined}
+								Counting…
+							{:else}
+								{imported.count === 0
+									? 'None'
+									: `${transactions(imported.count)}${dated(imported)}`}
+							{/if}
 						</dd>
 					</div>
-					{#if imported.count > 0}
+					{#if imported !== undefined && imported.count > 0}
 						<div>
 							<dt class="text-muted-foreground">
 								{owed ? 'Their net change in what you owe' : 'Their net amount'}
@@ -216,14 +224,17 @@
 						</div>
 					{/if}
 					<div>
-						<dt class="text-muted-foreground">Every Transaction since {since} arrived?</dt>
+						<dt class="text-muted-foreground">
+							Every Transaction since {since ?? 'the cutover date'} arrived?
+						</dt>
 						<dd>Unknown. The bank doesn't say whether its history is complete.</dd>
 					</div>
 				</dl>
 				<p>
 					Budge's estimate is the bank's balance less the imported Transactions, so a missing
 					Transaction or an out-of-date balance makes it wrong. A working connection doesn't prove
-					it either. Compare it with your bank statement balance for the start of {since}.
+					it either. Compare it with your bank statement balance for the start of {since ??
+						'the cutover date'}.
 				</p>
 			</div>
 		</details>
