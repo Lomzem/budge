@@ -9,7 +9,7 @@ Create Cash and Credit Card Accounts, arrange them, and decide where an unknown 
 - `account-start-edit`: editing a Starting Balance offers only Date, Category, Direction, Amount and Memo.
 - `account-rename`, `account-order`, `account-missing`: names, group order and invalid route.
 - `account-held`, `account-suggested`: map/create/ignore held bank Accounts and confirm the Starting Balance step.
-- `account-setup-confirmed`: each bank Account a connection feeds stays `Starting balance not confirmed` on its Bank card until the owner confirms that Account's Starting Balance for the current cutover date (changing the date unconfirms it); the step's `What it’s based on` names the bank Account the server asks for the balance (the newest one mapped to the Account) and says what Budge can't know. A bank Account set up anew in another Account keeps `Its earlier Transactions are still in <old Account>. Only new ones come to <Account>.` on its row until each of them is moved or deleted.
+- `account-setup-confirmed`: each bank Account a connection feeds stays `Starting balance not confirmed` on its Bank card until the owner confirms that Account's Starting Balance for the current cutover date (changing the date unconfirms it); the step's `What it’s based on` names the bank Account the server asks for the balance (of those mapped to the Account, the one Budge recorded last) and says what Budge can't know. A bank Account set up anew in another Account keeps `Its earlier Transactions are still in <old Account>. Only new ones come to <Account>.` on its row until each of them is moved or deleted.
 
 ## How to get to it (user POV)
 

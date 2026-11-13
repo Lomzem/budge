@@ -1,6 +1,6 @@
 # 02: Confirm Account setup and explain balance uncertainty
 
-**Status:** landed — review pending
+**Status:** done
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -78,3 +78,52 @@ Commits: `9c19182` (server and owner tests), `a49d47b` (Bank card, dialogs, jour
 - Stop syncing keeps wrongly mapped Transactions in the old Account, so the corrected Account starts empty. Moving them is not a supported flow.
 - "When the bank measured it" is always Unknown. Plaid's balance timestamp isn't stored.
 - The card menu's "Stop syncing {Account}" is ambiguous when two bank Accounts feed one Account.
+
+### Review and corrections (Opus 5.5, 2026-11-13)
+
+Commits: `20ac489` (server and owner tests), `05cceeb` (Bank card, step, Account page, journeys, feature map), and this record (feature map wording, ticket).
+
+**Dispositions**
+
+1. **(P2) Wrong bank identity in the evidence: fixed.**
+   - `startingBalanceSource` (`convex/lib/accounts.ts`) is the one selection. `startingBalanceBasis`, `suggestStartingBalance` and `startingBalanceEvidence` all return its `source` (`{bankName, mask, connectionName}`). The step renders that source and no longer picks a feed of its own; it only asks whether any feed exists.
+   - Red: `convex/heldAccounts.test.ts` with the `source` expectations gave 5 failed, 30 passed. Green: 35 passed.
+   - Mutation check: restoring a `.first()` selection without `.order('desc')` failed 2 tests: "after the Account is mapped to a newer bank Account…" (two feeds in one connection) and "waits for rows still coming in from any bank Account…". Reverting the mutation gave 35 passed again.
+2. **(P2) Remapping hides unresolved history: fixed.** Transactions are not moved.
+   - `historyElsewhere` returns the Account that holds a mapped bank Account's earlier Transactions. It reads that bank Account's Bank Rows through the new index `imports.by_connectionAccountId_accountId`, outside its current Account, and checks at most 100 rows. `bankConnections.list` returns it as `historyIn`, and `feedNeedsYou` counts it.
+   - The feed row says "Its earlier Transactions are still in {Account}. Only new ones come to {feed Account}.", with a link to that Account. The notice stays until each of those Transactions is moved or deleted.
+   - The confirm status adds "Its bank Account's earlier Transactions are still in {Account}", with an "Open {Account}" link. The ignored note and the Bring back status say that setting up changes where new transactions go and that earlier ones stay where they are.
+   - Owner test: "set up anew in another Account, says where its earlier Transactions still are until each is moved or deleted". Red: `historyIn` was missing.
+   - Journey `accounts/setup-correct`: asserts the notice and the status, and that the notice survives a reload. The link opens Savings, which lists SAMPLE INTEREST PAID and SAMPLE TRANSFER IN 5512. Savings Plus shows only its Starting Balance, with neither row.
+3. **Confirmation goes stale when the cutover date changes: fixed.**
+   - The mapped row stores `startingBalanceConfirmedFor: cutoverDate`, replacing `startingBalanceConfirmed`. `isStartingBalanceConfirmed` compares it with the current cutover date.
+   - Owner test: "a confirmed starting balance is unconfirmed again once the cutover date changes, until the owner sets it for the new date". Red: "expected true to be false". Items 2 and 3 together: red 2 failed, green 37 passed.
+4. **Copy: fixed.** "When the bank measured it" now reads "Unknown. Not available to Budge." The timestamp is not stored. `accounts/setup-check` asserts the text.
+5. **Stop syncing menu: fixed.**
+   - The card item reads "Stop syncing {bank Account} ending {mask}". Its status reads "Stopped syncing {label}. Its Transactions stay in {Account}."
+   - Root cause: the Account page menu had the same ambiguity. It now lists one item per bank Account feeding the Account.
+   - `accounts/setup-correct` and `plaid/stop-and-bring-back` assert the labels. There is no separate pre-fix red: the old label could not match.
+6. **Decided, no code.** Existing mappings stay unconfirmed. `/correct` item 2 is rejected: the journey layout guard already catches async layout movement, as it did at `a49d47b`.
+
+**Checks**
+
+- Focused owner tests (`convex/heldAccounts.test.ts`): 37 passed. `bun run test`: 58 files, 860 tests passed.
+- `bun run check` (main checkout): codegen, format, lint, lint:ui, typecheck and vitest passed. `capacity:check` refuses there (backend not anonymous).
+- `bun run capacity:check` in the worktree `budge-wt-02c` after `bun run app up`: passed (`maxFileRows` 250).
+- `bun run test:e2e:local -g "accounts/|plaid/"`: 16 passed. Full `bun run test:e2e:local`: 47 passed (6.8 min).
+
+**verify-budge** (worktree runs copied into the main checkout, gitignored; the app was stopped and the worktree removed)
+
+- `test-results/verify-budge/first-use-02c-journeys/`, at `05cceeb`: `accounts/setup-check`, `setup-correct`, `held-map`, `held-new-card`, `held-unknown-kind` and `held-legacy-name`, plus `plaid/stop-and-bring-back` and `plaid/attention`, all passed.
+- `test-results/verify-budge/first-use-02c/` (bank-sync, reseeded per viewport; 1280×800 and 320×640; `manual.ts`, notes, PNG and ARIA files):
+  - The evidence names a bank Account; Savings shows "Not available to Budge"; the labelled stop item and its status are shown.
+  - The remap notice and status are shown. Enter on the notice link opens Savings with its history, and the Savings menu names "Stop syncing Sample Statement Savings ending 6604".
+  - There is no horizontal scroll: scrollWidth was 1265 and 305.
+- The manual run showed that "newest" means the bank Account Budge recorded last, not the one mapped last: Savings' evidence names 6604, not the just-mapped 4417. This is the selection from `6146b20`. The feature map now says so.
+
+**Open questions**
+
+- With two bank Accounts feeding one Account, the suggestion asks the one recorded last, not the one mapped last (unchanged since `6146b20`). Should mapping order decide?
+- A dev deployment that holds `startingBalanceConfirmed: true` rejects the new schema until that field is cleared. Live data repair stays with ticket 12.
+- The history notice checks at most 100 Bank Rows outside the current Account. If none of those still has a Transaction elsewhere, it shows nothing.
+- The notice has no dismiss for history that rightly belongs in the old Account. Today it clears only when each Transaction is moved or deleted.
