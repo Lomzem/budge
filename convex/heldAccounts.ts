@@ -15,7 +15,13 @@ import {
 } from './_generated/server';
 import { findConnectionAccount, liveLayer, toPublicError } from './bankConnections';
 import { accountKind } from './lib/accountKind';
-import { bankImports, bankImportsSince, insertAccount } from './lib/accounts';
+import {
+	bankImports,
+	bankImportsSince,
+	bankSource,
+	insertAccount,
+	startingBalanceSource
+} from './lib/accounts';
 import { applyBankRows, planBankRows, type IncomingRow } from './lib/imports';
 import { requireOwner } from './lib/owner';
 import { ImportedPayees } from './lib/payees';
@@ -167,7 +173,8 @@ export const suggestStartingBalance = action({
 			kind: v.literal('suggested'),
 			startingBalance: v.number(),
 			bankBalance: v.number(),
-			imported: bankImports
+			imported: bankImports,
+			source: bankSource
 		}),
 		v.object({ kind: v.literal('notSynced') }),
 		v.object({ kind: v.literal('importing') }),
@@ -186,12 +193,21 @@ export const suggestStartingBalance = action({
 
 export const startingBalanceEvidence = query({
 	args: { accountId: v.id('accounts') },
-	returns: v.object({ since: v.string(), imported: bankImports }),
+	returns: v.object({
+		since: v.string(),
+		imported: bankImports,
+		source: v.union(bankSource, v.null())
+	}),
 	handler: async (ctx, { accountId }) => {
 		await requireOwner(ctx);
 		if ((await ctx.db.get('accounts', accountId)) === null) throw publicError('NOT_FOUND');
 		const since = await requireCutoverDate(ctx);
-		return { since, imported: await bankImportsSince(ctx, accountId, since) };
+		const source = await startingBalanceSource(ctx, accountId);
+		return {
+			since,
+			imported: await bankImportsSince(ctx, accountId, since),
+			source: source?.identity ?? null
+		};
 	}
 });
 
@@ -272,10 +288,10 @@ export const startingBalanceBasis = internalQuery({
 	args: { accountId: v.id('accounts') },
 	returns: basis,
 	handler: async (ctx, { accountId }) => {
-		const newest = await bankAccountsOf(ctx, accountId).order('desc').first();
-		if (newest === null) return { kind: 'notSynced' as const };
-		const connection = await ctx.db.get('bankConnections', newest.connectionId);
-		if (connection?.provider.kind !== 'plaid') return { kind: 'notSynced' as const };
+		const source = await startingBalanceSource(ctx, accountId);
+		if (source === null) return { kind: 'notSynced' as const };
+		const { bankAccount, connection, identity } = source;
+		if (connection.provider.kind !== 'plaid') return { kind: 'notSynced' as const };
 		for await (const mapped of bankAccountsOf(ctx, accountId)) {
 			if ((await heldRows(ctx, mapped._id, 1)).length > 0) return { kind: 'importing' as const };
 		}
@@ -285,7 +301,8 @@ export const startingBalanceBasis = internalQuery({
 			kind: 'synced' as const,
 			itemId: connection.provider.itemId,
 			encryptedToken: connection.provider.encryptedToken,
-			externalId: newest.externalId,
+			externalId: bankAccount.externalId,
+			source: identity,
 			imported
 		};
 	}

@@ -131,7 +131,8 @@ export default defineSchema({
 		.index('by_transactionId_state', ['transactionId', 'state'])
 		.index('by_state_transactionId', ['state', 'transactionId'])
 		.index('by_connectionAccountId_state', ['connectionAccountId', 'state'])
-		.index('by_connectionAccountId_sourceId', ['connectionAccountId', 'sourceId']),
+		.index('by_connectionAccountId_sourceId', ['connectionAccountId', 'sourceId'])
+		.index('by_connectionAccountId_accountId', ['connectionAccountId', 'accountId']),
 
 	bankConnections: defineTable({
 		name: v.string(),
@@ -185,7 +186,7 @@ export default defineSchema({
 				state: v.literal('mapped'),
 				accountId: v.id('accounts'),
 
-				startingBalanceConfirmed: v.optional(v.literal(true))
+				startingBalanceConfirmedFor: v.optional(v.string())
 			}),
 			v.object({
 				connectionId: v.id('bankConnections'),

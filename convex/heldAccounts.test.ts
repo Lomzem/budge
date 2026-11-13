@@ -379,7 +379,8 @@ describe('a bank Account Budge does not know', () => {
 			kind: 'suggested',
 			startingBalance: 300_000 - 231_042 + 4_250,
 			bankBalance: 300_000,
-			imported: { count: 2, total: 231_042 - 4_250, first: '2026-08-14', last: '2026-08-15' }
+			imported: { count: 2, total: 231_042 - 4_250, first: '2026-08-14', last: '2026-08-15' },
+			source: { bankName: 'Sample Savings', mask: '4321', connectionName: 'Sample Bank' }
 		});
 		if (suggestion.kind !== 'suggested') return;
 
@@ -500,7 +501,7 @@ describe('a bank Account Budge does not know', () => {
 		expect(await suggest(savings)).toMatchObject({ kind: 'suggested' });
 	});
 
-	test('an Account with no Bank Connection gets no suggestion', async () => {
+	test('an Account with no Bank Connection gets no suggestion, and its evidence names no bank Account', async () => {
 		const { owner, suggest } = await connectedBudget();
 		const wallet = await owner.mutation(api.accounts.create, {
 			name: 'Wallet',
@@ -509,6 +510,9 @@ describe('a bank Account Budge does not know', () => {
 		});
 
 		expect(await suggest(wallet)).toEqual({ kind: 'notSynced' });
+		expect(
+			await owner.query(api.heldAccounts.startingBalanceEvidence, { accountId: wallet })
+		).toMatchObject({ source: null });
 	});
 
 	test('ignored, drops its rows and stays ignored on later syncs', async () => {
@@ -576,6 +580,46 @@ describe('a bank Account the owner stops syncing', () => {
 				})
 			)
 		).toBe('INVALID_INPUT');
+	});
+
+	test('set up anew in another Account, says where its earlier Transactions still are until each is moved or deleted', async () => {
+		const { owner, sync, heldId, transactions, checking } = await connectedBudget();
+		await sync(rowsFor(checkingId));
+		const feeds = async () =>
+			(await owner.query(api.bankConnections.list, { now: Date.now() }))[0]?.feeds ?? [];
+		const [checkingFeed] = await feeds();
+		assert(checkingFeed !== undefined, 'Checking is fed by the connection');
+		expect(checkingFeed).toMatchObject({ name: 'Checking', historyIn: null });
+		const { connectionAccountId } = checkingFeed;
+
+		await owner.mutation(api.heldAccounts.stopSyncing, { connectionAccountId });
+		await owner.mutation(api.heldAccounts.restore, { connectionAccountId });
+		await sync(rowsFor(checkingId, 'after'));
+		const plus = await owner.mutation(api.heldAccounts.createAccount, {
+			connectionAccountId: await heldId(),
+			name: 'Checking Plus',
+			kind: 'cash'
+		});
+		const stillInChecking = {
+			name: 'Checking Plus',
+			historyIn: { accountId: checking, name: 'Checking' }
+		};
+		expect(await feeds()).toMatchObject([stillInChecking]);
+
+		const [moved, deleted] = await transactions(checking);
+		assert(moved !== undefined && deleted !== undefined, 'Checking kept two earlier rows');
+		await owner.mutation(api.transactions.update, {
+			transactionId: moved._id,
+			accountId: plus,
+			date: moved.date,
+			amount: moved.amount,
+			payee: moved.payeeName ?? '',
+			memo: moved.memo ?? ''
+		});
+		expect(await feeds()).toMatchObject([stillInChecking]);
+
+		await owner.mutation(api.transactions.remove, { transactionId: deleted._id });
+		expect(await feeds()).toMatchObject([{ name: 'Checking Plus', historyIn: null }]);
 	});
 });
 
@@ -654,6 +698,34 @@ describe('the Bank list', () => {
 			{ name: 'Checking', startingBalanceConfirmed: false },
 			{ name: 'Savings', startingBalanceConfirmed: false }
 		]);
+	});
+
+	test('a confirmed starting balance is unconfirmed again once the cutover date changes, until the owner sets it for the new date', async () => {
+		const { owner, sync, heldId } = await connectedBudget();
+		await sync(rowsFor(savingsId));
+		const savings = await owner.mutation(api.heldAccounts.createAccount, {
+			connectionAccountId: await heldId(),
+			name: 'Savings',
+			kind: 'cash'
+		});
+		const savingsConfirmed = async () =>
+			(await owner.query(api.bankConnections.list, { now: Date.now() }))[0]?.feeds.find(
+				(feed) => feed.accountId === savings
+			)?.startingBalanceConfirmed;
+		await owner.mutation(api.accounts.setStartingBalance, {
+			accountId: savings,
+			startingBalance: 73_208
+		});
+		expect(await savingsConfirmed()).toBe(true);
+
+		await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-07-01' });
+		expect(await savingsConfirmed()).toBe(false);
+
+		await owner.mutation(api.accounts.setStartingBalance, {
+			accountId: savings,
+			startingBalance: 73_208
+		});
+		expect(await savingsConfirmed()).toBe(true);
 	});
 });
 
@@ -889,7 +961,8 @@ describe('a suggested starting balance', () => {
 			kind: 'suggested',
 			startingBalance: 0,
 			bankBalance: 0,
-			imported: { count: 0, total: 0, first: null, last: null }
+			imported: { count: 0, total: 0, first: null, last: null },
+			source: { bankName: null, mask: null, connectionName: 'Sample Bank' }
 		});
 		expect(await suggest(checking, checkingReporting(null))).toEqual({ kind: 'noBalance' });
 		expect(await suggest(checking, [])).toEqual({ kind: 'noBalance' });
@@ -941,7 +1014,8 @@ describe('a suggested starting balance', () => {
 			await owner.query(api.heldAccounts.startingBalanceEvidence, { accountId: savings })
 		).toEqual({
 			since: cutoverDate,
-			imported: { count: 2, total: 231_042 - 4_250, first: '2026-08-14', last: '2026-08-15' }
+			imported: { count: 2, total: 231_042 - 4_250, first: '2026-08-14', last: '2026-08-15' },
+			source: { bankName: 'Sample Savings', mask: '4321', connectionName: 'Sample Bank' }
 		});
 	});
 
@@ -949,19 +1023,38 @@ describe('a suggested starting balance', () => {
 		{ externalId: movedCheckingId, name: 'Sample Checking', mask: '0042', kind: 'cash', balance }
 	];
 
-	test('after the Account is mapped to a newer bank Account, comes from the newer one', async () => {
-		const { owner, sync, heldId, suggest, checking } = await connectedBudget();
+	test('after the Account is mapped to a newer bank Account of its connection, comes from the newer one, which it and its evidence name', async () => {
+		const { owner, sync, syncWith, heldId, suggest, checking } = await connectedBudget();
 		await sync(page);
-		await sync(rowsFor(movedCheckingId));
+		await syncWith({
+			transactionsSync: () => Effect.succeed(rowsFor(movedCheckingId)),
+			accountsGet: () =>
+				Effect.succeed([
+					...bankAccounts,
+					{
+						externalId: movedCheckingId,
+						name: 'Sample Checking Plus',
+						mask: '0077',
+						kind: 'cash',
+						balance: null
+					}
+				])
+		});
 		await owner.mutation(api.heldAccounts.map, {
 			connectionAccountId: await heldId(),
 			accountId: checking
 		});
+		const newer = { bankName: 'Sample Checking Plus', mask: '0077', connectionName: 'Sample Bank' };
 
 		expect(await suggest(checking, movedReporting(150_000))).toMatchObject({
 			kind: 'suggested',
-			startingBalance: 150_000 - 231_042 + 4_250
+			startingBalance: 150_000 - 231_042 + 4_250,
+			bankBalance: 150_000,
+			source: newer
 		});
+		expect(
+			await owner.query(api.heldAccounts.startingBalanceEvidence, { accountId: checking })
+		).toMatchObject({ source: newer });
 	});
 
 	test('waits for rows still coming in from any bank Account mapped to the Account', async () => {

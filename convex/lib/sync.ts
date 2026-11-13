@@ -12,7 +12,7 @@ import {
 } from '../../src/lib/domain/plaid';
 import { internal } from '../_generated/api';
 import type { DataModel, Id } from '../_generated/dataModel';
-import { bankImports, type BankImports } from './accounts';
+import { bankImports, bankSource, type BankImports, type BankSource } from './accounts';
 import { accountKind } from './accountKind';
 import { PlaidClient, type PlaidError } from './plaidClient';
 import { failureOf, type SyncFailure } from './syncFailure';
@@ -118,6 +118,7 @@ export const startingBalanceBasis = v.union(
 		itemId: v.string(),
 		encryptedToken: v.string(),
 		externalId: v.string(),
+		source: bankSource,
 		imported: bankImports
 	})
 );
@@ -343,7 +344,13 @@ function namesOf({ externalId, name, mask, kind }: BankAccount) {
 }
 
 export type StartingBalanceSuggestion =
-	| { kind: 'suggested'; startingBalance: number; bankBalance: number; imported: BankImports }
+	| {
+			kind: 'suggested';
+			startingBalance: number;
+			bankBalance: number;
+			imported: BankImports;
+			source: BankSource;
+	  }
 	| { kind: 'notSynced' }
 	| { kind: 'importing' }
 	| { kind: 'noBalance' };
@@ -363,7 +370,8 @@ export const suggestStartingBalance = Effect.fnUntraced(function* (
 		kind: 'suggested',
 		startingBalance: account.balance - basis.imported.total,
 		bankBalance: account.balance,
-		imported: basis.imported
+		imported: basis.imported,
+		source: basis.source
 	} as const;
 });
 

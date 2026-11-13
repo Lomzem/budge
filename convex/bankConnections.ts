@@ -17,6 +17,7 @@ import {
 	type MutationCtx,
 	type QueryCtx
 } from './_generated/server';
+import { historyElsewhere, isStartingBalanceConfirmed } from './lib/accounts';
 import { applyBankChange, applyBankRemoval, syncedBankRow } from './lib/bankChanges';
 import { applyBankRows, planBankRows, requireBankRow, type IncomingRow } from './lib/imports';
 import { holdBankRow, updateBankRow } from './lib/transactions';
@@ -36,7 +37,7 @@ import {
 } from './lib/plaidWebhook';
 import { publicError } from './lib/publicError';
 import { runEffect } from './lib/runEffect';
-import { requireCutoverDate } from './lib/settings';
+import { readCutoverDate, requireCutoverDate } from './lib/settings';
 import {
 	applyArgs,
 	applyResult,
@@ -95,7 +96,8 @@ export const list = query({
 					name: v.string(),
 					bankName: v.union(v.string(), v.null()),
 					mask: v.union(v.string(), v.null()),
-					startingBalanceConfirmed: v.boolean()
+					startingBalanceConfirmed: v.boolean(),
+					historyIn: v.union(v.object({ accountId: v.id('accounts'), name: v.string() }), v.null())
 				})
 			),
 			ignored: v.array(
@@ -110,9 +112,10 @@ export const list = query({
 	handler: async (ctx, { now }) => {
 		await requireOwner(ctx);
 		const connections = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
+		const cutoverDate = await readCutoverDate(ctx);
 		return await Promise.all(
 			connections.map(async (connection) => ({
-				...(await bankAccountsOf(ctx, connection._id)),
+				...(await bankAccountsOf(ctx, connection._id, cutoverDate)),
 				_id: connection._id,
 				name: connection.name,
 				status: connection.status,
@@ -126,7 +129,11 @@ export const list = query({
 	}
 });
 
-async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>) {
+async function bankAccountsOf(
+	ctx: QueryCtx,
+	connectionId: Id<'bankConnections'>,
+	cutoverDate: string | null
+) {
 	const inState = (state: 'mapped' | 'ignored') =>
 		ctx.db
 			.query('connectionAccounts')
@@ -142,6 +149,7 @@ async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>
 		bankName: string | null;
 		mask: string | null;
 		startingBalanceConfirmed: boolean;
+		historyIn: { accountId: Id<'accounts'>; name: string } | null;
 	}[] = [];
 	const ignored: {
 		connectionAccountId: Id<'connectionAccounts'>;
@@ -165,7 +173,8 @@ async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>
 				name: account.name,
 				bankName: row.name ?? null,
 				mask: row.mask ?? null,
-				startingBalanceConfirmed: row.startingBalanceConfirmed === true
+				startingBalanceConfirmed: isStartingBalanceConfirmed(row, cutoverDate),
+				historyIn: await historyElsewhere(ctx, row)
 			});
 		}
 	}
