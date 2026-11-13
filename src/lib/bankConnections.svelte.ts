@@ -84,7 +84,13 @@ export class BankConnections {
 	readonly needingAttention = $derived(
 		this.all.filter((connection) => connection.status === 'needsAttention')
 	);
-	readonly needingYou = $derived(this.held.length + this.all.filter(needsALook).length);
+	readonly needingYou = $derived(
+		this.held.length +
+			this.all.filter(needsALook).length +
+			this.all
+				.flatMap((connection) => connection.feeds)
+				.filter((feed) => !feed.startingBalanceConfirmed).length
+	);
 	readonly broken = $derived(
 		this.all.some(
 			(connection) => connection.status === 'needsAttention' || connection.lastError !== null

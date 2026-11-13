@@ -30,9 +30,11 @@
 	}
 
 	let {
-		onsettled
+		onsettled,
+		onconfirmed
 	}: {
 		onsettled: (connectionAccountId: Id<'connectionAccounts'>, outcome: string) => void;
+		onconfirmed: (account: MappedAccount) => void;
 	} = $props();
 
 	const client = useConvexClient();
@@ -170,8 +172,10 @@
 					<StartingBalanceStep
 						account={session.mapped}
 						skippable
-						onDone={() => {
+						onDone={(confirmed) => {
+							const account = session.mapped;
 							dialog.close(session);
+							if (confirmed && account !== null) onconfirmed(account);
 						}}
 					/>
 				{:else}

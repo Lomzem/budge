@@ -7,15 +7,13 @@
 	import { attentionOf, getBankConnections } from '$lib/bankConnections.svelte';
 	import ReconcileDialog from '$lib/components/accounts/reconcile-dialog.svelte';
 	import RenameAccountDialog from '$lib/components/accounts/rename-account-dialog.svelte';
-	import StartingBalanceStep from '$lib/components/accounts/starting-balance-step.svelte';
+	import StartingBalanceDialog from '$lib/components/accounts/starting-balance-dialog.svelte';
 	import TransactionTable from '$lib/components/transactions/transaction-table.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import * as Dialog from '$lib/components/ui/dialog';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { formatDate } from '$lib/domain/dates';
 	import { formatSynced } from '$lib/domain/freshness';
 	import { formatCents } from '$lib/domain/money';
-	import { DialogSession } from '$lib/dialogSession.svelte';
 
 	import type { PageProps } from './$types';
 
@@ -32,9 +30,7 @@
 	let renameOpen = $state(false);
 	let reconcileOpen = $state(false);
 	let moveError = $state('');
-	const startingBalance = new DialogSession<{
-		account: { _id: Account['_id']; kind: Account['kind']; name: string };
-	}>();
+	let startingBalance: { open: (account: Account) => void } | undefined = $state();
 
 	let notice: { accountId: string; message: string } | undefined = $state();
 	const noticeText = $derived(notice?.accountId === params.accountId ? notice.message : '');
@@ -81,7 +77,7 @@
 	}
 
 	function editStartingBalance(chosen: Account) {
-		startingBalance.open({ account: { _id: chosen._id, kind: chosen.kind, name: chosen.name } });
+		startingBalance?.open(chosen);
 	}
 </script>
 
@@ -222,26 +218,7 @@
 	</div>
 	<RenameAccountDialog bind:open={renameOpen} accountId={account._id} currentName={account.name} />
 	<ReconcileDialog bind:open={reconcileOpen} {account} {onReconciled} />
-	<Dialog.Root
-		open={startingBalance.current !== null}
-		onOpenChange={(isOpen) => {
-			if (!isOpen) startingBalance.dismiss();
-		}}
-	>
-		<Dialog.Content>
-			{#if startingBalance.current !== null}
-				{@const session = startingBalance.current}
-				{#key session}
-					<StartingBalanceStep
-						account={session.account}
-						onDone={() => {
-							startingBalance.close(session);
-						}}
-					/>
-				{/key}
-			{/if}
-		</Dialog.Content>
-	</Dialog.Root>
+	<StartingBalanceDialog bind:this={startingBalance} />
 {:else if accounts.loaded}
 	<h1 class="text-2xl font-bold tracking-tight">No such Account</h1>
 	<p class="mt-2 text-muted-foreground">

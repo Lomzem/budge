@@ -18,27 +18,27 @@ Every picker is a shadcn-svelte Select: a `combobox` button labeled like the old
 
 ## Features
 
-| Feature map                         | User-facing coverage                                                     | v1 tickets |
-| ----------------------------------- | ------------------------------------------------------------------------ | ---------- |
-| [Budget](budget.md)                 | Assigned, Ready to Assign, month navigation, desktop/mobile entry        | 05         |
-| [Inspector](inspector.md)           | Inspect, Move to/Take from, Cover, keyboard and phone                    | 07         |
-| [Targets](targets.md)               | Monthly, By date, repeat, Assign, Upcoming                               | 08         |
-| [Categories](categories.md)         | Groups, create, rename, order, move, hide, delete/history                | 06         |
-| [Accounts](accounts.md)             | Cash/Card, starting balances, rename/order, held mapping and suggestions | 03, 21     |
-| [Transactions](transactions.md)     | Dialog, CRUD, Direction, Cleared, list pagination                        | 03, 05     |
-| [Transfers](transfers.md)           | Linked sides, edit/delete, imported candidate linking, card payments     | 09, 22     |
-| [Credit cards](credit-cards.md)     | Payment Category, purchases/refunds, debt, waiting on                    | 10         |
-| [Splits](splits.md)                 | Lines, remainder, unsplit, card lines                                    | 11         |
-| [Reconciliation](reconciliation.md) | Equal/adjustment, locks, Unlock                                          | 12         |
-| [Imports](imports.md)               | Capital One CSV/QFX, Discover CSV, preview, matching, Unmatch, Approve   | 14         |
-| [Payees](payees.md)                 | Last Category, exact Bank Text rename memory, API-only global rename     | 15         |
-| [Search](search.md)                 | Payee/memo/split/Bank Text, all filters, empty/reset                     | 16         |
-| [Bank changes](bank-changes.md)     | Held, quiet changes/removals, accept/keep resolutions (`bank-sync`)      | 19, 21     |
-| [Plaid](plaid.md)                   | Status, Sync now, needs-attention, consent, reconnect, webhook/daily     | 17, 18, 20 |
-| [Settings](settings.md)             | Cutover first-of-month default, first use/change/cancel/constraints      | 03, 23     |
-| [Auth](auth.md)                     | Sign-in/out, owner gate, expired session, GitHub/email                   | 02, 23     |
-| [Export](export.md)                 | JSON/CSV completeness and exclusions                                     | 13         |
-| [Shell](shell.md)                   | Routes, responsive navigation, theme, Home Screen/device checks          | 02, 04, 23 |
+| Feature map                         | User-facing coverage                                                                         | v1 tickets |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- | ---------- |
+| [Budget](budget.md)                 | Assigned, Ready to Assign, month navigation, desktop/mobile entry                            | 05         |
+| [Inspector](inspector.md)           | Inspect, Move to/Take from, Cover, keyboard and phone                                        | 07         |
+| [Targets](targets.md)               | Monthly, By date, repeat, Assign, Upcoming                                                   | 08         |
+| [Categories](categories.md)         | Groups, create, rename, order, move, hide, delete/history                                    | 06         |
+| [Accounts](accounts.md)             | Cash/Card, starting balances, rename/order, held mapping and suggestions, setup confirmation | 03, 21     |
+| [Transactions](transactions.md)     | Dialog, CRUD, Direction, Cleared, list pagination                                            | 03, 05     |
+| [Transfers](transfers.md)           | Linked sides, edit/delete, imported candidate linking, card payments                         | 09, 22     |
+| [Credit cards](credit-cards.md)     | Payment Category, purchases/refunds, debt, waiting on                                        | 10         |
+| [Splits](splits.md)                 | Lines, remainder, unsplit, card lines                                                        | 11         |
+| [Reconciliation](reconciliation.md) | Equal/adjustment, locks, Unlock                                                              | 12         |
+| [Imports](imports.md)               | Capital One CSV/QFX, Discover CSV, preview, matching, Unmatch, Approve                       | 14         |
+| [Payees](payees.md)                 | Last Category, exact Bank Text rename memory, API-only global rename                         | 15         |
+| [Search](search.md)                 | Payee/memo/split/Bank Text, all filters, empty/reset                                         | 16         |
+| [Bank changes](bank-changes.md)     | Held, quiet changes/removals, accept/keep resolutions (`bank-sync`)                          | 19, 21     |
+| [Plaid](plaid.md)                   | Status, Sync now, needs-attention, consent, reconnect, webhook/daily                         | 17, 18, 20 |
+| [Settings](settings.md)             | Cutover first-of-month default, first use/change/cancel/constraints                          | 03, 23     |
+| [Auth](auth.md)                     | Sign-in/out, owner gate, expired session, GitHub/email                                       | 02, 23     |
+| [Export](export.md)                 | JSON/CSV completeness and exclusions                                                         | 13         |
+| [Shell](shell.md)                   | Routes, responsive navigation, theme, Home Screen/device checks                              | 02, 04, 23 |
 
 ## Route and public API coverage
 

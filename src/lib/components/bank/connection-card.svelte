@@ -27,11 +27,13 @@
 		connection,
 		outcomes,
 		onsetup,
+		oncheck,
 		onremoved
 	}: {
 		connection: BankConnection;
 		outcomes: ReadonlyMap<Id<'connectionAccounts'>, string>;
 		onsetup: (account: HeldAccount) => void;
+		oncheck: (accountId: Id<'accounts'>) => void;
 		onremoved: (connectionId: Id<'bankConnections'>, report: string) => void;
 	} = $props();
 
@@ -82,6 +84,7 @@
 		}
 		return found;
 	});
+	const unconfirmed = $derived(connection.feeds.some((feed) => !feed.startingBalanceConfirmed));
 	const synced = $derived(
 		connection.lastSyncedAt === null
 			? 'Never synced.'
@@ -249,22 +252,48 @@
 			</DropdownMenu.Root>
 		</div>
 		<div class="flex flex-col gap-1 sm:pl-13">
-			<p class="text-sm break-words text-muted-foreground">
-				{#if connection.feeds.length === 0}
+			{#if connection.feeds.length === 0}
+				<p class="text-sm break-words text-muted-foreground">
 					Feeds no Budge Account yet.{paused && held.length === 0
 						? ' Reconnect to see its accounts and choose where they go.'
 						: ''}
-				{:else}
-					Feeds
-					{#each connection.feeds as feed, index (feed.accountId)}
-						<a
-							href={resolve('/(app)/accounts/[accountId]', { accountId: feed.accountId })}
-							class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
-							>{feed.name}</a
-						>{index < connection.feeds.length - 1 ? ', ' : '.'}
+				</p>
+			{:else}
+				<ul aria-label="Where {connection.name} goes" class="flex flex-col gap-2">
+					{#each connection.feeds as feed (feed.connectionAccountId)}
+						<li class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+							<div class="flex min-w-0 flex-1 basis-48 flex-col text-sm">
+								<span class="break-words text-muted-foreground">
+									<a
+										href={resolve('/(app)/accounts/[accountId]', { accountId: feed.accountId })}
+										class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
+										>{feed.name}</a
+									>
+									from {labelOf({ name: feed.bankName, mask: feed.mask })}
+								</span>
+								{#if !feed.startingBalanceConfirmed}
+									<span class="flex items-start gap-1.5 font-medium text-warning">
+										<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+										<span class="min-w-0">Starting balance not confirmed</span>
+									</span>
+								{/if}
+							</div>
+							{#if !feed.startingBalanceConfirmed}
+								<Button
+									variant="outline"
+									size="sm"
+									aria-label="Check {feed.name}'s starting balance"
+									onclick={() => {
+										oncheck(feed.accountId);
+									}}
+								>
+									Check balance
+								</Button>
+							{/if}
+						</li>
 					{/each}
-				{/if}
-			</p>
+				</ul>
+			{/if}
 			{#if problems.length > 0}
 				<ul id="problems-{connection._id}" class="flex flex-col gap-1">
 					{#each problems as problem (problem.text)}
@@ -310,7 +339,7 @@
 							{#if result.failed}<span class="text-muted-foreground">{synced}</span>{/if}</span
 						>
 					{:else}
-						{#if problems.length === 0}
+						{#if problems.length === 0 && !unconfirmed}
 							<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
 						{:else}
 							<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
