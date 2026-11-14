@@ -329,15 +329,27 @@ describe('categorizing several Transactions at once', () => {
 		expect(await state(first)).toMatchObject({ approved: false });
 	});
 
-	test('Undo puts back each Category and approval it changed, but keeps what changed since', async () => {
-		const { owner, card, categories, ids, state, balanceOf } = await unapprovedRows([
+	test('Undo puts back each Category and approval it changed, but keeps a row changed since and a Category whose earlier one was deleted', async () => {
+		const { owner, card, categories, groups, ids, state, balanceOf } = await unapprovedRows([
 			{ payee: 'Sample Noodle Bar', category: 'Dining' },
 			{ payee: 'Sample Bakery', category: 'Groceries' },
 			{ payee: 'Sample Pharmacy', category: 'Groceries' },
-			{ payee: 'Sample Corner Shop' }
+			{ payee: 'Sample Corner Shop' },
+			{ payee: 'Sample Florist' }
 		]);
-		const [plain, recategorized, transferred, alreadyApproved] = ids;
-		assert(plain && recategorized && transferred && alreadyApproved, 'four rows');
+		const [plain, recategorized, transferred, alreadyApproved, losesItsCategory] = ids;
+		assert(
+			plain && recategorized && transferred && alreadyApproved && losesItsCategory,
+			'five rows'
+		);
+		const flowers = await owner.mutation(api.categories.create, {
+			groupId: groups.Everyday,
+			name: 'Sample Flowers'
+		});
+		await owner.mutation(api.transactions.categorize, {
+			transactionId: losesItsCategory,
+			choice: { kind: 'category', categoryId: flowers }
+		});
 		await owner.mutation(api.transactions.categorize, {
 			transactionId: plain,
 			choice: { kind: 'category', categoryId: categories.Groceries, remember: true }
@@ -361,8 +373,15 @@ describe('categorizing several Transactions at once', () => {
 			transactionId: transferred,
 			choice: { kind: 'transfer', accountId: card }
 		});
+		await owner.mutation(api.categories.remove, {
+			categoryId: flowers,
+			destinationId: categories.Groceries
+		});
 
-		expect(await owner.mutation(api.transactions.undoCategorizeMany, applied)).toBe(3);
+		expect(await owner.mutation(api.transactions.undoCategorizeMany, applied)).toEqual({
+			restored: 3,
+			kept: 1
+		});
 
 		expect(await state(plain)).toEqual({
 			categoryId: categories.Dining,
@@ -376,6 +395,7 @@ describe('categorizing several Transactions at once', () => {
 		expect(await state(transferred)).toMatchObject({ categoryId: null, approved: false });
 		expect(await balanceOf(card)).toBe(4_250);
 		expect(await state(alreadyApproved)).toMatchObject({ categoryId: null, approved: true });
+		expect(await state(losesItsCategory)).toMatchObject({ categoryId: null, approved: false });
 	});
 
 	test('refuses a split, a Transfer, a missing Transaction or too many at once, and changes none of the rest', async () => {

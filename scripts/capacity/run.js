@@ -352,7 +352,7 @@ async function bulkTrial(count, run) {
 	);
 	const undone = await call('bulkState', { categoryId: bulkCategoryId }, true);
 	save(`bulk-undone-${count}-${run}.json`, undone);
-	if (!undo.error && (undo.result.result !== count || !sameCounts(undone, expectedSeed)))
+	if (!undo.error && (undo.result.result.restored !== count || !sameCounts(undone, expectedSeed)))
 		throw new Error(`bulk undo did not restore the seed: ${JSON.stringify(undone)}`);
 	return [categorize, undo];
 }

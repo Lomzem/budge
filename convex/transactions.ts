@@ -510,30 +510,50 @@ export const categorizeMany = mutation({
 	}
 });
 
+type BulkChange = Infer<typeof bulkCategorized>['changes'][number];
+
+async function undoOne(
+	ctx: MutationCtx,
+	categoryId: Id<'categories'> | null,
+	{ transactionId, previousCategoryId, approvedNow }: BulkChange,
+	exists: (id: Id<'categories'> | null) => Promise<boolean>
+): Promise<'restored' | 'kept' | 'untouched'> {
+	const transaction = await ctx.db.get('transactions', transactionId);
+	if (transaction === null) return 'untouched';
+	const keepsBulkCategory =
+		transaction.split !== true &&
+		transaction.transferTransactionId === undefined &&
+		(transaction.categoryId ?? null) === categoryId &&
+		previousCategoryId !== categoryId;
+	const keepsBulkApproval =
+		approvedNow && transaction.approved !== false && transaction.cleared !== 'reconciled';
+	const categoryGone = keepsBulkCategory && !(await exists(previousCategoryId));
+	if (keepsBulkCategory && !categoryGone) {
+		await categorizeTransaction(ctx, transaction, choiceOf(previousCategoryId));
+	}
+	if (keepsBulkApproval) await markUnapproved(ctx, transactionId);
+	if (categoryGone) return 'kept';
+	return keepsBulkCategory || keepsBulkApproval ? 'restored' : 'untouched';
+}
+
 export const undoCategorizeMany = mutation({
 	args: bulkCategorized.fields,
-	returns: v.number(),
+	returns: v.object({ restored: v.number(), kept: v.number() }),
 	handler: async (ctx, { categoryId, changes }) => {
 		await requireOwner(ctx);
 		requireBulkSize(changes.length);
-		let restored = 0;
-		for (const { transactionId, previousCategoryId, approvedNow } of changes) {
-			const transaction = await ctx.db.get('transactions', transactionId);
-			if (transaction === null) continue;
-			const keepsBulkCategory =
-				transaction.split !== true &&
-				transaction.transferTransactionId === undefined &&
-				(transaction.categoryId ?? null) === categoryId &&
-				previousCategoryId !== categoryId;
-			const keepsBulkApproval =
-				approvedNow && transaction.approved !== false && transaction.cleared !== 'reconciled';
-			if (keepsBulkCategory) {
-				await categorizeTransaction(ctx, transaction, choiceOf(previousCategoryId));
-			}
-			if (keepsBulkApproval) await markUnapproved(ctx, transactionId);
-			if (keepsBulkCategory || keepsBulkApproval) restored += 1;
-		}
-		return restored;
+		const stillExists = new Map<Id<'categories'>, boolean>();
+		const exists = async (id: Id<'categories'> | null) => {
+			if (id === null) return true;
+			const known = stillExists.get(id);
+			if (known !== undefined) return known;
+			const found = (await ctx.db.get('categories', id)) !== null;
+			stillExists.set(id, found);
+			return found;
+		};
+		const outcome = { restored: 0, kept: 0, untouched: 0 };
+		for (const change of changes) outcome[await undoOne(ctx, categoryId, change, exists)] += 1;
+		return { restored: outcome.restored, kept: outcome.kept };
 	}
 });
 

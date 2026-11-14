@@ -61,7 +61,8 @@
 	type Categorized = FunctionReturnType<typeof api.transactions.categorizeMany>;
 	type Undoable = { scopeKey: string; text: string } & (
 		| { kind: 'approved'; transactionIds: Id<'transactions'>[] }
-		| { kind: 'categorized'; record: Categorized }
+		| { kind: 'categorized'; record: Categorized; label: string }
+		| { kind: 'undone' }
 	);
 
 	let { accountId }: { accountId?: Id<'accounts'> | undefined } = $props();
@@ -603,7 +604,7 @@
 			announce(text);
 			return;
 		}
-		undoable = { kind: 'categorized', scopeKey: changedIn, record: saved.value, text };
+		undoable = { kind: 'categorized', scopeKey: changedIn, record: saved.value, label, text };
 		await tick();
 		undoButton?.focus();
 	}
@@ -614,22 +615,27 @@
 		approveAllButton?.focus();
 	}
 
-	function undoneText(entry: Undoable, count: number) {
-		return entry.kind === 'approved'
-			? `${String(count)} back to Unapproved`
-			: `${counted(count, 'Transaction')} put back`;
+	function keptText(label: string, kept: number, restored: number) {
+		const who = restored === 0 ? counted(kept, 'Transaction') : String(kept);
+		const why =
+			kept === 1 ? 'its earlier Category was deleted' : 'their earlier Categories were deleted';
+		return `${who} kept ${label} because ${why}.`;
 	}
 
 	async function undoLast() {
-		if (undo === null) return;
+		if (undo === null || undo.kind === 'undone') return;
 		const entry = undo;
 		undoable = null;
 		rowError = '';
-		const restored = await attempt(() =>
-			entry.kind === 'approved'
-				? unapprove({ transactionIds: entry.transactionIds })
-				: undoCategorizeMany(entry.record)
-		);
+		const restored = await attempt(async () => {
+			if (entry.kind === 'approved') {
+				const count = await unapprove({ transactionIds: entry.transactionIds });
+				return `${String(count)} back to Unapproved.`;
+			}
+			const { restored: back, kept } = await undoCategorizeMany(entry.record);
+			const putBack = back > 0 || kept === 0 ? [`${counted(back, 'Transaction')} put back.`] : [];
+			return [...putBack, ...(kept > 0 ? [keptText(entry.label, kept, back)] : [])].join(' ');
+		});
 		if (!restored.ok) {
 			undoable ??= entry;
 			rowError =
@@ -638,7 +644,8 @@
 					: "Budge couldn't put the Categories back. Try again.";
 			return;
 		}
-		announce(undoneText(entry, restored.value));
+		const text = restored.value;
+		undoable = { kind: 'undone', scopeKey: entry.scopeKey, text };
 		await tick();
 		const back =
 			entry.kind === 'approved'
@@ -894,10 +901,12 @@
 						onclick={clearSelection}>Clear</button
 					>
 				{:else if undo}
-					<span class="truncate">{undo.text}</span>
-					<button bind:this={undoButton} type="button" class={linkButton} onclick={undoLast}
-						>Undo</button
-					>
+					<span class={undo.kind === 'undone' ? 'break-words' : 'truncate'}>{undo.text}</span>
+					{#if undo.kind !== 'undone'}
+						<button bind:this={undoButton} type="button" class={linkButton} onclick={undoLast}
+							>Undo</button
+						>
+					{/if}
 				{:else}
 					<span class="truncate">{result}</span>
 				{/if}
