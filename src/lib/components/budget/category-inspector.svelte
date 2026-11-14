@@ -285,8 +285,6 @@
 				<p class="min-h-6 text-sm text-destructive">
 					{#if assignError}<span role="alert">{assignError}</span>{/if}
 				</p>
-			{:else}
-				<p class="text-sm text-muted-foreground">No Target yet.</p>
 			{/if}
 			<Button variant="outline" size="sm" onclick={editTarget}>
 				{category.target ? 'Edit Target' : 'Add Target'}

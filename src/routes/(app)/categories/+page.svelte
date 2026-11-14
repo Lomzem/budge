@@ -96,13 +96,7 @@
 
 <div class="flex flex-col gap-6">
 	<header class="flex flex-col gap-4">
-		<div class="flex max-w-prose flex-col gap-1">
-			<h1 class="text-2xl font-bold tracking-tight">Categories</h1>
-			<p class="text-muted-foreground">
-				Rename, reorder, hide, or delete Categories and their groups. Assign money to them on the
-				Budget.
-			</p>
-		</div>
+		<h1 class="text-2xl font-bold tracking-tight">Categories</h1>
 		<div class="flex flex-wrap gap-2">
 			<Button
 				variant="outline"

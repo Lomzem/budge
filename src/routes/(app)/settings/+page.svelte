@@ -44,10 +44,7 @@
 				<CutoverDate />
 			</div>
 			<section aria-labelledby="theme-heading" class="flex flex-col gap-3 p-5 sm:p-6">
-				<div class="flex flex-col gap-1">
-					<h2 id="theme-heading" class="text-lg font-bold">Theme</h2>
-					<p class="text-muted-foreground">Light and dark both keep every amount readable.</p>
-				</div>
+				<h2 id="theme-heading" class="text-lg font-bold">Theme</h2>
 				<RadioGroup.Root
 					aria-labelledby="theme-heading"
 					value={theme.choice}
@@ -67,9 +64,7 @@
 			<section aria-labelledby="data-heading" class="flex flex-col gap-3 p-5 sm:p-6">
 				<div class="flex flex-col gap-1">
 					<h2 id="data-heading" class="text-lg font-bold">Your data</h2>
-					<p class="text-muted-foreground">
-						Download everything in Budge as a backup, as CSV or JSON.
-					</p>
+					<p class="text-muted-foreground">Download CSV or JSON.</p>
 				</div>
 				<div>
 					<Button variant="outline" onclick={() => (exportOpen = true)}>

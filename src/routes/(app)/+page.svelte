@@ -489,7 +489,7 @@
 										<div class="rounded-lg border bg-card p-5">{@render inspector()}</div>
 									{:else}
 										<p class="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-											Select a Category to see its Target, move money or cover overspending here.
+											Select a Category.
 										</p>
 										<UpcomingList upcoming={view.upcoming} />
 									{/if}
