@@ -5,7 +5,7 @@ Use [the protocol](../../../docs/quality/ui-review/README.md) and [rubric](../..
 ## Coordinator brief
 
 - **Spec, scope, tasks and gaps:** unchanged from round 1. The tasks are T1–T10 and the gaps G1–G8 in the [round-1 brief](11-ui-review-round-1.md#coordinator-brief), with the same entry points, journeys, fixtures and expected outcomes. Judge every task afresh; this is a full re-inspection, not a spot check.
-- **Reviewed SHA:** `ROUND2_SHA` on `feat/first-use-ux`.
+- **Reviewed SHA:** `de7b552` on `feat/first-use-ux`.
 - **Changes since round 1 (`0b22367`):**
   - `80dda30`: a search or filter keeps the checked rows it still shows and says which left.
   - `4ce2459`: the font faces now live in the page shell.
