@@ -1,0 +1,34 @@
+# Ticket 11 round-1 fix review
+
+Reviewed `2212e03..ec73b1f` at `347d4d2`; application/journey files are identical to `ec73b1f`. Analysis only; production unchanged.
+
+## Findings
+
+**Standards: no substantive findings. Spec: no confirmed defects in the fixes.**
+
+- **Selection:** [selection.svelte.ts:22–43](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/src/lib/components/transactions/selection.svelte.ts:22) reconciles IDs after query loading and a Svelte flush, preserving checked survivors and announcing removals. [transaction-table.svelte:282–295,650–659](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/src/lib/components/transactions/transaction-table.svelte:282) derives bulk payloads from selected **displayed** rows; hidden IDs cannot enter the action. Grouping reorders those same rows, rather than widening selection.
+- **Focus:** [bank/+page.svelte:114–140](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/src/routes/(app)/bank/+page.svelte:114) handles Confirm, Skip/Escape, and Ignore through surviving controls. Direct Check cancellation retains its opener. Remove connection already delegates successful removal focus to the next/previous card or Connect ([bank/+page.svelte:90–104](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/src/routes/(app)/bank/+page.svelte:90)); its local menu fallback handles cancellation/refusal. No body-focus regression observed in exercised paths; concurrent changes from another tab were not tested.
+- **Remap:** [bankConnections.svelte.ts:28–30](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/src/lib/bankConnections.svelte.ts:28) counts an unconfirmed feed even with remapped history, then stops counting after confirmation. Card styling uses the same confirmation state. The history link remains; its server-derived destination still follows actual retained Transactions. This fixes classification rather than hiding the notice.
+- **Starting Balance:** [starting-balance-step.svelte:45–80,129–164](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/src/lib/components/accounts/starting-balance-step.svelte:45) prefills confirmed amounts, reverses credit-card signs correctly, leaves unconfirmed entry empty, preserves the confirmed amount against estimates, and provides focused, described empty-value errors. Supplied evidence explicitly lacks a separate bank-prefill red run.
+- **Fonts:** moving unchanged face descriptors and preload into the server shell removes registration from the replaced development stylesheet; production asset verification below is separate from the dev-loop evidence. Optional fallback on a slow first load remains intentional.
+- **Button:** [button.svelte:25](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/src/lib/components/ui/button/button.svelte:25) extends coarse-pointer hit testing vertically by 10 px each side without increasing layout height or width. Details is the only current `xs` caller. Its container padding prevents clipping; its neighboring action buttons remain outside that area. Future tightly stacked `xs` callers would need spacing or actual layout height.
+
+## Test-audit
+
+Pass for the changed steps: observable selections, focus, accessible field errors, attention counts, future-date consequences, grammar and hit testing; existing journeys remain primary owners. Synthetic events deliberately order input/check before debounce, without private setters. Color comparison checks informational presentation; hit testing checks event targeting. Plaid stand-ins prove UI response handling, not external Plaid behavior. Supplied red failures hit the intended assertions; historical baselines were inspected, not independently replayed.
+
+## `/correct` recommendations
+
+1. **Architecture: selection ownership.** Ticket 07 documented debounce clearing, ticket 08 reproduced it at 4× CPU, and round 1 rediscovered it. Keep reconciliation and generation ownership encapsulated in `SelectionPerScope`, with bulk scope restricted to shown rows. The new red/green recipe rejects the actual old unconditional clear; exercise that recipe grouped/on phone too. Types/lint cannot determine which asynchronously loaded rows remain visible.
+2. **Architecture: focus restoration.** Round 1 reproduced vanished openers in Confirm and setup Skip/Escape; ticket 05 already needed a surviving-row destination. Give dialog restoration one shared resolver for a connected opener, semantic continuation and stable fallback, retaining caller-specific destinations. Prove it by replaying round-1 body-focus failures. Types alone cannot prove DOM survival.
+3. **Architecture: isolate generated files.** Ticket 08’s concurrent-sync reload recurred during this review when Vitest initialized SvelteKit. Run such checks in an isolated generated-output workspace, or enforce an exclusive lock across all generating commands and journey driving. Replay the recorded overlap; it must refuse or leave selection intact. More documentation would not enforce exclusivity.
+
+## Verification and recommendation
+
+Eleven distinct maintained journeys passed across the two runs; eight passed initially, and the interrupted selection journey passed on retry with Remove and late-save. Four additional search/filter probes passed (register/groups × 1280/320). Feature-map tests: 3 passed. Configured production build passed; both hashed font URLs resolve to client and deployment artifacts. Initial build lacked PUBLIC_CONVEX_URL; the first phone run was invalidated by concurrent Vitest-generated reload. Evidence logs have whitespace errors; source diff is clean. App down passed, ownership record removed, evidence retained. Full check/E2E and production-browser cold loads were not rerun.
+
+Recommend accepting these fixes and proceeding to independent round 2; ticket 11’s approval gate remains open.  Prove It Works separated fresh checks from historical evidence; Test Behavior guided the audit; Encode Lessons selected structural corrections; Experience First/Laziness kept destinations and selection policy user-directed without another framework.
+
+Evidence: [journeys](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/test-results/verify-budge/round1-review/summary.json), [recheck](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/test-results/verify-budge/round1-review-recheck/summary.json), [probes](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/test-results/round1-review/selection-probe.json), [fonts](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/test-results/round1-review/font-assets.json), [build](/home/lomzem/.t3/worktrees/budge/t3-f33fb1b7-b6934951f2ae17d8/test-results/round1-review/build-configured.log).
+
+A trace excerpt exposed a short-lived test JWT, now expired. No reusable API key was exposed.
