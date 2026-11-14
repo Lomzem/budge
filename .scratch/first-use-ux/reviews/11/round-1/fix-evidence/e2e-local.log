@@ -1,0 +1,40 @@
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:486950) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  56 e2e/journeys.test.ts:10:3 › transfers/import-link › a Transfer from an import links the other import instead of a duplicate (6.7s)
+
+  Slow test file: e2e/journeys.test.ts (7.1m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  56 passed (8.6m)
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-kit sync

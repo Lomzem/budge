@@ -1,0 +1,1356 @@
+{
+	"result": "passed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "e6b43ba741b9f74123898a0ffef894ec691bdf03",
+	"uncommittedChanges": true,
+	"appUrl": "http://127.0.0.1:5173",
+	"journeys": [
+		{
+			"name": "accounts/start-late-save",
+			"title": "a starting balance saved from a dismissed dialog lands, and leaves the next Account's dialog alone",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Checking offers its current starting balance; save $100 more, hold the save, and dismiss",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-late-save/01-checking-offers-its-current-starting-balance-save-100-more-h.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-late-save/01-checking-offers-its-current-starting-balance-save-100-more-h.aria.yml"
+				},
+				{
+					"name": "type into Savings' dialog, then release the held save",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-late-save/02-type-into-savings-dialog-then-release-the-held-save.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-late-save/02-type-into-savings-dialog-then-release-the-held-save.aria.yml"
+				},
+				{
+					"name": "Checking's balance moves, and Savings' dialog keeps what was typed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-late-save/03-checking-s-balance-moves-and-savings-dialog-keeps-what-was-t.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-late-save/03-checking-s-balance-moves-and-savings-dialog-keeps-what-was-t.aria.yml"
+				},
+				{
+					"name": "Checking's dialog and balance show the new starting balance",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-late-save/04-checking-s-dialog-and-balance-show-the-new-starting-balance.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-late-save/04-checking-s-dialog-and-balance-show-the-new-starting-balance.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-late-save/trace.zip"
+		},
+		{
+			"name": "accounts/start-edit",
+			"title": "editing a starting balance offers only the edits it allows, and saving it still works",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "open Checking's Starting Balance Transaction",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-edit/01-open-checking-s-starting-balance-transaction.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-edit/01-open-checking-s-starting-balance-transaction.aria.yml"
+				},
+				{
+					"name": "Account and Payee are locked, and Category offers no split or Transfer",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-edit/02-account-and-payee-are-locked-and-category-offers-no-split-or.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-edit/02-account-and-payee-are-locked-and-category-offers-no-split-or.aria.yml"
+				},
+				{
+					"name": "saving it still works",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-edit/03-saving-it-still-works.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-edit/03-saving-it-still-works.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/start-edit/trace.zip"
+		},
+		{
+			"name": "accounts/held-map",
+			"title": "a held bank Account brought into an existing Account adds its rows and resets its Starting Balance",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "bring Sample Savings Plus into Savings with a $1,000.00 Starting Balance",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-map/01-bring-sample-savings-plus-into-savings-with-a-1-000-00-start.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-map/01-bring-sample-savings-plus-into-savings-with-a-1-000-00-start.aria.yml"
+				},
+				{
+					"name": "Savings lists its rows and the new Starting Balance",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-map/02-savings-lists-its-rows-and-the-new-starting-balance.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-map/02-savings-lists-its-rows-and-the-new-starting-balance.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-map/trace.zip"
+		},
+		{
+			"name": "accounts/held-new-card",
+			"title": "a held card becomes a new credit-card Account whose Starting Balance is the amount owed",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Sample Rewards Card refuses a cash Account, then comes in as a new credit card owing $100.00",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-new-card/01-sample-rewards-card-refuses-a-cash-account-then-comes-in-as-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-new-card/01-sample-rewards-card-refuses-a-cash-account-then-comes-in-as-.aria.yml"
+				},
+				{
+					"name": "Rewards Card lists its rows and owes the amount plus their charges",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-new-card/02-rewards-card-lists-its-rows-and-owes-the-amount-plus-their-c.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-new-card/02-rewards-card-lists-its-rows-and-owes-the-amount-plus-their-c.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-new-card/trace.zip"
+		},
+		{
+			"name": "accounts/held-unknown-kind",
+			"title": "a held bank Account the bank never described asks for its type instead of assuming cash",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "a new Account for it has no type until the owner picks one",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-unknown-kind/01-a-new-account-for-it-has-no-type-until-the-owner-picks-one.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-unknown-kind/01-a-new-account-for-it-has-no-type-until-the-owner-picks-one.aria.yml"
+				},
+				{
+					"name": "choosing Checking says the bank gave no kind to check against",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-unknown-kind/02-choosing-checking-says-the-bank-gave-no-kind-to-check-agains.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-unknown-kind/02-choosing-checking-says-the-bank-gave-no-kind-to-check-agains.aria.yml"
+				},
+				{
+					"name": "as a new credit card, its row lands there",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-unknown-kind/03-as-a-new-credit-card-its-row-lands-there.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-unknown-kind/03-as-a-new-credit-card-its-row-lands-there.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-unknown-kind/trace.zip"
+		},
+		{
+			"name": "accounts/held-legacy-name",
+			"title": "a held bank Account recorded with a name but no kind is never preselected into the same-named Account",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "it opens on a new Account, not Savings",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-legacy-name/01-it-opens-on-a-new-account-not-savings.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-legacy-name/01-it-opens-on-a-new-account-not-savings.aria.yml"
+				},
+				{
+					"name": "choosing Savings asks the owner to check its kind, and Escape from its starting balance lands on its Check balance",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-legacy-name/02-choosing-savings-asks-the-owner-to-check-its-kind-and-escape.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-legacy-name/02-choosing-savings-asks-the-owner-to-check-its-kind-and-escape.aria.yml"
+				},
+				{
+					"name": "Savings lists its row",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-legacy-name/03-savings-lists-its-row.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-legacy-name/03-savings-lists-its-row.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-legacy-name/trace.zip"
+		},
+		{
+			"name": "accounts/setup-check",
+			"title": "a mapped bank Account's starting balance stays unconfirmed until the owner confirms it, and its basis says what is unknown",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "the Bank card says Savings comes from Sample Statement Savings, its starting balance not confirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/01-the-bank-card-says-savings-comes-from-sample-statement-savin.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/01-the-bank-card-says-savings-comes-from-sample-statement-savin.aria.yml"
+				},
+				{
+					"name": "its basis names the bank Account and calls what Budge cannot know unknown",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/02-its-basis-names-the-bank-account-and-calls-what-budge-cannot.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/02-its-basis-names-the-bank-account-and-calls-what-budge-cannot.aria.yml"
+				},
+				{
+					"name": "Confirm with the field empty asks, at the field, for the balance the bank showed on the cutover date",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/03-confirm-with-the-field-empty-asks-at-the-field-for-the-balan.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/03-confirm-with-the-field-empty-asks-at-the-field-for-the-balan.aria.yml"
+				},
+				{
+					"name": "Cancel leaves it unconfirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/04-cancel-leaves-it-unconfirmed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/04-cancel-leaves-it-unconfirmed.aria.yml"
+				},
+				{
+					"name": "confirming it clears the problem, after a reload too, and points to categorizing",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/05-confirming-it-clears-the-problem-after-a-reload-too-and-poin.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/05-confirming-it-clears-the-problem-after-a-reload-too-and-poin.aria.yml"
+				},
+				{
+					"name": "Savings' actions offer its confirmed starting balance to keep",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/06-savings-actions-offer-its-confirmed-starting-balance-to-keep.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/06-savings-actions-offer-its-confirmed-starting-balance-to-keep.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-check/trace.zip"
+		},
+		{
+			"name": "accounts/setup-correct",
+			"title": "a bank Account set up in the wrong Account is moved through Stop syncing and Bring back, confirmed in its new one, and its earlier Transactions are shown still in the old one",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "at 390 px, set Sample Savings Plus up into Savings and skip its starting balance: its Check balance takes focus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/01-at-390-px-set-sample-savings-plus-up-into-savings-and-skip-i.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/01-at-390-px-set-sample-savings-plus-up-into-savings-and-skip-i.aria.yml"
+				},
+				{
+					"name": "the card says it goes into Savings, starting balance not confirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/02-the-card-says-it-goes-into-savings-starting-balance-not-conf.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/02-the-card-says-it-goes-into-savings-starting-balance-not-conf.aria.yml"
+				},
+				{
+					"name": "stop syncing it into Savings, and bring it back for setup",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/03-stop-syncing-it-into-savings-and-bring-it-back-for-setup.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/03-stop-syncing-it-into-savings-and-bring-it-back-for-setup.aria.yml"
+				},
+				{
+					"name": "set it up as a new Account and confirm its starting balance: the card and the status say its earlier Transactions are still in Savings, and its link takes focus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/04-set-it-up-as-a-new-account-and-confirm-its-starting-balance-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/04-set-it-up-as-a-new-account-and-confirm-its-starting-balance-.aria.yml"
+				},
+				{
+					"name": "once confirmed, the notice reads as information and counts in no \"need you\" count",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/05-once-confirmed-the-notice-reads-as-information-and-counts-in.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/05-once-confirmed-the-notice-reads-as-information-and-counts-in.aria.yml"
+				},
+				{
+					"name": "its earlier Transactions are in Savings, and not in Savings Plus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/06-its-earlier-transactions-are-in-savings-and-not-in-savings-p.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/06-its-earlier-transactions-are-in-savings-and-not-in-savings-p.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/setup-correct/trace.zip"
+		},
+		{
+			"name": "accounts/held-ignore",
+			"title": "an ignored held bank Account leaves the list and stays gone",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "ignore Sample Holiday Club: its card takes focus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-ignore/01-ignore-sample-holiday-club-its-card-takes-focus.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-ignore/01-ignore-sample-holiday-club-its-card-takes-focus.aria.yml"
+				},
+				{
+					"name": "brought back on the same page, it offers Set up again, and ignoring it again hides it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-ignore/02-brought-back-on-the-same-page-it-offers-set-up-again-and-ign.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-ignore/02-brought-back-on-the-same-page-it-offers-set-up-again-and-ign.aria.yml"
+				},
+				{
+					"name": "after a reload, the other held Accounts remain and it stays gone",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-ignore/03-after-a-reload-the-other-held-accounts-remain-and-it-stays-g.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-ignore/03-after-a-reload-the-other-held-accounts-remain-and-it-stays-g.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/accounts/held-ignore/trace.zip"
+		},
+		{
+			"name": "bank-changes/take-the-banks",
+			"title": "taking the bank's version updates a changed row in its editor and deletes a removed one from its row",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "open Checking",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/take-the-banks/01-open-checking.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/take-the-banks/01-open-checking.aria.yml"
+				},
+				{
+					"name": "the changed garden-center row takes the bank's $44.75",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/take-the-banks/02-the-changed-garden-center-row-takes-the-bank-s-44-75.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/take-the-banks/02-the-changed-garden-center-row-takes-the-bank-s-44-75.aria.yml"
+				},
+				{
+					"name": "the removed streaming row is deleted from its row",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/take-the-banks/03-the-removed-streaming-row-is-deleted-from-its-row.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/take-the-banks/03-the-removed-streaming-row-is-deleted-from-its-row.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/take-the-banks/trace.zip"
+		},
+		{
+			"name": "bank-changes/late-delete",
+			"title": "a delete that finishes after its confirmation was dismissed leaves the next confirmation open",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "open Checking",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/late-delete/01-open-checking.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/late-delete/01-open-checking.aria.yml"
+				},
+				{
+					"name": "delete the streaming row, hold the delete, and dismiss",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/late-delete/02-delete-the-streaming-row-hold-the-delete-and-dismiss.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/late-delete/02-delete-the-streaming-row-hold-the-delete-and-dismiss.aria.yml"
+				},
+				{
+					"name": "from the keyboard, confirm the gym row, then release",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/late-delete/03-from-the-keyboard-confirm-the-gym-row-then-release.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/late-delete/03-from-the-keyboard-confirm-the-gym-row-then-release.aria.yml"
+				},
+				{
+					"name": "the gym confirmation stays open and deletes its own row",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/late-delete/04-the-gym-confirmation-stays-open-and-deletes-its-own-row.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/late-delete/04-the-gym-confirmation-stays-open-and-deletes-its-own-row.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/late-delete/trace.zip"
+		},
+		{
+			"name": "bank-changes/keep-mine",
+			"title": "keeping mine, from the row or its editor, clears the bank flag and leaves my Transaction as I edited it",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "open Checking",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/keep-mine/01-open-checking.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/keep-mine/01-open-checking.aria.yml"
+				},
+				{
+					"name": "the changed garden-center row keeps my $40.00 from its row",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/keep-mine/02-the-changed-garden-center-row-keeps-my-40-00-from-its-row.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/keep-mine/02-the-changed-garden-center-row-keeps-my-40-00-from-its-row.aria.yml"
+				},
+				{
+					"name": "the removed streaming row stays, with my memo",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/keep-mine/03-the-removed-streaming-row-stays-with-my-memo.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/keep-mine/03-the-removed-streaming-row-stays-with-my-memo.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/bank-changes/keep-mine/trace.zip"
+		},
+		{
+			"name": "payees/last-category",
+			"title": "a Payee's remembered Category fills in, and picking another Category keeps it",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "open Add Transaction on Checking",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/last-category/01-open-add-transaction-on-checking.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/last-category/01-open-add-transaction-on-checking.aria.yml"
+				},
+				{
+					"name": "a known Payee fills in its remembered Category; a new one doesn't",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/last-category/02-a-known-payee-fills-in-its-remembered-category-a-new-one-doe.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/last-category/02-a-known-payee-fills-in-its-remembered-category-a-new-one-doe.aria.yml"
+				},
+				{
+					"name": "a Category picked by hand survives retyping the Payee",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/last-category/03-a-category-picked-by-hand-survives-retyping-the-payee.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/last-category/03-a-category-picked-by-hand-survives-retyping-the-payee.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/last-category/trace.zip"
+		},
+		{
+			"name": "payees/remember",
+			"title": "a Category picked from a row or the dialog changes the Payee's remembered one only when Remember is checked, by keyboard and on a 320 px phone",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "a one-off Category from a row leaves the remembered Rent alone",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/remember/01-a-one-off-category-from-a-row-leaves-the-remembered-rent-alo.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/remember/01-a-one-off-category-from-a-row-leaves-the-remembered-rent-alo.aria.yml"
+				},
+				{
+					"name": "by keyboard, Tab through the list reaches Remember, which picks the same Groceries again and makes it the remembered one",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/remember/02-by-keyboard-tab-through-the-list-reaches-remember-which-pick.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/remember/02-by-keyboard-tab-through-the-list-reaches-remember-which-pick.aria.yml"
+				},
+				{
+					"name": "in the dialog a new Payee’s first Category is saved once, and remembered only when asked",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/remember/03-in-the-dialog-a-new-payee-s-first-category-is-saved-once-and.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/remember/03-in-the-dialog-a-new-payee-s-first-category-is-saved-once-and.aria.yml"
+				},
+				{
+					"name": "on a 320 px phone Remember sits in the open Category above the tab bar",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/remember/04-on-a-320-px-phone-remember-sits-in-the-open-category-above-t.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/remember/04-on-a-320-px-phone-remember-sits-in-the-open-category-above-t.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/payees/remember/trace.zip"
+		},
+		{
+			"name": "plaid/status",
+			"title": "the Bank page shows when each Bank Connection last synced, and Sync now reports back",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "the sandbox connection says when it last synced",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/status/01-the-sandbox-connection-says-when-it-last-synced.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/status/01-the-sandbox-connection-says-when-it-last-synced.aria.yml"
+				},
+				{
+					"name": "Sync now and Reconnect are unavailable, and say why",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/status/02-sync-now-and-reconnect-are-unavailable-and-say-why.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/status/02-sync-now-and-reconnect-are-unavailable-and-say-why.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/status/trace.zip"
+		},
+		{
+			"name": "plaid/late-sync",
+			"title": "two Sync nows that finish late each report only on their own connection, and the result moves nothing",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Sync now on Sample Community Bank, and hold it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-sync/01-sync-now-on-sample-community-bank-and-hold-it.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-sync/01-sync-now-on-sample-community-bank-and-hold-it.aria.yml"
+				},
+				{
+					"name": "Sync now on Sample Credit Union while the first is held",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-sync/02-sync-now-on-sample-credit-union-while-the-first-is-held.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-sync/02-sync-now-on-sample-credit-union-while-the-first-is-held.aria.yml"
+				},
+				{
+					"name": "each released result reports on its own card while the other keeps syncing",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-sync/03-each-released-result-reports-on-its-own-card-while-the-other.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-sync/03-each-released-result-reports-on-its-own-card-while-the-other.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-sync/trace.zip"
+		},
+		{
+			"name": "plaid/sync-waiting",
+			"title": "a Sync now that leaves rows waiting for setup says so in full, Set up comes next by keyboard, and the largest Reconnect result keeps its summary whole with its matches under Details (the answers stand in for Plaid, which the local server cannot reach)",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "at 320 px, the result names what waits and stays whole",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/01-at-320-px-the-result-names-what-waits-and-stays-whole.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/01-at-320-px-the-result-names-what-waits-and-stays-whole.aria.yml"
+				},
+				{
+					"name": "at 320 px, Tab from Sync now reaches Set up",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/02-at-320-px-tab-from-sync-now-reaches-set-up.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/02-at-320-px-tab-from-sync-now-reaches-set-up.aria.yml"
+				},
+				{
+					"name": "at 390 px, the result names what waits and stays whole",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/03-at-390-px-the-result-names-what-waits-and-stays-whole.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/03-at-390-px-the-result-names-what-waits-and-stays-whole.aria.yml"
+				},
+				{
+					"name": "at 390 px, Tab from Sync now reaches Set up",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/04-at-390-px-tab-from-sync-now-reaches-set-up.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/04-at-390-px-tab-from-sync-now-reaches-set-up.aria.yml"
+				},
+				{
+					"name": "at 1280 px, the result names what waits and stays whole",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/05-at-1280-px-the-result-names-what-waits-and-stays-whole.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/05-at-1280-px-the-result-names-what-waits-and-stays-whole.aria.yml"
+				},
+				{
+					"name": "at 1280 px, Tab from Sync now reaches Set up",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/06-at-1280-px-tab-from-sync-now-reaches-set-up.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/06-at-1280-px-tab-from-sync-now-reaches-set-up.aria.yml"
+				},
+				{
+					"name": "at 320 px on a touch screen, the largest Reconnect result reads whole, and Details takes a 44 px tall tap and opens by touch and by keyboard",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/07-at-320-px-on-a-touch-screen-the-largest-reconnect-result-rea.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/07-at-320-px-on-a-touch-screen-the-largest-reconnect-result-rea.aria.yml"
+				},
+				{
+					"name": "at 390 px on a touch screen, the largest Reconnect result reads whole, and Details takes a 44 px tall tap and opens by touch and by keyboard",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/08-at-390-px-on-a-touch-screen-the-largest-reconnect-result-rea.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/08-at-390-px-on-a-touch-screen-the-largest-reconnect-result-rea.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/sync-waiting/trace.zip"
+		},
+		{
+			"name": "plaid/superseded-sync",
+			"title": "a Sync now that finishes after a newer Stop syncing or Bring back leaves their report and focus, and its late failure still shows (the answers stand in for Plaid)",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Sync now, then Stop syncing while it runs",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/superseded-sync/01-sync-now-then-stop-syncing-while-it-runs.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/superseded-sync/01-sync-now-then-stop-syncing-while-it-runs.aria.yml"
+				},
+				{
+					"name": "the older Sync now succeeds late and leaves the Stop syncing report",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/superseded-sync/02-the-older-sync-now-succeeds-late-and-leaves-the-stop-syncing.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/superseded-sync/02-the-older-sync-now-succeeds-late-and-leaves-the-stop-syncing.aria.yml"
+				},
+				{
+					"name": "Sync now again, then Bring back while it runs",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/superseded-sync/03-sync-now-again-then-bring-back-while-it-runs.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/superseded-sync/03-sync-now-again-then-bring-back-while-it-runs.aria.yml"
+				},
+				{
+					"name": "the older Sync now fails late: the Bring back report and focus stay, and the failure shows",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/superseded-sync/04-the-older-sync-now-fails-late-the-bring-back-report-and-focu.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/superseded-sync/04-the-older-sync-now-fails-late-the-bring-back-report-and-focu.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/superseded-sync/trace.zip"
+		},
+		{
+			"name": "plaid/attention",
+			"title": "a Bank Connection that needs a reconnect says so, the Budget points to it, and a failed reconnect leaves it asking",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "the Budget says the Bank needs you and links there",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/attention/01-the-budget-says-the-bank-needs-you-and-links-there.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/attention/01-the-budget-says-the-bank-needs-you-and-links-there.aria.yml"
+				},
+				{
+					"name": "only Sample Savings Bank asks for a reconnect",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/attention/02-only-sample-savings-bank-asks-for-a-reconnect.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/attention/02-only-sample-savings-bank-asks-for-a-reconnect.aria.yml"
+				},
+				{
+					"name": "its Sync now is unavailable until it reconnects, and says why, also when pressed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/attention/03-its-sync-now-is-unavailable-until-it-reconnects-and-says-why.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/attention/03-its-sync-now-is-unavailable-until-it-reconnects-and-says-why.aria.yml"
+				},
+				{
+					"name": "a failed Reconnect reports why and still offers Reconnect",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/attention/04-a-failed-reconnect-reports-why-and-still-offers-reconnect.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/attention/04-a-failed-reconnect-reports-why-and-still-offers-reconnect.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/attention/trace.zip"
+		},
+		{
+			"name": "plaid/consent",
+			"title": "a Bank Connection whose consent is ending offers to renew it, and its Account links to it",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Checking says why its bank needs you, and that link opens the card",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/consent/01-checking-says-why-its-bank-needs-you-and-that-link-opens-the.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/consent/01-checking-says-why-its-bank-needs-you-and-that-link-opens-the.aria.yml"
+				},
+				{
+					"name": "the card says when consent ends",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/consent/02-the-card-says-when-consent-ends.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/consent/02-the-card-says-when-consent-ends.aria.yml"
+				},
+				{
+					"name": "Reconnect reports the failure, and the consent notice returns",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/consent/03-reconnect-reports-the-failure-and-the-consent-notice-returns.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/consent/03-reconnect-reports-the-failure-and-the-consent-notice-returns.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/consent/trace.zip"
+		},
+		{
+			"name": "plaid/late-renew",
+			"title": "a held renew blocks every other Reconnect but not Sync now, and reports on its own connection",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "renew Sample Credit Union and hold the result",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-renew/01-renew-sample-credit-union-and-hold-the-result.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-renew/01-renew-sample-credit-union-and-hold-the-result.aria.yml"
+				},
+				{
+					"name": "releasing it reports on Sample Credit Union only",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-renew/02-releasing-it-reports-on-sample-credit-union-only.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-renew/02-releasing-it-reports-on-sample-credit-union-only.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/late-renew/trace.zip"
+		},
+		{
+			"name": "plaid/remove",
+			"title": "removing a Bank Connection asks first, waits for bank sync to sign out of the bank, and moves focus to the next card",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Keep it closes the confirm and leaves the card",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/remove/01-keep-it-closes-the-confirm-and-leaves-the-card.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/remove/01-keep-it-closes-the-confirm-and-leaves-the-card.aria.yml"
+				},
+				{
+					"name": "without bank sync set up, a connection with a bank login stays and says why",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/remove/02-without-bank-sync-set-up-a-connection-with-a-bank-login-stay.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/remove/02-without-bank-sync-set-up-a-connection-with-a-bank-login-stay.aria.yml"
+				},
+				{
+					"name": "a connection with no bank login is removed and reported",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/remove/03-a-connection-with-no-bank-login-is-removed-and-reported.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/remove/03-a-connection-with-no-bank-login-is-removed-and-reported.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/remove/trace.zip"
+		},
+		{
+			"name": "plaid/stop-and-bring-back",
+			"title": "an Account stops syncing from its bank, and the Bank card brings that bank Account back for setup",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Savings stops syncing Sample Statement Savings",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/stop-and-bring-back/01-savings-stops-syncing-sample-statement-savings.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/stop-and-bring-back/01-savings-stops-syncing-sample-statement-savings.aria.yml"
+				},
+				{
+					"name": "the Bank card lists it under Ignored bank Accounts",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/stop-and-bring-back/02-the-bank-card-lists-it-under-ignored-bank-accounts.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/stop-and-bring-back/02-the-bank-card-lists-it-under-ignored-bank-accounts.aria.yml"
+				},
+				{
+					"name": "Bring back offers it for setup and focuses Set up",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/stop-and-bring-back/03-bring-back-offers-it-for-setup-and-focuses-set-up.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/stop-and-bring-back/03-bring-back-offers-it-for-setup-and-focuses-set-up.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/plaid/stop-and-bring-back/trace.zip"
+		},
+		{
+			"name": "search/filters",
+			"title": "search finds Transactions by Bank Text and split memo, and filters narrow the list",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "search finds a Transaction by its Bank Text and a split by its line memo",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/01-search-finds-a-transaction-by-its-bank-text-and-a-split-by-i.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/01-search-finds-a-transaction-by-its-bank-text-and-a-split-by-i.aria.yml"
+				},
+				{
+					"name": "the Payee filter narrows the list",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/02-the-payee-filter-narrows-the-list.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/02-the-payee-filter-narrows-the-list.aria.yml"
+				},
+				{
+					"name": "the split has no Category of its own; its Gifts line lists it under Gifts",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/03-the-split-has-no-category-of-its-own-its-gifts-line-lists-it.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/03-the-split-has-no-category-of-its-own-its-gifts-line-lists-it.aria.yml"
+				},
+				{
+					"name": "Clear search and filters resets them",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/04-clear-search-and-filters-resets-them.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/04-clear-search-and-filters-resets-them.aria.yml"
+				},
+				{
+					"name": "a link whose filters name nothing Budge offers drops them and lists every Transaction",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/05-a-link-whose-filters-name-nothing-budge-offers-drops-them-an.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/05-a-link-whose-filters-name-nothing-budge-offers-drops-them-an.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/filters/trace.zip"
+		},
+		{
+			"name": "search/phone",
+			"title": "the search and filters are labeled and fit a 320 px screen",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Filters opens every labeled filter under the search",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/phone/01-filters-opens-every-labeled-filter-under-the-search.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/phone/01-filters-opens-every-labeled-filter-under-the-search.aria.yml"
+				},
+				{
+					"name": "search works with nothing scrolling sideways",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/phone/02-search-works-with-nothing-scrolling-sideways.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/phone/02-search-works-with-nothing-scrolling-sideways.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/search/phone/trace.zip"
+		},
+		{
+			"name": "settings/start",
+			"title": "the Budget and the Bank page propose the first of the local month, not the UTC one, on each side of a month boundary, and a file import starts there",
+			"fixture": "empty-budget",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "a minute before the month turns, last month’s first day is proposed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/start/01-a-minute-before-the-month-turns-last-month-s-first-day-is-pr.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/start/01-a-minute-before-the-month-turns-last-month-s-first-day-is-pr.aria.yml"
+				},
+				{
+					"name": "a minute after, the Bank page proposes the new month’s first day and saves it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/start/02-a-minute-after-the-bank-page-proposes-the-new-month-s-first-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/start/02-a-minute-after-the-bank-page-proposes-the-new-month-s-first-.aria.yml"
+				},
+				{
+					"name": "a bank file into a new Account brings in only rows from the start",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/start/03-a-bank-file-into-a-new-account-brings-in-only-rows-from-the-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/start/03-a-bank-file-into-a-new-account-brings-in-only-rows-from-the-.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/start/trace.zip"
+		},
+		{
+			"name": "settings/cutover",
+			"title": "the first cutover date gates Add Account, survives reload and cancel, bounds the months, and moves later through a preview when nothing is dated before",
+			"fixture": "empty-budget",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "before a date, there is no Cancel and Add Account points to Budget",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/01-before-a-date-there-is-no-cancel-and-add-account-points-to-b.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/01-before-a-date-there-is-no-cancel-and-add-account-points-to-b.aria.yml"
+				},
+				{
+					"name": "saving the first date keeps it on the Budget, then in Settings",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/02-saving-the-first-date-keeps-it-on-the-budget-then-in-setting.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/02-saving-the-first-date-keeps-it-on-the-budget-then-in-setting.aria.yml"
+				},
+				{
+					"name": "a change cancelled by button or Escape keeps the date; a saved one moves it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/03-a-change-cancelled-by-button-or-escape-keeps-the-date-a-save.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/03-a-change-cancelled-by-button-or-escape-keeps-the-date-a-save.aria.yml"
+				},
+				{
+					"name": "Previous month stops at the cutover month",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/04-previous-month-stops-at-the-cutover-month.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/04-previous-month-stops-at-the-cutover-month.aria.yml"
+				},
+				{
+					"name": "a later date with nothing dated before it moves through its preview",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/05-a-later-date-with-nothing-dated-before-it-moves-through-its-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/05-a-later-date-with-nothing-dated-before-it-moves-through-its-.aria.yml"
+				},
+				{
+					"name": "a date after today with nothing dated before it says the coming days’ bank transactions won’t come in",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/06-a-date-after-today-with-nothing-dated-before-it-says-the-com.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/06-a-date-after-today-with-nothing-dated-before-it-says-the-com.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/cutover/trace.zip"
+		},
+		{
+			"name": "settings/later-start",
+			"title": "a later cutover date opens a preview of the Starting Balances and budget it would leave; Cancel and Escape change nothing",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "a later date opens a readable preview",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/01-a-later-date-opens-a-readable-preview.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/01-a-later-date-opens-a-readable-preview.aria.yml"
+				},
+				{
+					"name": "Tab reads the preview top to bottom: Close, the lists that fold in, Cancel, then Move",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/02-tab-reads-the-preview-top-to-bottom-close-the-lists-that-fol.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/02-tab-reads-the-preview-top-to-bottom-close-the-lists-that-fol.aria.yml"
+				},
+				{
+					"name": "halfway down the preview, its Cancel button is wholly on screen",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/03-halfway-down-the-preview-its-cancel-button-is-wholly-on-scre.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/03-halfway-down-the-preview-its-cancel-button-is-wholly-on-scre.aria.yml"
+				},
+				{
+					"name": "Cancel and Escape close it and keep the date",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/04-cancel-and-escape-close-it-and-keep-the-date.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/04-cancel-and-escape-close-it-and-keep-the-date.aria.yml"
+				},
+				{
+					"name": "a date after today says why it has no preview",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/05-a-date-after-today-says-why-it-has-no-preview.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/05-a-date-after-today-says-why-it-has-no-preview.aria.yml"
+				},
+				{
+					"name": "on a 320 px phone, the preview with every list open stays within the screen",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/06-on-a-320-px-phone-the-preview-with-every-list-open-stays-wit.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/06-on-a-320-px-phone-the-preview-with-every-list-open-stays-wit.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-start/trace.zip"
+		},
+		{
+			"name": "settings/later-move",
+			"title": "confirming a later cutover date with Reconciled history needs its unlock, folds the history in, and Settings undoes it, on desktop and on 320 and 390 px phones",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "reconcile Card and leave one earlier Checking row uncleared",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/01-reconcile-card-and-leave-one-earlier-checking-row-uncleared.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/01-reconcile-card-and-leave-one-earlier-checking-row-uncleared.aria.yml"
+				},
+				{
+					"name": "the preview names the cleared-balance change and asks for the unlock",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/02-the-preview-names-the-cleared-balance-change-and-asks-for-th.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/02-the-preview-names-the-cleared-balance-change-and-asks-for-th.aria.yml"
+				},
+				{
+					"name": "Move start date folds the history in and Settings offers the undo on return",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/03-move-start-date-folds-the-history-in-and-settings-offers-the.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/03-move-start-date-folds-the-history-in-and-settings-offers-the.aria.yml"
+				},
+				{
+					"name": "Undo move by keyboard puts the date and the history back",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/04-undo-move-by-keyboard-puts-the-date-and-the-history-back.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/04-undo-move-by-keyboard-puts-the-date-and-the-history-back.aria.yml"
+				},
+				{
+					"name": "on a 320 px phone, the move and its Undo stay on screen and clear of the tab bar and the dialog's header",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/05-on-a-320-px-phone-the-move-and-its-undo-stay-on-screen-and-c.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/05-on-a-320-px-phone-the-move-and-its-undo-stay-on-screen-and-c.aria.yml"
+				},
+				{
+					"name": "on a 390 px phone, the move and its Undo stay on screen and clear of the tab bar and the dialog's header",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/06-on-a-390-px-phone-the-move-and-its-undo-stay-on-screen-and-c.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/06-on-a-390-px-phone-the-move-and-its-undo-stay-on-screen-and-c.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/settings/later-move/trace.zip"
+		},
+		{
+			"name": "shell/navigate",
+			"title": "the owner lands on the Budget, and the sidebar or the phone tab bar reaches all five Sections",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "sign-in lands on the Budget, beside the sidebar",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/01-sign-in-lands-on-the-budget-beside-the-sidebar.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/01-sign-in-lands-on-the-budget-beside-the-sidebar.aria.yml"
+				},
+				{
+					"name": "each sidebar Section opens its page and marks itself current",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/02-each-sidebar-section-opens-its-page-and-marks-itself-current.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/02-each-sidebar-section-opens-its-page-and-marks-itself-current.aria.yml"
+				},
+				{
+					"name": "a wheel over the Budget table or the sidebar scrolls the page",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/03-a-wheel-over-the-budget-table-or-the-sidebar-scrolls-the-pag.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/03-a-wheel-over-the-budget-table-or-the-sidebar-scrolls-the-pag.aria.yml"
+				},
+				{
+					"name": "on a 320 px phone the tab bar replaces the sidebar",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/04-on-a-320-px-phone-the-tab-bar-replaces-the-sidebar.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/04-on-a-320-px-phone-the-tab-bar-replaces-the-sidebar.aria.yml"
+				},
+				{
+					"name": "each tab opens its Section with no sideways scroll, and an Account keeps Accounts current",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/05-each-tab-opens-its-section-with-no-sideways-scroll-and-an-ac.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/05-each-tab-opens-its-section-with-no-sideways-scroll-and-an-ac.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/navigate/trace.zip"
+		},
+		{
+			"name": "shell/phone-pages",
+			"title": "on a 390 px phone every Section and an Account register load and scroll without moving",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Budget loads in place and scrolls to its end",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/01-budget-loads-in-place-and-scrolls-to-its-end.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/01-budget-loads-in-place-and-scrolls-to-its-end.aria.yml"
+				},
+				{
+					"name": "Accounts loads in place and scrolls to its end",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/02-accounts-loads-in-place-and-scrolls-to-its-end.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/02-accounts-loads-in-place-and-scrolls-to-its-end.aria.yml"
+				},
+				{
+					"name": "Bank loads in place and scrolls to its end",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/03-bank-loads-in-place-and-scrolls-to-its-end.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/03-bank-loads-in-place-and-scrolls-to-its-end.aria.yml"
+				},
+				{
+					"name": "Categories loads in place and scrolls to its end",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/04-categories-loads-in-place-and-scrolls-to-its-end.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/04-categories-loads-in-place-and-scrolls-to-its-end.aria.yml"
+				},
+				{
+					"name": "Settings loads in place and scrolls to its end",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/05-settings-loads-in-place-and-scrolls-to-its-end.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/05-settings-loads-in-place-and-scrolls-to-its-end.aria.yml"
+				},
+				{
+					"name": "the Checking register loads in place and scrolls to its end",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/06-the-checking-register-loads-in-place-and-scrolls-to-its-end.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/06-the-checking-register-loads-in-place-and-scrolls-to-its-end.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/shell/phone-pages/trace.zip"
+		},
+		{
+			"name": "transactions/create",
+			"title": "adding a Transaction changes the Account balance",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "open Checking",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/01-open-checking.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/01-open-checking.aria.yml"
+				},
+				{
+					"name": "Add Transaction on an Account opens on Payee, Enter in Payee moves to Amount, and Save without an amount says why until one is typed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/02-add-transaction-on-an-account-opens-on-payee-enter-in-payee-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/02-add-transaction-on-an-account-opens-on-payee-enter-in-payee-.aria.yml"
+				},
+				{
+					"name": "Escape asks before throwing the typing away, and Keep editing keeps it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/03-escape-asks-before-throwing-the-typing-away-and-keep-editing.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/03-escape-asks-before-throwing-the-typing-away-and-keep-editing.aria.yml"
+				},
+				{
+					"name": "save the $12.34 outflow, and the balance drops by it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/04-save-the-12-34-outflow-and-the-balance-drops-by-it.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/04-save-the-12-34-outflow-and-the-balance-drops-by-it.aria.yml"
+				},
+				{
+					"name": "columns drop as the list narrows, so nothing scrolls sideways at the narrowest width",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/05-columns-drop-as-the-list-narrows-so-nothing-scrolls-sideways.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/05-columns-drop-as-the-list-narrows-so-nothing-scrolls-sideways.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/create/trace.zip"
+		},
+		{
+			"name": "transactions/late-save",
+			"title": "a save that finishes after the dialog was closed leaves the next opening alone",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "save a new Transaction, hold its response, and close the dialog",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/late-save/01-save-a-new-transaction-hold-its-response-and-close-the-dialo.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/late-save/01-save-a-new-transaction-hold-its-response-and-close-the-dialo.aria.yml"
+				},
+				{
+					"name": "open another Transaction, then release the held save",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/late-save/02-open-another-transaction-then-release-the-held-save.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/late-save/02-open-another-transaction-then-release-the-held-save.aria.yml"
+				},
+				{
+					"name": "the save lands in the list, and the open dialog stays as it was",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/late-save/03-the-save-lands-in-the-list-and-the-open-dialog-stays-as-it-w.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/late-save/03-the-save-lands-in-the-list-and-the-open-dialog-stays-as-it-w.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/late-save/trace.zip"
+		},
+		{
+			"name": "transactions/categorize",
+			"title": "a Category or Transfer is searched for and saved from its row, by keyboard and on a 320 px phone, survives reload, and leaves the row Unapproved",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "typing on an Unapproved row’s Category opens a search that finds Groceries, and Enter saves it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize/01-typing-on-an-unapproved-row-s-category-opens-a-search-that-f.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize/01-typing-on-an-unapproved-row-s-category-opens-a-search-that-f.aria.yml"
+				},
+				{
+					"name": "after reload the row keeps Groceries and stays Unapproved",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize/02-after-reload-the-row-keeps-groceries-and-stays-unapproved.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize/02-after-reload-the-row-keeps-groceries-and-stays-unapproved.aria.yml"
+				},
+				{
+					"name": "a Checking outflow offers Ready to Assign with the Categories and its Transfers in their own section, and Transfer: Card pays the card",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize/03-a-checking-outflow-offers-ready-to-assign-with-the-categorie.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize/03-a-checking-outflow-offers-ready-to-assign-with-the-categorie.aria.yml"
+				},
+				{
+					"name": "on a 320 px phone the Category opens above the tab bar, fits the screen, and saves a search",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize/04-on-a-320-px-phone-the-category-opens-above-the-tab-bar-fits-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize/04-on-a-320-px-phone-the-category-opens-above-the-tab-bar-fits-.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize/trace.zip"
+		},
+		{
+			"name": "transactions/categorize-late",
+			"title": "a Category picked while the row’s earlier pick is still saving, or still looking for a Transfer to link, wins, and the earlier pick finishing late does not put it back",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "pick Coffee for a Checking row and hold its save",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/01-pick-coffee-for-a-checking-row-and-hold-its-save.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/01-pick-coffee-for-a-checking-row-and-hold-its-save.aria.yml"
+				},
+				{
+					"name": "pick Dining Out, then let the Coffee save land: the row still shows Dining Out",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/02-pick-dining-out-then-let-the-coffee-save-land-the-row-still-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/02-pick-dining-out-then-let-the-coffee-save-land-the-row-still-.aria.yml"
+				},
+				{
+					"name": "let the Dining Out save land, and it is kept after reload",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/03-let-the-dining-out-save-land-and-it-is-kept-after-reload.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/03-let-the-dining-out-save-land-and-it-is-kept-after-reload.aria.yml"
+				},
+				{
+					"name": "reload so searches for a Transfer to link are held, then on an imported row pick Transfer: Savings and, while its search is held, Groceries, which saves",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/04-reload-so-searches-for-a-transfer-to-link-are-held-then-on-a.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/04-reload-so-searches-for-a-transfer-to-link-are-held-then-on-a.aria.yml"
+				},
+				{
+					"name": "the search lands with nothing to link, a later save on another row lands, and the imported row keeps Groceries after reload",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/05-the-search-lands-with-nothing-to-link-a-later-save-on-anothe.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/05-the-search-lands-with-nothing-to-link-a-later-save-on-anothe.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/categorize-late/trace.zip"
+		},
+		{
+			"name": "transactions/approve-all-undo",
+			"title": "Unapproved Transactions come first under their own heading, and Approve all or Approve shown can be undone",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Accounts heads the Unapproved rows apart from the Approved ones",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/01-accounts-heads-the-unapproved-rows-apart-from-the-approved-o.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/01-accounts-heads-the-unapproved-rows-apart-from-the-approved-o.aria.yml"
+				},
+				{
+					"name": "a row's Approve offers Undo, which puts it back and focuses its Approve again",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/02-a-row-s-approve-offers-undo-which-puts-it-back-and-focuses-i.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/02-a-row-s-approve-offers-undo-which-puts-it-back-and-focuses-i.aria.yml"
+				},
+				{
+					"name": "a search approves only the Unapproved rows it shows and leaves the rest Unapproved; its Undo hides while the filters differ and puts them back once the search returns",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/03-a-search-approves-only-the-unapproved-rows-it-shows-and-leav.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/03-a-search-approves-only-the-unapproved-rows-it-shows-and-leav.aria.yml"
+				},
+				{
+					"name": "Approve all approves them and offers Undo",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/04-approve-all-approves-them-and-offers-undo.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/04-approve-all-approves-them-and-offers-undo.aria.yml"
+				},
+				{
+					"name": "Undo puts exactly those back to Unapproved",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/05-undo-puts-exactly-those-back-to-unapproved.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/05-undo-puts-exactly-those-back-to-unapproved.aria.yml"
+				},
+				{
+					"name": "with rows selected, the button approves only the selected Unapproved ones, and Undo puts them back",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/06-with-rows-selected-the-button-approves-only-the-selected-una.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/06-with-rows-selected-the-button-approves-only-the-selected-una.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-all-undo/trace.zip"
+		},
+		{
+			"name": "transactions/select-categorize",
+			"title": "Transactions picked one by one, across Payees and within one, take a Category, and approval only when asked; Undo puts back what changed and a search keeps only the checked rows it shows",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "pick the Unapproved bookshop and two Coffee Shop rows that are not next to each other",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/01-pick-the-unapproved-bookshop-and-two-coffee-shop-rows-that-a.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/01-pick-the-unapproved-bookshop-and-two-coffee-shop-rows-that-a.aria.yml"
+				},
+				{
+					"name": "the bulk picker offers Categories but no Transfer, and a search keeps the checked rows it shows, even one checked as the search was typed, and unselects the rest, saying so",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/02-the-bulk-picker-offers-categories-but-no-transfer-and-a-sear.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/02-the-bulk-picker-offers-categories-but-no-transfer-and-a-sear.aria.yml"
+				},
+				{
+					"name": "pick them again and give them Dining Out: only they change, the bookshop stays Unapproved, and Undo takes focus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/03-pick-them-again-and-give-them-dining-out-only-they-change-th.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/03-pick-them-again-and-give-them-dining-out-only-they-change-th.aria.yml"
+				},
+				{
+					"name": "Undo puts each row’s own Category back",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/04-undo-puts-each-row-s-own-category-back.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/04-undo-puts-each-row-s-own-category-back.aria.yml"
+				},
+				{
+					"name": "with Approve them too, the bookshop and hardware rows become Groceries and approved, and Undo makes them Unapproved and Uncategorized again",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/05-with-approve-them-too-the-bookshop-and-hardware-rows-become-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/05-with-approve-them-too-the-bookshop-and-hardware-rows-become-.aria.yml"
+				},
+				{
+					"name": "a Transfer picked with an ordinary row keeps its Category while the ordinary row takes the new one",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/06-a-transfer-picked-with-an-ordinary-row-keeps-its-category-wh.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/06-a-transfer-picked-with-an-ordinary-row-keeps-its-category-wh.aria.yml"
+				},
+				{
+					"name": "changing a row that action left alone keeps its Undo, and changing a row it touched retires it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/07-changing-a-row-that-action-left-alone-keeps-its-undo-and-cha.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/07-changing-a-row-that-action-left-alone-keeps-its-undo-and-cha.aria.yml"
+				},
+				{
+					"name": "a bulk save that lands after its selection was cleared and another row checked leaves that row checked and focused, and offers no Undo",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/08-a-bulk-save-that-lands-after-its-selection-was-cleared-and-a.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/08-a-bulk-save-that-lands-after-its-selection-was-cleared-and-a.aria.yml"
+				},
+				{
+					"name": "a Split in the selection is named as keeping its Category, and with nothing else picked there is nothing to categorize",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/09-a-split-in-the-selection-is-named-as-keeping-its-category-an.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/09-a-split-in-the-selection-is-named-as-keeping-its-category-an.aria.yml"
+				},
+				{
+					"name": "at 320 px the selection bar stays on screen while scrolling, clear of the tab bar and the right edge, and its picker saves",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/10-at-320-px-the-selection-bar-stays-on-screen-while-scrolling-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/10-at-320-px-the-selection-bar-stays-on-screen-while-scrolling-.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/select-categorize/trace.zip"
+		},
+		{
+			"name": "transactions/payee-groups",
+			"title": "grouped by Payee, a mixed-purpose Payee’s shown rows are picked at once, some are left out, and the same selection gives each part its own Category",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "import four SAMPLE WAREHOUSE 7701 rows and one SAMPLE WAREHOUSE 7702 row into Savings",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/01-import-four-sample-warehouse-7701-rows-and-one-sample-wareho.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/01-import-four-sample-warehouse-7701-rows-and-one-sample-wareho.aria.yml"
+				},
+				{
+					"name": "Group by Payee heads each Payee once, keeps the lookalike Payee apart, and lists each visit by its date and amount",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/02-group-by-payee-heads-each-payee-once-keeps-the-lookalike-pay.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/02-group-by-payee-heads-each-payee-once-keeps-the-lookalike-pay.aria.yml"
+				},
+				{
+					"name": "the Payee’s box picks its four shown rows; two left out leave it mixed, and a row of another Payee joins",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/03-the-payee-s-box-picks-its-four-shown-rows-two-left-out-leave.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/03-the-payee-s-box-picks-its-four-shown-rows-two-left-out-leave.aria.yml"
+				},
+				{
+					"name": "Groceries goes to those three only; the two left out keep their Category",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/04-groceries-goes-to-those-three-only-the-two-left-out-keep-the.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/04-groceries-goes-to-those-three-only-the-two-left-out-keep-the.aria.yml"
+				},
+				{
+					"name": "the Payee’s box again, less the Groceries rows, gives the other two Gifts and approves them",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/05-the-payee-s-box-again-less-the-groceries-rows-gives-the-othe.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/05-the-payee-s-box-again-less-the-groceries-rows-gives-the-othe.aria.yml"
+				},
+				{
+					"name": "grouping survives a reload and keeps a selection when turned off, and every row keeps its own Payee",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/06-grouping-survives-a-reload-and-keeps-a-selection-when-turned.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/06-grouping-survives-a-reload-and-keeps-a-selection-when-turned.aria.yml"
+				},
+				{
+					"name": "at 320 px a group heads its rows with the whole Payee name, and nothing reaches past the right edge",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/07-at-320-px-a-group-heads-its-rows-with-the-whole-payee-name-a.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/07-at-320-px-a-group-heads-its-rows-with-the-whole-payee-name-a.aria.yml"
+				},
+				{
+					"name": "at 390 px a group heads its rows with the whole Payee name, and nothing reaches past the right edge",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/08-at-390-px-a-group-heads-its-rows-with-the-whole-payee-name-a.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/08-at-390-px-a-group-heads-its-rows-with-the-whole-payee-name-a.aria.yml"
+				},
+				{
+					"name": "past the first page, Show more lands on the first new row as shown: SAMPLE ARCADE 3301, though it is older than the new SAMPLE ZOO 9902 rows",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/09-past-the-first-page-show-more-lands-on-the-first-new-row-as-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/09-past-the-first-page-show-more-lands-on-the-first-new-row-as-.aria.yml"
+				},
+				{
+					"name": "Undo puts focus on the first restored row as shown, SAMPLE ARCADE 3301 before the newer SAMPLE ZOO 9902, after a Category change and after an approval",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/10-undo-puts-focus-on-the-first-restored-row-as-shown-sample-ar.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/10-undo-puts-focus-on-the-first-restored-row-as-shown-sample-ar.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/payee-groups/trace.zip"
+		},
+		{
+			"name": "transactions/approve-phone",
+			"title": "on a 320 px phone, an Unapproved Transaction opens from its Payee and can be approved",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Accounts lists the Unapproved bookshop row without sideways scroll",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-phone/01-accounts-lists-the-unapproved-bookshop-row-without-sideways-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-phone/01-accounts-lists-the-unapproved-bookshop-row-without-sideways-.aria.yml"
+				},
+				{
+					"name": "the first Transaction shows above the tab bar without scrolling",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-phone/02-the-first-transaction-shows-above-the-tab-bar-without-scroll.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-phone/02-the-first-transaction-shows-above-the-tab-bar-without-scroll.aria.yml"
+				},
+				{
+					"name": "approve it from its dialog",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-phone/03-approve-it-from-its-dialog.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-phone/03-approve-it-from-its-dialog.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-final-affected/transactions/approve-phone/trace.zip"
+		}
+	]
+}

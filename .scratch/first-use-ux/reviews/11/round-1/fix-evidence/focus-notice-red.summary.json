@@ -1,0 +1,97 @@
+{
+	"result": "failed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "2212e039bd6bfbe380b42081229e2f8950adf9f3",
+	"uncommittedChanges": true,
+	"appUrl": "http://127.0.0.1:5173",
+	"journeys": [
+		{
+			"name": "accounts/setup-check",
+			"title": "a mapped bank Account's starting balance stays unconfirmed until the owner confirms it, and its basis says what is unknown",
+			"fixture": "bank-sync",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "the Bank card says Savings comes from Sample Statement Savings, its starting balance not confirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-check/01-the-bank-card-says-savings-comes-from-sample-statement-savin.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-check/01-the-bank-card-says-savings-comes-from-sample-statement-savin.aria.yml"
+				},
+				{
+					"name": "its basis names the bank Account and calls what Budge cannot know unknown",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-check/02-its-basis-names-the-bank-account-and-calls-what-budge-cannot.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-check/02-its-basis-names-the-bank-account-and-calls-what-budge-cannot.aria.yml"
+				},
+				{
+					"name": "Cancel leaves it unconfirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-check/03-cancel-leaves-it-unconfirmed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-check/03-cancel-leaves-it-unconfirmed.aria.yml"
+				},
+				{
+					"name": "confirming it clears the problem, after a reload too, and points to categorizing",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-check/04-confirming-it-clears-the-problem-after-a-reload-too-and-poin-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-check/04-confirming-it-clears-the-problem-after-a-reload-too-and-poin-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-check/trace.zip",
+			"error": "expect(locator).toBeFocused() failed\n\nLocator:  getByRole('status').filter({ hasText: /^Savings/ }).getByRole('link', { name: 'Categorize its Transactions' })\nExpected: focused\nReceived: inactive\nTimeout:  5000ms\n\nCall log:\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n  - Expect \"toBeFocused\" getByRole('status').filter({ hasText: /^Savings/ }).getByRole('link', { name: 'Categorize its Transactions' }) with timeout 5000ms\n  - waiting for getByRole('status').filter({ hasText: /^Savings/ }).getByRole('link', { name: 'Categorize its Transactions' })\n    14 × locator resolved to <a class=\"font-medium underline underline-offset-4 hover:no-underline\" href=\"/accounts?account=ks7b6fmxmw4h2k2twpr9dehzad8j7k2e&category=uncategorized\">Categorize its Transactions</a>\n       - unexpected value \"inactive\"\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n"
+		},
+		{
+			"name": "accounts/setup-correct",
+			"title": "a bank Account set up in the wrong Account is moved through Stop syncing and Bring back, confirmed in its new one, and its earlier Transactions are shown still in the old one",
+			"fixture": "bank-sync",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "at 390 px, set Sample Savings Plus up into Savings and skip its starting balance: its Check balance takes focus",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-correct/01-at-390-px-set-sample-savings-plus-up-into-savings-and-skip-i-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-correct/01-at-390-px-set-sample-savings-plus-up-into-savings-and-skip-i-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/setup-correct/trace.zip",
+			"error": "expect(locator).toBeFocused() failed\n\nLocator:  getByRole('list', { name: 'Bank Connections' }).getByRole('article', { name: 'Sample Credit Union', exact: true }).getByRole('list', { name: 'Where Sample Credit Union goes' }).getByRole('listitem').filter({ hasText: 'from Sample Savings Plus ending 4417' }).getByRole('button', { name: 'Check Savings\\'s starting balance' })\nExpected: focused\nReceived: inactive\nTimeout:  5000ms\n\nCall log:\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n  - Expect \"toBeFocused\" getByRole('list', { name: 'Bank Connections' }).getByRole('article', { name: 'Sample Credit Union', exact: true }).getByRole('list', { name: 'Where Sample Credit Union goes' }).getByRole('listitem').filter({ hasText: 'from Sample Savings Plus ending 4417' }).getByRole('button', { name: 'Check Savings\\'s starting balance' }) with timeout 5000ms\n  - waiting for getByRole('list', { name: 'Bank Connections' }).getByRole('article', { name: 'Sample Credit Union', exact: true }).getByRole('list', { name: 'Where Sample Credit Union goes' }).getByRole('listitem').filter({ hasText: 'from Sample Savings Plus ending 4417' }).getByRole('button', { name: 'Check Savings\\'s starting balance' })\n    14 × locator resolved to <button type=\"button\" data-slot=\"button\" aria-label=\"Check Savings's starting balance\" class=\"focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:outline-destructive rounded-md border bg-clip-padding text-sm font-medium active:not-aria-[haspopup]:translate-y-px group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-colors select-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-dis…>…</button>\n       - unexpected value \"inactive\"\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n"
+		},
+		{
+			"name": "accounts/held-legacy-name",
+			"title": "a held bank Account recorded with a name but no kind is never preselected into the same-named Account",
+			"fixture": "bank-sync",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "it opens on a new Account, not Savings",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/held-legacy-name/01-it-opens-on-a-new-account-not-savings.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/held-legacy-name/01-it-opens-on-a-new-account-not-savings.aria.yml"
+				},
+				{
+					"name": "choosing Savings asks the owner to check its kind, and Escape from its starting balance lands on its Check balance",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/held-legacy-name/02-choosing-savings-asks-the-owner-to-check-its-kind-and-escape-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/held-legacy-name/02-choosing-savings-asks-the-owner-to-check-its-kind-and-escape-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/held-legacy-name/trace.zip",
+			"error": "expect(locator).toBeFocused() failed\n\nLocator:  getByRole('list', { name: 'Bank Connections' }).getByRole('article', { name: 'Sample Credit Union', exact: true }).getByRole('list', { name: 'Where Sample Credit Union goes' }).getByRole('listitem').filter({ hasText: 'from Savings ending 6630' }).getByRole('button', { name: 'Check Savings\\'s starting balance' })\nExpected: focused\nReceived: inactive\nTimeout:  5000ms\n\nCall log:\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n  - Expect \"toBeFocused\" getByRole('list', { name: 'Bank Connections' }).getByRole('article', { name: 'Sample Credit Union', exact: true }).getByRole('list', { name: 'Where Sample Credit Union goes' }).getByRole('listitem').filter({ hasText: 'from Savings ending 6630' }).getByRole('button', { name: 'Check Savings\\'s starting balance' }) with timeout 5000ms\n  - waiting for getByRole('list', { name: 'Bank Connections' }).getByRole('article', { name: 'Sample Credit Union', exact: true }).getByRole('list', { name: 'Where Sample Credit Union goes' }).getByRole('listitem').filter({ hasText: 'from Savings ending 6630' }).getByRole('button', { name: 'Check Savings\\'s starting balance' })\n    14 × locator resolved to <button type=\"button\" data-slot=\"button\" aria-label=\"Check Savings's starting balance\" class=\"focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:outline-destructive rounded-md border bg-clip-padding text-sm font-medium active:not-aria-[haspopup]:translate-y-px group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-colors select-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-dis…>…</button>\n       - unexpected value \"inactive\"\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n"
+		},
+		{
+			"name": "accounts/held-ignore",
+			"title": "an ignored held bank Account leaves the list and stays gone",
+			"fixture": "bank-sync",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "ignore Sample Holiday Club: its card takes focus",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/held-ignore/01-ignore-sample-holiday-club-its-card-takes-focus-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/held-ignore/01-ignore-sample-holiday-club-its-card-takes-focus-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-red/accounts/held-ignore/trace.zip",
+			"error": "expect(locator).toBeFocused() failed\n\nLocator:  getByRole('list', { name: 'Bank Connections' }).getByRole('article', { name: 'Sample Credit Union', exact: true })\nExpected: focused\nReceived: inactive\nTimeout:  5000ms\n\nCall log:\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n  - Expect \"toBeFocused\" getByRole('list', { name: 'Bank Connections' }).getByRole('article', { name: 'Sample Credit Union', exact: true }) with timeout 5000ms\n  - waiting for getByRole('list', { name: 'Bank Connections' }).getByRole('article', { name: 'Sample Credit Union', exact: true })\n    14 × locator resolved to <article tabindex=\"-1\" aria-labelledby=\"connection-j97e6t7g5hynf15nt2jcc4pcex8j6nw8\" class=\"scroll-mt-4 rounded-lg border bg-card outline-none focus-visible:ring-3 focus-visible:ring-ring/50\">…</article>\n       - unexpected value \"inactive\"\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n"
+		}
+	]
+}

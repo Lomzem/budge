@@ -1,0 +1,135 @@
+{
+	"result": "passed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "2212e039bd6bfbe380b42081229e2f8950adf9f3",
+	"uncommittedChanges": false,
+	"appUrl": "http://127.0.0.1:5174",
+	"journeys": [
+		{
+			"name": "transactions/select-categorize",
+			"title": "Transactions picked one by one, across Payees and within one, take a Category, and approval only when asked; Undo puts back what changed and a search starts the selection over",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "pick the Unapproved bookshop and two Coffee Shop rows that are not next to each other",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/01-pick-the-unapproved-bookshop-and-two-coffee-shop-rows-that-a.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/01-pick-the-unapproved-bookshop-and-two-coffee-shop-rows-that-a.aria.yml"
+				},
+				{
+					"name": "the bulk picker offers Categories but no Transfer, and a search starts the selection over instead of reaching rows it hides",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/02-the-bulk-picker-offers-categories-but-no-transfer-and-a-sear.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/02-the-bulk-picker-offers-categories-but-no-transfer-and-a-sear.aria.yml"
+				},
+				{
+					"name": "pick them again and give them Dining Out: only they change, the bookshop stays Unapproved, and Undo takes focus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/03-pick-them-again-and-give-them-dining-out-only-they-change-th.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/03-pick-them-again-and-give-them-dining-out-only-they-change-th.aria.yml"
+				},
+				{
+					"name": "Undo puts each row’s own Category back",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/04-undo-puts-each-row-s-own-category-back.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/04-undo-puts-each-row-s-own-category-back.aria.yml"
+				},
+				{
+					"name": "with Approve them too, the bookshop and hardware rows become Groceries and approved, and Undo makes them Unapproved and Uncategorized again",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/05-with-approve-them-too-the-bookshop-and-hardware-rows-become-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/05-with-approve-them-too-the-bookshop-and-hardware-rows-become-.aria.yml"
+				},
+				{
+					"name": "a Transfer picked with an ordinary row keeps its Category while the ordinary row takes the new one",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/06-a-transfer-picked-with-an-ordinary-row-keeps-its-category-wh.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/06-a-transfer-picked-with-an-ordinary-row-keeps-its-category-wh.aria.yml"
+				},
+				{
+					"name": "changing a row that action left alone keeps its Undo, and changing a row it touched retires it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/07-changing-a-row-that-action-left-alone-keeps-its-undo-and-cha.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/07-changing-a-row-that-action-left-alone-keeps-its-undo-and-cha.aria.yml"
+				},
+				{
+					"name": "a bulk save that lands after its selection was cleared and another row checked leaves that row checked and focused, and offers no Undo",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/08-a-bulk-save-that-lands-after-its-selection-was-cleared-and-a.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/08-a-bulk-save-that-lands-after-its-selection-was-cleared-and-a.aria.yml"
+				},
+				{
+					"name": "a Split in the selection is named as keeping its Category, and with nothing else picked there is nothing to categorize",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/09-a-split-in-the-selection-is-named-as-keeping-its-category-an.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/09-a-split-in-the-selection-is-named-as-keeping-its-category-an.aria.yml"
+				},
+				{
+					"name": "at 320 px the selection bar stays on screen while scrolling, clear of the tab bar and the right edge, and its picker saves",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/10-at-320-px-the-selection-bar-stays-on-screen-while-scrolling-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/10-at-320-px-the-selection-bar-stays-on-screen-while-scrolling-.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/transactions/select-categorize/trace.zip"
+		},
+		{
+			"name": "plaid/sync-waiting",
+			"title": "a Sync now that leaves rows waiting for setup says so in full, Set up comes next by keyboard, and the largest Reconnect result keeps its summary whole with its matches under Details (the answers stand in for Plaid, which the local server cannot reach)",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "at 320 px, the result names what waits and stays whole",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/01-at-320-px-the-result-names-what-waits-and-stays-whole.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/01-at-320-px-the-result-names-what-waits-and-stays-whole.aria.yml"
+				},
+				{
+					"name": "at 320 px, Tab from Sync now reaches Set up",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/02-at-320-px-tab-from-sync-now-reaches-set-up.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/02-at-320-px-tab-from-sync-now-reaches-set-up.aria.yml"
+				},
+				{
+					"name": "at 390 px, the result names what waits and stays whole",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/03-at-390-px-the-result-names-what-waits-and-stays-whole.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/03-at-390-px-the-result-names-what-waits-and-stays-whole.aria.yml"
+				},
+				{
+					"name": "at 390 px, Tab from Sync now reaches Set up",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/04-at-390-px-tab-from-sync-now-reaches-set-up.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/04-at-390-px-tab-from-sync-now-reaches-set-up.aria.yml"
+				},
+				{
+					"name": "at 1280 px, the result names what waits and stays whole",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/05-at-1280-px-the-result-names-what-waits-and-stays-whole.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/05-at-1280-px-the-result-names-what-waits-and-stays-whole.aria.yml"
+				},
+				{
+					"name": "at 1280 px, Tab from Sync now reaches Set up",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/06-at-1280-px-tab-from-sync-now-reaches-set-up.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/06-at-1280-px-tab-from-sync-now-reaches-set-up.aria.yml"
+				},
+				{
+					"name": "at 320 px, the largest Reconnect result reads whole, and Details opens by touch and by keyboard",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/07-at-320-px-the-largest-reconnect-result-reads-whole-and-detai.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/07-at-320-px-the-largest-reconnect-result-reads-whole-and-detai.aria.yml"
+				},
+				{
+					"name": "at 390 px, the largest Reconnect result reads whole, and Details opens by touch and by keyboard",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/08-at-390-px-the-largest-reconnect-result-reads-whole-and-detai.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/08-at-390-px-the-largest-reconnect-result-reads-whole-and-detai.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/before-01/plaid/sync-waiting/trace.zip"
+		}
+	]
+}

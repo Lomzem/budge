@@ -1,0 +1,99 @@
+$ bun run codegen:check && bun run format:check && bun run lint && bun run lint:ui && bun run typecheck && bun run test && bun run capacity:check
+$ bun run codegen && git diff --exit-code -- convex/_generated
+$ bun scripts/codegen.js
+Temporary directory '/tmp' and project directory 'convex/_generated' are on different filesystems.
+  If you're running into errors with other tools watching the project directory, override the temporary directory location with the CONVEX_TMPDIR environment variable.
+  Be sure to pick a temporary directory that's on the same filesystem as your project.
+$ prettier --check .
+Checking formatting...
+All matched files use Prettier code style!
+$ eslint --max-warnings 0 .
+$ eslint --config eslint.ui.config.js --max-warnings 0 .
+$ bun run typecheck:app && bun run typecheck:convex
+$ bun run sync && PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-check --tsconfig ./tsconfig.json --fail-on-warnings
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-kit sync
+1794649922148 START "/home/lomzem/proj/budge"
+1794649922152 COMPLETED 1689 FILES 0 ERRORS 0 WARNINGS 0 FILES_WITH_PROBLEMS
+$ effect-tsgo tsc@7.0.2 --project convex/tsconfig.json
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} vitest run
+
+ RUN  v5.0.5 /home/lomzem/proj/budge
+
+(node:472054) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472052) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472055) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472050) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472051) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472056) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472092) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472053) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472048) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472049) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472100) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472169) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472176) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472184) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472183) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472196) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472205) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472217) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472225) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472233) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472241) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472247) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472254) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472256) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472255) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:472277) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+app: SIGINT; stopping what this start launched…
+(node:473686) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  58 passed (58)
+      Tests  924 passed (924)
+   Start at  01:52:04
+   Duration  25.20s (tests 70%, import 24%, transform 3%, environment 3%)
+
+$ bun run capacity --check
+$ bun --no-env-file scripts/capacity/run.js --check
+132 | }
+133 | 
+134 | export function requireLocalAnonymousDeployment(checkout: string, action: string) {
+135 | 	const check = checkLocalAnonymousDeployment(checkout);
+136 | 	if (!check.local) {
+137 | 		throw new Error(
+                  ^
+error: refusing to measure capacity: this checkout's backend is not a local anonymous deployment (its CONVEX_DEPLOYMENT is a local deployment, not anonymous). Run `bun run app up` first.
+      at requireLocalAnonymousDeployment (/home/lomzem/proj/budge/scripts/local/deployment.ts:137:13)
+      at /home/lomzem/proj/budge/scripts/capacity/run.js:30:20
+
+Bun v1.4.4 (Linux x64)
+error: script "capacity" exited with code 1
+error: script "capacity:check" exited with code 1
+error: script "check" exited with code 1

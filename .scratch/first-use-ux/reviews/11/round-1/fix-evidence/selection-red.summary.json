@@ -1,0 +1,31 @@
+{
+	"result": "failed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "2212e039bd6bfbe380b42081229e2f8950adf9f3",
+	"uncommittedChanges": true,
+	"appUrl": "http://127.0.0.1:5174",
+	"journeys": [
+		{
+			"name": "transactions/select-categorize",
+			"title": "Transactions picked one by one, across Payees and within one, take a Category, and approval only when asked; Undo puts back what changed and a search keeps only the checked rows it shows",
+			"fixture": "bank-sync",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "pick the Unapproved bookshop and two Coffee Shop rows that are not next to each other",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-selection-red/transactions/select-categorize/01-pick-the-unapproved-bookshop-and-two-coffee-shop-rows-that-a.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-selection-red/transactions/select-categorize/01-pick-the-unapproved-bookshop-and-two-coffee-shop-rows-that-a.aria.yml"
+				},
+				{
+					"name": "the bulk picker offers Categories but no Transfer, and a search keeps the checked rows it shows, even one checked as the search was typed, and unselects the rest, saying so",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-selection-red/transactions/select-categorize/02-the-bulk-picker-offers-categories-but-no-transfer-and-a-sear-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-selection-red/transactions/select-categorize/02-the-bulk-picker-offers-categories-but-no-transfer-and-a-sear-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-selection-red/transactions/select-categorize/trace.zip",
+			"error": "expect(received).toEqual(expected) // deep equality\n\n- Expected  - 5\n+ Received  + 1\n\n- Array [\n-   \"Select Sample Coffee Shop, Nov 10, 2026\",\n-   \"Select Sample Coffee Shop, Nov 13, 2026\",\n-   \"Select Sample Coffee Shop, Nov 14, 2026\",\n- ]\n+ Array []\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate"
+		}
+	]
+}

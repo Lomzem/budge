@@ -1,0 +1,47 @@
+{
+	"result": "failed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "2212e039bd6bfbe380b42081229e2f8950adf9f3",
+	"uncommittedChanges": true,
+	"appUrl": "http://127.0.0.1:5173",
+	"journeys": [
+		{
+			"name": "accounts/setup-check",
+			"title": "a mapped bank Account's starting balance stays unconfirmed until the owner confirms it, and its basis says what is unknown",
+			"fixture": "bank-sync",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "the Bank card says Savings comes from Sample Statement Savings, its starting balance not confirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-red/accounts/setup-check/01-the-bank-card-says-savings-comes-from-sample-statement-savin.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-red/accounts/setup-check/01-the-bank-card-says-savings-comes-from-sample-statement-savin.aria.yml"
+				},
+				{
+					"name": "its basis names the bank Account and calls what Budge cannot know unknown",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-red/accounts/setup-check/02-its-basis-names-the-bank-account-and-calls-what-budge-cannot-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-red/accounts/setup-check/02-its-basis-names-the-bank-account-and-calls-what-budge-cannot-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-red/accounts/setup-check/trace.zip",
+			"error": "expect(locator).not.toHaveAttribute() failed\n\nLocator:  getByRole('dialog', { name: 'Starting balance for Savings' }).getByLabel('Starting balance')\nExpected: not have attribute\nReceived: have attribute\nTimeout:  5000ms\n\nCall log:\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n  - Expect \"not toHaveAttribute\" getByRole('dialog', { name: 'Starting balance for Savings' }).getByLabel('Starting balance') with timeout 5000ms\n  - waiting for getByRole('dialog', { name: 'Starting balance for Savings' }).getByLabel('Starting balance')\n    14 × locator resolved to <input required=\"\" data-slot=\"input\" placeholder=\"0.00\" autocomplete=\"off\" inputmode=\"decimal\" id=\"starting-balance\" class=\"h-9 w-full min-w-0 rounded-md border border-input bg-card px-3 py-1 text-base transition-colors file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:pointer-events-none dis…/>\n       - unexpected value \"attribute present\"\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n"
+		},
+		{
+			"name": "accounts/start-late-save",
+			"title": "a starting balance saved from a dismissed dialog lands, and leaves the next Account's dialog alone",
+			"fixture": "budget-with-accounts",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "Checking offers its current starting balance; save $100 more, hold the save, and dismiss",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-red/accounts/start-late-save/01-checking-offers-its-current-starting-balance-save-100-more-h-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-red/accounts/start-late-save/01-checking-offers-its-current-starting-balance-save-100-more-h-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-red/accounts/start-late-save/trace.zip",
+			"error": "expect(locator).toHaveValue(expected) failed\n\nLocator:  getByRole('dialog').getByLabel('Starting balance')\nExpected: \"2418.37\"\nReceived: \"\"\nTimeout:  5000ms\n\nCall log:\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n  - Expect \"toHaveValue\" getByRole('dialog').getByLabel('Starting balance') with timeout 5000ms\n  - waiting for getByRole('dialog').getByLabel('Starting balance')\n    14 × locator resolved to <input required=\"\" data-slot=\"input\" placeholder=\"0.00\" autocomplete=\"off\" inputmode=\"decimal\" id=\"starting-balance\" class=\"h-9 w-full min-w-0 rounded-md border border-input bg-card px-3 py-1 text-base transition-colors file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:pointer-events-none dis…/>\n       - unexpected value \"\"\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n"
+		}
+	]
+}
