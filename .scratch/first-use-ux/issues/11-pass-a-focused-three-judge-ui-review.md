@@ -1,6 +1,6 @@
 # 11: Pass a focused three-judge UI review
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -89,3 +89,9 @@ The coordinator ruled that both open questions were regressions against "no beha
 - Green: all 56 dialog journeys pass.
 - `bun run check` passed (924 tests, capacity:check included).
 - `bun run test:e2e:local`: 56 passed in 8.8 minutes (`followup-test-e2e-local.log`).
+
+### Round 2: gate passed
+
+- On `1d463b6`, Sol A, Sol B and Opus each scored 9/10 and approved independently, with full required coverage and no open blocker or major.
+- Reports: `reviews/11/round-2/`.
+- Each finding's disposition is in [round 2](11-ui-review-round-2.md#coordinator-disposition-and-final-gate). All eight round-2 minors and nits are deferred with reasons to `first-use-ux-polish` 01. Nothing was changed after the approved commit.

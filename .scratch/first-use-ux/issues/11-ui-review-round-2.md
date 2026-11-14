@@ -35,4 +35,27 @@ Copied from each judge's checkout into `../reviews/11/round-2/`.
 
 ## Coordinator disposition and final gate
 
-Pending.
+**Gate: passed on `1d463b6`** (the reviewed `de7b552` plus the line that pins it). All three judges scored 9/10 on that commit independently. Each completed the required coverage, and none left a blocker or major open.
+
+| Judge | Model, effort | Score | Verdict | Report |
+| --- | --- | ---: | --- | --- |
+| Sol A | GPT-6.1-Sol, high | 9 | approve | [sol-a.md](../reviews/11/round-2/sol-a.md) |
+| Sol B | GPT-6.1-Sol, high | 9 | approve | [sol-b.md](../reviews/11/round-2/sol-b.md) |
+| Opus | Opus 5.5 | 9 | approve | [opus.md](../reviews/11/round-2/opus.md) |
+
+All round-1 findings were re-checked as fixed or answered. The one exception is opus-5: the warning covers a later move, but not a first start date after today. That case is now r2-opus-4.
+
+The Opus judge's grep printed four lines of the round-1 disposition section: two dispositions its brief already gave it, and the round-2 coverage note. They contained no score or verdict from any judge. The judge declared this, and no judgment relied on them. The approval stands.
+
+Every round-2 finding is a minor or a nit. Fixing any of them would change the approved commit and need a fresh three-judge round. So all are deferred, with reasons, to [first-use-ux-polish 01](../../first-use-ux-polish/issues/01-round-2-ui-findings.md):
+
+| Finding | Severity | Disposition |
+| --- | --- | --- |
+| r2-opus-1: Approving one row while others are checked hides that row's result line and Undo behind the selection bar. | minor | **Deferred.** The result is still announced. Clear selection brings Undo back, and the row can be unapproved directly. |
+| r2-opus-2: A keyboard user needs about 31 Shift+Tab presses from the checked rows to the bulk Categorize button. The bar comes before the table in reading order. | minor | **Deferred.** The task completes by keyboard. The fix is a change to reading order or a skip control, and needs its own design and a journey. |
+| r2-opus-3: At 320 px, the pinned Starting-balance confirmation covers the last Bank card's Reconnect and Sync now. | minor | **Deferred.** Dismiss clears it, and the message is short-lived. Needs a layout fix and a journey assertion. |
+| r2-opus-4: A first start date after today saves without the warning that a later move gets. | minor | **Deferred.** The user can recover with Change. It extends the existing future-date line from `9036e26` to the first-set path. |
+| r2-sol-a-2: After a partial Undo following a Category deletion, the explanation sentence is above the visible area once focus scrolls to the row. | minor | **Deferred.** The sentence is in the live region, so screen readers announce it, and scrolling up shows it. This is a rare two-tab path. |
+| r2-sol-a-1 / r2-opus-6: In about 1 run in 3, a Category chevron moved 9 px on the dev server and the journey's layout-shift guard failed. | minor / nit | **Deferred.** Seen only under Vite dev serving. CI and `test:e2e:local` run the production build behind `scripts/local/preview.ts` (`playwright.config.ts`), and 56 of 56 passed there. Cold loads showed 0 shifts for all three judges. Remaining risk: `bun run app verify` can flake on this journey. |
+| r2-opus-5: At 320 px, a balance of 1,234,567.89 pushes Reconcile 1 px past the right edge. | nit | **Deferred.** It needs a seven-figure balance. |
+| r2-opus-7: The unconfirmed "Now $2,418.37" next to the header Balance can read as today's balance. | nit | **Deferred.** It's a wording choice ("Recorded now"); copy review in the follow-up. |
