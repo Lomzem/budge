@@ -43,7 +43,21 @@ export function attentionOf(connection: BankConnection): string | null {
 
 export interface Report {
 	text: string;
+	detail?: string;
 	failed: boolean;
+}
+
+const transactions = (count: number) =>
+	count === 1 ? '1 Transaction' : `${String(count)} Transactions`;
+
+function describeRun({ added, matched, held }: { added: number; matched: number; held: number }) {
+	const additions = added === 0 ? 'No Transactions added.' : `${transactions(added)} added.`;
+	const waiting =
+		held === 0 ? '' : ` ${String(held)} ${held === 1 ? 'waits' : 'wait'} for setup below.`;
+	const report: Report = { text: additions + waiting, failed: false };
+	if (matched === 0) return report;
+	const entered = matched === 1 ? 'a Transaction' : 'Transactions';
+	return { ...report, detail: `${String(matched)} matched ${entered} you entered.` };
 }
 
 export function describeSync(outcome: SyncOutcome): Report {
@@ -51,21 +65,12 @@ export function describeSync(outcome: SyncOutcome): Report {
 	if (outcome.kind === 'noToken') {
 		return { text: 'This Bank Connection has no bank login, so it never syncs.', failed: true };
 	}
-	return {
-		text: `Synced. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`,
-		failed: false
-	};
+	return describeRun(outcome);
 }
 
 export function describeReconnect(outcome: SyncOutcome): Report {
-	if (outcome.kind === 'synced') {
-		return {
-			text: `Reconnected. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`,
-			failed: false
-		};
-	}
 	const synced = describeSync(outcome);
-	return { text: `Reconnected. ${synced.text}`, failed: synced.failed };
+	return { ...synced, text: `Reconnected. ${synced.text}` };
 }
 
 export class BankConnections {

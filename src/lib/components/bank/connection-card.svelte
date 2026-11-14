@@ -97,10 +97,11 @@
 		if (reconnecting) return 'Reconnecting…';
 		return null;
 	});
+	const aside = $derived.by(() => (result?.failed ? synced : result?.detail));
 	const slotText = $derived.by(() => {
 		if (pending !== null) return pending;
 		if (result === null) return synced;
-		return result.failed ? `${result.text} ${synced}` : result.text;
+		return aside === undefined ? result.text : `${result.text} ${aside}`;
 	});
 	const reconnectBlocked = $derived(!connection.bankLogin || bank.linking !== null || syncing);
 	const paused = $derived(connection.bankLogin && connection.status === 'needsAttention');
@@ -130,6 +131,7 @@
 	}
 	let seen: Seen[] = $state([]);
 	const held = $derived(bank.heldFrom(connection._id));
+	const nothingNeedsYou = $derived(problems.length === 0 && !feedsNeedYou && held.length === 0);
 
 	$effect(() => {
 		const known = untrack(() => seen);
@@ -348,15 +350,17 @@
 					{:else if result !== null}
 						{#if result.failed}
 							<TriangleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-						{:else}
+						{:else if nothingNeedsYou}
 							<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
+						{:else}
+							<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
 						{/if}
 						<span class="line-clamp-2 min-w-0"
 							>{result.text}
-							{#if result.failed}<span class="text-muted-foreground">{synced}</span>{/if}</span
+							{#if aside !== undefined}<span class="text-muted-foreground">{aside}</span>{/if}</span
 						>
 					{:else}
-						{#if problems.length === 0 && !feedsNeedYou}
+						{#if nothingNeedsYou}
 							<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
 						{:else}
 							<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
@@ -365,7 +369,9 @@
 					{/if}
 				</p>
 			</div>
-			<span role="status" class="sr-only">{result?.text ?? ''}</span>
+			<span role="status" class="sr-only"
+				>{[result?.text, result?.detail].filter(Boolean).join(' ')}</span
+			>
 			<div class="grid grid-cols-2 gap-2 sm:flex">
 				<div class="grid sm:w-36">
 					<Button
