@@ -359,6 +359,17 @@
 	}
 	const editButtonOf = (row: Row | undefined) =>
 		row === undefined ? undefined : shownOf(`[data-edit="${row._id}"]`);
+	function firstShown(
+		ids: Iterable<Id<'transactions'>>,
+		controlOf: (row: Row) => HTMLElement | undefined
+	) {
+		const candidates = new Set(ids);
+		for (const row of listed) {
+			const control = candidates.has(row._id) ? controlOf(row) : undefined;
+			if (control !== undefined) return control;
+		}
+		return undefined;
+	}
 	let dialogOpen = $state(false);
 	let importOpen = $state(false);
 	let editingSnapshot: Row | undefined = $state();
@@ -568,18 +579,20 @@
 		return addButton ?? undefined;
 	}
 
-	let focusFrom: number | null = null;
+	let loadedBefore: Set<Id<'transactions'>> | null = null;
 	function showMore() {
 		if (more.status !== 'CanLoadMore') return;
-		focusFrom = rows.length;
+		loadedBefore = new Set(rows.map((row) => row._id));
 		more.loadMore(PAGE_SIZE);
 	}
 	$effect(() => {
-		const count = rows.length;
-		if (focusFrom === null || count <= focusFrom || more.status === 'LoadingMore') return;
-		const firstNew = rows[focusFrom];
-		focusFrom = null;
-		void tick().then(() => editButtonOf(firstNew)?.focus());
+		const shown = rows;
+		const before = loadedBefore;
+		if (before === null || more.status === 'LoadingMore') return;
+		const loaded = shown.filter((row) => !before.has(row._id)).map((row) => row._id);
+		if (loaded.length === 0) return;
+		loadedBefore = null;
+		void tick().then(() => firstShown(loaded, editButtonOf)?.focus());
 	});
 
 	async function approveEvery() {
@@ -685,13 +698,9 @@
 		const text = restored.value;
 		undoable = { kind: 'undone', scopeKey: entry.scopeKey, text };
 		await tick();
-		const back =
-			entry.kind === 'approved'
-				? entry.transactionIds.map((id) => shownOf(`[data-approve="${id}"]`))
-				: entry.record.changes.map(({ transactionId }) =>
-						shownOf(`[data-category="${transactionId}"]`)
-					);
-		(back.find((element) => element !== undefined) ?? approveAllButton)?.focus();
+		const control = entry.kind === 'approved' ? 'data-approve' : 'data-category';
+		const back = firstShown(touchedBy(entry), (row) => shownOf(`[${control}="${row._id}"]`));
+		(back ?? approveAllButton)?.focus();
 	}
 </script>
 

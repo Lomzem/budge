@@ -640,13 +640,25 @@ export const transactions = {
 				const [year, month, day] = date.split('-');
 				return `${month ?? ''}/${day ?? ''}/${year ?? ''}`;
 			};
-			const csv = [
-				'Account Number,Transaction Description,Transaction Date,Transaction Type,Transaction Amount,Balance',
-				...visits.map(
-					({ date, amount }) => `0000,${warehouse},${csvDate(date)},Debit,${amount},100.00`
-				),
-				`0000,${lookalike},${csvDate(addDays(today, -1))},Debit,7.77,100.00`
-			].join('\n');
+			const bankRow = (payee: string, date: string, amount: string) =>
+				`0000,${payee},${csvDate(date)},Debit,${amount},100.00`;
+			const importIntoSavings = async (name: string, rows: string[]) => {
+				await page.getByRole('button', { name: 'Import file' }).click();
+				const dialog = page.getByRole('dialog', { name: 'Import a bank file' });
+				await chooseBankFile(
+					page,
+					name,
+					[
+						'Account Number,Transaction Description,Transaction Date,Transaction Type,Transaction Amount,Balance',
+						...rows
+					].join('\n')
+				);
+				await expect(dialog.getByRole('status')).toHaveText(
+					new RegExp(`^${String(rows.length)} new Transactions, 0 Matches`)
+				);
+				await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
+				await expect(dialog).toBeHidden();
+			};
 
 			const grouping = page.getByRole('button', { name: 'Group by Payee' });
 			const groupBox = (payee: string, count: number) =>
@@ -678,12 +690,10 @@ export const transactions = {
 				async () => {
 					await page.goto('/');
 					await openAccount(page, 'Savings');
-					await page.getByRole('button', { name: 'Import file' }).click();
-					const dialog = page.getByRole('dialog', { name: 'Import a bank file' });
-					await chooseBankFile(page, 'savings.csv', csv);
-					await expect(dialog.getByRole('status')).toHaveText(/^5 new Transactions, 0 Matches/);
-					await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
-					await expect(dialog).toBeHidden();
+					await importIntoSavings('savings.csv', [
+						...visits.map(({ date, amount }) => bankRow(warehouse, date, amount)),
+						bankRow(lookalike, addDays(today, -1), '7.77')
+					]);
 				}
 			);
 
@@ -801,6 +811,54 @@ export const transactions = {
 					}
 				);
 			}
+
+			const older = 'SAMPLE ARCADE 3301';
+			const newer = 'SAMPLE ZOO 9902';
+			await step(
+				`past the first page, Show more lands on the first new row as shown: ${older}, though it is older than the new ${newer} rows`,
+				async () => {
+					await page.setViewportSize({ width: 1280, height: 800 });
+					await importIntoSavings('more.csv', [
+						...Array.from({ length: 50 }, (_, index) =>
+							bankRow(newer, addDays(today, -4 - (index % 10)), (index + 1).toFixed(2))
+						),
+						bankRow(older, addDays(today, -20), '3.30')
+					]);
+					await page.reload();
+					await expect(rowBoxes(newer)).not.toHaveCount(0);
+					await expect(rowBoxes(older)).toHaveCount(0);
+					await page.getByRole('button', { name: 'Show more', exact: true }).click();
+					await expect(
+						groupOf(older).getByRole('button', { name: /edit Transaction on/ })
+					).toBeFocused();
+				}
+			);
+
+			await step(
+				`Undo puts focus on the first restored row as shown, ${older} before the newer ${newer}, after a Category change and after an approval`,
+				async () => {
+					const undo = page.getByRole('button', { name: 'Undo', exact: true });
+					const pickBoth = async () => {
+						await rowBoxes(newer).first().check();
+						await rowBoxes(older).check();
+						await expect(selectedCount).toHaveText('2 selected');
+					};
+					await pickBoth();
+					await choose(bulk, 'Gifts');
+					await expect(page.getByText('2 Transactions now Gifts.')).toBeVisible();
+					await undo.click();
+					await expect(
+						groupOf(older).getByRole('button', { name: /, Category of / })
+					).toBeFocused();
+					await pickBoth();
+					await page.getByRole('button', { name: 'Approve 2 selected', exact: true }).click();
+					await expect(page.getByText('Approved 2 Transactions.')).toBeVisible();
+					await undo.click();
+					await expect(
+						page.getByRole('button', { name: new RegExp(`^Approve ${older}, `) })
+					).toBeFocused();
+				}
+			);
 		}
 	},
 	'approve-phone': {
