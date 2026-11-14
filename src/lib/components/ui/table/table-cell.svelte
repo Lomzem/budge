@@ -11,6 +11,7 @@
 		align,
 		width,
 		showFrom,
+		hideFrom,
 		numeric,
 		...restProps
 	}: WithElementRef<Omit<HTMLTdAttributes, 'align'>> & TableColumnVariants = $props();
@@ -21,7 +22,7 @@
 	data-slot="table-cell"
 	class={cn(
 		'px-2 py-2 align-middle whitespace-nowrap sm:px-3',
-		tableColumnVariants({ align, width, showFrom, numeric }),
+		tableColumnVariants({ align, width, showFrom, hideFrom, numeric }),
 		className
 	)}
 	{...restProps}

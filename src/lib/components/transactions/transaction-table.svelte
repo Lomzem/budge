@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CheckCheckIcon from '@lucide/svelte/icons/check-check';
+	import ListTreeIcon from '@lucide/svelte/icons/list-tree';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UploadIcon from '@lucide/svelte/icons/upload';
@@ -38,6 +39,7 @@
 
 	import { categoryChoices, labelOf, rememberCopy, transferChoices } from './categoryChoices';
 	import ImportDialog from './import-dialog.svelte';
+	import { groupByPayee, type PayeeGroup } from './payeeGroups';
 	import {
 		counted,
 		keepsItsCategory,
@@ -90,16 +92,26 @@
 	}
 
 	const SEARCH_PAUSE_MS = 300;
+	const GROUP_PARAM = 'group';
+	const BY_PAYEE = 'payee';
+	const groupedIn = (url: URL) => url.searchParams.get(GROUP_PARAM) === BY_PAYEE;
+	function urlGrouped(url: URL, grouped: boolean) {
+		if (grouped) url.searchParams.set(GROUP_PARAM, BY_PAYEE);
+		else url.searchParams.delete(GROUP_PARAM);
+		return url;
+	}
 	let filterValues = $state(filtersFromUrl(page.url));
+	let byPayee = $state(groupedIn(page.url));
 	let arrivedAt = page.url;
 	$effect(() => {
 		const url = page.url;
 		if (url === arrivedAt) return;
 		arrivedAt = url;
 		filterValues = filtersFromUrl(url);
+		byPayee = groupedIn(url);
 	});
 	$effect(() => {
-		const kept = urlWithFilters(new URL(location.href), filterValues);
+		const kept = urlGrouped(urlWithFilters(new URL(location.href), filterValues), byPayee);
 		if (kept.href === location.href) return;
 		const samePage = `${kept.pathname}${kept.search}${kept.hash}` as ResolvedPathname;
 		replaceState(samePage, page.state);
@@ -296,14 +308,25 @@
 	let undoButton: HTMLButtonElement | null = $state(null);
 	const linkButton =
 		'relative -my-0.5 min-h-6 shrink-0 rounded-sm px-1 font-medium text-foreground underline underline-offset-4 after:absolute after:-inset-x-2 after:-inset-y-2.5 hover:no-underline';
-	const groups = $derived.by(() => {
+	const sections = $derived.by(() => {
 		const waiting = rows.filter((row) => !row.approved);
-		if (filtering || waiting.length === 0) return [{ label: '', rows }];
-		return [
-			{ label: 'Unapproved', rows: waiting },
-			{ label: 'Approved', rows: rows.filter((row) => row.approved) }
-		];
+		const split =
+			filtering || waiting.length === 0
+				? [{ label: '', rows }]
+				: [
+						{ label: 'Unapproved', rows: waiting },
+						{ label: 'Approved', rows: rows.filter((row) => row.approved) }
+					];
+		return split.map((section) => ({
+			...section,
+			payees: byPayee ? groupByPayee(section.rows) : []
+		}));
 	});
+	const listed = $derived(
+		sections.flatMap((section) =>
+			byPayee ? section.payees.flatMap((group) => group.rows) : section.rows
+		)
+	);
 	const loading = $derived(
 		offered === undefined || first.isLoading || (secondShown && second.isLoading)
 	);
@@ -360,11 +383,11 @@
 
 	function returnFocus() {
 		if (editingSnapshot === undefined) return addButton ?? undefined;
-		const remaining = rows.filter((row) => row._id !== deletedId);
+		const remaining = listed.filter((row) => row._id !== deletedId);
 		const candidates =
 			deletedId === editingSnapshot._id
 				? [remaining[editingAt], remaining[editingAt - 1]]
-				: [editingSnapshot, rows[editingAt], rows[editingAt - 1]];
+				: [editingSnapshot, listed[editingAt], listed[editingAt - 1]];
 		for (const candidate of candidates) {
 			const button = editButtonOf(candidate);
 			if (button !== undefined) return button;
@@ -389,7 +412,7 @@
 		preset = option;
 		deletedId = null;
 		editingSnapshot = row;
-		editingAt = rows.findIndex((other) => other._id === row._id);
+		editingAt = listed.findIndex((other) => other._id === row._id);
 		dialogOpen = true;
 	}
 
@@ -447,7 +470,7 @@
 		const pick = (latestPick.get(row._id) ?? 0) + 1;
 		latestPick.set(row._id, pick);
 		picked.set(row._id, option);
-		const at = rows.findIndex((other) => other._id === row._id);
+		const at = listed.findIndex((other) => other._id === row._id);
 		const handOff = await linksAnImport(row, option);
 		if (latestPick.get(row._id) !== pick) return;
 		if (handOff) {
@@ -471,7 +494,7 @@
 	}
 
 	function focusAfterCategorize(row: Row, at: number) {
-		const target = [row, rows[at], rows[at - 1]]
+		const target = [row, listed[at], listed[at - 1]]
 			.map((candidate) => categoryPickerOf(candidate) ?? editButtonOf(candidate))
 			.find((element) => element !== undefined);
 		(target ?? addButton)?.focus();
@@ -487,8 +510,8 @@
 		rowError = '';
 		undoable = null;
 		const approvedIn = scopeKey;
-		const at = rows.findIndex((other) => other._id === row._id);
-		const waiting = [...rows.slice(at + 1), ...rows.slice(0, at).reverse()].filter(
+		const at = listed.findIndex((other) => other._id === row._id);
+		const waiting = [...listed.slice(at + 1), ...listed.slice(0, at).reverse()].filter(
 			(other) => !other.approved
 		);
 		const approved = await attempt(() => approve({ transactionId: row._id }));
@@ -522,7 +545,7 @@
 		rowError = '';
 		retireUndoOf(row._id);
 		resolving = true;
-		const at = rows.findIndex((other) => other._id === row._id);
+		const at = listed.findIndex((other) => other._id === row._id);
 		const resolved = await attempt(() => resolveBankChange({ importId, keep }));
 		resolving = false;
 		if (!resolved.ok) {
@@ -535,7 +558,7 @@
 	}
 
 	function focusAfterResolve(row: Row, at: number) {
-		const candidates = [rows[at], rows[at - 1]].filter((candidate) => candidate !== undefined);
+		const candidates = [listed[at], listed[at - 1]].filter((candidate) => candidate !== undefined);
 		const same = candidates.find((candidate) => candidate._id === row._id);
 		if (same) return editButtonOf(same);
 		for (const candidate of candidates) {
@@ -697,9 +720,11 @@
 				aria-label="Select {payee}, {formatDate(row.date)}"
 			/>
 		</Table.Cell>
-		<Table.Cell numeric showFrom="2xl">
-			<time datetime={row.date} class="block truncate">{formatDate(row.date)}</time>
-		</Table.Cell>
+		{#if !byPayee}
+			<Table.Cell numeric showFrom="2xl">
+				<time datetime={row.date} class="block truncate">{formatDate(row.date)}</time>
+			</Table.Cell>
+		{/if}
 		{#if allAccounts}
 			<Table.Cell showFrom="5xl">
 				<span class="block truncate">{row.accountName}</span>
@@ -716,22 +741,28 @@
 					edit(row);
 				}}
 			>
-				<span
-					class={[
-						'break-words whitespace-normal @4xl:line-clamp-1',
-						row.payeeName === null && !row.transfer && 'text-muted-foreground'
-					]}
-				>
-					{payee}
-				</span>
+				{#if byPayee}
+					<time datetime={row.date} class="tabular-nums">{formatDate(row.date)}</time>
+				{:else}
+					<span
+						class={[
+							'break-words whitespace-normal @4xl:line-clamp-1',
+							row.payeeName === null && !row.transfer && 'text-muted-foreground'
+						]}
+					>
+						{payee}
+					</span>
+				{/if}
 			</button>
 			{#if flag}
 				<span class="block text-xs font-normal break-words text-warning">{flag}</span>
 			{/if}
 			<span class="flex min-w-0 flex-wrap gap-x-2 text-xs font-normal text-muted-foreground">
-				<time datetime={row.date} class="shrink-0 tabular-nums @2xl:hidden">
-					{formatDate(row.date, 'short')}
-				</time>
+				{#if !byPayee}
+					<time datetime={row.date} class="shrink-0 tabular-nums @2xl:hidden">
+						{formatDate(row.date, 'short')}
+					</time>
+				{/if}
 				{@render rowCategory(row, payee, ['@4xl:hidden', categoryClass])}
 			</span>
 			{#if allAccounts}
@@ -835,6 +866,63 @@
 			{/if}
 		</Table.Cell>
 	</Table.Row>
+{/snippet}
+
+{#snippet sectionHeading(label: string)}
+	<Table.Row>
+		<Table.Cell></Table.Cell>
+		{#if !byPayee}
+			<Table.Cell showFrom="2xl"></Table.Cell>
+		{/if}
+		{#if allAccounts}
+			<Table.Cell showFrom="5xl"></Table.Cell>
+		{/if}
+		<Table.Head scope="rowgroup">{label}</Table.Head>
+		<Table.Cell showFrom="4xl"></Table.Cell>
+		<Table.Cell showFrom={memoFrom}></Table.Cell>
+		<Table.Cell></Table.Cell>
+		<Table.Cell showFrom="lg"></Table.Cell>
+		<Table.Cell showFrom="2xl"></Table.Cell>
+	</Table.Row>
+{/snippet}
+
+{#snippet payeeHeading(group: PayeeGroup<Row>, section: string)}
+	{@const ids = group.rows.map((row) => row._id)}
+	{@const chosen = ids.filter((id) => selection.has(id)).length}
+	{@const shown = `${String(ids.length)} ${section === '' ? '' : `${section} `}shown`}
+	<Table.Row>
+		<Table.Cell width="select">
+			<Checkbox
+				bind:checked={
+					() => chosen === ids.length,
+					(checked: boolean) => {
+						selection.set(ids, checked);
+					}
+				}
+				indeterminate={chosen > 0 && chosen < ids.length}
+				aria-label="Select the {shown} from {group.label}"
+			/>
+		</Table.Cell>
+		{#if allAccounts}
+			<Table.Cell showFrom="5xl"></Table.Cell>
+		{/if}
+		<Table.Head scope="rowgroup" variant="group" colspan={2} hideFrom="lg">
+			{@render payeeLabel(group)}
+		</Table.Head>
+		<Table.Head scope="rowgroup" variant="group" showFrom="lg">
+			{@render payeeLabel(group)}
+		</Table.Head>
+		<Table.Cell showFrom="4xl"></Table.Cell>
+		<Table.Cell showFrom={memoFrom}></Table.Cell>
+		<Table.Cell showFrom="lg"></Table.Cell>
+		<Table.Cell showFrom="lg"></Table.Cell>
+		<Table.Cell showFrom="2xl"></Table.Cell>
+	</Table.Row>
+{/snippet}
+
+{#snippet payeeLabel(group: PayeeGroup<Row>)}
+	<span class="font-semibold break-words text-foreground">{group.label}</span>
+	<span class="ms-2 inline-block font-normal whitespace-nowrap">{group.rows.length} shown</span>
 {/snippet}
 
 {#snippet rowCategory(row: Row, payee: string, className: ClassValue | undefined)}
@@ -947,6 +1035,14 @@
 					</div>
 				{/if}
 				<Button
+					variant={byPayee ? 'secondary' : 'outline'}
+					aria-pressed={byPayee}
+					onclick={() => (byPayee = !byPayee)}
+				>
+					<ListTreeIcon aria-hidden="true" />
+					<span class="max-sm:sr-only">Group by Payee</span>
+				</Button>
+				<Button
 					bind:ref={approveAllButton}
 					variant="outline"
 					aria-disabled={approveAllBlocked}
@@ -977,11 +1073,13 @@
 			<Table.Header labels="lg">
 				<Table.Row>
 					<Table.Head width="select"><span class="sr-only">Select</span></Table.Head>
-					<Table.Head width="date" showFrom="2xl">Date</Table.Head>
+					{#if !byPayee}
+						<Table.Head width="date" showFrom="2xl">Date</Table.Head>
+					{/if}
 					{#if allAccounts}
 						<Table.Head width="name" showFrom="5xl">Account</Table.Head>
 					{/if}
-					<Table.Head>Payee</Table.Head>
+					<Table.Head>{byPayee ? 'Date' : 'Payee'}</Table.Head>
 					<Table.Head width="name" showFrom="4xl">Category</Table.Head>
 					<Table.Head width="note" showFrom={memoFrom}>Memo</Table.Head>
 					<Table.Head width="amount" align="end">Amount</Table.Head>
@@ -991,27 +1089,29 @@
 					>
 				</Table.Row>
 			</Table.Header>
-			{#each groups as group (group.label)}
-				<Table.Body>
-					{#if group.label !== ''}
-						<Table.Row>
-							<Table.Cell></Table.Cell>
-							<Table.Cell showFrom="2xl"></Table.Cell>
-							{#if allAccounts}
-								<Table.Cell showFrom="5xl"></Table.Cell>
-							{/if}
-							<Table.Head scope="rowgroup">{group.label}</Table.Head>
-							<Table.Cell showFrom="4xl"></Table.Cell>
-							<Table.Cell showFrom={memoFrom}></Table.Cell>
-							<Table.Cell></Table.Cell>
-							<Table.Cell showFrom="lg"></Table.Cell>
-							<Table.Cell showFrom="2xl"></Table.Cell>
-						</Table.Row>
+			{#each sections as section (section.label)}
+				{#if byPayee}
+					{#if section.label !== ''}
+						<Table.Body>{@render sectionHeading(section.label)}</Table.Body>
 					{/if}
-					{#each group.rows as row (row._id)}
-						{@render transactionRow(row)}
+					{#each section.payees as group (group.key)}
+						<Table.Body>
+							{@render payeeHeading(group, section.label)}
+							{#each group.rows as row (row._id)}
+								{@render transactionRow(row)}
+							{/each}
+						</Table.Body>
 					{/each}
-				</Table.Body>
+				{:else}
+					<Table.Body>
+						{#if section.label !== ''}
+							{@render sectionHeading(section.label)}
+						{/if}
+						{#each section.rows as row (row._id)}
+							{@render transactionRow(row)}
+						{/each}
+					</Table.Body>
+				{/if}
 			{/each}
 		</Table.Root>
 	</div>

@@ -27,12 +27,14 @@ export const tableColumnVariants = tv({
 			'screen-xs': 'hidden xs:table-cell',
 			'screen-sm': 'hidden sm:table-cell'
 		},
+		hideFrom: { never: '', lg: '@lg:hidden' },
 		numeric: { true: 'tabular-nums', false: '' }
 	},
 	defaultVariants: {
 		align: 'start',
 		width: 'auto',
 		showFrom: 'always',
+		hideFrom: 'never',
 		numeric: false
 	}
 });

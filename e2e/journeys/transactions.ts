@@ -1,10 +1,12 @@
 import { expect, type Locator } from '@playwright/test';
 
+import { addDays, formatDate, localToday } from '../../src/lib/domain/dates';
 import { holdResponseTo, withholdQueryResult } from '../heldResponse';
 import {
 	centsIn,
 	choicesOf,
 	choose,
+	chooseBankFile,
 	expectClearOf,
 	expectNothingPastTheRightEdge,
 	openAccount,
@@ -617,6 +619,188 @@ export const transactions = {
 					await expectNothingPastTheRightEdge(page);
 				}
 			);
+		}
+	},
+	'payee-groups': {
+		title:
+			'grouped by Payee, a mixed-purpose Payee’s shown rows are picked at once, some are left out, and the same selection gives each part its own Category',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			await page.setViewportSize({ width: 1280, height: 800 });
+			const warehouse = 'SAMPLE WAREHOUSE 7701';
+			const lookalike = 'SAMPLE WAREHOUSE 7702';
+			const today = localToday();
+			const visits = [
+				{ date: today, amount: '61.20' },
+				{ date: addDays(today, -1), amount: '18.45' },
+				{ date: addDays(today, -2), amount: '92.10' },
+				{ date: addDays(today, -3), amount: '24.99' }
+			];
+			const csvDate = (date: string) => {
+				const [year, month, day] = date.split('-');
+				return `${month ?? ''}/${day ?? ''}/${year ?? ''}`;
+			};
+			const csv = [
+				'Account Number,Transaction Description,Transaction Date,Transaction Type,Transaction Amount,Balance',
+				...visits.map(
+					({ date, amount }) => `0000,${warehouse},${csvDate(date)},Debit,${amount},100.00`
+				),
+				`0000,${lookalike},${csvDate(addDays(today, -1))},Debit,7.77,100.00`
+			].join('\n');
+
+			const grouping = page.getByRole('button', { name: 'Group by Payee' });
+			const groupBox = (payee: string, count: number) =>
+				page.getByRole('checkbox', {
+					name: `Select the ${String(count)} Unapproved shown from ${payee}`,
+					exact: true
+				});
+			const groupOf = (payee: string) =>
+				page.getByRole('rowgroup').filter({
+					has: page.getByRole('checkbox', {
+						name: new RegExp(`^Select the \\d+ Unapproved shown from ${payee}$`)
+					})
+				});
+			const rowBoxes = (payee: string) =>
+				groupOf(payee).getByRole('checkbox', { name: new RegExp(`^Select ${payee}, `) });
+			const categoryOf = (box: Locator) =>
+				box
+					.locator('xpath=ancestor::tr[1]')
+					.getByRole('button', { name: /, Category of / })
+					.getAttribute('aria-label')
+					.then((name) => (name ?? '').split(', Category of ')[0]);
+			const categoriesOf = (boxes: Locator) =>
+				boxes.all().then((all) => Promise.all(all.map(categoryOf)));
+			const bulk = page.getByRole('button', { name: /^Category for \d+ selected Transactions?$/ });
+			const selectedCount = page.getByText(/^\d+ selected$/);
+
+			await step(
+				`import four ${warehouse} rows and one ${lookalike} row into Savings`,
+				async () => {
+					await page.goto('/');
+					await openAccount(page, 'Savings');
+					await page.getByRole('button', { name: 'Import file' }).click();
+					const dialog = page.getByRole('dialog', { name: 'Import a bank file' });
+					await chooseBankFile(page, 'savings.csv', csv);
+					await expect(dialog.getByRole('status')).toHaveText(/^5 new Transactions, 0 Matches/);
+					await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
+					await expect(dialog).toBeHidden();
+				}
+			);
+
+			await step(
+				'Group by Payee heads each Payee once, keeps the lookalike Payee apart, and lists each visit by its date and amount',
+				async () => {
+					await grouping.click();
+					await expect(grouping).toHaveAttribute('aria-pressed', 'true');
+					await expect(page).toHaveURL(/[?&]group=payee/);
+					await expect(groupOf(warehouse).getByRole('rowheader')).toHaveText(
+						new RegExp(`^${warehouse}\\s*4 shown$`)
+					);
+					await expect(rowBoxes(warehouse)).toHaveCount(4);
+					await expect(rowBoxes(lookalike)).toHaveCount(1);
+					const visitRows = groupOf(warehouse).getByRole('button', { name: /edit Transaction on/ });
+					await expect(visitRows).toHaveText(visits.map(({ date }) => formatDate(date)));
+					for (const { amount } of visits)
+						await expect(
+							groupOf(warehouse).getByRole('cell', { name: `−$${amount}`, exact: true })
+						).toBeVisible();
+				}
+			);
+
+			const before = await categoriesOf(rowBoxes(warehouse));
+			await step(
+				'the Payee’s box picks its four shown rows; two left out leave it mixed, and a row of another Payee joins',
+				async () => {
+					await groupBox(warehouse, 4).check();
+					await expect(selectedCount).toHaveText('4 selected');
+					await expect(rowBoxes(lookalike)).not.toBeChecked();
+					await rowBoxes(warehouse).nth(1).uncheck();
+					await rowBoxes(warehouse).nth(3).uncheck();
+					await expect(groupBox(warehouse, 4)).toHaveAttribute('aria-checked', 'mixed');
+					await expect(selectedCount).toHaveText('2 selected');
+					await rowBoxes(lookalike).check();
+					await expect(selectedCount).toHaveText('3 selected');
+				}
+			);
+
+			await step(
+				'Groceries goes to those three only; the two left out keep their Category',
+				async () => {
+					await choose(bulk, 'Groceries');
+					await expect(page.getByText('3 Transactions now Groceries.')).toBeVisible();
+					await expect
+						.poll(() => categoriesOf(rowBoxes(warehouse)))
+						.toEqual(['Groceries', before[1], 'Groceries', before[3]]);
+					expect(await categoriesOf(rowBoxes(lookalike))).toEqual(['Groceries']);
+				}
+			);
+
+			await step(
+				'the Payee’s box again, less the Groceries rows, gives the other two Gifts and approves them',
+				async () => {
+					await groupBox(warehouse, 4).check();
+					await rowBoxes(warehouse).nth(0).uncheck();
+					await rowBoxes(warehouse).nth(2).uncheck();
+					await expect(selectedCount).toHaveText('2 selected');
+					await bulk.click();
+					await page.getByRole('checkbox', { name: 'Approve them too', exact: true }).check();
+					await page.getByRole('option', { name: 'Gifts', exact: true }).click();
+					await expect(page.getByText('2 Transactions now Gifts and approved.')).toBeVisible();
+					await expect(groupBox(warehouse, 2)).toBeVisible();
+					await expect(
+						groupOf(warehouse).getByRole('button', { name: /edit Transaction on/ })
+					).toHaveText([visits[0], visits[2]].map((visit) => formatDate(visit?.date ?? '')));
+				}
+			);
+
+			await step(
+				'grouping survives a reload and keeps a selection when turned off, and every row keeps its own Payee',
+				async () => {
+					await page.reload();
+					await expect(grouping).toHaveAttribute('aria-pressed', 'true');
+					await rowBoxes(lookalike).check();
+					await grouping.click();
+					await expect(grouping).toHaveAttribute('aria-pressed', 'false');
+					await expect(page).not.toHaveURL(/[?&]group=/);
+					await expect(
+						page.getByRole('rowheader', { name: new RegExp(`^${warehouse}`) })
+					).toHaveCount(0);
+					await expect(selectedCount).toHaveText('1 selected');
+					await expect(
+						page.getByRole('checkbox', { name: new RegExp(`^Select ${lookalike}, `) })
+					).toBeChecked();
+					await expect(
+						page.getByRole('button', { name: new RegExp(`^${warehouse}, Unapproved, edit`) })
+					).toHaveCount(2);
+					await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+				}
+			);
+
+			for (const width of [320, 390]) {
+				await step(
+					`at ${String(width)} px a group heads its rows with the whole Payee name, and nothing reaches past the right edge`,
+					async () => {
+						await page.setViewportSize({ width, height: 740 });
+						if ((await grouping.getAttribute('aria-pressed')) !== 'true') await grouping.click();
+						const heading = groupOf(warehouse).getByRole('rowheader');
+						await heading.scrollIntoViewIfNeeded();
+						await expect(heading).toHaveText(new RegExp(`^${warehouse}\\s*2 shown$`));
+						const lines = await heading
+							.getByText(warehouse, { exact: true })
+							.evaluate((name) => name.getClientRects().length);
+						expect(lines).toBe(1);
+						await groupBox(warehouse, 2).check();
+						await expect(selectedCount).toHaveText('2 selected');
+						await expectClearOf(
+							groupBox(warehouse, 2),
+							page.getByRole('navigation', { name: 'Sections', exact: true }),
+							page.locator('[data-selection-bar]')
+						);
+						await expectNothingPastTheRightEdge(page);
+						await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+					}
+				);
+			}
 		}
 	},
 	'approve-phone': {

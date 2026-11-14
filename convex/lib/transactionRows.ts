@@ -18,6 +18,7 @@ export async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		accountName: account?.name ?? '',
 		date: transaction.date,
 		amount: transaction.amount,
+		payeeId: transaction.payeeId ?? null,
 		payeeName: await payeeNameOf(ctx, transaction, () => Promise.resolve(payee)),
 		rememberedCategoryId:
 			payee === null || transaction.kind === 'startingBalance'

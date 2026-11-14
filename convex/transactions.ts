@@ -36,6 +36,7 @@ const transactionRow = v.object({
 	accountName: v.string(),
 	date: v.string(),
 	amount: v.number(),
+	payeeId: v.union(v.id('payees'), v.null()),
 	payeeName: v.union(v.string(), v.null()),
 	rememberedCategoryId: v.union(v.id('categories'), v.null()),
 	startingBalance: v.boolean(),
