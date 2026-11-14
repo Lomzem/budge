@@ -182,7 +182,12 @@ async function bankAccountsOf(
 }
 
 const ownerSyncResult = v.union(
-	v.object({ kind: v.literal('synced'), added: v.number(), matched: v.number() }),
+	v.object({
+		kind: v.literal('synced'),
+		added: v.number(),
+		matched: v.number(),
+		held: v.number()
+	}),
 	v.object({ kind: v.literal('busy') }),
 	v.object({ kind: v.literal('noToken') })
 );
@@ -484,7 +489,7 @@ async function ownerSync(
 	if (outcome.kind === 'missing') throw publicError('NOT_FOUND');
 	if (outcome.kind === 'paused') throw publicError(needsLogin.code, needsLogin.message);
 	if (outcome.kind !== 'synced') return outcome;
-	return { kind: 'synced', added: outcome.added, matched: outcome.matched };
+	return { kind: 'synced', added: outcome.added, matched: outcome.matched, held: outcome.held };
 }
 
 export const service = query({
