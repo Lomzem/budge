@@ -1,6 +1,7 @@
 import type { FunctionReturnType } from 'convex/server';
 import { assert, describe, expect, test } from 'vitest';
 
+import { BULK_CATEGORIZE_LIMIT } from '../src/lib/domain/bulkCategorize';
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { publicErrorCode, startBudget, useOwnerEnv } from './test.helper';
@@ -250,6 +251,178 @@ describe('categorizing a Transaction in place', () => {
 				'INVALID_INPUT'
 			);
 		}
+	});
+});
+
+describe('categorizing several Transactions at once', () => {
+	async function unapprovedRows(rows: { payee: string; category?: 'Groceries' | 'Dining' }[]) {
+		const budget = await budgetWithTwoAccounts();
+		const { owner, checking, categories } = budget;
+		const ids: Id<'transactions'>[] = [];
+		for (const [i, { payee, category }] of rows.entries()) {
+			ids.push(
+				await owner.mutation(api.transactions.create, {
+					accountId: checking,
+					...groceries,
+					date: `2026-08-${String(10 + i)}`,
+					payee,
+					...(category === undefined ? {} : { categoryId: categories[category] })
+				})
+			);
+		}
+		await owner.mutation(api.transactions.unapprove, { transactionIds: ids });
+		const rowOf = async (id: Id<'transactions'>) => {
+			const row = (await budget.page(checking)).find((each) => each._id === id);
+			assert(row !== undefined, 'the row is listed');
+			return row;
+		};
+		const state = async (id: Id<'transactions'>) => {
+			const { categoryId, approved, rememberedCategoryId } = await rowOf(id);
+			return { categoryId, approved, rememberedCategoryId };
+		};
+		return { ...budget, ids, rowOf, state };
+	}
+
+	test('gives exactly the chosen Transactions the Category, approves them only when asked, and leaves remembered Categories alone', async () => {
+		const { owner, categories, ids, state } = await unapprovedRows([
+			{ payee: 'Sample Noodle Bar', category: 'Dining' },
+			{ payee: 'Sample Noodle Bar' },
+			{ payee: 'Sample Corner Shop' },
+			{ payee: 'Sample Noodle Bar' }
+		]);
+		const [first, second, third, fourth] = ids;
+		assert(first && second && third && fourth, 'four rows');
+		await owner.mutation(api.transactions.categorize, {
+			transactionId: first,
+			choice: { kind: 'category', categoryId: categories.Dining, remember: true }
+		});
+
+		await owner.mutation(api.transactions.categorizeMany, {
+			transactionIds: [first, third],
+			categoryId: categories.Groceries,
+			approve: false
+		});
+
+		const noodles = { rememberedCategoryId: categories.Dining };
+		const corner = { rememberedCategoryId: null };
+		expect(await state(first)).toEqual({
+			categoryId: categories.Groceries,
+			approved: false,
+			...noodles
+		});
+		expect(await state(second)).toEqual({ categoryId: null, approved: false, ...noodles });
+		expect(await state(third)).toEqual({
+			categoryId: categories.Groceries,
+			approved: false,
+			...corner
+		});
+		expect(await state(fourth)).toEqual({ categoryId: null, approved: false, ...noodles });
+
+		await owner.mutation(api.transactions.categorizeMany, {
+			transactionIds: [second, fourth],
+			categoryId: null,
+			approve: true
+		});
+
+		expect(await state(second)).toEqual({ categoryId: null, approved: true, ...noodles });
+		expect(await state(fourth)).toEqual({ categoryId: null, approved: true, ...noodles });
+		expect(await state(first)).toMatchObject({ approved: false });
+	});
+
+	test('Undo puts back each Category and approval it changed, but keeps what changed since', async () => {
+		const { owner, card, categories, ids, state, balanceOf } = await unapprovedRows([
+			{ payee: 'Sample Noodle Bar', category: 'Dining' },
+			{ payee: 'Sample Bakery', category: 'Groceries' },
+			{ payee: 'Sample Pharmacy', category: 'Groceries' },
+			{ payee: 'Sample Corner Shop' }
+		]);
+		const [plain, recategorized, transferred, alreadyApproved] = ids;
+		assert(plain && recategorized && transferred && alreadyApproved, 'four rows');
+		await owner.mutation(api.transactions.categorize, {
+			transactionId: plain,
+			choice: { kind: 'category', categoryId: categories.Groceries, remember: true }
+		});
+		await owner.mutation(api.transactions.categorize, {
+			transactionId: plain,
+			choice: { kind: 'category', categoryId: categories.Dining }
+		});
+		await owner.mutation(api.transactions.approve, { transactionId: alreadyApproved });
+
+		const applied = await owner.mutation(api.transactions.categorizeMany, {
+			transactionIds: ids,
+			categoryId: null,
+			approve: true
+		});
+		await owner.mutation(api.transactions.categorize, {
+			transactionId: recategorized,
+			choice: { kind: 'category', categoryId: categories.Dining }
+		});
+		await owner.mutation(api.transactions.categorize, {
+			transactionId: transferred,
+			choice: { kind: 'transfer', accountId: card }
+		});
+
+		expect(await owner.mutation(api.transactions.undoCategorizeMany, applied)).toBe(3);
+
+		expect(await state(plain)).toEqual({
+			categoryId: categories.Dining,
+			approved: false,
+			rememberedCategoryId: categories.Groceries
+		});
+		expect(await state(recategorized)).toMatchObject({
+			categoryId: categories.Dining,
+			approved: false
+		});
+		expect(await state(transferred)).toMatchObject({ categoryId: null, approved: false });
+		expect(await balanceOf(card)).toBe(4_250);
+		expect(await state(alreadyApproved)).toMatchObject({ categoryId: null, approved: true });
+	});
+
+	test('refuses a split, a Transfer, a missing Transaction or too many at once, and changes none of the rest', async () => {
+		const { owner, checking, card, categories, ids, state } = await unapprovedRows([
+			{ payee: 'Sample Corner Shop' }
+		]);
+		const [plain] = ids;
+		assert(plain, 'one row');
+		const split = await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			...groceries,
+			splits: [
+				{ categoryId: categories.Groceries, amount: -3_000, memo: '' },
+				{ categoryId: categories.Dining, amount: -1_250, memo: '' }
+			]
+		});
+		const transfer = await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			...groceries,
+			payee: '',
+			transferAccountId: card
+		});
+		const removed = await owner.mutation(api.transactions.create, {
+			accountId: checking,
+			...groceries
+		});
+		await owner.mutation(api.transactions.remove, { transactionId: removed });
+		const categorizeWith = (other: Id<'transactions'>) =>
+			owner.mutation(api.transactions.categorizeMany, {
+				transactionIds: [plain, other],
+				categoryId: categories.Dining,
+				approve: true
+			});
+
+		expect(await publicErrorCode(categorizeWith(split))).toBe('INVALID_INPUT');
+		expect(await publicErrorCode(categorizeWith(transfer))).toBe('INVALID_INPUT');
+		expect(await publicErrorCode(categorizeWith(removed))).toBe('NOT_FOUND');
+		expect(
+			await publicErrorCode(
+				owner.mutation(api.transactions.categorizeMany, {
+					transactionIds: Array.from({ length: BULK_CATEGORIZE_LIMIT + 1 }, () => plain),
+					categoryId: categories.Dining,
+					approve: true
+				})
+			)
+		).toBe('INVALID_INPUT');
+		expect(await state(plain)).toMatchObject({ categoryId: null, approved: false });
 	});
 });
 

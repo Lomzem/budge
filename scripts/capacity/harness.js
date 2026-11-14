@@ -338,3 +338,102 @@ export const cutoverState = query({
 		totals: (await ctx.db.query('monthlyTotals').collect()).length
 	})
 });
+
+const bulkWide = (label, i) =>
+	`Invented Bulk ${label} ${String(i).padStart(6, '0')} `.padEnd(500, 'x');
+
+export const bulkBase = mutation({
+	args: { categoryId: v.id('categories') },
+	handler: async (ctx, { categoryId }) => {
+		const category = await ctx.db.get('categories', categoryId);
+		return await ctx.db.insert('categories', {
+			groupId: category.groupId,
+			name: 'Invented Bulk',
+			kind: 'normal',
+			position: 1
+		});
+	}
+});
+
+export const bulkRows = mutation({
+	args: {
+		accountId: v.id('accounts'),
+		categoryId: v.id('categories'),
+		start: v.number(),
+		count: v.number()
+	},
+	handler: async (ctx, { accountId, categoryId, start, count }) => {
+		for (let i = start; i < start + count; i++) {
+			const date = diverseBulkDate(i);
+			const bankText = bulkWide('Payee', i);
+			const payeeId = await ctx.db.insert('payees', { name: bankText, lastCategoryId: categoryId });
+			await ctx.db.insert('payeeRenames', { bankText, payeeId });
+			const transactionId = await ctx.db.insert('transactions', {
+				accountId,
+				categoryId,
+				date,
+				amount: -100,
+				payeeId,
+				memo: bulkWide('Memo', i),
+				cleared: 'uncleared',
+				approved: false
+			});
+			await ctx.db.insert('imports', {
+				source: 'qfx',
+				sourceId: `invented-bulk-${i}`,
+				accountId,
+				date,
+				amount: -100,
+				bankText,
+				transactionId,
+				matched: true,
+				state: 'linked'
+			});
+		}
+		return count;
+	}
+});
+
+function diverseBulkDate(i) {
+	return `${2020 + Math.floor((i % 60) / 12)}-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`;
+}
+
+export const bulkIds = query({
+	args: {},
+	handler: async (ctx) => (await ctx.db.query('transactions').collect()).map((row) => row._id)
+});
+
+export const bulkCategorize = mutation({
+	args: { transactionIds: v.array(v.id('transactions')), categoryId: v.id('categories') },
+	handler: async (ctx, { transactionIds, categoryId }) => {
+		const result = await ctx.runMutation(api.transactions.categorizeMany, {
+			transactionIds,
+			categoryId,
+			approve: true
+		});
+		return { result, metrics: await ctx.meta.getTransactionMetrics() };
+	}
+});
+
+export const bulkUndo = mutation({
+	args: { record: v.any() },
+	handler: async (ctx, { record }) => {
+		const result = await ctx.runMutation(api.transactions.undoCategorizeMany, record);
+		return { result, metrics: await ctx.meta.getTransactionMetrics() };
+	}
+});
+
+export const bulkState = query({
+	args: { categoryId: v.id('categories') },
+	handler: async (ctx, { categoryId }) => {
+		const rows = await ctx.db.query('transactions').collect();
+		const totals = await ctx.db.query('monthlyTotals').collect();
+		return {
+			inCategory: rows.filter((row) => row.categoryId === categoryId).length,
+			unapproved: rows.filter((row) => row.approved === false).length,
+			totalsInCategory: totals
+				.filter((row) => row.bucket === categoryId)
+				.reduce((sum, row) => sum + row.count, 0)
+		};
+	}
+});

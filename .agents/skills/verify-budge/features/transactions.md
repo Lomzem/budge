@@ -49,4 +49,4 @@ Preconditions:
 
 - Amounts follow the selected Direction; changing a field without Save is not persistence.
 - Reconciled rows restrict edits until Unlock. A seeded list may not exceed a page: report pagination blocked if Show more cannot be reached with current data.
-- Sources: ticket 03, 05, 14, 16; public `transactions.list/create/update/categorize/remove/setCleared/approve/approveAll/approveMany/unapprove/unapprovedCount/bankChangeCount`.
+- Sources: ticket 03, 05, 07, 14, 16; public `transactions.list/create/update/categorize/categorizeMany/undoCategorizeMany/remove/setCleared/approve/approveAll/approveMany/unapprove/unapprovedCount/bankChangeCount`.

@@ -119,3 +119,22 @@ apply's largest use was 2,641 of 4,096 index ranges (64%) and 15,775 of 32,000
 documents read (49%), and the undo's was 2,335 index ranges (57%); every delete
 and patch counts as an index range. At 500
 Transactions the apply exceeded 4,096 index ranges, which set the lower bounds.
+
+## Bulk categorize contract
+
+Categorizing selected Transactions (and approving them too) runs in one atomic
+mutation, and so does its undo, so both refuse more than `BULK_CATEGORIZE_LIMIT`
+(`src/lib/domain/bulkCategorize.ts`) Transactions. `bun run capacity bulk COUNT`
+seeds COUNT Unapproved Transactions across 60 months, each with a distinct
+500-character Payee, Payee alias, 500-character memo and linked bank row, then
+categorizes and approves all of them and undoes it, three times. It checks the
+moved Category, the approvals and the monthly totals after each step against the
+seed. `capacity:check` runs `BULK_CATEGORIZE_LIMIT` once and exits 1 with
+`Bulk categorize capacity contract failed; reduce BULK_CATEGORIZE_LIMIT or reduce measured categorize/undo work.`
+when any call reaches a full limit.
+
+Measured 2026-11-13: each Transaction costs about 5 index ranges, 16 documents
+read and 5 written, and the undo reads about 1.3 times the bytes. At 250 the
+largest use was 1,456 of 4,096 index ranges (36%) and 3,880 of 32,000 documents
+read, in 0.46 seconds. At 500 the index ranges reached 66% and each call took
+0.9 to 1 second, which set the limit at 250.

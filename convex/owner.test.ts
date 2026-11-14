@@ -61,6 +61,11 @@ function sampleArgs(ids: {
 		'transactions:create': entry,
 		'transactions:update': { transactionId, ...entry },
 		'transactions:categorize': { transactionId, choice: { kind: 'uncategorized' } },
+		'transactions:categorizeMany': { transactionIds: [transactionId], categoryId, approve: false },
+		'transactions:undoCategorizeMany': {
+			categoryId,
+			changes: [{ transactionId, previousCategoryId: null, approvedNow: false }]
+		},
 		'transactions:remove': { transactionId },
 		'transactions:setCleared': { transactionId, cleared: true },
 		'transactions:unlock': { transactionId },

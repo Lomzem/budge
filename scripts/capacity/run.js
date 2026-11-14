@@ -21,6 +21,7 @@ import { capacityPassed, limits } from './limits.ts';
 import { loadavg, cpus, freemem } from 'node:os';
 import { MAX_FILE_ROWS } from '../../convex/lib/imports.ts';
 import { LATER_CUTOVER_READS } from '../../convex/lib/laterCutover.ts';
+import { BULK_CATEGORIZE_LIMIT } from '../../src/lib/domain/bulkCategorize.ts';
 
 const checkMode = process.argv[2] === '--check';
 const started = performance.now();
@@ -307,6 +308,65 @@ async function cutoverCapacity(runs) {
 	};
 }
 
+async function bulkTrial(count, run) {
+	await emptyEveryTable(checkout, deployment);
+	const { accountId, categoryId } = await call('initialize');
+	const bulkCategoryId = await call('bulkBase', { categoryId });
+	for (let start = 0; start < count; start += 100) {
+		await call('bulkRows', {
+			accountId,
+			categoryId,
+			start,
+			count: Math.min(100, count - start)
+		});
+		await new Promise((resolve) => setTimeout(resolve, 250));
+	}
+	await call('rebuild');
+	const transactionIds = await call('bulkIds', {}, true);
+	const seeded = await call('bulkState', { categoryId: bulkCategoryId }, true);
+	const expectedSeed = { inCategory: 0, unapproved: count, totalsInCategory: 0 };
+	if (transactionIds.length !== count || !sameCounts(seeded, expectedSeed))
+		throw new Error(`bulk seed differs: ${JSON.stringify(seeded)}`);
+	const scenario = 'bulk-categorize';
+	const categorize = await measured(
+		'bulkCategorize',
+		{ transactionIds, categoryId: bulkCategoryId },
+		scenario,
+		count,
+		run
+	);
+	if (categorize.error) return [categorize];
+	const changed = await call('bulkState', { categoryId: bulkCategoryId }, true);
+	save(`bulk-categorized-${count}-${run}.json`, changed);
+	if (
+		categorize.result.result.changes.length !== count ||
+		!sameCounts(changed, { inCategory: count, unapproved: 0, totalsInCategory: count })
+	)
+		throw new Error(`bulk categorize skipped work: ${JSON.stringify(changed)}`);
+	const undo = await measured(
+		'bulkUndo',
+		{ record: categorize.result.result },
+		scenario,
+		count,
+		run
+	);
+	const undone = await call('bulkState', { categoryId: bulkCategoryId }, true);
+	save(`bulk-undone-${count}-${run}.json`, undone);
+	if (!undo.error && (undo.result.result !== count || !sameCounts(undone, expectedSeed)))
+		throw new Error(`bulk undo did not restore the seed: ${JSON.stringify(undone)}`);
+	return [categorize, undo];
+}
+
+async function bulkCapacity(count, runs) {
+	const measuredRecords = [];
+	for (let run = 1; run <= runs; run++) measuredRecords.push(...(await bulkTrial(count, run)));
+	return {
+		passed: capacityPassed(measuredRecords),
+		belowHalf: measuredRecords.every(belowHalf),
+		transactions: count
+	};
+}
+
 async function trials(scenario, count, phase = 'workflow', evaluated = []) {
 	const judged = (row) =>
 		row.scenario === scenario &&
@@ -374,10 +434,18 @@ async function checkCapacity() {
 		);
 		process.exitCode = 1;
 	}
+	const bulk = await bulkCapacity(BULK_CATEGORIZE_LIMIT, 1);
+	if (!bulk.passed) {
+		console.error(
+			'Bulk categorize capacity contract failed; reduce BULK_CATEGORIZE_LIMIT or reduce measured categorize/undo work.'
+		);
+		process.exitCode = 1;
+	}
 	return {
-		passed: passed && cutover.passed,
+		passed: passed && cutover.passed && bulk.passed,
 		maxFileRows: MAX_FILE_ROWS,
 		cutover,
+		bulk,
 		seconds: (performance.now() - started) / 1000
 	};
 }
@@ -387,14 +455,15 @@ const count = Number(countText);
 if (
 	scenario !== undefined &&
 	scenario !== 'cutover' &&
-	(!['qfx', 'csv', 'history'].includes(scenario) ||
+	(!['qfx', 'csv', 'history', 'bulk'].includes(scenario) ||
 		!Number.isSafeInteger(count) ||
 		count < 1 ||
 		(scenario === 'history' && count % 60 !== 0) ||
-		(scenario !== 'history' && count > MAX_FILE_ROWS))
+		(['qfx', 'csv'].includes(scenario) && count > MAX_FILE_ROWS) ||
+		(scenario === 'bulk' && count > BULK_CATEGORIZE_LIMIT))
 )
 	throw new Error(
-		`usage: bun run capacity [qfx|csv|history COUNT | cutover]; imports admit at most ${MAX_FILE_ROWS} rows`
+		`usage: bun run capacity [qfx|csv|history|bulk COUNT | cutover]; imports admit at most ${MAX_FILE_ROWS} rows, bulk categorize at most ${BULK_CATEGORIZE_LIMIT}`
 	);
 save('manifest.json', {
 	limits,
@@ -409,6 +478,7 @@ try {
 	const summary = {};
 	if (checkMode) summary.check = await checkCapacity();
 	else if (scenario === 'cutover') summary.cutover = await cutoverCapacity(3);
+	else if (scenario === 'bulk') summary.bulk = await bulkCapacity(count, 3);
 	else if (scenario !== undefined) summary[scenario] = await trials(scenario, count);
 	else {
 		for (const source of ['qfx', 'csv'])
