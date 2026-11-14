@@ -1,0 +1,12 @@
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} vitest run "convex/ticket07review.test.ts"
+
+ RUN  v5.0.5 /home/lomzem/.t3/worktrees/budge/t3-9ff441fa-11bc78ea02656dec
+
+(node:294049) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  18:20:00
+   Duration  639ms (import 52%, transform 25%, tests 14%, environment 9%, worker 1%)
+

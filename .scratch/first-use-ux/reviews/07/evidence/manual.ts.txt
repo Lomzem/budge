@@ -1,0 +1,49 @@
+import {chromium,expect} from '@playwright/test';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {holdResponseTo} from '../../e2e/heldResponse';
+const {appUrl}=JSON.parse(readFileSync('.local-app/running.json','utf8'));
+const browser=await chromium.launch();
+let held;
+try {
+const context=await browser.newContext({baseURL:appUrl,storageState:'.local-app/storage-state.json',viewport:{width:1280,height:800},timezoneId:'America/Los_Angeles'});
+const page=await context.newPage();
+held=await holdResponseTo(page,'transactions:categorizeMany');
+await page.goto('/accounts');
+const book=page.getByRole('checkbox',{name:/^Select SAMPLE BOOKSHOP 0193,/});
+await book.focus(); await page.keyboard.press('Space'); await expect(book).toBeChecked();
+const bulk=page.getByRole('button',{name:/^Category for /});
+await bulk.focus(); await page.keyboard.press('Enter');
+await page.getByRole('combobox',{name:'Search Categories'}).fill('Dining');
+await expect(page.getByRole('option',{name:'Dining Out',exact:true})).toBeVisible();
+await page.keyboard.press('Enter');
+await page.screenshot({path:'test-results/ticket-07-review/keyboard-pick.png'});
+await Promise.race([held.held,new Promise((_,reject)=>setTimeout(()=>reject(new Error('bulk response not held')),15000))]);
+console.log('held response');
+await page.keyboard.press('Escape');
+await page.getByRole('button',{name:'Clear selection',exact:true}).click();
+const coffee=page.getByRole('checkbox',{name:/^Select Sample Coffee Shop,/}).first();
+await coffee.focus(); await page.keyboard.press('Space');
+await expect(coffee).toBeChecked();
+await page.screenshot({path:'test-results/ticket-07-review/late-before.png'});
+writeFileSync('test-results/ticket-07-review/late-before.aria.yml',await page.locator('body').ariaSnapshot());
+held.release();
+await expect(coffee).not.toBeChecked();
+await page.screenshot({path:'test-results/ticket-07-review/late-after.png'});
+writeFileSync('test-results/ticket-07-review/late-after.aria.yml',await page.locator('body').ariaSnapshot());
+console.log('VERIFIED: keyboard selection and picker; old bulk response clears newly checked Coffee after clearing the original selection');
+await page.reload(); await expect(coffee).toBeVisible();
+await page.getByRole('searchbox',{name:'Search',exact:true}).fill('');
+await expect(book).toBeVisible();
+await expect(book.locator('xpath=ancestor::tr[1]').getByRole('button',{name:/^Dining Out, Category of/})).toBeVisible();
+console.log('Original bookshop change persists after reload');
+const transfers=page.getByRole('checkbox',{name:/^Select Transfer,/});
+console.log('Transfer rows loaded',await transfers.count());
+if(await transfers.count()){
+ await transfers.first().check();
+ await expect(page.getByText('1 Transfer keeps its Category.',{exact:true})).toBeVisible();
+ await expect(bulk).toBeDisabled();
+ await page.screenshot({path:'test-results/ticket-07-review/transfer-excluded.png'});
+ writeFileSync('test-results/ticket-07-review/transfer-excluded.aria.yml',await page.locator('body').ariaSnapshot());
+ console.log('Transfer selection is explained and cannot be bulk categorized');
+}
+}finally{held?.release();await browser.close();}
