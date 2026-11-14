@@ -290,6 +290,10 @@ export const settings = {
 				await page.keyboard.press('Escape');
 				await expect(preview).toBeHidden();
 				await expect(region.getByLabel('Cutover date')).toBeFocused();
+				await region.getByRole('button', { name: 'Save' }).click();
+				await page.keyboard.press('Escape');
+				await expect(preview).toBeHidden();
+				await expect(region.getByLabel('Cutover date')).toBeFocused();
 				await page.keyboard.press('Escape');
 				await expectCutover(page, saved);
 				await page.reload();

@@ -57,10 +57,11 @@ function takesFocus(
 export function restoreFocus(
 	destinations: FocusReturn,
 	opened: HTMLElement | null,
-	closing: HTMLElement | null
+	closing: HTMLElement | null,
+	focusEntered: boolean
 ): void {
 	const within = topmostOpenDialog(closing);
-	if (settledIn(within)) return;
+	if (focusEntered && settledIn(within)) return;
 	const opener = destinations.opener === undefined ? opened : destinations.opener(opened);
 	if (takesFocus(opener, within, opener === opened ? { preventScroll: true } : undefined)) return;
 	if (takesFocus(destinations.continuation?.(), within)) return;

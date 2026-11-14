@@ -20,6 +20,7 @@
 		size = 'default',
 		returnFocus,
 		onOpenAutoFocus,
+		onfocusin,
 		...restProps
 	}: Omit<WithoutChildrenOrChild<DialogPrimitive.ContentProps>, 'onCloseAutoFocus'> & {
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DialogPortal>>;
@@ -31,6 +32,7 @@
 	} = $props();
 
 	let opened: HTMLElement | null = null;
+	let focusEntered = false;
 
 	let body: HTMLElement | null = $state(null);
 	let scrolled = $state(false);
@@ -67,11 +69,16 @@
 		{...restProps}
 		onOpenAutoFocus={(event: Event) => {
 			opened = dialogOpener();
+			focusEntered = false;
 			onOpenAutoFocus?.(event);
+		}}
+		onfocusin={(event) => {
+			focusEntered = true;
+			onfocusin?.(event);
 		}}
 		onCloseAutoFocus={(event: Event) => {
 			event.preventDefault();
-			restoreFocus(returnFocus, opened, ref);
+			restoreFocus(returnFocus, opened, ref, focusEntered);
 		}}
 	>
 		<ScrollAreaPrimitive.Root data-slot="scroll-area" class="relative flex min-h-0 flex-1 flex-col">

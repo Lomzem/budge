@@ -13,6 +13,7 @@
 		portalProps,
 		returnFocus,
 		onOpenAutoFocus,
+		onfocusin,
 		...restProps
 	}: Omit<WithoutChild<AlertDialogPrimitive.ContentProps>, 'onCloseAutoFocus'> & {
 		size?: 'default' | 'sm';
@@ -21,6 +22,7 @@
 	} = $props();
 
 	let opened: HTMLElement | null = null;
+	let focusEntered = false;
 </script>
 
 <AlertDialogPortal {...portalProps}>
@@ -36,11 +38,16 @@
 		{...restProps}
 		onOpenAutoFocus={(event: Event) => {
 			opened = dialogOpener();
+			focusEntered = false;
 			onOpenAutoFocus?.(event);
+		}}
+		onfocusin={(event) => {
+			focusEntered = true;
+			onfocusin?.(event);
 		}}
 		onCloseAutoFocus={(event: Event) => {
 			event.preventDefault();
-			restoreFocus(returnFocus, opened, ref);
+			restoreFocus(returnFocus, opened, ref, focusEntered);
 		}}
 	/>
 </AlertDialogPortal>
