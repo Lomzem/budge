@@ -24,6 +24,7 @@
 	import { formatDate } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
 	import { BANK_CHANGE_LIMIT } from '$lib/domain/bankChanges';
+	import { BULK_CATEGORIZE_LIMIT } from '$lib/domain/bulkCategorize';
 	import { formatUnapprovedCount, UNAPPROVED_COUNT_LIMIT } from '$lib/domain/unapproved';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { usePaginatedQuery } from '$lib/paginatedQuery.svelte';
@@ -37,6 +38,12 @@
 
 	import { categoryChoices, labelOf, rememberCopy, transferChoices } from './categoryChoices';
 	import ImportDialog from './import-dialog.svelte';
+	import {
+		counted,
+		keepsItsCategory,
+		keptCategoriesNote,
+		SelectionPerScope
+	} from './selection.svelte';
 	import TransactionDialog from './transaction-dialog.svelte';
 	import {
 		BANK_CHANGES,
@@ -51,6 +58,11 @@
 	import TransactionFilters from './transaction-filters.svelte';
 
 	type Row = FunctionReturnType<typeof api.transactions.list>['page'][number];
+	type Categorized = FunctionReturnType<typeof api.transactions.categorizeMany>;
+	type Undoable = { scopeKey: string; text: string } & (
+		| { kind: 'approved'; transactionIds: Id<'transactions'>[] }
+		| { kind: 'categorized'; record: Categorized }
+	);
 
 	let { accountId }: { accountId?: Id<'accounts'> | undefined } = $props();
 
@@ -185,6 +197,8 @@
 	const approveMany = useMutation(api.transactions.approveMany);
 	const unapprove = useMutation(api.transactions.unapprove);
 	const categorize = useMutation(api.transactions.categorize);
+	const categorizeMany = useMutation(api.transactions.categorizeMany);
+	const undoCategorizeMany = useMutation(api.transactions.undoCategorizeMany);
 	const convex = useConvexClient();
 	const picked = new SvelteMap<Id<'transactions'>, string>();
 	const latestPick = new SvelteMap<Id<'transactions'>, number>();
@@ -194,15 +208,16 @@
 	const removal = new DialogSession<{ row: Row; importId: Id<'imports'>; payee: string }>();
 	const confirmRemoval = $derived(removal.current);
 	let afterRemoval: HTMLElement | undefined;
-	let undoable = $state<{
-		scopeKey: string;
-		transactionIds: Id<'transactions'>[];
-		text: string;
-	} | null>(null);
+	let undoable = $state<Undoable | null>(null);
 	const scopeKey = $derived(JSON.stringify([scope, filters]));
 	const undo = $derived(undoable?.scopeKey === scopeKey ? undoable : null);
+	const selection = new SelectionPerScope(() => scopeKey);
 
 	const approveAllLabel = $derived.by(() => {
+		if (selecting) {
+			const count = selectedUnapproved.length;
+			return count === 0 ? 'Approve selected' : `Approve ${String(count)} selected`;
+		}
 		if (shownUnapproved !== null) {
 			const shown = shownUnapproved.length;
 			return shown === 0 ? 'Approve shown' : `Approve ${String(shown)} shown`;
@@ -239,6 +254,38 @@
 					.map((row) => row._id)
 			: null
 	);
+	const selected = $derived(selection.of(rows));
+	const selecting = $derived(selected.length > 0);
+	const selectedUnapproved = $derived(
+		selected
+			.filter((row) => !row.approved)
+			.slice(0, UNAPPROVED_COUNT_LIMIT)
+			.map((row) => row._id)
+	);
+	const approving = $derived(selecting ? selectedUnapproved : shownUnapproved);
+	const categorizable = $derived(selected.filter((row) => !keepsItsCategory(row)));
+	const keptNote = $derived(keptCategoriesNote(selected));
+	const tooManyToCategorize = $derived(categorizable.length > BULK_CATEGORIZE_LIMIT);
+	const bulkChoices = $derived([
+		{ value: optionOf({ kind: 'uncategorized' }), label: 'Uncategorized' },
+		...categoryChoices(categoryList.data)
+	]);
+	const NOTHING_PICKED = 'nothing-picked';
+	let bulkPick = $state(NOTHING_PICKED);
+	let categorizingMany = $state(false);
+	let selectionBarHeight = $state(0);
+
+	$effect(() => {
+		if (!selecting) return;
+		const root = document.documentElement;
+		root.style.setProperty('--selection-bar-height', `${String(selectionBarHeight)}px`);
+		return () => {
+			root.style.removeProperty('--selection-bar-height');
+		};
+	});
+	let undoButton: HTMLButtonElement | null = $state(null);
+	const linkButton =
+		'relative -my-0.5 min-h-6 shrink-0 rounded-sm px-1 font-medium text-foreground underline underline-offset-4 after:absolute after:-inset-x-2 after:-inset-y-2.5 hover:no-underline';
 	const groups = $derived.by(() => {
 		const waiting = rows.filter((row) => !row.approved);
 		if (filtering || waiting.length === 0) return [{ label: '', rows }];
@@ -292,7 +339,7 @@
 	let rowError = $state('');
 	let approvingAll = $state(false);
 	const approveAllBlocked = $derived(
-		approvingAll || (shownUnapproved?.length ?? unapprovedCount.data ?? 0) === 0
+		approvingAll || (approving?.length ?? unapprovedCount.data ?? 0) === 0
 	);
 
 	function add() {
@@ -323,7 +370,7 @@
 
 	function openFromRow(event: MouseEvent, row: Row) {
 		if (!(event.target instanceof Element)) return;
-		if (event.target.closest('button, a, input, label, [role="checkbox"]')) return;
+		if (event.target.closest('button, a, input, label, [role="checkbox"], [data-pick]')) return;
 		if ((getSelection()?.toString() ?? '') !== '') return;
 		edit(row);
 	}
@@ -438,7 +485,12 @@
 			rowError = "Budge couldn't approve the Transaction. Try again.";
 			return;
 		}
-		undoable = { scopeKey: approvedIn, transactionIds: [row._id], text: `Approved ${payee}.` };
+		undoable = {
+			kind: 'approved',
+			scopeKey: approvedIn,
+			transactionIds: [row._id],
+			text: `Approved ${payee}.`
+		};
 		announce(`Approved ${payee}`);
 		await tick();
 		const next = waiting.find((other) =>
@@ -500,7 +552,7 @@
 		rowError = '';
 		approvingAll = true;
 		const approvedIn = scopeKey;
-		const transactionIds = shownUnapproved;
+		const transactionIds = approving;
 		const approved = await attempt(() =>
 			transactionIds === null ? approveAll(scope) : approveMany({ transactionIds })
 		);
@@ -509,7 +561,9 @@
 			rowError = "Budge couldn't approve the Transactions. Try again.";
 			return;
 		}
+		if (selecting) selection.clear();
 		undoable = {
+			kind: 'approved',
 			scopeKey: approvedIn,
 			transactionIds: approved.value,
 			text: approvedText(approved.value.length)
@@ -520,24 +574,79 @@
 		return `Approved ${String(count)} ${count === 1 ? 'Transaction' : 'Transactions'}.`;
 	}
 
-	async function undoApproveAll() {
-		if (undo === null) return;
-		const entry = undo;
-		const { transactionIds } = entry;
-		undoable = null;
+	async function categorizeSelected(option: string, approveToo: boolean) {
+		const choice = rowChoiceFor(option);
+		const changing = categorizable;
+		if (choice === undefined || choice.kind === 'transfer' || categorizingMany) return;
+		if (changing.length === 0 || tooManyToCategorize) return;
 		rowError = '';
-		const restored = await attempt(() => unapprove({ transactionIds }));
-		if (!restored.ok) {
-			undoable ??= entry;
-			rowError = "Budge couldn't undo the approvals. Try again.";
+		undoable = null;
+		categorizingMany = true;
+		const changedIn = scopeKey;
+		const label = labelOf(bulkChoices, option) ?? 'their Category';
+		const saved = await attempt(() =>
+			categorizeMany({
+				transactionIds: changing.map((row) => row._id),
+				categoryId: choice.kind === 'category' ? choice.categoryId : null,
+				approve: approveToo
+			})
+		);
+		categorizingMany = false;
+		bulkPick = NOTHING_PICKED;
+		if (!saved.ok) {
+			rowError = saved.error?.message ?? "Budge couldn't change the Categories. Try again.";
 			return;
 		}
-		announce(`${String(restored.value)} back to Unapproved`);
+		selection.clear();
+		const text = `${counted(changing.length, 'Transaction')} now ${label}${approveToo ? ' and approved' : ''}.`;
+		if (saved.value.changes.length === 0) {
+			announce(text);
+			return;
+		}
+		undoable = { kind: 'categorized', scopeKey: changedIn, record: saved.value, text };
 		await tick();
-		const back = transactionIds
-			.map((transactionId) => shownOf(`[data-approve="${transactionId}"]`))
-			.find((button) => button !== undefined);
-		(back ?? approveAllButton)?.focus();
+		undoButton?.focus();
+	}
+
+	function clearSelection() {
+		selection.clear();
+		announce('Selection cleared');
+		approveAllButton?.focus();
+	}
+
+	function undoneText(entry: Undoable, count: number) {
+		return entry.kind === 'approved'
+			? `${String(count)} back to Unapproved`
+			: `${counted(count, 'Transaction')} put back`;
+	}
+
+	async function undoLast() {
+		if (undo === null) return;
+		const entry = undo;
+		undoable = null;
+		rowError = '';
+		const restored = await attempt(() =>
+			entry.kind === 'approved'
+				? unapprove({ transactionIds: entry.transactionIds })
+				: undoCategorizeMany(entry.record)
+		);
+		if (!restored.ok) {
+			undoable ??= entry;
+			rowError =
+				entry.kind === 'approved'
+					? "Budge couldn't undo the approvals. Try again."
+					: "Budge couldn't put the Categories back. Try again.";
+			return;
+		}
+		announce(undoneText(entry, restored.value));
+		await tick();
+		const back =
+			entry.kind === 'approved'
+				? entry.transactionIds.map((id) => shownOf(`[data-approve="${id}"]`))
+				: entry.record.changes.map(({ transactionId }) =>
+						shownOf(`[data-category="${transactionId}"]`)
+					);
+		(back.find((element) => element !== undefined) ?? approveAllButton)?.focus();
 	}
 </script>
 
@@ -550,10 +659,22 @@
 	<Table.Row
 		weight={row.approved ? 'normal' : 'strong'}
 		opens
+		data-state={selection.has(row._id) ? 'selected' : undefined}
 		onclick={(event: MouseEvent) => {
 			openFromRow(event, row);
 		}}
 	>
+		<Table.Cell width="select" data-pick>
+			<Checkbox
+				bind:checked={
+					() => selection.has(row._id),
+					(checked: boolean) => {
+						selection.set([row._id], checked);
+					}
+				}
+				aria-label="Select {payee}, {formatDate(row.date)}"
+			/>
+		</Table.Cell>
 		<Table.Cell numeric showFrom="2xl">
 			<time datetime={row.date} class="block truncate">{formatDate(row.date)}</time>
 		</Table.Cell>
@@ -752,7 +873,11 @@
 		{problem}
 	</p>
 	<p role="status" class="sr-only">{announcement}</p>
-	<div class="@container">
+	<div
+		data-selection-bar={selecting ? '' : undefined}
+		bind:clientHeight={selectionBarHeight}
+		class={['@container', selecting && 'sticky top-0 z-20 border-b bg-background py-2']}
+	>
 		<div
 			class="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
 		>
@@ -760,33 +885,70 @@
 				aria-live="polite"
 				class="flex min-h-6 max-w-full min-w-0 items-center gap-2 text-sm text-muted-foreground"
 			>
-				{#if undo}
-					<span class="truncate">{undo.text}</span>
+				{#if selecting}
+					<span class="truncate font-medium text-foreground">{selected.length} selected</span>
 					<button
 						type="button"
-						class="relative -my-0.5 min-h-6 shrink-0 rounded-sm px-1 font-medium text-foreground underline underline-offset-4 after:absolute after:-inset-x-2 after:-inset-y-2.5 hover:no-underline"
-						onclick={undoApproveAll}>Undo</button
+						aria-label="Clear selection"
+						class={linkButton}
+						onclick={clearSelection}>Clear</button
+					>
+				{:else if undo}
+					<span class="truncate">{undo.text}</span>
+					<button bind:this={undoButton} type="button" class={linkButton} onclick={undoLast}
+						>Undo</button
 					>
 				{:else}
 					<span class="truncate">{result}</span>
 				{/if}
 			</p>
-			<Button
-				bind:ref={approveAllButton}
-				variant="outline"
-				aria-disabled={approveAllBlocked}
-				onclick={approveEvery}
-			>
-				<CheckCheckIcon aria-hidden="true" />
-				<span class="min-w-36 text-left">{approveAllLabel}</span>
-			</Button>
+			<div class="flex max-w-full flex-wrap items-center gap-2">
+				{#if selecting}
+					<div class="w-32 sm:w-40">
+						<CategoryPicker
+							bind:value={bulkPick}
+							aria-label="Category for {counted(categorizable.length, 'selected Transaction')}"
+							placeholder="Categorize"
+							shown={categorizingMany ? 'Saving…' : undefined}
+							disabled={categorizable.length === 0 || tooManyToCategorize || categorizingMany}
+							choices={bulkChoices}
+							optIn={{ label: 'Approve them too', hint: '', accepts: () => true }}
+							onValueChange={(option: string, approveToo: boolean) =>
+								categorizeSelected(option, approveToo)}
+						/>
+					</div>
+				{/if}
+				<Button
+					bind:ref={approveAllButton}
+					variant="outline"
+					aria-disabled={approveAllBlocked}
+					onclick={approveEvery}
+				>
+					<CheckCheckIcon aria-hidden="true" />
+					{#if selecting && selectedUnapproved.length > 0}
+						<span class="text-left">
+							Approve {selectedUnapproved.length}<span class="max-sm:sr-only">&nbsp;selected</span>
+						</span>
+					{:else}
+						<span class={['text-left', !selecting && 'min-w-36']}>{approveAllLabel}</span>
+					{/if}
+				</Button>
+			</div>
 		</div>
+		{#if selecting && (keptNote !== '' || tooManyToCategorize)}
+			<p class="mt-1 text-xs text-muted-foreground">
+				{keptNote}
+				{tooManyToCategorize ? `Categorize at most ${String(BULK_CATEGORIZE_LIMIT)} at once.` : ''}
+			</p>
+		{/if}
 	</div>
 
 	<div class={['@container', rows.length === 0 && !loading && 'hidden']}>
 		<Table.Root layout="fixed">
+			<colgroup><col class="w-8 sm:w-12" /></colgroup>
 			<Table.Header labels="lg">
 				<Table.Row>
+					<Table.Head width="select"><span class="sr-only">Select</span></Table.Head>
 					<Table.Head width="date" showFrom="2xl">Date</Table.Head>
 					{#if allAccounts}
 						<Table.Head width="name" showFrom="5xl">Account</Table.Head>
@@ -805,6 +967,7 @@
 				<Table.Body>
 					{#if group.label !== ''}
 						<Table.Row>
+							<Table.Cell></Table.Cell>
 							<Table.Cell showFrom="2xl"></Table.Cell>
 							{#if allAccounts}
 								<Table.Cell showFrom="5xl"></Table.Cell>

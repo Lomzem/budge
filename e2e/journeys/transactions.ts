@@ -1,8 +1,9 @@
-import { expect } from '@playwright/test';
+import { expect, type Locator } from '@playwright/test';
 
 import { holdResponseTo, withholdQueryResult } from '../heldResponse';
 import {
 	centsIn,
+	choicesOf,
 	choose,
 	expectClearOf,
 	expectNothingPastTheRightEdge,
@@ -373,6 +374,191 @@ export const transactions = {
 				await expect(waitingHeading).toBeVisible();
 				await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0);
 			});
+
+			await step(
+				'with rows selected, the button approves only the selected Unapproved ones, and Undo puts them back',
+				async () => {
+					const [first, , third] = waiting;
+					if (first === undefined || third === undefined)
+						throw new Error('fewer than three Unapproved rows');
+					const selectBox = (name: string) =>
+						page.getByRole('checkbox', {
+							name: `Select ${name.replace(', Unapproved, edit Transaction on', ',')}`,
+							exact: true
+						});
+					await selectBox(first).check();
+					await selectBox(third).check();
+					await page
+						.getByRole('checkbox', { name: /^Select Sample Coffee Shop,/ })
+						.last()
+						.check();
+					const selected = page.getByRole('button', { name: 'Approve 2 selected', exact: true });
+					await selected.click();
+					await expect(page.getByText('Approved 2 Transactions.')).toBeVisible();
+					await expect(page.getByRole('checkbox', { name: /^Select /, checked: true })).toHaveCount(
+						0
+					);
+					await expect
+						.poll(unapprovedRows)
+						.toEqual(waiting.filter((name) => name !== first && name !== third));
+					await page.getByRole('button', { name: 'Undo', exact: true }).click();
+					await expect.poll(unapprovedRows).toEqual(waiting);
+					await expect(approveAll).toHaveText(label ?? '');
+				}
+			);
+		}
+	},
+	'select-categorize': {
+		title:
+			'Transactions picked one by one, across Payees and within one, take a Category, and approval only when asked; Undo puts back what changed and a search starts the selection over',
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const selectBoxes = page.getByRole('checkbox', { name: /^Select / });
+			const picked = page.getByRole('checkbox', { name: /^Select /, checked: true });
+			const rowOf = (box: Locator) => box.locator('xpath=ancestor::tr[1]');
+			const categoryIn = (box: Locator) =>
+				rowOf(box).getByRole('button', { name: /, Category of / });
+			const bulk = page.getByRole('button', { name: /^Category for \d+ selected Transactions?$/ });
+			const undo = page.getByRole('button', { name: 'Undo', exact: true });
+			const bookshop = page.getByRole('checkbox', { name: /^Select SAMPLE BOOKSHOP 0193,/ });
+			const hardware = page.getByRole('checkbox', { name: /^Select SAMPLE HARDWARE 2208,/ });
+			const coffee = page.getByRole('checkbox', { name: /^Select Sample Coffee Shop,/ });
+			const chosen = [bookshop, coffee.nth(1), coffee.nth(3)];
+			const between = coffee.nth(2);
+			const categoryNames = (boxes: Locator[]) =>
+				Promise.all(
+					boxes.map(async (box) => {
+						const name = await categoryIn(box).getAttribute('aria-label');
+						return (name ?? '').split(', Category of ')[0] ?? '';
+					})
+				);
+
+			const before = await step(
+				'pick the Unapproved bookshop and two Coffee Shop rows that are not next to each other',
+				async () => {
+					await page.goto('/accounts');
+					await expect(
+						page.getByRole('rowheader', { name: 'Unapproved', exact: true })
+					).toBeVisible();
+					for (const box of chosen) await box.check();
+					await expect(page.getByText('3 selected', { exact: true })).toBeVisible();
+					await expect(picked).toHaveCount(3);
+					for (const box of chosen)
+						await expect(rowOf(box)).toHaveAttribute('data-state', 'selected');
+					await expect(between).not.toBeChecked();
+					await expect(
+						page.getByRole('button', { name: 'Approve 1 selected', exact: true })
+					).toBeVisible();
+					await expect(bulk).toHaveAccessibleName('Category for 3 selected Transactions');
+					return { chosen: await categoryNames(chosen), between: await categoryNames([between]) };
+				}
+			);
+
+			await step(
+				'the bulk picker offers Categories but no Transfer, and a search starts the selection over instead of reaching rows it hides',
+				async () => {
+					const offered = await choicesOf(bulk);
+					expect(offered).toContain('Dining Out');
+					expect(offered.filter((name) => name.startsWith('Transfer'))).toEqual([]);
+					const search = page.getByRole('searchbox', { name: 'Search' });
+					await search.fill('Coffee');
+					await expect(page.getByText(/^\d+ selected$/)).toHaveCount(0);
+					await expect(picked).toHaveCount(0);
+					await search.fill('');
+					await expect(bookshop).toBeVisible();
+					await expect(picked).toHaveCount(0);
+					await expect(bulk).toHaveCount(0);
+				}
+			);
+
+			await step(
+				'pick them again and give them Dining Out: only they change, the bookshop stays Unapproved, and Undo takes focus',
+				async () => {
+					for (const box of chosen) await box.check();
+					await choose(bulk, 'Dining Out');
+					await expect(page.getByText('3 Transactions now Dining Out.')).toBeVisible();
+					await expect(undo).toBeFocused();
+					await expect(picked).toHaveCount(0);
+					expect(await categoryNames(chosen)).toEqual(['Dining Out', 'Dining Out', 'Dining Out']);
+					expect(await categoryNames([between])).toEqual(before.between);
+					await expect(
+						page.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193, Unapproved/ })
+					).toBeVisible();
+				}
+			);
+
+			await step('Undo puts each row’s own Category back', async () => {
+				await undo.click();
+				await expect(page.getByText('3 Transactions put back')).toBeAttached();
+				await expect.poll(() => categoryNames(chosen)).toEqual(before.chosen);
+				await expect(categoryIn(bookshop)).toBeFocused();
+			});
+
+			await step(
+				'with Approve them too, the bookshop and hardware rows become Groceries and approved, and Undo makes them Unapproved and Uncategorized again',
+				async () => {
+					const approveAll = page.getByRole('button', { name: /^Approve all \d/ });
+					const waiting = await approveAll.textContent();
+					const ids = await Promise.all(
+						[bookshop, hardware].map((box) => categoryIn(box).getAttribute('data-category'))
+					);
+					const category = (id: string | null) =>
+						page.getByRole('button').and(page.locator(`[data-category="${String(id)}"]`));
+					await bookshop.check();
+					await hardware.check();
+					await bulk.click();
+					await page.getByRole('checkbox', { name: 'Approve them too', exact: true }).check();
+					await page.getByRole('option', { name: 'Groceries', exact: true }).click();
+					await expect(page.getByText('2 Transactions now Groceries and approved.')).toBeVisible();
+					for (const id of ids) await expect(category(id)).toHaveAccessibleName(/^Groceries, /);
+					await expect(
+						page.getByRole('button', { name: /^SAMPLE (BOOKSHOP 0193|HARDWARE 2208), Unapproved/ })
+					).toHaveCount(0);
+					await undo.click();
+					for (const id of ids) await expect(category(id)).toHaveAccessibleName(/^Uncategorized, /);
+					await expect(approveAll).toHaveText(waiting ?? '');
+				}
+			);
+
+			await step(
+				'a Split in the selection is named as keeping its Category, and with nothing else picked there is nothing to categorize',
+				async () => {
+					await page.getByRole('searchbox', { name: 'Search' }).fill('Warehouse');
+					await page.getByRole('checkbox', { name: /^Select Sample Warehouse Club,/ }).check();
+					await expect(page.getByText('1 Split keeps its Category.')).toBeVisible();
+					await expect(bulk).toHaveAccessibleName('Category for 0 selected Transactions');
+					await expect(bulk).toBeDisabled();
+					await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+					await expect(picked).toHaveCount(0);
+					await expect(page.getByRole('button', { name: /^Approve( \d+)? shown$/ })).toBeFocused();
+				}
+			);
+
+			await step(
+				'at 320 px the selection bar stays on screen while scrolling, clear of the tab bar and the right edge, and its picker saves',
+				async () => {
+					await page.setViewportSize({ width: 320, height: 640 });
+					await page.getByRole('button', { name: 'Clear search and filters' }).click();
+					await expect(selectBoxes.first()).toBeVisible();
+					await coffee.nth(1).check();
+					await coffee.nth(3).check();
+					const tabBar = page.getByRole('navigation', { name: 'Sections', exact: true });
+					await selectBoxes.nth(30).focus();
+					await expectClearOf(bulk, tabBar);
+					await selectBoxes.nth(10).focus();
+					await expectClearOf(selectBoxes.nth(10), tabBar, page.locator('[data-selection-bar]'));
+					await expectNothingPastTheRightEdge(page);
+					await bulk.click();
+					const listbox = page.getByRole('listbox');
+					await expectClearOf(listbox, tabBar);
+					await expectNothingPastTheRightEdge(page);
+					await page.getByRole('combobox', { name: 'Search Categories' }).fill('dini');
+					await listbox.getByRole('option', { name: 'Dining Out', exact: true }).click();
+					await expect(page.getByText('2 Transactions now Dining Out.')).toBeVisible();
+					await expectClearOf(undo, tabBar);
+					await expectNothingPastTheRightEdge(page);
+				}
+			);
 		}
 	},
 	'approve-phone': {

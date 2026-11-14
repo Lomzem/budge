@@ -249,6 +249,10 @@
 			scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
 		}
 	}
+	/* While Transactions are selected, what scrolls into view stops below the sticky selection bar. */
+	html:has([data-selection-bar]) {
+		scroll-padding-top: calc(var(--selection-bar-height, 0px) + 1rem);
+	}
 	h1,
 	h2,
 	h3 {
