@@ -21,7 +21,7 @@ Every picker is a shadcn-svelte Select: a `combobox` button labeled like the old
 | Feature map                         | User-facing coverage                                                                         | v1 tickets |
 | ----------------------------------- | -------------------------------------------------------------------------------------------- | ---------- |
 | [Budget](budget.md)                 | Assigned, Ready to Assign, month navigation, desktop/mobile entry                            | 05         |
-| [Inspector](inspector.md)           | Inspect, Move to/Take from, Cover, keyboard and phone                                        | 07         |
+| [Inspector](inspector.md)           | Inspect, From/To move, Cover, manage a Category, keyboard and phone                          | 07         |
 | [Targets](targets.md)               | Monthly, By date, repeat, Assign, Upcoming                                                   | 08         |
 | [Categories](categories.md)         | Groups, create, rename, order, move, hide, delete/history                                    | 06         |
 | [Accounts](accounts.md)             | Cash/Card, starting balances, rename/order, held mapping and suggestions, setup confirmation | 03, 21     |

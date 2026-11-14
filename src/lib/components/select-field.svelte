@@ -10,6 +10,7 @@
 		disabled = false,
 		required = false,
 		onValueChange,
+		onclosed,
 		...trigger
 	}: {
 		id: string;
@@ -21,6 +22,7 @@
 		disabled?: boolean;
 		required?: boolean;
 		onValueChange?: (value: string) => void;
+		onclosed?: () => void;
 	} = $props();
 
 	const flat = $derived(choices.flatMap((entry) => ('group' in entry ? entry.choices : [entry])));
@@ -41,6 +43,9 @@
 		}
 	}
 	{disabled}
+	onOpenChangeComplete={(next: boolean) => {
+		if (!next) onclosed?.();
+	}}
 	items={flat.map((choice) => ({
 		value: key(choice.value),
 		label: choice.label,

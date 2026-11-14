@@ -127,7 +127,7 @@
 	}
 </script>
 
-<div class="ml-auto w-24 *:text-right *:tabular-nums sm:w-28">
+<div class="ml-auto w-21 *:text-right *:tabular-nums max-xs:*:px-2 xs:w-24 sm:w-28">
 	<Input
 		bind:value={read, write}
 		onfocus={start}

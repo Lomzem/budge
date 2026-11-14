@@ -1,7 +1,15 @@
 import { expect } from '@playwright/test';
 
 import { holdResponseTo } from '../heldResponse';
-import { cents, centsIn, expectClearOf, openBudget, typed, type Journey } from './journey';
+import {
+	cents,
+	centsIn,
+	expectClearOf,
+	expectNothingPastTheRightEdge,
+	openBudget,
+	typed,
+	type Journey
+} from './journey';
 
 function monthName(monthsFromNow: number) {
 	const today = new Date();
@@ -204,7 +212,7 @@ export const budget = {
 				async () => {
 					await openBudget(page);
 					await needsYou.getByRole('button', { name: /^\d+ Categories? overspent$/ }).click();
-					const opened = page.getByRole('table').getByRole('button', { expanded: true });
+					const opened = page.locator('[aria-controls="category-inspector"]');
 					await expect(opened).toHaveCount(1);
 					const name = (await opened.textContent())?.trim() ?? '';
 					await expect(page.getByRole('region', { name, exact: true })).toContainText(
@@ -216,10 +224,131 @@ export const budget = {
 
 			await step('clicking it again steps to the next overspent Category', async () => {
 				await needsYou.getByRole('button', { name: /^\d+ Categories overspent$/ }).click();
-				const opened = page.getByRole('table').getByRole('button', { expanded: true });
+				const opened = page.locator('[aria-controls="category-inspector"]');
 				await expect(opened).not.toHaveText(first);
 				const name = (await opened.textContent())?.trim() ?? '';
 				await expect(page.getByRole('region', { name, exact: true })).toContainText('Overspent by');
+			});
+		}
+	},
+	'month-jump': {
+		title:
+			'the month heading jumps to any month and year, keeps the arrows, and cannot reach before the first budget month',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			const picker = page.getByRole('button', { name: /, choose a month$/ });
+			const months = page.getByRole('dialog').or(page.locator('[data-slot="popover-content"]'));
+
+			await step('open the month picker from the heading', async () => {
+				await page.setViewportSize({ width: 320, height: 640 });
+				await openBudget(page);
+				await expect(picker).toHaveAccessibleName(`${monthName(0)}, choose a month`);
+				await picker.click();
+				await expect(months.getByRole('button', { name: monthName(0), exact: true })).toBeFocused();
+			});
+
+			await step('months before the first budget month cannot be picked', async () => {
+				await expect(
+					months.getByRole('button', { name: monthName(-3), exact: true })
+				).toBeDisabled();
+				await expect(
+					months.getByRole('button', { name: monthName(-2), exact: true })
+				).toBeEnabled();
+			});
+
+			await step('Next year, then a month, jumps there and the URL keeps it', async () => {
+				await months.getByRole('button', { name: 'Next year' }).click();
+				await months.getByRole('button', { name: monthName(12), exact: true }).click();
+				await expect(page.getByText(monthName(12), { exact: true })).toBeVisible();
+				await expect(picker).toBeFocused();
+				await page.reload();
+				await expect(page.getByText(monthName(12), { exact: true })).toBeVisible();
+			});
+
+			await step('the arrows still step one month', async () => {
+				await page.getByRole('button', { name: 'Previous month', exact: true }).click();
+				await expect(page.getByText(monthName(11), { exact: true })).toBeVisible();
+				await expectNothingPastTheRightEdge(page);
+			});
+
+			await step('arrow keys move between months and Enter picks one', async () => {
+				await picker.click();
+				await page.keyboard.press('ArrowLeft');
+				await page.keyboard.press('Enter');
+				await expect(page.getByText(monthName(10), { exact: true })).toBeVisible();
+			});
+		}
+	},
+	'phone-groups': {
+		title:
+			'on a 320 px phone Assigned is edited in the table, and a collapsed group keeps its totals and overspending',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			const assigned = page.getByRole('textbox', { name: 'Assigned for Groceries', exact: true });
+			const readyToAssign = () => centsIn(page.getByTestId('ready-to-assign'));
+			const header = (group: string) =>
+				page.getByRole('rowheader', { name: new RegExp(`^${group}`) });
+			const toggle = (group: string) =>
+				header(group).getByRole('button', { name: new RegExp(`^${group}( \\d+ overspent)?$`) });
+
+			const before = await step('open the Budget on a 320 px phone', async () => {
+				await page.setViewportSize({ width: 320, height: 640 });
+				await openBudget(page);
+				await expect(assigned).toBeVisible();
+				await expectNothingPastTheRightEdge(page);
+				return { assigned: cents(await assigned.inputValue()), ready: await readyToAssign() };
+			});
+
+			await step('Assigned saves from the table without opening the inspector', async () => {
+				await assigned.fill(typed(before.assigned + 500));
+				await assigned.press('Enter');
+				await expect.poll(readyToAssign).toBe(before.ready - 500);
+				await expect(page.getByRole('dialog')).toHaveCount(0);
+				await page.reload();
+				await expect(assigned).toHaveValue(typed(before.assigned + 500));
+			});
+
+			const overspentGroup = await step('find a group with an overspent Category', async () => {
+				const flagged = page
+					.getByRole('rowgroup')
+					.filter({ has: page.getByText(/^Overspent by/) })
+					.first();
+				const name =
+					(
+						await flagged.getByRole('rowheader').getByRole('button').first().textContent()
+					)?.trim() ?? '';
+				expect(name).not.toBe('');
+				return name;
+			});
+
+			await step(
+				'collapsing it hides its rows but keeps its totals and an overspent count',
+				async () => {
+					const row = page.getByRole('rowgroup').filter({ has: header(overspentGroup) });
+					const totals = await row.getByRole('row').first().getByRole('cell').allTextContents();
+					await toggle(overspentGroup).click();
+					await expect(toggle(overspentGroup)).toHaveAttribute('aria-expanded', 'false');
+					await expect(row.getByRole('row')).toHaveCount(1);
+					await expect(row.getByRole('row').first().getByRole('cell')).toHaveText(totals);
+					await expect(header(overspentGroup)).toContainText(/\d+ overspent/);
+					await expect(header(overspentGroup)).toContainText(/\$[\d,]+\.\d\d assigned/);
+				}
+			);
+
+			await step('the collapse lasts through a reload', async () => {
+				await page.reload();
+				await expect(toggle(overspentGroup)).toHaveAttribute('aria-expanded', 'false');
+			});
+
+			await step('the overspent item opens its Category and expands the group', async () => {
+				await page
+					.getByRole('region', { name: 'Needs you', exact: true })
+					.getByRole('button', { name: /overspent$/ })
+					.click();
+				const dialog = page.getByRole('dialog');
+				await expect(dialog).toContainText('Overspent by');
+				await page.keyboard.press('Escape');
+				await expect(toggle(overspentGroup)).toHaveAttribute('aria-expanded', 'true');
 			});
 		}
 	}

@@ -6,8 +6,9 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { useQuery } from 'convex-svelte';
+	import { Result } from 'effect';
 	import { tick } from 'svelte';
-	import { MediaQuery } from 'svelte/reactivity';
+	import { MediaQuery, SvelteSet } from 'svelte/reactivity';
 
 	import { goto, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -22,12 +23,13 @@
 	import AddCategoryDialog from '$lib/components/budget/add-category-dialog.svelte';
 	import BudgetTable from '$lib/components/budget/budget-table.svelte';
 	import CategoryInspector from '$lib/components/budget/category-inspector.svelte';
+	import MonthPicker from '$lib/components/budget/month-picker.svelte';
 	import UpcomingList from '$lib/components/budget/upcoming-list.svelte';
 	import CutoverDate from '$lib/components/settings/cutover-date.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { formatMonth, isIsoMonth, monthOf } from '$lib/domain/dates';
+	import { isIsoMonth, monthOf } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
 	import { formatBankChangeCount } from '$lib/domain/bankChanges';
@@ -72,7 +74,41 @@
 	let adding: 'group' | 'category' = $state('group');
 	let addingOpen = $state(false);
 
-	let addDialog: { reset: () => void; saving: () => boolean } | undefined = $state();
+	let addDialog:
+		{ reset: (inGroup?: Id<'categoryGroups'>) => void; saving: () => boolean } | undefined =
+		$state();
+
+	const COLLAPSED_KEY = 'budge.collapsedGroups';
+	const collapsed = new SvelteSet<Id<'categoryGroups'>>(rememberedCollapsed());
+
+	function rememberedCollapsed(): Id<'categoryGroups'>[] {
+		const stored = Result.try(() => {
+			const parsed: unknown = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]');
+			return Array.isArray(parsed)
+				? parsed.filter((id): id is Id<'categoryGroups'> => typeof id === 'string')
+				: [];
+		});
+		return Result.isSuccess(stored) ? stored.success : [];
+	}
+
+	function rememberCollapsed() {
+		Result.try(() => {
+			localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]));
+		});
+	}
+
+	function toggleGroup(id: Id<'categoryGroups'>) {
+		if (collapsed.has(id)) collapsed.delete(id);
+		else collapsed.add(id);
+		rememberCollapsed();
+	}
+
+	function expandGroupOf(id: Id<'categories'>) {
+		const group = view?.groups.find((g) => g.categories.some((c) => c.id === id));
+		if (group === undefined || !collapsed.has(group.id)) return;
+		collapsed.delete(group.id);
+		rememberCollapsed();
+	}
 
 	const view = $derived(budget.shown);
 	const readyToAssign = $derived(budget.readyToAssign);
@@ -197,6 +233,7 @@
 
 	async function select(id: Id<'categories'>, keepOpen = false) {
 		selectedId = selectedId === id && !keepOpen ? null : id;
+		if (selectedId !== null) expandGroupOf(selectedId);
 		if (selectedId !== null && wide.current) {
 			await tick();
 			document.getElementById('category-inspector')?.focus({ preventScroll: true });
@@ -224,6 +261,7 @@
 
 	async function stepTo(id: Id<'categories'>) {
 		selectedId = id;
+		expandGroupOf(id);
 		await tick();
 		document
 			.getElementById('category-inspector')
@@ -238,16 +276,27 @@
 		const id = selectedId;
 		selectedId = null;
 		await tick();
-		if (id !== null) {
-			[...document.querySelectorAll<HTMLElement>(`[data-category-id="${id}"]`)]
-				.find((button) => button.checkVisibility())
-				?.focus();
-		}
+		if (id === null) return;
+		const row = [...document.querySelectorAll<HTMLElement>(`[data-category-id="${id}"]`)].find(
+			(button) => button.checkVisibility()
+		);
+		(row ?? mainRegion())?.focus();
 	}
 
-	function add(kind: 'group' | 'category') {
+	$effect(() => {
+		if (selectedId === null || view === undefined || budget.stale || selected !== undefined) return;
+		void (async () => {
+			selectedId = null;
+			await tick();
+			if (document.activeElement === null || document.activeElement === document.body) {
+				mainRegion()?.focus();
+			}
+		})();
+	});
+
+	function add(kind: 'group' | 'category', inGroup?: Id<'categoryGroups'>) {
 		adding = kind;
-		addDialog?.reset();
+		addDialog?.reset(inGroup);
 		addingOpen = true;
 	}
 </script>
@@ -280,7 +329,7 @@
 						<ChevronLeftIcon />
 					</Button>
 					<h2 aria-live="polite" class="min-w-40 text-center text-lg font-bold">
-						{formatMonth(budget.month)}
+						<MonthPicker />
 					</h2>
 					<Button
 						variant="ghost"
@@ -455,25 +504,32 @@
 					<PlusIcon aria-hidden="true" />
 					Add Category Group
 				</Button>
-				{#if groupsACategoryCanJoin.length > 0}
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={addDialog?.saving() === true && adding !== 'category'}
-						onclick={() => {
-							add('category');
-						}}
-					>
-						<PlusIcon aria-hidden="true" />
-						Add Category
-					</Button>
-				{/if}
+				<Button
+					variant="outline"
+					size="sm"
+					disabled={addDialog?.saving() === true && adding !== 'category'}
+					onclick={() => {
+						add('category');
+					}}
+				>
+					<PlusIcon aria-hidden="true" />
+					Add Category
+				</Button>
 				<Button variant="ghost" size="sm" href={resolve('/categories')}>Manage Categories</Button>
 			</div>
 			{#if view.groups.length > 0}
 				<div class="lg:flex lg:items-start lg:gap-8" aria-busy={budget.stale}>
 					<div class={['min-w-0 flex-1', budget.stale && 'opacity-60']} inert={budget.stale}>
-						<BudgetTable groups={view.groups} selectedId={selected?.id ?? null} onselect={select} />
+						<BudgetTable
+							groups={view.groups}
+							selectedId={selected?.id ?? null}
+							{collapsed}
+							onselect={select}
+							ontoggle={toggleGroup}
+							onadd={(group: { id: Id<'categoryGroups'>; name: string }) => {
+								add('category', group.id);
+							}}
+						/>
 					</div>
 					{#if wide.current}
 						<aside
@@ -547,16 +603,14 @@
 			>
 				Add Category Group
 			</DropdownMenu.Item>
-			{#if groupsACategoryCanJoin.length > 0}
-				<DropdownMenu.Item
-					disabled={addDialog?.saving() === true && adding !== 'category'}
-					onSelect={() => {
-						add('category');
-					}}
-				>
-					Add Category
-				</DropdownMenu.Item>
-			{/if}
+			<DropdownMenu.Item
+				disabled={addDialog?.saving() === true && adding !== 'category'}
+				onSelect={() => {
+					add('category');
+				}}
+			>
+				Add Category
+			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={() => {
 					void goto(resolve('/categories'));
