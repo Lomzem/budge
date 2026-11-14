@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 import { formatCents } from '../../src/lib/domain/money';
 import { holdResponseTo } from '../heldResponse';
@@ -451,10 +451,21 @@ export const accounts = {
 			const plus = feedOf(page, 'Sample Credit Union', 'Sample Savings Plus ending 4417');
 			const stillInSavings =
 				'Its earlier Transactions are still in Savings. Only new ones come to Savings Plus.';
+			const bankNeeds = async () => {
+				const bank = page
+					.getByRole('navigation', { name: /^Sections/ })
+					.getByRole('link', { name: /^Bank\b/ });
+				const counted = /(\d+)\s*need you/.exec((await bank.textContent()) ?? '');
+				return Number(counted?.[1] ?? 0);
+			};
+			const colorOf = (shown: Locator) =>
+				shown.evaluate((element) => getComputedStyle(element).color);
+			let needsBefore = 0;
 
 			await step(
 				'set it up as a new Account and confirm its starting balance: the card and the status say its earlier Transactions are still in Savings, and its link takes focus',
 				async () => {
+					needsBefore = await bankNeeds();
 					await creditUnion
 						.getByRole('button', { name: 'Set up Sample Savings Plus ending 4417' })
 						.click();
@@ -473,6 +484,29 @@ export const accounts = {
 					await expect(confirmed.getByRole('link', { name: 'Open Savings' })).toBeFocused();
 					await page.reload();
 					await expect(plus).toContainText(stillInSavings);
+				}
+			);
+
+			await step(
+				'once confirmed, the notice reads as information and counts in no "need you" count',
+				async () => {
+					const notice = plus.getByText(/^Its earlier Transactions are still in/);
+					await expect(notice).toBeVisible();
+					expect(await colorOf(notice)).toBe(
+						await colorOf(plus.getByText('from Sample Savings Plus ending 4417'))
+					);
+					await expect.poll(bankNeeds).toBe(needsBefore - 1);
+					await page.goto('/');
+					const needed = needsBefore - 1;
+					await expect(
+						page
+							.getByRole('region', { name: 'Needs you' })
+							.getByRole('link', { name: /^Bank: \d+ things? needs? you$/ })
+					).toHaveAccessibleName(
+						`Bank: ${String(needed)} ${needed === 1 ? 'thing needs' : 'things need'} you`
+					);
+					await page.goto('/bank');
+					await expect(notice).toBeVisible();
 				}
 			);
 

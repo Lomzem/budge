@@ -4,6 +4,7 @@
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
@@ -315,16 +316,29 @@
 									</span>
 								{/if}
 								{#if feed.historyIn !== null}
-									<span class="flex items-start gap-1.5 font-medium text-warning">
-										<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+									<span
+										class={[
+											'flex items-start gap-1.5',
+											feed.startingBalanceConfirmed
+												? 'text-muted-foreground'
+												: 'font-medium text-warning'
+										]}
+									>
+										{#if feed.startingBalanceConfirmed}
+											<InfoIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+										{:else}
+											<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+										{/if}
 										<span class="min-w-0 break-words">
 											Its earlier Transactions are still in
 											<a
 												href={resolve('/(app)/accounts/[accountId]', {
 													accountId: feed.historyIn.accountId
 												})}
-												class="underline underline-offset-4 hover:no-underline"
-												>{feed.historyIn.name}</a
+												class={[
+													'underline underline-offset-4 hover:no-underline',
+													feed.startingBalanceConfirmed && 'font-medium text-foreground'
+												]}>{feed.historyIn.name}</a
 											>. Only new ones come to {feed.name}.
 										</span>
 									</span>

@@ -26,7 +26,7 @@ export function needsALook(connection: BankConnection) {
 }
 
 export function feedNeedsYou(feed: Feed) {
-	return !feed.startingBalanceConfirmed || feed.historyIn !== null;
+	return !feed.startingBalanceConfirmed;
 }
 
 const shortDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
