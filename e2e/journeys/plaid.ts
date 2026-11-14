@@ -1,10 +1,18 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 import { answerInsteadOfServer, holdResponseTo } from '../heldResponse';
 import { expectClearOf, expectNothingPastTheRightEdge, openAccount, type Journey } from './journey';
 
 const notSetUp = "Bank sync isn't set up on this server.";
 const syncThatHeldRowsForSetup = { kind: 'synced', added: 1, matched: 0, held: 2 };
+const largestReconnect = { kind: 'synced', added: 1000, matched: 1, held: 199 };
+const PLAID_LINK_SCRIPT = 'https://cdn.plaid.com/link/v2/stable/link-initialize.js';
+const plaidLinkThatSucceedsAtOnce = `window.Plaid = {
+	create: (config) => ({
+		open: () => config.onSuccess('public-synthetic-not-real', null),
+		destroy: () => {}
+	})
+};`;
 const SLOWER_THAN_RECENT_INPUT_MS = 1_000;
 const noLogin = 'A sample connection with no bank login, so it can’t sync or reconnect.';
 
@@ -12,6 +20,42 @@ function card(page: Page, name: string) {
 	return page
 		.getByRole('list', { name: 'Bank Connections' })
 		.getByRole('article', { name, exact: true });
+}
+
+async function expectUnclipped(text: Locator) {
+	const clippedBy = await text.evaluate((element) => {
+		const box = element.getBoundingClientRect();
+		for (let parent = element.parentElement; parent !== null; parent = parent.parentElement) {
+			if (getComputedStyle(parent).overflow === 'visible') continue;
+			const frame = parent.getBoundingClientRect();
+			const inside =
+				box.top >= frame.top - 0.5 &&
+				box.bottom <= frame.bottom + 0.5 &&
+				box.left >= frame.left - 0.5 &&
+				box.right <= frame.right + 0.5;
+			if (!inside || parent.scrollHeight > parent.clientHeight + 1)
+				return parent.outerHTML.slice(0, 80);
+		}
+		return null;
+	});
+	expect(clippedBy, `${String(text)} is clipped`).toBeNull();
+}
+
+async function tap(target: Locator) {
+	const box = await target.boundingBox();
+	if (box === null) throw new Error(`${String(target)} has no box on screen.`);
+	const touchPoints = [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
+	const touch = await target.page().context().newCDPSession(target.page());
+	await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints });
+	await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+	await touch.detach();
+}
+
+async function fakePlaidLinkOnceTheCachedPageLoaded(page: Page) {
+	await page.route(PLAID_LINK_SCRIPT, (route) =>
+		route.fulfill({ contentType: 'text/javascript', body: plaidLinkThatSucceedsAtOnce })
+	);
+	return () => page.unroute(PLAID_LINK_SCRIPT);
 }
 
 async function openBank(page: Page) {
@@ -88,10 +132,15 @@ export const plaid = {
 	},
 	'sync-waiting': {
 		title:
-			'a Sync now that leaves rows waiting for setup says so in full, and Set up comes next by keyboard (the answer stands in for Plaid, which the local server cannot reach)',
+			'a Sync now that leaves rows waiting for setup says so in full, Set up comes next by keyboard, and the largest Reconnect result keeps its summary whole with its matches under Details (the answers stand in for Plaid, which the local server cannot reach)',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
-			const sync = await answerInsteadOfServer(page, 'bankConnections:syncNow');
+			const bank = await answerInsteadOfServer(
+				page,
+				'bankConnections:syncNow',
+				'bankConnections:reconnect',
+				'bankConnections:syncAfterReconnect'
+			);
 			const creditUnion = card(page, 'Sample Credit Union');
 			const waiting = '1 Transaction added. 2 wait for setup below.';
 			const tabBar = page.getByRole('navigation', { name: 'Sections', exact: true });
@@ -105,15 +154,13 @@ export const plaid = {
 						await openBank(page);
 						const syncNow = creditUnion.getByRole('button', { name: 'Sync now' });
 						await syncNow.click();
-						await sync.called;
+						await bank.called('bankConnections:syncNow');
 						await expect(creditUnion.getByRole('button', { name: 'Syncing…' })).toBeFocused();
-						sync.answer(syncThatHeldRowsForSetup);
+						await bank.answer('bankConnections:syncNow', syncThatHeldRowsForSetup);
 						await expect(creditUnion.getByRole('status')).toHaveText(waiting);
 						const shown = creditUnion.getByRole('paragraph').getByText(waiting, { exact: true });
 						await expect(shown).toBeVisible();
-						expect(await shown.evaluate((text) => text.scrollHeight <= text.clientHeight)).toBe(
-							true
-						);
+						await expectUnclipped(shown);
 						await shown.scrollIntoViewIfNeeded();
 						await expectClearOf(shown, ...(width < 640 ? [tabBar] : []));
 						await expectNothingPastTheRightEdge(page);
@@ -132,6 +179,125 @@ export const plaid = {
 					await expect(dialog).toBeHidden();
 				});
 			}
+
+			for (const width of [320, 390]) {
+				await step(
+					`at ${String(width)} px, the largest Reconnect result reads whole, and Details opens by touch and by keyboard`,
+					async () => {
+						await page.goto('about:blank');
+						await page.setViewportSize({ width, height: 740 });
+						await openBank(page);
+						const stopFakingPlaidLink = await fakePlaidLinkOnceTheCachedPageLoaded(page);
+						const reconnect = creditUnion.getByRole('button', { name: 'Reconnect', exact: true });
+						await reconnect.click();
+						await bank.answer('bankConnections:reconnect', {
+							linkToken: 'link-synthetic-not-real'
+						});
+						await bank.answer('bankConnections:syncAfterReconnect', largestReconnect);
+						const summary = 'Reconnected. 1000 Transactions added. 199 wait for setup below.';
+						const matched = '1 matched a Transaction you entered.';
+						await expect(creditUnion.getByRole('status')).toHaveText(`${summary} ${matched}`);
+						const shown = creditUnion.getByRole('paragraph').getByText(summary, { exact: true });
+						await expect(shown).toBeVisible();
+						await expectUnclipped(shown);
+						await shown.scrollIntoViewIfNeeded();
+						await expectClearOf(
+							shown,
+							tabBar,
+							reconnect,
+							creditUnion.getByRole('button', { name: 'Sync now' })
+						);
+
+						const details = creditUnion.getByRole('button', { name: 'Details' });
+						const detail = creditUnion.getByText(matched, { exact: true });
+						await expect(details).toHaveAttribute('aria-expanded', 'false');
+						await expect(detail).toBeHidden();
+						await tap(details);
+						await expect(details).toHaveAttribute('aria-expanded', 'true');
+						await expect(detail).toBeVisible();
+						await detail.scrollIntoViewIfNeeded();
+						await expectClearOf(detail, tabBar);
+						await expectNothingPastTheRightEdge(page);
+
+						await details.focus();
+						await page.keyboard.press('Enter');
+						await expect(detail).toBeHidden();
+						await page.keyboard.press('Space');
+						await expect(detail).toBeVisible();
+						await stopFakingPlaidLink();
+					}
+				);
+			}
+		}
+	},
+	'superseded-sync': {
+		title:
+			'a Sync now that finishes after a newer Stop syncing or Bring back leaves their report and focus, and its late failure still shows (the answers stand in for Plaid)',
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const bank = await answerInsteadOfServer(page, 'bankConnections:syncNow');
+			const communityBank = card(page, 'Sample Community Bank');
+			const label = 'Sample Statement Savings ending 6604';
+			const stopped = `Stopped syncing ${label}. Its Transactions stay in Savings.`;
+			const broughtBack = 'Brought back. Set it up to choose where its new transactions go.';
+			const status = communityBank.getByRole('status');
+			const syncNow = communityBank.getByRole('button', { name: /^(Sync now|Syncing…)$/ });
+			const actions = communityBank.getByRole('button', { name: 'Sample Community Bank actions' });
+			const setUp = communityBank.getByRole('button', { name: `Set up ${label}` });
+			const shown = (text: string) =>
+				communityBank.getByRole('paragraph').getByText(text, { exact: true });
+
+			await step('Sync now, then Stop syncing while it runs', async () => {
+				await openBank(page);
+				await syncNow.click();
+				await bank.called('bankConnections:syncNow');
+				await actions.click();
+				await page.getByRole('menuitem', { name: `Stop syncing ${label}` }).click();
+				await expect(status).toHaveText(stopped);
+				await expect(actions).toBeFocused();
+			});
+
+			await step(
+				'the older Sync now succeeds late and leaves the Stop syncing report',
+				async () => {
+					await bank.answer('bankConnections:syncNow', {
+						kind: 'synced',
+						added: 3,
+						matched: 0,
+						held: 0
+					});
+					await expect(syncNow).toHaveText('Sync now');
+					await expect(syncNow).toBeEnabled();
+					await expect(status).toHaveText(stopped);
+					await expect(shown(stopped)).toBeVisible();
+					await expect(actions).toBeFocused();
+				}
+			);
+
+			await step('Sync now again, then Bring back while it runs', async () => {
+				await syncNow.click();
+				await bank.called('bankConnections:syncNow');
+				await communityBank.getByRole('button', { name: `Bring back ${label}` }).click();
+				await expect(status).toHaveText(broughtBack);
+				await expect(setUp).toBeFocused();
+			});
+
+			await step(
+				'the older Sync now fails late: the Bring back report and focus stay, and the failure shows',
+				async () => {
+					await bank.refuse('bankConnections:syncNow', {
+						code: 'BANK_SYNC_UNAVAILABLE',
+						message: notSetUp
+					});
+					await expect(syncNow).toHaveText('Sync now');
+					await expect(status).toHaveText(broughtBack);
+					await expect(shown(broughtBack)).toBeVisible();
+					await expect(setUp).toBeFocused();
+					await expect(
+						communityBank.getByRole('listitem').filter({ hasText: `Sync now failed: ${notSetUp}` })
+					).toBeVisible();
+				}
+			);
 		}
 	},
 	attention: {

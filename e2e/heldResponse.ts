@@ -69,36 +69,60 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 	};
 }
 
-export async function answerInsteadOfServer(page: Page, udfPath: string) {
-	const asked: unknown[] = [];
+export async function answerInsteadOfServer(page: Page, ...udfPaths: string[]) {
+	const asked = new Map(udfPaths.map((udfPath) => [udfPath, [] as unknown[]]));
+	const arrived = new Map<string, () => void>();
 	let browser: WebSocketRoute | undefined;
-	const { promise: called, resolve: markCalled } = Promise.withResolvers<undefined>();
 
 	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => {
 		browser = socket;
 		const server = socket.connectToServer();
 		socket.onMessage((frame) => {
 			const message = parse(frame);
-			if (message.type === 'Action' && message.udfPath === udfPath) {
-				asked.push(message.requestId);
-				markCalled(undefined);
-			} else {
+			const udfPath = typeof message.udfPath === 'string' ? message.udfPath : '';
+			const waiting = message.type === 'Action' ? asked.get(udfPath) : undefined;
+			if (waiting === undefined) {
 				server.send(frame);
+				return;
 			}
+			waiting.push(message.requestId);
+			arrived.get(udfPath)?.();
 		});
 		server.onMessage((frame) => {
 			socket.send(frame);
 		});
 	});
 
+	const waitingFor = (udfPath: string) => {
+		const waiting = asked.get(udfPath);
+		if (waiting === undefined) throw new Error(`${udfPath} is not answered here`);
+		return waiting;
+	};
+	const called = async (udfPath: string) => {
+		const waiting = waitingFor(udfPath);
+		while (waiting.length === 0) {
+			const { promise, resolve } = Promise.withResolvers<undefined>();
+			arrived.set(udfPath, () => {
+				resolve(undefined);
+			});
+			await promise;
+		}
+		return waiting;
+	};
+	const respond = async (udfPath: string, response: object) => {
+		const requestId = (await called(udfPath)).shift();
+		browser?.send(JSON.stringify({ type: 'ActionResponse', requestId, logLines: [], ...response }));
+	};
+
 	return {
-		called,
-		answer(result: unknown) {
-			const requestId = asked.shift();
-			if (requestId === undefined) throw new Error(`No ${udfPath} call is waiting`);
-			browser?.send(
-				JSON.stringify({ type: 'ActionResponse', requestId, success: true, result, logLines: [] })
-			);
+		async called(udfPath: string) {
+			await called(udfPath);
+		},
+		async answer(udfPath: string, result: unknown) {
+			await respond(udfPath, { success: true, result });
+		},
+		async refuse(udfPath: string, error: { code: string; message: string }) {
+			await respond(udfPath, { success: false, result: error.message, errorData: error });
 		}
 	};
 }
