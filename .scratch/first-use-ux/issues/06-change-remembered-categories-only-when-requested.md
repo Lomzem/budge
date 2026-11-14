@@ -1,6 +1,6 @@
 # 06: Change remembered Categories only when requested
 
-**Status:** landed — review pending
+**Status:** done
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -100,3 +100,58 @@ Evidence is under `test-results/`.
 2. With the row picker open, Tab first stops on the list's scroll viewport, so Remember is reached with Shift+Tab. Is that acceptable?
 3. Choosing Remember with Uncategorized or a Transfer is not offered. Should "forget this Payee's Category" be a separate choice later?
 
+### Review fixes 2026-11-13 (commits 8b8573d..f7f8094 on `feat/first-use-ux`)
+
+Review: `.scratch/first-use-ux/reviews/06/review.md` (no production defect; one P3). The owner's decisions are binding.
+
+**P3: the rename-memory recipe still expected automatic Category memory. Fixed** (f0bebbb).
+
+- `.agents/skills/verify-budge/features/payees.md` (Rename memory): to expect Groceries on the next import, the recipe now checks `Remember for Sample Verification Shop’s later imports` before Save. A separate branch keeps the claim that renaming alone remembers the Bank Text. It renames `SAMPLE MEMORY 9002` to `Sample Verification Kiosk` with Groceries and Remember left unchecked, and the next exact-text import must show the Kiosk with Uncategorized.
+- Driven in the browser rather than only traced (scripts kept in `test-results/ticket-06-fix/`). Each Payee was imported, edited, re-imported with the same Bank Text and a different amount, then reloaded:
+  - Shop, Remember checked: both rows Groceries.
+  - Kiosk, unchecked: the edited row Groceries, the new import Uncategorized under the friendly Payee.
+  - Evidence: `test-results/verify-budge/t06-fix-rename-recipe-2`. The first attempt, `t06-fix-rename-recipe`, reused an amount and hit duplicate detection; that was the script, not the app.
+
+**Glossary: Remembered Category added** (8b8573d), through `domain-modeling`.
+
+- The definition: the Category chosen for a Payee, which fills later imports and new Transactions entered for it, changes only on an explicit remember, never through a one-off edit, and so need not be the Payee's latest Transaction's Category. Imports it fills are still Unapproved.
+- _Avoid_: Last Category, default Category.
+- No field, API or UI copy was renamed.
+
+**Forward Tab order: proved, and the list's focus ring fixed** (f0bebbb, f7f8094).
+
+- **Probe (1280×800, row picker on Sample Landlord):**
+  - Forward Tab from the search: the list's scroll viewport, then Remember, then back to the search.
+  - Shift+Tab reverses the same path. Every stop matched `:focus-visible`.
+  - Evidence: `test-results/verify-budge/t06-fix-tab-probe-2`.
+- **Defect found: the ring on the list stop was clipped.** It drew 2 px outside the viewport and was cut off by the popover, so only a faint line under Search showed (`t06-fix-tab-probe-2/zoom-1.png`).
+- **Fix:** `src/lib/components/ui/command/command-list.svelte` gives its viewport `focus-visible:-outline-offset-2`, matching the standalone ScrollArea. The ring now draws fully around the list (`t06-fix-tab-probe-3/zoom-1.png`; Remember's ring is in `zoom-2.png`). The category picker is the only user of the Command list.
+- **Journey.** `payees/remember`'s keyboard step now uses the forward path: ArrowDown, Tab (focus is in the `Choices` listbox), Tab (Remember focused), Space, Shift+Tab (in the list), Shift+Tab (search), Enter. The old Shift+Tab-from-search shortcut assertion was replaced; the trap still cycles that way. The feature map's journey line was updated.
+- **Red/green.** The fault was a Tab handler on the list that sent forward Tab back to the search, skipping Remember; it was reverted.
+  - The previous journey still passed under the fault: `test-results/verify-budge/t06-fix-fault-old-journey`. It proved only the reverse shortcut.
+  - The new journey failed at `Remember … toBeFocused`: `t06-fix-fault-red`.
+  - With the fault reverted it passed: `t06-fix-forward-green`.
+  - Visible focus is proved by the screenshots, not asserted. A pixel or computed-style assertion would pin styling.
+- **Test-audit gate.**
+  - Contract: forward and reverse keyboard reach of Remember in the open row picker.
+  - Regression: a focus trap that loops the list back to the search.
+  - Why existing proof missed it: it drove only Shift+Tab from the search.
+  - The owning journey step was extended, with no new test and no seam.
+
+**Forget a Remembered Category: deferred to a later ticket. No code.**
+
+- Uncategorized and a Transfer are choices for one Transaction. They must not silently clear a Payee's memory, so Remember stays unavailable for them.
+- Forgetting is its own user action. It should leave historical Categories untouched and make later imports Uncategorized. It needs its own scope and proof.
+- Nothing in tickets 07 or 08 depends on it.
+
+**Checks**
+
+- `bun run check` in a temporary worktree, with capacity:check: exit 0, 58 files and 905 tests (`test-results/ticket-06-fix/check.log`).
+- Affected journeys, all passed (`test-results/verify-budge/t06-fix-affected-2`): payees/last-category, payees/remember, transactions/create, late-save, categorize, categorize-late, approve-all-undo, approve-phone.
+- Prettier, ESLint, shadcn-lint and gitleaks hooks passed on each commit.
+- Full `bun run test:e2e:local` with the content of f7f8094: 52 passed (7.3 min) (`test-results/ticket-06-fix/e2e.log`).
+- The local backend started normally; the reviewer's DNS `EAI_AGAIN` did not recur. The app was stopped (`app down`) and the worktree removed.
+
+**Open question**
+
+1. The glossary now avoids "Last Category", but UI copy still says `Looking up the last Category…`, `Budge couldn't look up this Payee's last Category…`, and the `payees/last-category` journey title uses it too. Should that copy say "Remembered Category" in a later ticket? It was left alone here, as the owner asked for no renames.
