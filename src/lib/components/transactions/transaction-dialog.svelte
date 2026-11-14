@@ -12,7 +12,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import CategoryPicker from '$lib/components/category-picker.svelte';
-	import RememberChoice from '$lib/components/remember-choice.svelte';
+	import OptInChoice from '$lib/components/opt-in-choice.svelte';
 	import type { Choices } from '$lib/components/choices';
 	import SelectField from '$lib/components/select-field.svelte';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
@@ -354,7 +354,7 @@
 		</p>
 	{:else}
 		{@const copy = rememberCopy(choices, offer.payee, offer.remembered)}
-		<RememberChoice bind:checked={draft.remember} label={copy.label} hint={copy.hint} />
+		<OptInChoice bind:checked={draft.remember} label={copy.label} hint={copy.hint} />
 	{/if}
 {/snippet}
 

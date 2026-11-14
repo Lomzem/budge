@@ -711,7 +711,7 @@
 				value={pending ?? savedOptionOf(row)}
 				shown={pending === undefined ? category : undefined}
 				choices={choicesFor(row)}
-				remember={rememberingFor(row)}
+				optIn={rememberingFor(row)}
 				onValueChange={(option: string, remember: boolean) =>
 					pickCategory(row, option, payee, remember)}
 			/>

@@ -18,15 +18,15 @@
 <div class="flex items-start gap-2 break-words">
 	<span class="mt-0.5 flex">
 		<Checkbox
-			id="{id}-remember"
+			id="{id}-opt-in"
 			bind:checked
-			aria-describedby={hint === '' ? undefined : `${id}-remember-hint`}
+			aria-describedby={hint === '' ? undefined : `${id}-opt-in-hint`}
 		/>
 	</span>
 	<span class="flex min-w-0 flex-col gap-0.5">
-		<Label for="{id}-remember">{label}</Label>
+		<Label for="{id}-opt-in">{label}</Label>
 		{#if hint !== ''}
-			<span id="{id}-remember-hint" class="text-xs text-muted-foreground">{hint}</span>
+			<span id="{id}-opt-in-hint" class="text-xs text-muted-foreground">{hint}</span>
 		{/if}
 	</span>
 </div>
