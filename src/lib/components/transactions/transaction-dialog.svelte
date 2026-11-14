@@ -12,6 +12,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import CategoryPicker from '$lib/components/category-picker.svelte';
+	import RememberChoice from '$lib/components/remember-choice.svelte';
 	import type { Choices } from '$lib/components/choices';
 	import SelectField from '$lib/components/select-field.svelte';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
@@ -20,7 +21,7 @@
 	import { SPLIT_LINE_LIMIT } from '$lib/domain/splits';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 
-	import { categoryChoices, transferChoices } from './categoryChoices';
+	import { categoryChoices, labelOf, rememberCopy, transferChoices } from './categoryChoices';
 	import {
 		addLine,
 		choose,
@@ -31,10 +32,11 @@
 		followSaved,
 		linkQuery,
 		lookupOf,
+		memoryQuery,
 		NEW_SIDE,
 		openDraft,
 		optionOf,
-		recallQuery,
+		type Remembering,
 		removeLine,
 		savedCategoryOf,
 		view,
@@ -109,7 +111,7 @@
 
 	const payeeMemory = useQuery(
 		api.payees.lastCategory,
-		() => (open ? recallQuery(draft) : undefined) ?? 'skip'
+		() => (open ? memoryQuery(draft) : undefined) ?? 'skip'
 	);
 	const world: World = $derived({
 		saved: transaction,
@@ -342,6 +344,19 @@
 		);
 	}
 </script>
+
+{#snippet remembering(offer: Remembering)}
+	{@const choices = selectionChoices()}
+	{#if offer.already}
+		<p class="text-sm text-muted-foreground">
+			{labelOf(choices, optionOf(shown.selection)) ?? 'This Category'} is remembered for {offer.payee}’s
+			later imports.
+		</p>
+	{:else}
+		{@const copy = rememberCopy(choices, offer.payee, offer.remembered)}
+		<RememberChoice bind:checked={draft.remember} label={copy.label} hint={copy.hint} />
+	{/if}
+{/snippet}
 
 {#snippet splitLines()}
 	<fieldset class="flex flex-col gap-3 rounded-lg border border-border p-3">
@@ -629,6 +644,9 @@
 				/>
 				{#if shown.selection.kind === 'recallFailed'}
 					<p class="text-sm text-destructive" role="alert">{shown.selection.message}</p>
+				{/if}
+				{#if shown.remembering}
+					{@render remembering(shown.remembering)}
 				{/if}
 				{#if shown.selection.kind === 'split'}
 					{@render splitLines()}

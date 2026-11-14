@@ -4,6 +4,8 @@
 	import * as Command from '$lib/components/ui/command';
 	import * as Popover from '$lib/components/ui/popover';
 
+	import RememberChoice from './remember-choice.svelte';
+
 	import { matchingChoices, type Choice, type Choices } from './choices';
 
 	let {
@@ -15,6 +17,7 @@
 		required = false,
 		inline = false,
 		searchLabel = 'Search Categories',
+		remember,
 		onValueChange,
 		...trigger
 	}: {
@@ -31,7 +34,14 @@
 		required?: boolean;
 		inline?: boolean;
 		searchLabel?: string;
-		onValueChange?: (value: string) => void;
+		remember?:
+			| {
+					readonly label: string;
+					readonly hint: string;
+					readonly accepts: (value: string) => boolean;
+			  }
+			| undefined;
+		onValueChange?: (value: string, remember: boolean) => void;
 	} = $props();
 
 	let open = $state(false);
@@ -39,6 +49,7 @@
 	let highlighted = $state('');
 	let searchField = $state<HTMLInputElement | null>(null);
 	let list = $state<HTMLElement | null>(null);
+	let remembering = $state(false);
 
 	const flat = $derived(choices.flatMap((entry) => ('group' in entry ? entry.choices : [entry])));
 	const chosen = $derived(flat.find((choice) => choice.value === value));
@@ -52,6 +63,7 @@
 		const tabBar = parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom);
 		clearOfTabBar = 8 + (Number.isFinite(tabBar) ? tabBar : 0);
 		search = seed;
+		remembering = false;
 		highlighted = seed === '' && chosen ? key(chosen.value) : '';
 		open = true;
 	}
@@ -98,14 +110,15 @@
 	function pick(choice: string) {
 		value = choice;
 		open = false;
-		onValueChange?.(choice);
+		onValueChange?.(choice, remember !== undefined && remembering);
 	}
 </script>
 
 {#snippet item(choice: Choice)}
 	<Command.Item
 		value={key(choice.value)}
-		disabled={choice.disabled ?? false}
+		disabled={(choice.disabled ?? false) ||
+			(remembering && remember?.accepts(choice.value) === false)}
 		checked={choice.value === value}
 		onSelect={() => {
 			pick(choice.value);
@@ -173,5 +186,10 @@
 				</p>
 			{/if}
 		</Command.Root>
+		{#if remember}
+			<div class="shrink-0 border-t px-3 py-2">
+				<RememberChoice bind:checked={remembering} label={remember.label} hint={remember.hint} />
+			</div>
+		{/if}
 	</Popover.Content>
 </Popover.Root>

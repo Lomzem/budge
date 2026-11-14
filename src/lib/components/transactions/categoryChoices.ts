@@ -35,3 +35,20 @@ export function transferChoices(accounts: readonly AccountChoice[]): Choices {
 		}
 	];
 }
+
+export function labelOf(choices: Choices, value: string): string | undefined {
+	return choices
+		.flatMap((entry) => ('group' in entry ? entry.choices : [entry]))
+		.find((entry) => entry.value === value)?.label;
+}
+
+export function rememberCopy(
+	choices: Choices,
+	payee: string,
+	remembered: string | null | undefined
+): { readonly label: string; readonly hint: string } {
+	const label = `Remember for ${payee}’s later imports`;
+	if (remembered === undefined) return { label, hint: '' };
+	if (remembered === null) return { label, hint: 'Nothing is remembered yet.' };
+	return { label, hint: `Remembered now: ${labelOf(choices, remembered) ?? 'another Category'}.` };
+}

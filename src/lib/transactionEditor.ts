@@ -39,6 +39,7 @@ export interface Draft {
 	readonly lines: Line[];
 	readonly choice: Choice;
 	readonly picked: boolean;
+	remember: boolean;
 	readonly link: string | undefined;
 	readonly nextLineKey: number;
 	readonly filledFrom: SavedSize | null;
@@ -52,6 +53,7 @@ interface SavedSize {
 export interface Saved extends SavedSize {
 	readonly accountId: Id<'accounts'>;
 	readonly payeeName: string | null;
+	readonly startingBalance: boolean;
 	readonly memo: string | null;
 	readonly categoryId: Id<'categories'> | null;
 	readonly categoryName: string | null;
@@ -101,8 +103,15 @@ export type Payload =
 	| { readonly kind: 'invalid'; readonly message: string; readonly field: Field }
 	| { readonly kind: 'ready'; readonly fields: Fields };
 
+export interface Remembering {
+	readonly payee: string;
+	readonly remembered: Id<'categories'> | null | undefined;
+	readonly already: boolean;
+}
+
 export interface View<Candidate> {
 	readonly selection: Selection;
+	readonly remembering: Remembering | undefined;
 	readonly transferAccounts: readonly AccountChoice[];
 	readonly cardPayment: boolean;
 	readonly remainder: number | undefined;
@@ -161,6 +170,7 @@ export function openDraft(start: {
 			lines: [],
 			choice: { kind: 'uncategorized' },
 			picked: false,
+			remember: false,
 			link: undefined,
 			nextLineKey: 0,
 			filledFrom: null
@@ -183,6 +193,7 @@ export function openDraft(start: {
 		lines,
 		choice: choiceOf(saved),
 		picked: false,
+		remember: false,
 		link: undefined,
 		nextLineKey: lines.length,
 		filledFrom: { date: saved.date, amount: saved.amount }
@@ -210,8 +221,26 @@ function recallsCategory(draft: Draft) {
 }
 
 export function recallQuery(draft: Draft): { name: string } | undefined {
+	return recallsCategory(draft) ? memoryQuery(draft) : undefined;
+}
+
+export function memoryQuery(draft: Draft): { name: string } | undefined {
 	const name = draft.payee.trim();
-	return recallsCategory(draft) && name !== '' ? { name } : undefined;
+	return name === '' ? undefined : { name };
+}
+
+function rememberingOf(
+	draft: Draft,
+	world: World,
+	choice: Choice | undefined
+): Remembering | undefined {
+	const query = memoryQuery(draft);
+	if (choice?.kind !== 'category' || query === undefined || world.saved?.startingBalance) {
+		return undefined;
+	}
+	const memory = world.payeeMemory;
+	const remembered = memory.kind === 'loaded' && !memory.stale ? memory.data : undefined;
+	return { payee: query.name, remembered, already: remembered === choice.categoryId };
 }
 
 function categoryIn(world: World, id: string): Id<'categories'> | undefined {
@@ -498,7 +527,8 @@ function payloadOf(
 	world: World,
 	choice: Choice,
 	transferAccounts: readonly AccountChoice[],
-	linked: { readonly _id: Id<'transactions'> } | undefined
+	linked: { readonly _id: Id<'transactions'> } | undefined,
+	remembering: Remembering | undefined
 ): Payload {
 	const account = world.accounts.find((a) => a._id === draft.accountId);
 	const amount = signedAmount(draft);
@@ -513,7 +543,12 @@ function payloadOf(
 		case 'category':
 			return {
 				kind: 'ready',
-				fields: { ...shared, payee: draft.payee, categoryId: choice.categoryId }
+				fields: {
+					...shared,
+					payee: draft.payee,
+					categoryId: choice.categoryId,
+					...(draft.remember && remembering?.already === false ? { rememberCategory: true } : {})
+				}
 			};
 		case 'split': {
 			const splits = splitsOf(draft, world);
@@ -553,6 +588,7 @@ export function view<Candidate extends { readonly _id: Id<'transactions'> }>(
 			? (draft.link ?? NEW_SIDE)
 			: (candidates[0]?._id ?? NEW_SIDE);
 	const choice = resolvedChoice(selection);
+	const remembering = rememberingOf(draft, world, choice);
 	const linkLoading = linkQuery(draft, world) !== undefined && linkCandidates.kind === 'loading';
 	const payload: Payload =
 		choice === undefined || linkLoading
@@ -562,10 +598,12 @@ export function view<Candidate extends { readonly _id: Id<'transactions'> }>(
 					world,
 					choice,
 					transferAccounts,
-					candidates.find((candidate) => candidate._id === link)
+					candidates.find((candidate) => candidate._id === link),
+					remembering
 				);
 	return {
 		selection,
+		remembering,
 		transferAccounts,
 		cardPayment: isCardPayment(draft, selection, world.accounts),
 		remainder: remainderOf(draft),

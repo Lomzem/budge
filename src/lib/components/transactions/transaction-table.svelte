@@ -35,7 +35,7 @@
 		savedOptionOf
 	} from '$lib/transactionEditor';
 
-	import { categoryChoices, transferChoices } from './categoryChoices';
+	import { categoryChoices, labelOf, rememberCopy, transferChoices } from './categoryChoices';
 	import ImportDialog from './import-dialog.svelte';
 	import TransactionDialog from './transaction-dialog.svelte';
 	import {
@@ -363,9 +363,28 @@
 		return !found.ok || found.value.length > 0;
 	}
 
-	async function pickCategory(row: Row, option: string, payee: string) {
-		const choice = rowChoiceFor(option);
-		if (choice === undefined || option === (picked.get(row._id) ?? savedOptionOf(row))) return;
+	function rememberingFor(row: Row) {
+		if (row.payeeName === null || row.startingBalance) return undefined;
+		const choices = choicesFor(row);
+		return {
+			...rememberCopy(choices, row.payeeName, row.rememberedCategoryId),
+			accepts: (option: string) => rowChoiceFor(option)?.kind === 'category'
+		};
+	}
+
+	function changeOf(row: Row, option: string, remember: boolean) {
+		const found = rowChoiceFor(option);
+		if (found === undefined) return undefined;
+		const remembers = remember && found.kind === 'category';
+		const unchanged = option === (picked.get(row._id) ?? savedOptionOf(row));
+		if (unchanged && (!remembers || option === row.rememberedCategoryId)) return undefined;
+		return { choice: remembers ? { ...found, remember } : found, remembers };
+	}
+
+	async function pickCategory(row: Row, option: string, payee: string, remember: boolean) {
+		const change = changeOf(row, option, remember);
+		if (change === undefined) return;
+		const { choice, remembers } = change;
 		rowError = '';
 		const pick = (latestPick.get(row._id) ?? 0) + 1;
 		latestPick.set(row._id, pick);
@@ -385,10 +404,10 @@
 			rowError = "Budge couldn't change the Category. Try again.";
 			return;
 		}
-		const label = choicesFor(row)
-			.flatMap((entry) => ('group' in entry ? entry.choices : [entry]))
-			.find((entry) => entry.value === option)?.label;
-		announce(`${label ?? 'Category'} saved for ${payee}`);
+		const label = labelOf(choicesFor(row), option) ?? 'Category';
+		announce(
+			remembers ? `${label} saved and remembered for ${payee}` : `${label} saved for ${payee}`
+		);
 		await tick();
 		if (document.activeElement === document.body) focusAfterCategorize(row, at);
 	}
@@ -692,7 +711,9 @@
 				value={pending ?? savedOptionOf(row)}
 				shown={pending === undefined ? category : undefined}
 				choices={choicesFor(row)}
-				onValueChange={(option: string) => pickCategory(row, option, payee)}
+				remember={rememberingFor(row)}
+				onValueChange={(option: string, remember: boolean) =>
+					pickCategory(row, option, payee, remember)}
 			/>
 		</span>
 	{/if}

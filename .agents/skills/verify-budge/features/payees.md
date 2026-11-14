@@ -1,16 +1,18 @@
 # Payees and rename memory
 
-Reuse the last Category for a Payee and remember an edited imported Payee for exactly the same Bank Text.
+Reuse a Payee's remembered Category, change it only when the owner checks Remember, and remember an edited imported Payee for exactly the same Bank Text.
 
 ## Sub-features
 
-- `payee-category`: prefill last Category, respect explicit override.
+- `payee-category`: prefill the remembered Category, respect explicit override.
+- `payee-remember`: a Category picked from a row or saved in the dialog is a one-off unless `Remember for <Payee>’s later imports` is checked; only a checked save changes the remembered Category that later imports and the dialog use.
 - `payee-memory`: exact Bank Text rename reused, differing text stays distinct.
 - `payee-global-rename`: public API rename and search refresh, currently without a UI entry.
 
 ## How to get to it (user POV)
 
-- Add/Edit Transaction → Payee and Category or Transfer. The Accounts page or a named Account → Payee filter (`#transaction-filter-payee`, populated by `payees.list`).
+- Add/Edit Transaction → Payee and Category or Transfer; with a Category and a Payee, the `Remember for <Payee>’s later imports` checkbox under it (its description says what is remembered now), or `<Category> is remembered for <Payee>’s later imports.` when the pick already is.
+- A register row's Category picker → the same checkbox at the foot of the open list (not on splits, Transfers without a Payee, or a Starting Balance). While it is checked only Categories can be picked; picking the row's current Category again remembers it. The Accounts page or a named Account → Payee filter (`#transaction-filter-payee`, populated by `payees.list`).
 - Import file → saved imported row → Edit Transaction → Payee.
 - Global Payee rename has no visible menu or route in this checkout.
 
@@ -19,6 +21,7 @@ Reuse the last Category for a Payee and remember an edited imported Payee for ex
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/payees.ts`, also run by `bun run test:e2e:local`):
 
 - `payees/last-category`: the Category memory recipe up to keeping an explicitly picked Category.
+- `payees/remember`: a one-off row pick leaves the remembered Rent; by keyboard (ArrowDown, Shift+Tab to Remember, Space, Tab, Enter) the same Category is remembered and announced; in the dialog a new Payee's unchecked save stays unremembered and a checked one is remembered; on a 320 px phone Remember is clear of the tab bar.
 
 The recipes below cover what the journeys leave out.
 
@@ -38,4 +41,5 @@ Preconditions:
 
 - `payees.rename` exists publicly but is not wired to UI. Record that missing entry point explicitly.
 - Rename-memory rows are created through real imported-Transaction edits; do not seed them through internal setters.
-- Sources: ticket 15–16; public `payees.list/lastCategory/rename`.
+- The server owns the policy: `saveTransaction` takes a required `rememberCategory`; `transactions.create/update` take `rememberCategory`, `transactions.categorize`'s Category choice takes `remember`. Taking the bank's version never remembers. The import outcomes of the policy are proved by `convex/payees.test.ts`, not by a journey.
+- Sources: ticket 15–16, first-use UX ticket 06; public `payees.list/lastCategory/rename`.

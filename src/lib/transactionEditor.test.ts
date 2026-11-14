@@ -78,6 +78,7 @@ function savedRow(changes: Partial<Saved> = {}): Saved {
 		date: '2026-10-30',
 		amount: -1250,
 		payeeName: 'Corner Market',
+		startingBalance: false,
 		memo: null,
 		categoryId: null,
 		categoryName: null,
