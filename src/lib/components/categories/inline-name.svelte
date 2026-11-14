@@ -27,6 +27,7 @@
 	let draft = $state('');
 	let pending: string | null = $state(null);
 	let error = $state('');
+	let failed: { name: string; error: string } | null = $state(null);
 	let latest = 0;
 	const errorId = $props.id();
 
@@ -36,8 +37,9 @@
 		draftOpened = editing;
 		if (!opening) return;
 		untrack(() => {
-			draft = pending ?? name;
-			error = '';
+			draft = pending ?? failed?.name ?? name;
+			error = failed?.error ?? '';
+			failed = null;
 		});
 	});
 
@@ -48,11 +50,13 @@
 		if (ticket !== latest) return;
 		pending = null;
 		if (saved.ok) return;
-		const typingAnotherName = editing;
+		const message = saved.error?.message ?? "Budge couldn't rename it. Try again.";
+		if (editing) {
+			error = message;
+			return;
+		}
+		failed = { name: next, error: message };
 		editing = true;
-		await tick();
-		if (!typingAnotherName) draft = next;
-		error = saved.error?.message ?? "Budge couldn't rename it. Try again.";
 	}
 
 	function commit(): boolean {
@@ -109,6 +113,11 @@
 			}}
 		/>
 		{#if error}<p id={errorId} role="alert" class="mt-1 text-sm text-destructive">{error}</p>{/if}
+	</div>
+{:else if failed}
+	<div class={['flex min-w-0 flex-1 flex-col', className]}>
+		{@render children(name)}
+		<p role="alert" class="mt-1 text-sm text-destructive">{failed.error}</p>
 	</div>
 {:else}
 	{@render children(pending ?? name)}

@@ -127,6 +127,61 @@ export async function answerInsteadOfServer(page: Page, ...udfPaths: string[]) {
 	};
 }
 
+export async function failFirstCallTo(page: Page, ...udfPaths: string[]) {
+	const calls = new Map<string, { requestId: unknown } & PromiseWithResolvers<undefined>>(
+		udfPaths.map((udfPath) => [
+			udfPath,
+			{ requestId: undefined, ...Promise.withResolvers<undefined>() }
+		])
+	);
+	let browser: WebSocketRoute | undefined;
+
+	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => {
+		browser = socket;
+		const server = socket.connectToServer();
+		socket.onMessage((frame) => {
+			const message = parse(frame);
+			const call =
+				message.type === 'Mutation' && typeof message.udfPath === 'string'
+					? calls.get(message.udfPath)
+					: undefined;
+			if (call !== undefined && call.requestId === undefined) {
+				call.requestId = message.requestId;
+				call.resolve(undefined);
+				return;
+			}
+			server.send(frame);
+		});
+		server.onMessage((frame) => {
+			socket.send(frame);
+		});
+	});
+
+	const callTo = (udfPath: string) => {
+		const call = calls.get(udfPath);
+		if (call === undefined) throw new Error(`${udfPath} is not failed here`);
+		return call;
+	};
+	return {
+		async called(udfPath: string) {
+			await callTo(udfPath).promise;
+		},
+		failWithServerError(udfPath: string) {
+			const { requestId } = callTo(udfPath);
+			if (requestId === undefined) throw new Error(`${udfPath} has not been called`);
+			browser?.send(
+				JSON.stringify({
+					type: 'MutationResponse',
+					requestId,
+					success: false,
+					result: 'Server Error',
+					logLines: []
+				})
+			);
+		}
+	};
+}
+
 export async function pausableSync(page: Page) {
 	const queued: Frame[] = [];
 	let browser: WebSocketRoute | undefined;

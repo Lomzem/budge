@@ -80,3 +80,50 @@ Commits on `feat/ux-efficiency`: `f821979` (cherry-pick of `52e699e`, conflicts 
 ### Status of all 26 items
 
 Items 1–12 implemented (`f821979`) and repaired (`17bbcc5`), proven by `budget/*`, `categories/*`, `inspector/*`, `targets/monthly`; 13–20 from `c7d354b`, proven by `search/*`, `transactions/*`, `splits/*` in the full run; 21–26 from `3374532`, proven by the copy journeys. All 26 implemented; independent judges pending.
+
+## Final review repairs (Opus 5.5, isolated checkout `t3/integration-review-repairs`)
+
+Base `6f4fe2f` (last code `17bbcc5`), worktree `/home/lomzem/.t3/worktrees/budge/t3-70d3dfa3-145e8cc7c58da72e`. Findings from the final Standards review, `/home/lomzem/proj/budge/test-results/ux-efficiency/reviews/integration-standards.md` (Standards items 1–3; "IS-n" below). No Convex, copy or other behavior changes; the 26 items are untouched apart from these repairs.
+
+### Dispositions
+
+| Finding | Disposition | Change | Proof (user boundary, persisted) |
+| --- | --- | --- | --- |
+| IS-1 (P2) failed rename takes another row's newer editor | Fixed | `inline-name.svelte`: a failed save while this name is open shows the error in place (unchanged); otherwise it keeps `{ name, error }` and asks its owner to reopen it. The Categories owner (`editing(id)` setter) now only grants a reopen when no other name is open (`renaming ??= id`); user opens (click, Rename) still set `renaming` directly. If refused, the failure is shown beside the persisted name (`role="alert"`), and the next open of that name restores the failed name and error to retry. The inspector's single editor always grants, so its recovery is unchanged. | New `categories/failed-rename` (320 px): first `categories:rename` / `categories:renameGroup` call failed at the Convex WebSocket with a plain server error (`failFirstCallTo` in `e2e/heldResponse.ts`; the request never reaches the server, nothing is saved, no success is fabricated). Red on prior code (`red-1`): Groceries' editor reopened (`textbox "Category name": Sample Refused Groceries`) and Coffee's unsubmitted draft was gone. Green after: Coffee keeps `Sample Typed Coffee` and focus, Groceries shows the alert beside its name; Coffee saves; Groceries reopens with the failed name and error and saves; reload shows both saved names and the group's old name. Also proves the existing no-other-editor recovery (group reopens with draft, error as the field's description) and no page overflow at 320. |
+| IS-2 (P2) a foreign pointer's cancel/lost capture ends the owned drag | Fixed | `reorder.ts`: `pointercancel` / `lostpointercapture` go through `interrupt`, which ends the drag only for the owning `pointerId` (as move/drop do). Escape and attachment teardown still call `end()` unconditionally (transforms, `data-dragging`, rAF, Escape listener and capture cleared, no `onmove`). | `categories/reorder` step "a second finger tapping Coffee's handle mid-drag leaves the first finger to drop it" with real CDP touch: finger 2 on the dragged handle lifts (`touchEnd` with only that finger fires its `lostpointercapture` on the handle; event order recorded below). Red on prior code (`red-2`): order unchanged (`Coffee` first), the drag silently ended. Green after: Coffee dropped two rows down, persisted through the journey's reload and Budget order. |
+| IS-3 (P3) feature map overstated `categories/reorder` | Fixed by adding retained proof and narrowing the rest | Journey gained own-cancel steps at 320 px: a CDP touch drag ended by `touchCancel` and a mouse drag ended by Escape each move nothing, the row returns to its resting position (bounding box), order unchanged. Map corrected: touch steps are 320 px (not 390); lists exactly the retained steps; states that the owning pointer's own `lostpointercapture`, leaving the page mid-drag, and native gesture cancel are not in the journey (one-off probes only). `categories/failed-rename` added to the map. | `featureMap.test.ts` passes in `bun run test`. |
+
+Second-finger CDP behaviour (probe `test-results/verify-budge/second-finger-probe/probe-finger.ts`, run from the checkout root while the app ran; output observed in-session): omitting a finger from a `touchMove` does not lift it (both lift on the final `touchEnd`), while `touchEnd` listing only finger 2 gives `pointerdown 2, gotpointercapture 2, pointerdown 3, gotpointercapture 3, pointerup 3, lostpointercapture 3 …` on the handle — the foreign-pointer event IS-2 needs. The journey uses that form.
+
+Design decision (IS-1): the decision "may this name reopen?" belongs to the owner of the shared editor slot (Categories page), not to `InlineName`, which has no view of other rows. No new prop or global: the existing bindable `editing` setter expresses the refusal, and `InlineName` reacts to whether it actually opened (its `failed` value either initialises the draft on open or stays as the in-row alert). Rejected: re-opening A after B closes (would steal focus from whatever the user did next), and a page-level message (detached from the row, off screen on phones).
+
+### Checks (app stopped for static checks)
+
+- Launch (verify-budge): no `.local-app/running.json` before start; `bun run app up` → `starting the local anonymous backend…`, `up at http://127.0.0.1:5173 (backend http://127.0.0.1:3210)`; worktree `.env.local` written by the CLI holds `CONVEX_DEPLOYMENT=anonymous…` (values not printed); `doctor` all ok; `login`, `seed budget-with-accounts` exit 0. Parent checkout and its env untouched.
+- Runs (`test-results/verify-budge/` in this worktree, `summary.json` records base `6f4fe2f` + uncommitted repair diff): `red-1` (prior production code: `categories/failed-rename` FAIL at step 3, `categories/reorder` pass because the first second-finger form lifted the wrong finger), `red-2` (corrected form: `categories/reorder` FAIL at the second-finger step), `green-1` (failed-rename, reorder, late-rename pass), `green-2` (failed-rename at 320 pass), `final-focused` 12/12: `budget/{assign,assign-back,month-jump,needs-you,phone-groups}`, `categories/{failed-rename,late-rename,manage,reorder}`, `inspector/{cover-and-manage,move-money}`, `targets/monthly`; `final-repeat` reorder + failed-rename pass. Only comment lines changed after `final-focused` (lint `local/no-comments`).
+- `bun run app down` exit 0; `running.json` absent afterwards; evidence directories kept.
+- `codegen:check`, `format:check`, `lint`, `lint:ui`, `typecheck` (0 errors/warnings), `bun run test` 58 files / 929 tests: pass. Full E2E (61→62 journeys) and `capacity:check` not rerun (scoped change; capacity independently checked by the parent).
+- Local `code-review` skill not run here (it fans out to sub-agents, out of scope for this checkout); the parent runs fresh review rechecks.
+
+### Changed files
+
+`src/lib/reorder.ts`, `src/lib/components/categories/inline-name.svelte`, `src/routes/(app)/categories/+page.svelte`, `e2e/heldResponse.ts` (`failFirstCallTo`), `e2e/journeys/categories.ts` (`failed-rename`; reorder interruption steps and order expectations after them), `.agents/skills/verify-budge/features/categories.md`.
+
+### Test-audit gate
+
+- `categories/failed-rename`: contract = a failed rename never discards another row's draft/focus, the failure stays visible on its own row and retryable, persisted names correct. Regression = unconditional reopen (red-1). Existing `late-rename` only covered successful responses on the same row. The failure is injected at the existing production transport boundary (Convex WebSocket), labelled; real server refusal of a rename needs a deleted row, which would remove the row under test.
+- Reorder steps: contracts = own cancel/Escape commit nothing and restore rows; a foreign pointer cannot end the owner's drag. Assertions are user-visible geometry and persisted order, not handler calls or transforms. Regression = unconditional cancel (red-2). No algorithm mirroring, no global event harness.
+- No production test-only flags or exports.
+
+### Principles that changed a choice
+
+- **Model the Domain / Separate Before Serializing Shared State:** the shared `renaming` slot has one owner; the fix puts the reopen decision there instead of giving `InlineName` knowledge of other rows.
+- **Experience First:** failure shown beside the failed name and restored on reopen, rather than a later focus-stealing reopen or a detached page message.
+- **Prove It Works / Fix Root Causes:** the first second-finger step passed on broken code; instrumenting the actual pointer events showed CDP lifted the wrong finger, so the step was corrected and then shown red before the fix.
+- **Test Behavior, Not Implementation:** journeys assert focus, drafts, alerts, row positions and reloaded order.
+
+### Remaining
+
+- Not retained in a journey: the owning pointer's own `lostpointercapture`, leaving the page mid-drag, native OS gesture cancel (probe-only, labelled in the map).
+- A failure alert stays beside a name until that name is opened again (by design; a reload clears it).
+- Fresh review rechecks and three judges at the final SHA remain with the parent.

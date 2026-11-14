@@ -64,7 +64,7 @@
 				return renaming === id;
 			},
 			set current(on: boolean) {
-				if (on) renaming = id;
+				if (on) renaming ??= id;
 				else if (renaming === id) renaming = null;
 			}
 		};

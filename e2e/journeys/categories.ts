@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-import { holdResponseTo } from '../heldResponse';
+import { failFirstCallTo, holdResponseTo } from '../heldResponse';
 import {
 	choicesOf,
 	choose,
@@ -83,6 +83,30 @@ async function touchDragToTheBottomEdge(page: Page, handle: Locator, until: Loca
 	await expect(until).toBeInViewport();
 	await touch('touchEnd', nearTheBottomEdge);
 	await finger.detach();
+}
+
+interface Finger {
+	id: number;
+	x: number;
+	y: number;
+}
+
+async function touchscreen(page: Page) {
+	const cdp = await page.context().newCDPSession(page);
+	return {
+		async touch(type: 'touchStart' | 'touchMove' | 'touchEnd' | 'touchCancel', fingers: Finger[]) {
+			await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: fingers });
+		},
+		async detach() {
+			await cdp.detach();
+		}
+	};
+}
+
+async function centerOf(locator: Locator) {
+	const box = await locator.boundingBox();
+	if (box === null) throw new Error('The element is not on screen.');
+	return { x: box.x + box.width / 2, y: box.y + box.height / 2, top: box.y };
 }
 
 export const categories = {
@@ -322,6 +346,94 @@ export const categories = {
 					.toEqual([...before.filter((name) => name !== 'Savings Goals'), 'Savings Goals']);
 			});
 
+			const coffeeRow = everyday
+				.getByRole('listitem')
+				.filter({ has: page.getByRole('button', { name: 'Move Coffee', exact: true }) });
+			const coffeeHandle = everyday.getByRole('button', { name: 'Move Coffee', exact: true });
+			const belowDiningOut = async () => {
+				const box = await everyday
+					.getByRole('listitem')
+					.filter({ has: page.getByRole('button', { name: 'Move Dining Out', exact: true }) })
+					.boundingBox();
+				if (box === null) throw new Error('Dining Out is not on screen.');
+				return box.y + box.height * 0.8;
+			};
+
+			await step(
+				'a finger drag the browser cancels moves nothing and puts Coffee back',
+				async () => {
+					await coffeeHandle.scrollIntoViewIfNeeded();
+					const rest = await centerOf(coffeeRow);
+					const handle = await centerOf(coffeeHandle);
+					const to = await belowDiningOut();
+					const screen = await touchscreen(page);
+					await screen.touch('touchStart', [{ id: 1, x: handle.x, y: handle.y }]);
+					for (let at = 1; at <= 6; at++) {
+						await screen.touch('touchMove', [
+							{ id: 1, x: handle.x, y: handle.y + ((to - handle.y) * at) / 6 }
+						]);
+					}
+					await expect
+						.poll(async () => (await centerOf(coffeeRow)).top)
+						.toBeGreaterThan(rest.top + 40);
+					await screen.touch('touchCancel', []);
+					await screen.detach();
+					await expect.poll(async () => (await centerOf(coffeeRow)).top).toBe(rest.top);
+					expect(await orderIn(everyday)).toEqual([
+						'Everyday',
+						'Coffee',
+						'Groceries',
+						'Dining Out',
+						'Transit'
+					]);
+				}
+			);
+
+			await step('Escape during a drag moves nothing and puts Coffee back', async () => {
+				const rest = await centerOf(coffeeRow);
+				const handle = await centerOf(coffeeHandle);
+				await page.mouse.move(handle.x, handle.y);
+				await page.mouse.down();
+				await page.mouse.move(handle.x, await belowDiningOut(), { steps: 6 });
+				await expect
+					.poll(async () => (await centerOf(coffeeRow)).top)
+					.toBeGreaterThan(rest.top + 40);
+				await page.keyboard.press('Escape');
+				await page.mouse.up();
+				await expect.poll(async () => (await centerOf(coffeeRow)).top).toBe(rest.top);
+				expect(await orderIn(everyday)).toEqual([
+					'Everyday',
+					'Coffee',
+					'Groceries',
+					'Dining Out',
+					'Transit'
+				]);
+			});
+
+			await step(
+				"a second finger tapping Coffee's handle mid-drag leaves the first finger to drop it",
+				async () => {
+					const handle = await centerOf(coffeeHandle);
+					const to = await belowDiningOut();
+					const first = (y: number): Finger => ({ id: 1, x: handle.x, y });
+					const screen = await touchscreen(page);
+					await screen.touch('touchStart', [first(handle.y)]);
+					await screen.touch('touchMove', [first(handle.y + (to - handle.y) / 2)]);
+					const lifted = await centerOf(coffeeHandle);
+					const second: Finger = { id: 2, x: lifted.x + 4, y: lifted.y };
+					await screen.touch('touchStart', [first(handle.y + (to - handle.y) / 2), second]);
+					await screen.touch('touchEnd', [second]);
+					for (let at = 3; at <= 6; at++) {
+						await screen.touch('touchMove', [first(handle.y + ((to - handle.y) * at) / 6)]);
+					}
+					await screen.touch('touchEnd', []);
+					await screen.detach();
+					await expect
+						.poll(() => orderIn(everyday))
+						.toEqual(['Everyday', 'Groceries', 'Dining Out', 'Coffee', 'Transit']);
+				}
+			);
+
 			const touchedOrder = await step<string[]>(
 				'a finger holding a group near the bottom edge scrolls to a group off screen and drops it last',
 				async () => {
@@ -344,7 +456,7 @@ export const categories = {
 				}
 			);
 
-			await step('dragging Transit by its handle onto Coffee puts it first', async () => {
+			await step('dragging Transit by its handle onto the first row puts it first', async () => {
 				await page.setViewportSize({ width: 1280, height: 800 });
 				await drag(
 					page,
@@ -353,21 +465,21 @@ export const categories = {
 				);
 				await expect
 					.poll(() => orderIn(everyday))
-					.toEqual(['Everyday', 'Transit', 'Coffee', 'Groceries', 'Dining Out']);
+					.toEqual(['Everyday', 'Transit', 'Groceries', 'Dining Out', 'Coffee']);
 			});
 
 			await step('a reload and the Budget keep the new order', async () => {
 				await page.reload();
 				await expect
 					.poll(() => orderIn(everyday))
-					.toEqual(['Everyday', 'Transit', 'Coffee', 'Groceries', 'Dining Out']);
+					.toEqual(['Everyday', 'Transit', 'Groceries', 'Dining Out', 'Coffee']);
 				expect(await groupOrder(page)).toEqual(touchedOrder);
 				await openBudget(page);
 				const rows = page
 					.getByRole('rowgroup')
 					.filter({ has: page.getByRole('rowheader', { name: /^Everyday/ }) })
 					.locator('[data-category-id]');
-				await expect(rows).toHaveText(['Transit', 'Coffee', 'Groceries', 'Dining Out']);
+				await expect(rows).toHaveText(['Transit', 'Groceries', 'Dining Out', 'Coffee']);
 			});
 		}
 	},
@@ -428,6 +540,91 @@ export const categories = {
 				await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 				await page.reload();
 				await expect(named('Sample Fast Groceries')).toBeVisible();
+			});
+		}
+	},
+	'failed-rename': {
+		title:
+			'a rename the server fails reopens its own name to retry, without taking over a name being typed in another row, at 320 px',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			const server = await failFirstCallTo(page, 'categories:rename', 'categories:renameGroup');
+			const categoryField = page.getByRole('textbox', { name: 'Category name' });
+			const groupField = page.getByRole('textbox', { name: 'Category Group name' });
+			const named = (name: string) => page.getByRole('button', { name, exact: true });
+			const rowOf = (name: string) =>
+				page
+					.getByRole('listitem')
+					.filter({ has: page.getByRole('button', { name: `Move ${name}`, exact: true }) });
+			const failure = "Budge couldn't rename it. Try again.";
+
+			await step(
+				'rename the Everyday group; when its save fails the name reopens with it',
+				async () => {
+					await page.setViewportSize({ width: 320, height: 640 });
+					await openCategories(page);
+					await named('Everyday').click();
+					await groupField.fill('Sample Refused Everyday');
+					await groupField.press('Enter');
+					await server.called('categories:renameGroup');
+					server.failWithServerError('categories:renameGroup');
+					await expect(groupField).toHaveValue('Sample Refused Everyday');
+					await expect(groupField).toBeFocused();
+					await expect(groupField).toHaveAccessibleDescription(failure);
+					await groupField.press('Escape');
+					await expect(named('Everyday')).toBeFocused();
+				}
+			);
+
+			await step(
+				'rename Groceries, then start typing a name for Coffee before the save answers',
+				async () => {
+					await named('Groceries').click();
+					await categoryField.fill('Sample Refused Groceries');
+					await categoryField.press('Enter');
+					await server.called('categories:rename');
+					await named('Coffee').click();
+					await categoryField.fill('Sample Typed Coffee');
+				}
+			);
+
+			await step(
+				'the Groceries save failing keeps the Coffee name being typed and shows the failure on Groceries',
+				async () => {
+					server.failWithServerError('categories:rename');
+					await expect(rowOf('Groceries').getByRole('alert')).toHaveText(failure);
+					await expect(named('Groceries')).toBeVisible();
+					await expectNothingPastTheRightEdge(page);
+					await settled(page);
+					await expect(categoryField).toHaveCount(1);
+					await expect(categoryField).toHaveValue('Sample Typed Coffee');
+					await expect(categoryField).toBeFocused();
+				}
+			);
+
+			await step('Enter saves the Coffee name; the Groceries failure stays beside it', async () => {
+				await categoryField.press('Enter');
+				await expect(named('Sample Typed Coffee')).toBeFocused();
+				await expect(rowOf('Groceries').getByRole('alert')).toHaveText(failure);
+			});
+
+			await step(
+				'Groceries reopens with the name that failed, and saving it again works',
+				async () => {
+					await named('Groceries').click();
+					await expect(categoryField).toHaveValue('Sample Refused Groceries');
+					await expect(categoryField).toHaveAccessibleDescription(failure);
+					await categoryField.press('Enter');
+					await expect(named('Sample Refused Groceries')).toBeFocused();
+					await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
+				}
+			);
+
+			await step('a reload keeps both saved names and the group name that failed', async () => {
+				await page.reload();
+				await expect(named('Sample Refused Groceries')).toBeVisible();
+				await expect(named('Sample Typed Coffee')).toBeVisible();
+				await expect(named('Everyday')).toBeVisible();
 			});
 		}
 	}

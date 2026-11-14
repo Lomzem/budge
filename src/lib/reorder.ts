@@ -134,15 +134,15 @@ export function reorderHandle(
 			if (dropped !== null && dropped.to !== dropped.from) onmove(dropped.to);
 		}
 
-		function cancel() {
-			end();
+		function interrupt(event: PointerEvent) {
+			if (drag?.pointerId === event.pointerId) end();
 		}
 
 		function escape(event: KeyboardEvent) {
 			if (event.key !== 'Escape') return;
 			event.preventDefault();
 			event.stopPropagation();
-			cancel();
+			end();
 		}
 
 		function key(event: KeyboardEvent) {
@@ -160,16 +160,16 @@ export function reorderHandle(
 		handle.addEventListener('pointerdown', down);
 		handle.addEventListener('pointermove', move);
 		handle.addEventListener('pointerup', drop);
-		handle.addEventListener('pointercancel', cancel);
-		handle.addEventListener('lostpointercapture', cancel);
+		handle.addEventListener('pointercancel', interrupt);
+		handle.addEventListener('lostpointercapture', interrupt);
 		handle.addEventListener('keydown', key);
 		return () => {
-			cancel();
+			end();
 			handle.removeEventListener('pointerdown', down);
 			handle.removeEventListener('pointermove', move);
 			handle.removeEventListener('pointerup', drop);
-			handle.removeEventListener('pointercancel', cancel);
-			handle.removeEventListener('lostpointercapture', cancel);
+			handle.removeEventListener('pointercancel', interrupt);
+			handle.removeEventListener('lostpointercapture', interrupt);
 			handle.removeEventListener('keydown', key);
 		};
 	};
