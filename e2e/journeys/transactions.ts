@@ -584,6 +584,7 @@ export const transactions = {
 				'a Split in the selection is named as keeping its Category, and with nothing else picked there is nothing to categorize',
 				async () => {
 					await page.getByRole('searchbox', { name: 'Search' }).fill('Warehouse');
+					await expect(bookshop).toHaveCount(0);
 					await page.getByRole('checkbox', { name: /^Select Sample Warehouse Club,/ }).check();
 					await expect(page.getByText('1 Split keeps its Category.')).toBeVisible();
 					await expect(bulk).toHaveAccessibleName('Category for 0 selected Transactions');
