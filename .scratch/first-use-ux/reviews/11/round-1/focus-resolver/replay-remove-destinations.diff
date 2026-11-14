@@ -1,0 +1,30 @@
+diff --git a/a/src/lib/components/bank/connection-card.svelte b/b/src/lib/components/bank/connection-card.svelte
+index 82de554..cf4ec68 100644
+--- a/a/src/lib/components/bank/connection-card.svelte
++++ b/b/src/lib/components/bank/connection-card.svelte
+@@ -349,7 +349,6 @@
+ 								<Button
+ 									variant="outline"
+ 									size="sm"
+-									data-check={feed.connectionAccountId}
+ 									aria-label="Check {feed.name}'s starting balance"
+ 									onclick={() => {
+ 										oncheck(feed.accountId);
+diff --git a/a/src/routes/(app)/bank/+page.svelte b/b/src/routes/(app)/bank/+page.svelte
+index 39f794d..e6b1ff7 100644
+--- a/a/src/routes/(app)/bank/+page.svelte
++++ b/b/src/routes/(app)/bank/+page.svelte
+@@ -290,11 +290,11 @@
+ 		outcomes.set(connectionAccountId, outcome);
+ 	}}
+ 	onconfirmed={confirmed}
+-	returnFocus={afterSetup}
++	returnFocus={{ fallback: mainRegion }}
+ />
+ 
+ <StartingBalanceDialog
+ 	bind:this={startingBalance}
+ 	onconfirmed={confirmed}
+-	returnFocus={afterSetup}
++	returnFocus={{ fallback: mainRegion }}
+ />

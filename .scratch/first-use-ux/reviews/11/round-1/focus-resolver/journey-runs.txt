@@ -1,0 +1,99 @@
+## focus-resolver-green
+passed  accounts/start-late-save  
+passed  accounts/start-edit  
+passed  accounts/held-map  
+passed  accounts/held-new-card  
+passed  accounts/held-unknown-kind  
+passed  accounts/held-legacy-name  
+passed  accounts/setup-check  
+passed  accounts/setup-correct  
+passed  accounts/held-ignore  
+passed  bank-changes/take-the-banks  
+passed  bank-changes/late-delete  
+passed  bank-changes/keep-mine  
+passed  budget/assign  
+passed  budget/assign-back  
+passed  budget/needs-you  
+passed  categories/manage  
+passed  categories/late-rename  
+passed  credit-cards/debt  
+passed  export/files  
+passed  imports/twin  
+passed  imports/approve  
+passed  imports/late-save  
+passed  inspector/move-money  
+passed  payees/last-category  
+passed  payees/remember  
+passed  plaid/status  
+passed  plaid/late-sync  
+passed  plaid/sync-waiting  
+passed  plaid/superseded-sync  
+passed  plaid/attention  
+passed  plaid/consent  
+passed  plaid/late-renew  
+passed  plaid/remove  
+passed  plaid/stop-and-bring-back  
+passed  reconciliation/difference  
+passed  search/filters  
+passed  search/phone  
+passed  settings/start  
+passed  settings/cutover  
+failed  settings/later-start | step: on a 320 px phone, the preview with every list open stays within the screen | Expected: visible
+passed  settings/later-move  
+passed  shell/navigate  
+passed  shell/phone-pages  
+passed  splits/lines  
+passed  splits/restart  
+passed  targets/monthly  
+passed  transactions/create  
+passed  transactions/late-save  
+passed  transactions/categorize  
+passed  transactions/categorize-late  
+passed  transactions/approve-all-undo  
+passed  transactions/select-categorize  
+passed  transactions/payee-groups  
+passed  transactions/approve-phone  
+failed  transfers/pair | step: deleting from the Savings side takes both sides out and leaves focus on a neighboring row | Expected: visible
+passed  transfers/import-link  
+
+## focus-resolver-recheck-3
+failed  settings/later-start | step: on a 320 px phone, the preview with every list open stays within the screen | Expected: visible
+failed  transfers/pair | step: deleting from the Savings side takes both sides out and leaves focus on a neighboring row | Expected: visible
+
+## focus-resolver-fix
+passed  settings/later-start  
+passed  settings/later-move  
+passed  settings/cutover  
+passed  transfers/pair  
+passed  transactions/create  
+passed  transactions/late-save  
+passed  transactions/categorize  
+passed  splits/lines  
+passed  splits/restart  
+passed  bank-changes/take-the-banks  
+passed  bank-changes/late-delete  
+passed  bank-changes/keep-mine  
+passed  accounts/setup-check  
+passed  accounts/setup-correct  
+passed  accounts/held-legacy-name  
+passed  accounts/held-ignore  
+passed  payees/remember  
+
+## focus-resolver-replay-original-asserts
+failed  accounts/held-legacy-name | step: choosing Savings asks the owner to check its kind, and Escape from its starting balance lands on its Check balance | Expected: focused Received: inactive
+failed  accounts/setup-check | step: confirming it clears the problem, after a reload too, and points to categorizing | Expected: focused Received: inactive
+failed  accounts/setup-correct | step: at 390 px, set Sample Savings Plus up into Savings and skip its starting balance: its Check balance takes focus | Expected: focused Received: inactive
+failed  accounts/held-ignore | step: ignore Sample Holiday Club: its card takes focus | Expected: focused Received: inactive
+
+## focus-resolver-replay-main
+passed  accounts/held-legacy-name  
+passed  accounts/setup-check  
+passed  accounts/setup-correct  
+passed  accounts/held-ignore  
+
+## focus-resolver-replay-no-fallback
+failed  accounts/held-legacy-name | step: choosing Savings asks the owner to check its kind, and Escape from its starting balance lands on its Check balance | Expected: "main#main" Received: "body"
+failed  accounts/setup-check | step: confirming it clears the problem, after a reload too, and points to categorizing | Expected: "main#main" Received: "body"
+failed  accounts/setup-correct | step: at 390 px, set Sample Savings Plus up into Savings and skip its starting balance: its Check balance takes focus | Expected: "main#main" Received: "body"
+failed  accounts/held-ignore | step: ignore Sample Holiday Club: its card takes focus | Expected: "main#main" Received: "body"
+
