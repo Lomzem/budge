@@ -68,3 +68,9 @@ Current phase: two isolated fresh Opus 5.5 implementation agents running from sp
 ## Final Standards report delivered
 
 - integration_standards completed: exactly2P2 (cross-row failed rename steals current editor; foreign pointercancel/lostcapture cancels owner drag) and1P3 (feature-map retained coverage overclaim). Full report retained reviews/integration-standards.md.100 focused tests and diff checks passed; no new browser claims. All3 already assigned to fresh Opus final_repair_task; final report path sent with steer to existing running task (no new review/recheck task). No other native reviewers running. Await repair and capacity completion wakes; no polling. Parent checkout app remains stopped.
+
+## Capacity gate passed
+
+- Capacity/readiness Sol completed at clean d824517. Parent directly inspected detailed report, measured table and summary, and both journey results.32 uncached capacity calls passed0errors, modules restored and clean, supported app readiness+budget/assign+search/filters pass, cleanup complete. Summary with absolute evidence paths retained reviews/capacity-readiness.md.
+- Existing full check's missing capacity step is now satisfied safely in isolated anonymous backend without changing owner config. Authentication uses Clerk dev, Convex loopback only. No need rerun backend capacity for UI-only repairs if exact relevant source equivalence is confirmed after integration.
+- Only final Opus edge-case repair task remains running. On its completion cherry-pick, verify evidence, fresh local review recheck, pin clean final revision and launch3judges. No PR exists yet. Do not poll the running task.
