@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { FunctionReturnType } from 'convex/server';
 	import { useMutation, useQuery } from 'convex-svelte';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { tick, untrack } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -87,6 +89,9 @@
 			today: localIsoDate(new Date())
 		});
 	let draft: Draft = $state(untrack(freshDraft));
+	let changingAccount = $state(false);
+	let memoShown = $state(false);
+	const lineMemosShown = new SvelteSet<number>();
 	let error = $state('');
 	let invalidField = $state<string | undefined>();
 	const dialog = new DialogSession<object, 'write'>();
@@ -141,15 +146,32 @@
 		});
 	});
 
-	function fill() {
+	function fill(kept?: { readonly accountId: string; readonly date: string }) {
 		dialog.open({});
 		error = '';
 		invalidField = undefined;
 		errorChecksDraft = false;
 		unlocked = false;
-		draft = freshDraft();
+		draft = kept === undefined ? freshDraft() : { ...freshDraft(), ...kept };
 		pristine = JSON.stringify(draft);
+		changingAccount = false;
+		memoShown = draft.memo !== '';
+		lineMemosShown.clear();
+		for (const line of draft.lines) if (line.memo !== '') lineMemosShown.add(line.key);
 		if (preset !== undefined) draft = choose(draft, preset, world);
+	}
+
+	const accountShownAsContext = $derived(
+		transaction === undefined &&
+			defaultAccountId !== undefined &&
+			!changingAccount &&
+			invalidField !== 'transaction-account'
+	);
+
+	async function reveal(id: string, show: () => void) {
+		show();
+		await tick();
+		document.getElementById(id)?.focus();
 	}
 
 	function changed() {
@@ -234,7 +256,7 @@
 		work: () => PromiseLike<unknown>,
 		failure: string,
 		done: string,
-		succeeded = () => {
+		succeeded: () => unknown = () => {
 			open = false;
 		}
 	) {
@@ -250,10 +272,14 @@
 		} else error = result.error?.message ?? failure;
 	}
 
-	async function submit(event: SubmitEvent) {
+	function submit(event: SubmitEvent) {
 		event.preventDefault();
+		void save('close');
+	}
+
+	async function save(then: 'close' | 'addAnother') {
 		const { payload } = shown;
-		if (payload.kind === 'waiting') return;
+		if (saving || payload.kind === 'waiting') return;
 		if (payload.kind === 'invalid') {
 			error = payload.message;
 			errorChecksDraft = true;
@@ -265,10 +291,18 @@
 		}
 		const { fields } = payload;
 		const transactionId = transaction?._id;
+		const kept = { accountId: draft.accountId, date: draft.date };
 		await write(
 			() => (transactionId === undefined ? create(fields) : update({ transactionId, ...fields })),
 			"Budge couldn't save the Transaction. Try again.",
-			transactionId === undefined ? 'Transaction added' : 'Transaction saved'
+			transactionId === undefined ? 'Transaction added' : 'Transaction saved',
+			then === 'close'
+				? undefined
+				: async () => {
+						fill(kept);
+						await tick();
+						document.getElementById('transaction-payee')?.focus();
+					}
 		);
 	}
 
@@ -385,15 +419,30 @@
 							/>
 						</div>
 					</div>
-					<div class="flex flex-wrap items-end gap-2">
-						<div class="flex min-w-40 flex-1 flex-col gap-1">
-							<Label for={`split-memo-${String(line.key)}`}>Line {number} memo</Label>
-							<Input
-								id={`split-memo-${String(line.key)}`}
-								bind:value={line.memo}
-								autocomplete="off"
-							/>
-						</div>
+					<div class="flex flex-wrap items-end justify-between gap-2">
+						{#if lineMemosShown.has(line.key)}
+							<div class="flex min-w-40 flex-1 flex-col gap-1">
+								<Label for={`split-memo-${String(line.key)}`}>Line {number} memo</Label>
+								<Input
+									id={`split-memo-${String(line.key)}`}
+									bind:value={line.memo}
+									autocomplete="off"
+								/>
+							</div>
+						{:else}
+							<div class="-ml-2">
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									onclick={() =>
+										reveal(`split-memo-${String(line.key)}`, () => lineMemosShown.add(line.key))}
+								>
+									<PlusIcon aria-hidden="true" />
+									Add memo<span class="sr-only"> to line {number}</span>
+								</Button>
+							</div>
+						{/if}
 						<Button
 							type="button"
 							variant="outline"
@@ -536,18 +585,39 @@
 					Unlocked: it's no longer Reconciled. Reconcile the Account again to lock it.
 				</p>
 			{/if}
-			<div class="flex flex-col gap-2">
-				<Label for="transaction-account">Account</Label>
-				<SelectField
-					id="transaction-account"
-					required
-					bind:value={draft.accountId}
-					disabled={locked || startingBalance}
-					{...marked('transaction-account')}
-					placeholder="Pick an Account"
-					choices={accounts.all.map((account) => ({ value: account._id, label: account.name }))}
-				/>
-			</div>
+			{#if accountShownAsContext}
+				<div class="flex items-center justify-between gap-2 text-sm">
+					<p class="min-w-0 truncate">
+						<span class="text-muted-foreground">Account</span>
+						<span class="font-medium"
+							>{accounts.all.find((account) => account._id === draft.accountId)?.name ?? ''}</span
+						>
+					</p>
+					<div class="-mr-2">
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							onclick={() => reveal('transaction-account', () => (changingAccount = true))}
+						>
+							Change<span class="sr-only"> Account</span>
+						</Button>
+					</div>
+				</div>
+			{:else}
+				<div class="flex flex-col gap-2">
+					<Label for="transaction-account">Account</Label>
+					<SelectField
+						id="transaction-account"
+						required
+						bind:value={draft.accountId}
+						disabled={locked || startingBalance}
+						{...marked('transaction-account')}
+						placeholder="Pick an Account"
+						choices={accounts.all.map((account) => ({ value: account._id, label: account.name }))}
+					/>
+				</div>
+			{/if}
 			<div class="flex flex-col gap-2">
 				<Label for="transaction-date">Date</Label>
 				<Input
@@ -673,10 +743,24 @@
 					</RadioGroup.Root>
 				</fieldset>
 			{/if}
-			<div class="flex flex-col gap-2">
-				<Label for="transaction-memo">Memo</Label>
-				<Input id="transaction-memo" bind:value={draft.memo} autocomplete="off" />
-			</div>
+			{#if memoShown}
+				<div class="flex flex-col gap-2">
+					<Label for="transaction-memo">Memo</Label>
+					<Input id="transaction-memo" bind:value={draft.memo} autocomplete="off" />
+				</div>
+			{:else}
+				<div class="-ml-2">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onclick={() => reveal('transaction-memo', () => (memoShown = true))}
+					>
+						<PlusIcon aria-hidden="true" />
+						Add memo
+					</Button>
+				</div>
+			{/if}
 			{#if transaction && transaction.bankRows.length > 0}
 				<section aria-labelledby="transaction-bank-text" class="flex flex-col gap-2">
 					<h3 id="transaction-bank-text" class="text-sm font-medium">Bank Text</h3>
@@ -720,6 +804,16 @@
 				{#if transaction && !transaction.approved}
 					<Button type="button" variant="outline" disabled={saving} onclick={approveTransaction}>
 						Approve
+					</Button>
+				{/if}
+				{#if !transaction}
+					<Button
+						type="button"
+						variant="outline"
+						disabled={saving || shown.payload.kind === 'waiting'}
+						onclick={() => save('addAnother')}
+					>
+						Save and add another
 					</Button>
 				{/if}
 				<Button type="submit" disabled={saving || shown.payload.kind === 'waiting'}>Save</Button>

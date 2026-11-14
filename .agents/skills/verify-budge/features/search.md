@@ -9,15 +9,15 @@ Find Transactions by Payee, memo, split memo or Bank Text, then narrow by Accoun
 
 ## How to get to it (user POV)
 
-- The Accounts page or a named Account's register, through the sidebar or the phone tab bar. Below the filter container's `3xl` width, the Category/Status/Payee/date filters fold behind a `Filters` toggle (`aria-expanded`), which counts the active ones; `Clear search and filters` is always present and disabled when nothing is set.
+- The Accounts page or a named Account's register, through the sidebar or the phone tab bar. Below the filter container's `3xl` width, the Category/Status/Payee/date filters fold behind a `Filters` toggle (`aria-expanded`), which counts the active filters (From and To together count as one Dates filter). While the panel is folded, a list `Active filters` shows one chip per active filter (`Remove Payee: Sample Landlord`, `Remove Dates: This year`); removing a chip clears that filter and focuses the next chip, or the Filters toggle after the last. Category and Payee are searchable pickers (`Search Categories`, `Search Payees`); the Payee filter matches the chosen Payee's identity, apart from the free-text Search. `Dates` offers `Any dates`, `This month`, `Last month`, `Last 30 days` and `This year`, worked out on local dates, which fill From and To; editing From or To reads `Custom dates`; `Clear search and filters` is always present and disabled when nothing is set.
 - A link from the Budget's `Needs you` chips: `/accounts?category=uncategorized` arrives with Category = `Uncategorized`, and `/accounts?status=unapproved` with Status = `Unapproved`. The Filters panel stays folded on arrival (so the first rows stay in view on a phone); the Filters toggle shows the count of active filters, and the count line above the table names the narrowing (`9 Uncategorized Transactions`, `3 Unapproved Transactions`).
 
 ## Driving it with Playwright
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/search.ts`, also run by `bun run test:e2e:local`):
 
-- `search/filters`: Bank Text, split memo, the Payee and Category filters and Clear (`search-text`, `search-filters`, `search-clear`).
-- `search/phone`: labeled controls that fit 320 px (`search-mobile`).
+- `search/filters`: Bank Text, split memo, the Payee and Category filters and Clear (`search-text`, `search-filters`, `search-clear`). Typing `land` in the Payee picker leaves only Sample Landlord, Enter picks it, and the URL holds `payee` but no `q` (the Search box stays empty); `gif` in the Category picker finds Gifts and the Warehouse split; `Last 30 days` fills From and To with today − 29 and today and lists only those dates, editing From reads `Custom dates`, and `Any dates` brings the original list back.
+- `search/phone`: labeled controls, `Dates` among them, that fit 320 px (`search-mobile`). With Payee Sample Landlord and Dates This year, the folded panel shows the two chips, the toggle counts 2, and nothing passes the right edge; removing the first chip focuses the next and drops `payee` from the URL, and Enter on the last focuses the toggle, drops the dates, and disables Clear.
 
 The recipes below cover what the journeys leave out.
 

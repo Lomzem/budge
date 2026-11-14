@@ -137,7 +137,7 @@ export const payees = {
 						);
 						await expect(remember(florist)).not.toBeChecked();
 						if (checked) await remember(florist).check();
-						await dialog.getByRole('button', { name: 'Save' }).click();
+						await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 						await expect(dialog).toBeHidden();
 					};
 					await add(false);

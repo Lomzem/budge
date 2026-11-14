@@ -43,8 +43,9 @@ export const transfers = {
 				await choose(dialog.getByLabel('Category or Transfer'), 'Transfer: Savings');
 				await expect(dialog.getByLabel('Payee')).toBeHidden();
 				await dialog.getByLabel('Amount').fill('12.34');
+				await dialog.getByRole('button', { name: 'Add memo', exact: true }).click();
 				await dialog.getByLabel('Memo').fill(memo);
-				await dialog.getByRole('button', { name: 'Save' }).click();
+				await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 				await expect(dialog).toBeHidden();
 				const otherAccountInPlaceOfACategory = row.getByText('To Savings');
 				await expect(otherAccountInPlaceOfACategory.filter({ visible: true })).toBeVisible();
@@ -101,8 +102,9 @@ export const transfers = {
 					await expect(
 						dialog.getByRole('radio', { name: /^Link the import SAMPLE E2E XFER IN/ })
 					).toBeChecked();
+					await dialog.getByRole('button', { name: 'Add memo', exact: true }).click();
 					await dialog.getByLabel('Memo').fill(memo);
-					await dialog.getByRole('button', { name: 'Save' }).click();
+					await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 					await expect(dialog).toBeHidden();
 					await expect(linked.getByText('To Savings').filter({ visible: true })).toBeVisible();
 				}

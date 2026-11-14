@@ -36,7 +36,7 @@ export const transactions = {
 					await dialog.getByLabel('Payee').pressSequentially('Smoke Test Bakery');
 					await page.keyboard.press('Enter');
 					await expect(dialog.getByLabel('Amount')).toBeFocused();
-					await dialog.getByRole('button', { name: 'Save' }).click();
+					await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 					const error = dialog.getByRole('alert').filter({ hasText: /\S/ });
 					await expect(error).toHaveCount(1);
 					await dialog.getByLabel('Amount').fill('12.34');
@@ -57,7 +57,7 @@ export const transactions = {
 			);
 
 			await step('save the $12.34 outflow, and the balance drops by it', async () => {
-				await dialog.getByRole('button', { name: 'Save' }).click();
+				await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 				await expect(dialog).toBeHidden();
 				await expect(
 					page.getByRole('button', { name: /^Smoke Test Bakery/ }).first()
@@ -94,7 +94,7 @@ export const transactions = {
 				await page.getByRole('button', { name: 'Add Transaction' }).click();
 				await adding.getByLabel('Payee').fill(slowPayee);
 				await adding.getByLabel('Amount').fill('7.00');
-				await adding.getByRole('button', { name: 'Save' }).click();
+				await adding.getByRole('button', { name: 'Save', exact: true }).click();
 				await create.held;
 				await page.keyboard.press('Escape');
 				await expect(adding).toBeHidden();
@@ -113,11 +113,153 @@ export const transactions = {
 				await expect(
 					page.getByRole('button', { name: new RegExp(`^${slowPayee}`) }).first()
 				).toBeVisible();
-				await expect(editing.getByRole('button', { name: 'Save' })).toBeEnabled();
+				await expect(editing.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
 				await expect(editing).toHaveAttribute('data-state', 'open');
 				await expect(editing.getByLabel('Payee')).toHaveValue('Sample Landlord');
 				await expect(editing.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 			});
+		}
+	},
+	'add-another': {
+		title:
+			'Add Transaction on an Account shows that Account with Change, keeps the memo behind Add memo, and Save and add another saves once and starts a clean draft in the same Account and date',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			await page.setViewportSize({ width: 1280, height: 800 });
+			const create = await holdResponseTo(page, 'transactions:create');
+			const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
+			const balance = () => centsIn(page.getByTestId('account-balance'));
+			const saveAndAdd = dialog.getByRole('button', { name: 'Save and add another' });
+			const changeAccount = dialog.getByRole('button', { name: 'Change Account' });
+			const twoDaysAgo = addDays(localToday(), -2);
+			const rowsOf = (payee: string) =>
+				page.getByRole('table').getByRole('button', { name: new RegExp(`^${payee}, `) });
+
+			const savingsBefore = await step(
+				'note the Savings balance, then Add Transaction on Checking names Checking with Change and keeps Memo behind Add memo',
+				async () => {
+					await page.goto('/');
+					await openAccount(page, 'Savings');
+					const before = await balance();
+					await openAccount(page, 'Checking');
+					await page.getByRole('button', { name: 'Add Transaction' }).click();
+					await expect(dialog.getByLabel('Payee')).toBeFocused();
+					await expect(dialog.getByText('Account Checking', { exact: true })).toBeVisible();
+					await expect(changeAccount).toBeVisible();
+					await expect(dialog.getByRole('combobox', { name: 'Account' })).toHaveCount(0);
+					await expect(dialog.getByLabel('Memo', { exact: true })).toHaveCount(0);
+					await expect(dialog.getByRole('button', { name: 'Add memo', exact: true })).toBeVisible();
+					return before;
+				}
+			);
+
+			await step(
+				'clicking Save and add another twice and pressing Enter while the save is held sends one save',
+				async () => {
+					await dialog.getByLabel('Payee').fill('Sample E2E Kettle One');
+					await dialog.getByLabel('Amount').fill('11.00');
+					await saveAndAdd.click();
+					await create.held;
+					await expect(saveAndAdd).toBeDisabled();
+					await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+					await saveAndAdd.click({ force: true });
+					await dialog.getByLabel('Amount').press('Enter');
+				}
+			);
+
+			await step(
+				'closing during the held save and opening a new draft keeps that draft when the save lands late',
+				async () => {
+					await page.keyboard.press('Escape');
+					await expect(dialog).toBeHidden();
+					await page.getByRole('button', { name: 'Add Transaction' }).click();
+					await expect(dialog.getByText('Account Checking', { exact: true })).toBeVisible();
+					await dialog.getByLabel('Payee').fill('Sample E2E Kettle Two');
+					create.release();
+					await expect(rowsOf('Sample E2E Kettle One')).toHaveCount(1);
+					await expect(dialog.getByLabel('Payee')).toHaveValue('Sample E2E Kettle Two');
+					await expect(dialog.getByLabel('Payee')).toBeFocused();
+					await expect(dialog.getByLabel('Date')).toHaveValue(localToday());
+					await expect(dialog.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
+				}
+			);
+
+			await step(
+				'Change moves the draft to Savings two days ago with a memo, and Save and add another starts a clean draft there',
+				async () => {
+					await changeAccount.click();
+					const account = dialog.getByRole('combobox', { name: 'Account' });
+					await expect(account).toBeFocused();
+					await choose(account, 'Savings');
+					await dialog.getByLabel('Date').fill(twoDaysAgo);
+					await dialog.getByLabel('Amount').fill('21.50');
+					await dialog.getByRole('button', { name: 'Add memo', exact: true }).click();
+					const memo = dialog.getByLabel('Memo', { exact: true });
+					await expect(memo).toBeFocused();
+					await memo.fill('Sample kettle note');
+					await saveAndAdd.click();
+					await expect(dialog.getByLabel('Payee')).toHaveValue('');
+					await expect(dialog.getByLabel('Payee')).toBeFocused();
+					await expect(dialog.getByLabel('Amount')).toHaveValue('');
+					await expect(dialog.getByLabel('Memo', { exact: true })).toHaveCount(0);
+					await expect(dialog.getByLabel('Category or Transfer')).toHaveText('Uncategorized');
+					await expect(dialog.getByText('Account Savings', { exact: true })).toBeVisible();
+					await expect(dialog.getByLabel('Date')).toHaveValue(twoDaysAgo);
+					await expect(
+						page.getByRole('status').filter({ hasText: 'Transaction added' })
+					).toHaveCount(1);
+				}
+			);
+
+			await step(
+				'the next one saves into Savings on the kept date, and the clean draft closes without asking',
+				async () => {
+					await dialog.getByLabel('Payee').fill('Sample E2E Kettle Three');
+					await dialog.getByLabel('Amount').fill('4.00');
+					await saveAndAdd.click();
+					await expect(dialog.getByLabel('Payee')).toHaveValue('');
+					await page.keyboard.press('Escape');
+					await expect(page.getByRole('alertdialog')).toHaveCount(0);
+					await expect(dialog).toBeHidden();
+					await expect(rowsOf('Sample E2E Kettle One')).toHaveCount(1);
+					await expect(rowsOf('Sample E2E Kettle Two')).toHaveCount(0);
+				}
+			);
+
+			await step(
+				'Savings lists each saved once on that date, its balance drops by both, and the saved memo shows when editing',
+				async () => {
+					await openAccount(page, 'Savings');
+					const onTheKeptDate = `edit Transaction on ${formatDate(twoDaysAgo)}`;
+					for (const payee of ['Sample E2E Kettle Two', 'Sample E2E Kettle Three']) {
+						await expect(rowsOf(payee)).toHaveCount(1);
+						await expect(rowsOf(payee)).toHaveAccessibleName(new RegExp(`${onTheKeptDate}$`));
+					}
+					await expect.poll(balance).toBe(savingsBefore - 2150 - 400);
+					await rowsOf('Sample E2E Kettle Two').click();
+					const editing = page.getByRole('dialog', { name: 'Edit Transaction' });
+					await expect(editing.getByLabel('Memo', { exact: true })).toHaveValue(
+						'Sample kettle note'
+					);
+					await expect(editing.getByRole('combobox', { name: 'Account' })).toHaveText('Savings');
+					await expect(editing.getByRole('button', { name: 'Save and add another' })).toHaveCount(
+						0
+					);
+					await page.keyboard.press('Escape');
+					await expect(editing).toBeHidden();
+				}
+			);
+
+			await step(
+				'on All Accounts, Add Transaction still picks the Account in the form',
+				async () => {
+					await page.goto('/accounts');
+					await page.getByRole('button', { name: 'Add Transaction' }).click();
+					await expect(dialog.getByRole('combobox', { name: 'Account' })).toBeVisible();
+					await expect(changeAccount).toHaveCount(0);
+					await expect(saveAndAdd).toBeVisible();
+				}
+			);
 		}
 	},
 	categorize: {
@@ -919,7 +1061,7 @@ export const transactions = {
 				const pinned = editing.locator('[data-slot="dialog-bar"]');
 				for (const field of [
 					editing.getByLabel('Category'),
-					editing.getByRole('button', { name: 'Save' })
+					editing.getByRole('button', { name: 'Save', exact: true })
 				]) {
 					await field.scrollIntoViewIfNeeded();
 					await expectClearOf(field, pinned);
