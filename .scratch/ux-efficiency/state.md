@@ -9,4 +9,8 @@ Read /home/lomzem/.agents/PR-WORKFLOW.md, implement skill, principles router and
 
 Plan: two isolated Opus slices (01 Budget/Categories, 02 Transactions); cherry-pick to integration; fresh Opus integrates and implements copy (03); parent verifies source/evidence, local Standards/Spec review and corrections; fresh Sol A High/Sol B High/Opus 5.5 UI judges; Opus repairs and fresh rechecks until all >=9 final revision; draft integration PR, green CI, one CodeRabbit request; batch repairs, incremental review only after CI; merge then deployment/live read-only verification. Parent must link PR immediately after create/push and use watch_pull_request for waits, never polling. Delegate completions wake parent; follow next and do not poll/wait on async children.
 
-Current phase: specification recorded; implementation not launched yet. No app session owned by parent.
+Current phase: two isolated fresh Opus 5.5 implementation agents running from spec commit b1537fa. No app session owned by parent. Do not poll children; completion wakes this thread. Tool functions store also holds structured child handles under 01-budget-categories.md and 02-transactions.md.
+
+- Budget task: node:delegated-task:command%3Amcp%3A3b488d9c-bba3-4e99-817f-ef86db429e81%3Adelegate-task%3A85078bef-79fb-461a-8f0a-2a8d4fe958c3
+- Transactions task: node:delegated-task:command%3Amcp%3A3b488d9c-bba3-4e99-817f-ef86db429e81%3Adelegate-task%3A599a6a8f-4ef5-40a4-9c29-6d0682dadeb3
+- Both use provider claudeAgent / claude-opus-5-5 with inherited defaults; no further delegation permitted. They own only their slice and their ticket. They must commit, verify in their own app, clean up, and return hashes and evidence. Parent then integrates; fresh Opus integration/copy agent still to be commissioned.
