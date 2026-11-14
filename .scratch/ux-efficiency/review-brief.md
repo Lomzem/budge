@@ -1,15 +1,16 @@
 # Independent UI review brief — UX efficiency
 
-Draft: do not launch judges until the coordinator pins the clean integrated SHA and completed checks below. Judge reports must not be read by other judges before their own verdicts.
+Judge reports must not be read by other judges before their own verdicts. The coordinator supplies the exact clean review SHA in each fresh assignment; all judges must inspect that same revision.
 
 ## Sources and revision
 
 - Spec: [spec.md](spec.md), all items 1–26.
 - Tickets: [01](issues/01-budget-categories.md), [02](issues/02-transactions.md), [03](issues/03-integration-copy.md), [04](issues/04-reviews-shipping.md).
 - Protocol/rubric/template: `docs/quality/ui-review/{README,rubric,report-template}.md`.
-- Clean review SHA: `feat/ux-efficiency` HEAD after `17bbcc5` (last code commit; the next commit is records only). Pin the exact HEAD when launching.
-- Checks at `17bbcc5`: `bun run check` all pass except `capacity:check` (refused in the integration checkout: non-anonymous backend; no Convex changes); unit 929/929; `bun run test:e2e:local` 61/61. Dispositions and red/green proofs: [ticket 03](issues/03-integration-copy.md#integration-opus-55-integration-implementer). Local code review rerun on the integrated diff: pending parent.
-- Journeys for the judges: `budget/*`, `categories/{manage,reorder,late-rename}`, `inspector/*`, `targets/monthly`, `search/*`, `transactions/*`, `splits/*`, plus copy journeys `export/files`, `shell/navigate`, `settings/later-start`. Synthetic extras worth sampling by hand: a long Category name and $999,999.99 Assigned at 320 px; touch reorder near the bottom edge; an arrow key straight after reopening the month grid.
+- Review branch: `feat/ux-efficiency`; last code commit `cec8434` (cherry-pick of isolated repair `cf5565b`). Pin the exact clean HEAD after review records when launching.
+- Deterministic evidence: at `17bbcc5`, codegen/format/lint/lint:ui/typecheck/unit929 pass and isolated E2E61/61 pass. Missing capacity step independently passed at clean `d824517` with32 measured calls and supported verify-budge readiness; [capacity record](reviews/capacity-readiness.md). Parent confirmed all Convex/capacity/admission source and package/lock files unchanged through `cec8434`, so capacity evidence applies. Repair `cf5565b` independently passed unit929, codegen/format/lint/lint:ui/typecheck,12 focused maintained journeys and repeat2 changed journeys; no full62-journey run yet (CI will exercise it).
+- Local review history: prior findings and correction decisions are in ticket03. Final repair Standards/Spec rechecks must be dispositioned before launch; judges assess independently and must not read other UI judge scores/verdicts.
+- Journeys for the judges: `budget/*`, `categories/{manage,reorder,late-rename,failed-rename}`, `inspector/*`, `targets/monthly`, `search/*`, `transactions/*`, `splits/*`, plus copy journeys `export/files`, `shell/navigate`, `settings/later-start`. Synthetic extras worth sampling by hand: long Category names and $999,999.99 Assigned at320px; touch reorder offscreen and second-pointer/cancel; failed Category/Group rename while another editor holds an unsent draft; arrow key straight after reopening month grid.
 
 ## Required user tasks
 
@@ -28,7 +29,7 @@ Each judge independently completes every task below at desktop 1280x800 with poi
 
 ## Fixtures, journeys and limitations
 
-Use only invented data through verify-budge named fixtures (budget-with-accounts, bank-sync, empty-budget or appropriate maintained fixture). Read affected feature maps: budget, categories, inspector, targets, transactions, search, splits, accounts, transfers, payees, settings, shell, auth. Final exact journey list and any extra synthetic setup will be pinned after integration.
+Use only invented data through verify-budge named fixtures (budget-with-accounts, bank-sync, empty-budget or appropriate maintained fixture). Read affected feature maps: budget, categories, inspector, targets, transactions, search, splits, accounts, transfers, payees, settings, shell, auth. Expand the journey patterns above from the maintained registry; do not pass wildcards to a CLI that expects exact names. Use app verify --list when needed. Additional synthetic long-name/large-amount setup must use existing user controls or the documented fixtures.
 
 Real Plaid Link/webhooks, owner production authentication, and production bank data are outside this local UI review; no changed behavior depends on exercising external bank delivery. Do not read or mutate real data. New/changed UI and its money/control effects remain required, not waived by this exclusion.
 
