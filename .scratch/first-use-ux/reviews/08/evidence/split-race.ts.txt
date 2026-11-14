@@ -1,0 +1,32 @@
+import {chromium,expect} from '@playwright/test';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {openAccount} from '../../e2e/journeys/journey';
+import {withholdQueryResult} from '../../e2e/heldResponse';
+const {appUrl}=JSON.parse(readFileSync('.local-app/running.json','utf8'));
+const browser=await chromium.launch();
+try{
+ const context=await browser.newContext({baseURL:appUrl,storageState:'.local-app/storage-state.json',timezoneId:'America/Los_Angeles'});
+ const page=await context.newPage();const hold=await withholdQueryResult(page,'payees:lastCategory');
+ await page.goto('/');await openAccount(page,'Card');await page.getByRole('button',{name:'Add Transaction'}).click();
+ const dialog=page.getByRole('dialog');await dialog.getByLabel('Payee').fill('Smoke Test Warehouse');
+ await dialog.getByLabel('Amount').fill('-50.00');await dialog.getByLabel('Memo',{exact:true}).fill('Smoke test split');
+ await dialog.getByLabel('Category or Transfer').click();
+ await expect(page.getByRole('option',{name:'Looking up the remembered Category…'})).toBeVisible();
+ const split=page.getByRole('option',{name:'Split across Categories',exact:true});
+ const before=await split.boundingBox();if(!before)throw Error('missing Split');
+ const point={x:before.x+before.width/2,y:before.y+before.height/2};
+ await page.mouse.move(point.x,point.y);
+ await page.screenshot({path:'test-results/ticket-08-review/race-before.png'});
+ hold.release();
+ await expect(page.getByRole('option',{name:'Looking up the remembered Category…'})).toHaveCount(0);
+ const after=await split.boundingBox();
+ console.log(JSON.stringify({before,after,underPointer:await page.evaluate(({x,y})=>document.elementFromPoint(x,y)?.closest('[role=option]')?.textContent,point)}));
+ await page.screenshot({path:'test-results/ticket-08-review/race-after-lookup.png'});
+ await page.mouse.click(point.x,point.y);
+ await expect(page.getByRole('listbox')).toBeHidden();
+ console.log('Category after intended Split click:',await dialog.getByLabel('Category or Transfer').innerText());
+ console.log('Line 1 amount count:',await dialog.getByLabel('Line 1 amount').count());
+ writeFileSync('test-results/ticket-08-review/race-result.aria.yml',await page.locator('body').ariaSnapshot());
+ await page.screenshot({path:'test-results/ticket-08-review/race-result.png'});
+ await context.close();
+}finally{await browser.close();}

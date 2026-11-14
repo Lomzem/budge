@@ -1,0 +1,35 @@
+import { chromium, expect } from '@playwright/test';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { openAccount, choose } from '../../e2e/journeys/journey';
+import { withholdQueryResult } from '../../e2e/heldResponse';
+const {appUrl} = JSON.parse(readFileSync('.local-app/running.json','utf8'));
+const browser = await chromium.launch();
+try {
+ const context = await browser.newContext({baseURL:appUrl, storageState:'.local-app/storage-state.json', timezoneId:'America/Los_Angeles'});
+ const page = await context.newPage();
+ await page.goto('/');
+ await expect(page.getByRole('heading',{name:'Budget',exact:true,level:1})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Assigned for Groceries'})).toBeVisible();
+ console.log('Authenticated seeded Budget ready');
+ if (process.argv.includes('--baseline')) process.exitCode = 0;
+ else {
+  const hold = await withholdQueryResult(page, 'payees:lastCategory');
+  await page.goto('/');
+  await openAccount(page,'Card');
+  await page.getByRole('button',{name:'Add Transaction'}).click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByLabel('Payee').fill('Smoke Test Warehouse');
+  await dialog.getByLabel('Amount').fill('-50.00');
+  await dialog.getByLabel('Memo',{exact:true}).fill('Smoke test split');
+  await choose(dialog.getByLabel('Category or Transfer'),'Split across Categories');
+  await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('');
+  console.log('Split exists while Payee memory held');
+  hold.release();
+  await expect(dialog.getByLabel('Category or Transfer')).toHaveText('Split across Categories');
+  await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('');
+  console.log('Split survives late Payee memory');
+  await page.screenshot({path:'test-results/ticket-08-review/split-delayed-memory.png'});
+  writeFileSync('test-results/ticket-08-review/split-delayed-memory.aria.yml', await page.locator('body').ariaSnapshot());
+ }
+ await context.close();
+} finally { await browser.close(); }
