@@ -37,3 +37,16 @@ Current phase: two isolated fresh Opus 5.5 implementation agents running from sp
 
 - Fresh Sol copy Standards and Spec reviews both finished with0 findings at3374532; parent read and retained reports in reviews/copy-{standards,spec}.md. No justified recurring correction class. Source/whitespace review only; real-app proof from implementor remains precommit, independent final-SHA judges still pending.
 - No active native reviewers or parent app session. Budget/Categories Opus is the only unfinished implementation delegate. Do not poll/wait on it; await its completion wake. Integration/repair Opus still to commission after budget source is available.
+
+## Budget handoff and integration in progress
+
+- Budget Opus completed52e699e in /home/lomzem/.t3/worktrees/budge/t3-0383bc99-0c2aaafa4fd2d5e6 branch t3/budget-category-efficiency. All12 items implemented; reported924 tests and60 verify-budge journeys passed; final320px group-header change reverified. Evidence ux01-full/ and ux01-e/ in that checkout. Open risks: long Category words wrap at320px; touch drag only mouse-tested; moving into collapsed Group hides row; SelectField gained onclosed. Parent needs decisive source/evidence inspection, full integrated checks, reviews and judges.
+- Parent cherry-picked52e699e atop95a3473; IN-PROGRESS cherry-pick has conflicts in .agents/skills/verify-budge/features/budget.md and src/lib/components/budget/category-inspector.svelte. Fresh Opus integration agent owns resolving and continuing, preserving copy21–26 and transaction13–20. Parent must not edit UI conflict resolutions.
+- Fresh native budget_standards and budget_spec reviewers read ORIGINAL completed budget worktree pinned52e699e, not mutable integration checkout. Reports in that checkout test-results/ux-efficiency/reviews/budget-{standards,spec}.md. Standards also test-audit + analysis-only correct. They may run focused unit tests there, no app sessions/source writes. Reports will wake parent; pass actionable results to integration repair when available.
+- Parent app not started; once fresh shared Opus integration agent starts, it exclusively owns parent working tree, git writes and app lifecycle until release. Parent coordinates read-only elsewhere only.
+
+## Integration complete (Opus integration implementer)
+
+- Cherry-pick committed as `f821979`; integration fixes `17bbcc5`; records commit follows. All Budget Spec P2s, Standards S1–S5, Search P2, integration risks, C1/C2 dispositioned with red/green proof in ticket 03. New finding fixed: month grid lost an arrow move right after reopening (Bits FocusScope remount).
+- Checks: unit 929/929, lint/typecheck/format/codegen pass; `capacity:check` refused in this checkout (non-anonymous backend; no Convex changes); `test:e2e:local` 61/61.
+- Review brief SHA/checks/journeys filled. Next: parent local code review of the integrated diff, then the three judges. Checkout clean; no app session; ownership released.

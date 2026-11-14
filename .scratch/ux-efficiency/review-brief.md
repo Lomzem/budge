@@ -7,8 +7,9 @@ Draft: do not launch judges until the coordinator pins the clean integrated SHA 
 - Spec: [spec.md](spec.md), all items 1–26.
 - Tickets: [01](issues/01-budget-categories.md), [02](issues/02-transactions.md), [03](issues/03-integration-copy.md), [04](issues/04-reviews-shipping.md).
 - Protocol/rubric/template: `docs/quality/ui-review/{README,rubric,report-template}.md`.
-- Clean review SHA: **pending integration**. Branch: `feat/ux-efficiency`.
-- Checks, local review, correction dispositions, named journeys at this SHA: **pending integration**.
+- Clean review SHA: `feat/ux-efficiency` HEAD after `17bbcc5` (last code commit; the next commit is records only). Pin the exact HEAD when launching.
+- Checks at `17bbcc5`: `bun run check` all pass except `capacity:check` (refused in the integration checkout: non-anonymous backend; no Convex changes); unit 929/929; `bun run test:e2e:local` 61/61. Dispositions and red/green proofs: [ticket 03](issues/03-integration-copy.md#integration-opus-55-integration-implementer). Local code review rerun on the integrated diff: pending parent.
+- Journeys for the judges: `budget/*`, `categories/{manage,reorder,late-rename}`, `inspector/*`, `targets/monthly`, `search/*`, `transactions/*`, `splits/*`, plus copy journeys `export/files`, `shell/navigate`, `settings/later-start`. Synthetic extras worth sampling by hand: a long Category name and $999,999.99 Assigned at 320 px; touch reorder near the bottom edge; an arrow key straight after reopening the month grid.
 
 ## Required user tasks
 
