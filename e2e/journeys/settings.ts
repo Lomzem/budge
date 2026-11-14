@@ -335,7 +335,7 @@ export const settings = {
 					await region.getByRole('button', { name: 'Change' }).click();
 					await saveCutover(page, firstOfThisMonth);
 					await expect(preview).toContainText(
-						/Checking: 1 Transaction \((\S+)\) that haven't cleared count in the Starting Balance as if they had, so the cleared balance changes by \1\./
+						/Checking: 1 Transaction \((\S+)\) that hasn't cleared counts in the Starting Balance as if it had, so the cleared balance changes by \1\./
 					);
 					await expect(preview).toContainText(/Card: \d+ Transactions \(\S+\) you reconciled/);
 					const move = preview.getByRole('button', { name: 'Move start date' });

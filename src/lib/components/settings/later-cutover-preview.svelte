@@ -99,13 +99,14 @@
 
 	function cautionText(caution: Caution) {
 		const what = `${transactions(caution.count)} (${formatCents(caution.total)})`;
+		const one = caution.count === 1;
 		if (caution.kind === 'remapped') {
-			return `${caution.accountName}: ${what} came from a bank account that now feeds ${caution.nowAccountName}. They count in ${caution.accountName}'s Starting Balance, where they are now.`;
+			return `${caution.accountName}: ${what} came from a bank account that now feeds ${caution.nowAccountName}. ${one ? 'It counts' : 'They count'} in ${caution.accountName}'s Starting Balance, where ${one ? 'it is' : 'they are'} now.`;
 		}
 		if (caution.kind === 'reconciled') {
-			return `${caution.accountName}: ${what} you reconciled become part of the Starting Balance.`;
+			return `${caution.accountName}: ${what} you reconciled ${one ? 'becomes' : 'become'} part of the Starting Balance.`;
 		}
-		return `${caution.accountName}: ${what} that haven't cleared count in the Starting Balance as if they had, so the cleared balance changes by ${formatCents(caution.total)}.`;
+		return `${caution.accountName}: ${what} that ${one ? "hasn't" : "haven't"} cleared ${one ? 'counts' : 'count'} in the Starting Balance as if ${one ? 'it' : 'they'} had, so the cleared balance changes by ${formatCents(caution.total)}.`;
 	}
 
 	function monthsText(months: readonly string[]) {
