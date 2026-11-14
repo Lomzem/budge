@@ -507,7 +507,11 @@ export const transactions = {
 					await bookshop.check();
 					await hardware.check();
 					await bulk.click();
-					await page.getByRole('checkbox', { name: 'Approve them too', exact: true }).check();
+					const approveToo = page.getByRole('checkbox', { name: 'Approve them too', exact: true });
+					await expect(approveToo).toHaveAccessibleDescription(
+						'Marks these Transactions reviewed. Balances already include them.'
+					);
+					await approveToo.check();
 					await page.getByRole('option', { name: 'Groceries', exact: true }).click();
 					await expect(page.getByText('2 Transactions now Groceries and approved.')).toBeVisible();
 					for (const id of ids) await expect(category(id)).toHaveAccessibleName(/^Groceries, /);
@@ -517,6 +521,60 @@ export const transactions = {
 					await undo.click();
 					for (const id of ids) await expect(category(id)).toHaveAccessibleName(/^Uncategorized, /);
 					await expect(approveAll).toHaveText(waiting ?? '');
+				}
+			);
+
+			await step(
+				'a Transfer picked with an ordinary row keeps its Category while the ordinary row takes the new one',
+				async () => {
+					const transfer = page.getByRole('checkbox', { name: /^Select Transfer,/ }).first();
+					const transferCategory = await categoryIn(transfer).getAttribute('aria-label');
+					await transfer.check();
+					await hardware.check();
+					await expect(page.getByText('1 Transfer keeps its Category.')).toBeVisible();
+					await expect(bulk).toHaveAccessibleName('Category for 1 selected Transaction');
+					await choose(bulk, 'Groceries');
+					await expect(page.getByText('1 Transaction now Groceries.')).toBeVisible();
+					await expect(categoryIn(hardware)).toHaveAccessibleName(/^Groceries, /);
+					await expect(categoryIn(transfer)).toHaveAccessibleName(transferCategory ?? '');
+				}
+			);
+
+			await step(
+				'changing a row that action left alone keeps its Undo, and changing a row it touched retires it',
+				async () => {
+					await expect(undo).toBeVisible();
+					await choose(categoryIn(bookshop), 'Dining Out');
+					await expect(categoryIn(bookshop)).toHaveAccessibleName(/^Dining Out, /);
+					await expect(undo).toBeVisible();
+					await choose(categoryIn(hardware), 'Dining Out');
+					await expect(categoryIn(hardware)).toHaveAccessibleName(/^Dining Out, /);
+					await expect(undo).toHaveCount(0);
+				}
+			);
+
+			await step(
+				'a bulk save that lands after its selection was cleared and another row checked leaves that row checked and focused, and offers no Undo',
+				async () => {
+					const saving = await holdResponseTo(page, 'transactions:categorizeMany');
+					await page.goto('/accounts');
+					await bookshop.check();
+					await choose(bulk, 'Groceries');
+					await saving.held;
+					await expect(bulk).toContainText('Saving…');
+					await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+					await between.focus();
+					await page.keyboard.press('Space');
+					await expect(between).toBeChecked();
+					saving.release();
+					await expect(categoryIn(bookshop)).toHaveAccessibleName(/^Groceries, /);
+					await expect(bulk).not.toContainText('Saving…');
+					await expect(between).toBeChecked();
+					await expect(between).toBeFocused();
+					await expect(page.getByText('1 selected', { exact: true })).toBeVisible();
+					await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+					await expect(picked).toHaveCount(0);
+					await expect(undo).toHaveCount(0);
 				}
 			);
 

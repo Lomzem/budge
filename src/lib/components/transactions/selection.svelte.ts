@@ -5,8 +5,14 @@ import type { Id } from '$convex/_generated/dataModel';
 
 type TransactionId = Id<'transactions'>;
 
+export interface SelectionMark {
+	readonly generation: number;
+	readonly scope: string;
+}
+
 export class SelectionPerScope {
 	#scope = $state('');
+	#generation = 0;
 	readonly #ids = new SvelteSet<TransactionId>();
 	readonly #scopeOf: () => string;
 
@@ -15,7 +21,7 @@ export class SelectionPerScope {
 		$effect.pre(() => {
 			scopeOf();
 			untrack(() => {
-				this.#ids.clear();
+				this.clear();
 			});
 		});
 	}
@@ -26,6 +32,7 @@ export class SelectionPerScope {
 
 	set(ids: readonly TransactionId[], picked: boolean) {
 		const scope = this.#scopeOf();
+		this.#generation += 1;
 		if (scope !== this.#scope) {
 			this.#ids.clear();
 			this.#scope = scope;
@@ -37,7 +44,16 @@ export class SelectionPerScope {
 	}
 
 	clear() {
+		this.#generation += 1;
 		this.#ids.clear();
+	}
+
+	mark(): SelectionMark {
+		return { generation: this.#generation, scope: this.#scopeOf() };
+	}
+
+	owns(mark: SelectionMark): boolean {
+		return mark.generation === this.#generation && mark.scope === this.#scopeOf();
 	}
 
 	of<Row extends { readonly _id: TransactionId }>(rows: readonly Row[]): Row[] {

@@ -212,6 +212,15 @@
 	let undoable = $state<Undoable | null>(null);
 	const scopeKey = $derived(JSON.stringify([scope, filters]));
 	const undo = $derived(undoable?.scopeKey === scopeKey ? undoable : null);
+	function touchedBy(entry: Undoable) {
+		if (entry.kind === 'approved') return entry.transactionIds;
+		if (entry.kind === 'categorized') return entry.record.changes.map((c) => c.transactionId);
+		return [];
+	}
+	function retireUndoOf(transactionId: Id<'transactions'> | undefined) {
+		if (undoable === null || transactionId === undefined) return;
+		if (touchedBy(undoable).includes(transactionId)) undoable = null;
+	}
 	const selection = new SelectionPerScope(() => scopeKey);
 
 	const approveAllLabel = $derived.by(() => {
@@ -434,6 +443,7 @@
 		if (change === undefined) return;
 		const { choice, remembers } = change;
 		rowError = '';
+		retireUndoOf(row._id);
 		const pick = (latestPick.get(row._id) ?? 0) + 1;
 		latestPick.set(row._id, pick);
 		picked.set(row._id, option);
@@ -510,6 +520,7 @@
 	) {
 		if (resolving) return undefined;
 		rowError = '';
+		retireUndoOf(row._id);
 		resolving = true;
 		const at = rows.findIndex((other) => other._id === row._id);
 		const resolved = await attempt(() => resolveBankChange({ importId, keep }));
@@ -553,16 +564,18 @@
 		rowError = '';
 		approvingAll = true;
 		const approvedIn = scopeKey;
+		const from = selection.mark();
 		const transactionIds = approving;
 		const approved = await attempt(() =>
 			transactionIds === null ? approveAll(scope) : approveMany({ transactionIds })
 		);
 		approvingAll = false;
+		if (!selection.owns(from)) return;
 		if (!approved.ok) {
 			rowError = "Budge couldn't approve the Transactions. Try again.";
 			return;
 		}
-		if (selecting) selection.clear();
+		selection.clear();
 		undoable = {
 			kind: 'approved',
 			scopeKey: approvedIn,
@@ -584,6 +597,7 @@
 		undoable = null;
 		categorizingMany = true;
 		const changedIn = scopeKey;
+		const from = selection.mark();
 		const label = labelOf(bulkChoices, option) ?? 'their Category';
 		const saved = await attempt(() =>
 			categorizeMany({
@@ -594,6 +608,7 @@
 		);
 		categorizingMany = false;
 		bulkPick = NOTHING_PICKED;
+		if (!selection.owns(from)) return;
 		if (!saved.ok) {
 			rowError = saved.error?.message ?? "Budge couldn't change the Categories. Try again.";
 			return;
@@ -921,7 +936,11 @@
 							shown={categorizingMany ? 'Saving…' : undefined}
 							disabled={categorizable.length === 0 || tooManyToCategorize || categorizingMany}
 							choices={bulkChoices}
-							optIn={{ label: 'Approve them too', hint: '', accepts: () => true }}
+							optIn={{
+								label: 'Approve them too',
+								hint: 'Marks these Transactions reviewed. Balances already include them.',
+								accepts: () => true
+							}}
 							onValueChange={(option: string, approveToo: boolean) =>
 								categorizeSelected(option, approveToo)}
 						/>
@@ -1011,7 +1030,10 @@
 	{preset}
 	defaultAccountId={accountId}
 	{returnFocus}
-	ondone={announce}
+	ondone={(message: string) => {
+		retireUndoOf(editingSnapshot?._id);
+		announce(message);
+	}}
 	ondeleted={(transactionId: Id<'transactions'>) => {
 		deletedId = transactionId;
 	}}
