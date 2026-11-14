@@ -412,7 +412,7 @@ export const transactions = {
 	},
 	'select-categorize': {
 		title:
-			'Transactions picked one by one, across Payees and within one, take a Category, and approval only when asked; Undo puts back what changed and a search starts the selection over',
+			'Transactions picked one by one, across Payees and within one, take a Category, and approval only when asked; Undo puts back what changed and a search keeps only the checked rows it shows',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
 			const selectBoxes = page.getByRole('checkbox', { name: /^Select / });
@@ -457,17 +457,40 @@ export const transactions = {
 			);
 
 			await step(
-				'the bulk picker offers Categories but no Transfer, and a search starts the selection over instead of reaching rows it hides',
+				'the bulk picker offers Categories but no Transfer, and a search keeps the checked rows it shows, even one checked as the search was typed, and unselects the rest, saying so',
 				async () => {
 					const offered = await choicesOf(bulk);
 					expect(offered).toContain('Dining Out');
 					expect(offered.filter((name) => name.startsWith('Transfer'))).toEqual([]);
 					const search = page.getByRole('searchbox', { name: 'Search' });
-					await search.fill('Coffee');
-					await expect(page.getByText(/^\d+ selected$/)).toHaveCount(0);
-					await expect(picked).toHaveCount(0);
+					const namesOf = (boxes: Locator) =>
+						boxes.evaluateAll((all) => all.map((box) => box.getAttribute('aria-label')).sort());
+					const coffees = [coffee.nth(1), between, coffee.nth(3)];
+					const kept = (
+						await Promise.all(coffees.map((box) => box.getAttribute('aria-label')))
+					).sort();
+					const checkedBeforeTheSearchApplies = [
+						await between.elementHandle(),
+						await hardware.elementHandle()
+					];
+					await search.evaluate((input: HTMLInputElement, boxes) => {
+						input.value = 'Coffee';
+						input.dispatchEvent(new Event('input', { bubbles: true }));
+						for (const box of boxes) box.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+					}, checkedBeforeTheSearchApplies);
+					await expect(bookshop).toHaveCount(0);
+					await expect.poll(() => namesOf(picked)).toEqual(kept);
+					await expect(page.getByText('3 selected', { exact: true })).toBeVisible();
+					const note = '2 selected Transactions left the list and were unselected.';
+					await expect(page.getByRole('paragraph').filter({ hasText: note })).toBeVisible();
+					await expect(page.getByRole('status').filter({ hasText: note })).toHaveCount(1);
 					await search.fill('');
 					await expect(bookshop).toBeVisible();
+					await expect(bookshop).not.toBeChecked();
+					await expect(hardware).not.toBeChecked();
+					await expect.poll(() => namesOf(picked)).toEqual(kept);
+					await expect(page.getByRole('paragraph').filter({ hasText: note })).toHaveCount(0);
+					await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
 					await expect(picked).toHaveCount(0);
 					await expect(bulk).toHaveCount(0);
 				}

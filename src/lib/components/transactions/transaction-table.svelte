@@ -7,7 +7,7 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import type { ClassValue } from 'svelte/elements';
 	import { useConvexClient, useMutation, useQuery } from 'convex-svelte';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { replaceState } from '$app/navigation';
@@ -233,7 +233,10 @@
 		if (undoable === null || transactionId === undefined) return;
 		if (touchedBy(undoable).includes(transactionId)) undoable = null;
 	}
-	const selection = new SelectionPerScope(() => scopeKey);
+	const selection = new SelectionPerScope(
+		() => scopeKey,
+		() => (loading || first.error || second.error ? undefined : rows.map((row) => row._id))
+	);
 
 	const approveAllLabel = $derived.by(() => {
 		if (selecting) {
@@ -350,6 +353,18 @@
 	function announce(message: string) {
 		announcement = announcement === message ? `${message}\u00a0` : message;
 	}
+	const unselectedNote = $derived.by(() => {
+		const count = selection.leftTheList?.count;
+		if (count === undefined) return '';
+		return `${counted(count, 'selected Transaction')} left the list and ${count === 1 ? 'was' : 'were'} unselected.`;
+	});
+	$effect(() => {
+		const note = unselectedNote;
+		if (note !== '')
+			untrack(() => {
+				announce(note);
+			});
+	});
 	let addButton: HTMLButtonElement | HTMLAnchorElement | null = $state(null);
 	let approveAllButton: HTMLButtonElement | HTMLAnchorElement | null = $state(null);
 	function shownOf(selector: string) {
@@ -1068,8 +1083,9 @@
 				</Button>
 			</div>
 		</div>
-		{#if selecting && (keptNote !== '' || tooManyToCategorize)}
+		{#if unselectedNote !== '' || keptNote !== '' || tooManyToCategorize}
 			<p class="mt-1 text-xs text-muted-foreground">
+				{unselectedNote}
 				{keptNote}
 				{tooManyToCategorize ? `Categorize at most ${String(BULK_CATEGORIZE_LIMIT)} at once.` : ''}
 			</p>

@@ -1,4 +1,4 @@
-import { untrack } from 'svelte';
+import { tick, untrack } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 
 import type { Id } from '$convex/_generated/dataModel';
@@ -11,32 +11,52 @@ export interface SelectionMark {
 }
 
 export class SelectionPerScope {
-	#scope = $state('');
-	#generation = 0;
+	#generation = $state(0);
+	#settling = $state(false);
+	#unselected = $state<{ count: number; mark: SelectionMark } | null>(null);
 	readonly #ids = new SvelteSet<TransactionId>();
 	readonly #scopeOf: () => string;
 
-	constructor(scopeOf: () => string) {
+	constructor(scopeOf: () => string, shownOnceLoaded: () => readonly TransactionId[] | undefined) {
 		this.#scopeOf = scopeOf;
 		$effect.pre(() => {
 			scopeOf();
 			untrack(() => {
-				this.clear();
+				this.#generation += 1;
+				this.#settling = this.#ids.size > 0;
 			});
+		});
+		$effect(() => {
+			if (this.#settling && shownOnceLoaded() !== undefined)
+				void this.#keepOnlyShownOnceTheListQueryCaughtUp(shownOnceLoaded);
 		});
 	}
 
+	async #keepOnlyShownOnceTheListQueryCaughtUp(
+		shownOnceLoaded: () => readonly TransactionId[] | undefined
+	) {
+		await tick();
+		const shown = shownOnceLoaded();
+		if (!this.#settling || shown === undefined) return;
+		this.#settling = false;
+		const left = [...this.#ids].filter((id) => !shown.includes(id));
+		if (left.length === 0) return;
+		for (const id of left) this.#ids.delete(id);
+		this.#generation += 1;
+		this.#unselected = { count: left.length, mark: this.mark() };
+	}
+
+	get leftTheList(): { readonly count: number } | undefined {
+		const note = this.#unselected;
+		return note !== null && this.owns(note.mark) ? note : undefined;
+	}
+
 	has(id: TransactionId): boolean {
-		return this.#scope === this.#scopeOf() && this.#ids.has(id);
+		return this.#ids.has(id);
 	}
 
 	set(ids: readonly TransactionId[], picked: boolean) {
-		const scope = this.#scopeOf();
 		this.#generation += 1;
-		if (scope !== this.#scope) {
-			this.#ids.clear();
-			this.#scope = scope;
-		}
 		for (const id of ids) {
 			if (picked) this.#ids.add(id);
 			else this.#ids.delete(id);
@@ -45,6 +65,7 @@ export class SelectionPerScope {
 
 	clear() {
 		this.#generation += 1;
+		this.#settling = false;
 		this.#ids.clear();
 	}
 
