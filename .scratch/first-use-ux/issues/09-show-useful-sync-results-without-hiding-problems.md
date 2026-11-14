@@ -1,6 +1,6 @@
 # 09: Show useful Sync results without hiding problems
 
-**Status:** landed — review pending
+**Status:** done
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -71,3 +71,50 @@ Evidence is under `test-results/ticket-09/`.
 
 - Modified and removed bank rows still go uncounted in the result (spec note). Should they get a detail?
 - With a large Reconnect result plus a matched detail, the detail can still clip at 320 px. The full text stays in `title` and the status region.
+
+### Review fixes 2026-11-13 (commits 4702f1d..84f6efe on `feat/first-use-ux`, this record in the next commit)
+
+The review is [`reviews/09/review.md`](../reviews/09/review.md). The owner's decisions are binding; each item is below.
+
+**1. P2, a late Sync now result replaced newer card feedback: fixed.**
+
+- `connection-card.svelte` keeps a generation counter. Every card operation (Sync now, including the paused refusal; Reconnect and its sync; Stop syncing; Bring back; Remove) advances it and takes over the result line with its own `Syncing…`/`Reconnecting…` text, then its own report. Only the owner publishes, and only the owner of a Bring back moves focus to `Set up`. Remove still drops the card on success, owner or not.
+- A superseded failure does not vanish. It joins the card's problem list as `Sync now failed: <message>` (likewise `Reconnect failed:`, `Stop syncing failed:`, `Bring back failed:`, `Remove connection failed:`), until the next operation on the card. Durable connection problems are unchanged. A superseded success is dropped: the server state it reports already shows in the card.
+- Nothing is serialized. Sync now's button still reads `Syncing…` until its own answer comes.
+- Proof: `plaid/superseded-sync` (`answerInsteadOfServer`, now able to answer or refuse several actions). Sync now is held, Stop syncing completes, the old success is released, and the Stop syncing report and focus on the actions button survive. Then Sync now is held, Bring back completes, the old failure is released, and the Bring back report and `Set up` focus survive with the failure visible in the problem list.
+- Red on the old card: `journey-red` fails at step 2 (status `3 Transactions added.` replaced `Stopped syncing …`). Step 4 is unreachable there. Green: `journey-green`.
+
+**2. P2, diagnostic detail clipped at 320 px with no touch access: fixed.**
+
+- The summary (`N Transactions added.`, `N wait for setup below.`, the `Reconnected.` prefix) sits in its own span and stays whole. Matched counts open from an inline `Details` button: a shadcn-svelte Collapsible, added under `src/lib/components/ui/collapsible/`, using the Button `link`/`xs` variant through the trigger's `child` snippet so `lint:ui` stays clean. It opens by tap, click, Enter or Space; the detail shows in muted text below the line, and a new operation closes it. The `status` region still reads text plus detail; `title` stays only as a backstop for long failure messages.
+- Layout: measured at 320 px, the worst Reconnect summary plus `Details` takes three lines, so the slot reserves three lines below 640 px and two from there (it keeps its slot whether empty or not, per the bank-sync spec). Between 640 and 1279 px the side-by-side slot was 149–277 px wide, so the buttons now sit beside the line only from 1280 px (`xl:`) and below it otherwise.
+- Proof: `plaid/sync-waiting` gains a step at 320 and 390 px. Reconnect runs a fake Plaid Link and is answered with 1000 added, 1 matched and 199 held. The summary is visible, unclipped by any ancestor, and clear of the tab bar and buttons; `Details` starts collapsed, opens by a CDP touch tap, closes by Enter and reopens by Space; the detail is clear of the tab bar and nothing passes the right edge. The layout-shift guard ran throughout.
+- Red on the old card: `journey-red` fails at the 320 px step (summary span not found; text and detail shared one clipped span). Green: `journey-green`.
+- Found on the way: `page.route` turns off the browser cache, so routing the Plaid Link script before the page loaded refetched a font after first paint and shifted the tab bar's `Categories` label (shift score 2.7e-5, at about 350 ms after load, also present with the old card). The route is now added after the page loads (`fakePlaidLinkOnceTheCachedPageLoaded`) and removed at the step's end.
+
+**3. Changed/removed counts: deferred.** `syncConnection` in `convex/lib/sync.ts` totals only `added`, `matched` and `held`. `applyBankChange` and `applyBankRemoval` in `convex/lib/bankChanges.ts` return nothing and decide internally whether a change is a no-op, followed quietly, flagged `changed`, or removed. Counting applied changes and removals needs new per-row outcomes from those functions, threaded through the apply mutation and its capacity budget, which is new tracking beyond a per-run sum. The result never shows them as additions or as the backlog; the feature map says they are not counted.
+
+**4. Receipt coverage gap: fixed.** In `convex/plaidWebhook.test.ts` the public receipt test became a table over both owner entry points, `syncNow` and `syncAfterReconnect`, with three cases each: a mixed run then a quiet run (`{2,0,3}` then zeros), a run matching a Transaction the owner entered (`{added 1, matched 1, held 0}`), and a held-only run (a fake-Plaid `onlyUnmapped` flag; `{0,0,2}`). The fake Plaid `fetch` stays the boundary. This is existing behavior, so red is by mutation of `ownerSync`'s mapping: matched folded into added fails the 2 matched cases (`server-red-matched.txt`); `held: 0` fails the 4 mixed and held-only cases (`server-red-held.txt`). Green: 49/49 (`server-green.txt`).
+
+The webhook and daily sync intentionally return no receipt: nobody is waiting on them, and their user-visible result is the card's freshness, its problems and the `New bank Accounts` section.
+
+**Checks**
+
+Evidence is under `test-results/ticket-09-fix/`.
+
+- `bun run check` (`check.txt`): codegen, format, lint, `lint:ui`, typecheck and 924 unit tests passed; `capacity:check` refused in the main checkout as before. Not rerun in a worktree: no write, limit or mutation changed.
+- Journeys in a temporary worktree (`journeys-affected`): 14 passed, all `plaid/*` (status, late-sync, sync-waiting, superseded-sync, attention, consent, late-renew, remove, stop-and-bring-back) and `accounts/held-*` (map, new-card, unknown-kind, legacy-name, ignore).
+- Full `bun run test:e2e:local`: 56 passed in 8.5 min, exit 0 (`e2e-local.txt`).
+- Feature map: `.agents/skills/verify-budge/features/plaid.md` (card result line, Details, ownership and late failures, both journeys); `scripts/app/featureMap.test.ts` passes.
+
+**Principles**
+
+- *Separate Before Serializing Shared State*: the card's single result slot was the shared write target. Each operation now owns its turn by generation, and a superseded failure goes to its own channel (the problem list) instead of serializing operations.
+- *Fix Root Causes*: the tab-bar shift was traced with layout-shift timestamps to an uncached font refetch caused by the journey's own route, not suppressed or blamed on the card.
+- *Prove It Works*: every new assertion was shown red on the old card or by mutation before green.
+
+**Open questions**
+
+- Should a superseded *success* also leave a trace (for example a muted `Sync now finished.`)? It is dropped now, since the card's freshness and sections already reflect it.
+- Changed/removed counts (item 3) wait for per-row outcomes from `applyBankChange`/`applyBankRemoval` if the owner wants them.
+
