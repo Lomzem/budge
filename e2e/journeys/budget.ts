@@ -11,12 +11,13 @@ import {
 	type Journey
 } from './journey';
 
-function monthName(monthsFromNow: number) {
+function monthOf(monthsFromNow: number) {
 	const today = new Date();
-	return new Date(today.getFullYear(), today.getMonth() + monthsFromNow, 1).toLocaleString(
-		'en-US',
-		{ month: 'long', year: 'numeric' }
-	);
+	return new Date(today.getFullYear(), today.getMonth() + monthsFromNow, 1);
+}
+
+function monthName(monthsFromNow: number) {
+	return monthOf(monthsFromNow).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 }
 
 export const budget = {
@@ -238,6 +239,16 @@ export const budget = {
 		run: async (page, { step }) => {
 			const picker = page.getByRole('button', { name: /, choose a month$/ });
 			const months = page.getByRole('dialog').or(page.locator('[data-slot="popover-content"]'));
+			const showYear = async (year: number) => {
+				const grid = months.getByRole('group');
+				let shown = Number(await grid.getAttribute('aria-label'));
+				while (shown !== year) {
+					const later = shown < year;
+					await months.getByRole('button', { name: later ? 'Next year' : 'Previous year' }).click();
+					shown += later ? 1 : -1;
+					await expect(grid).toHaveAttribute('aria-label', String(shown));
+				}
+			};
 
 			await step('open the month picker from the heading', async () => {
 				await page.setViewportSize({ width: 320, height: 640 });
@@ -247,17 +258,26 @@ export const budget = {
 				await expect(months.getByRole('button', { name: monthName(0), exact: true })).toBeFocused();
 			});
 
-			await step('months before the first budget month cannot be picked', async () => {
-				await expect(
-					months.getByRole('button', { name: monthName(-3), exact: true })
-				).toBeDisabled();
-				await expect(
-					months.getByRole('button', { name: monthName(-2), exact: true })
-				).toBeEnabled();
-			});
+			await step(
+				'months before the first budget month cannot be picked, nor any earlier year',
+				async () => {
+					const firstMonth = monthOf(-2);
+					await showYear(firstMonth.getFullYear());
+					await expect(months.getByRole('button', { name: 'Previous year' })).toBeDisabled();
+					await expect(
+						months.getByRole('button', { name: monthName(-2), exact: true })
+					).toBeEnabled();
+					const monthBefore = monthOf(-3);
+					if (monthBefore.getFullYear() === firstMonth.getFullYear()) {
+						await expect(
+							months.getByRole('button', { name: monthName(-3), exact: true })
+						).toBeDisabled();
+					}
+				}
+			);
 
 			await step('Next year, then a month, jumps there and the URL keeps it', async () => {
-				await months.getByRole('button', { name: 'Next year' }).click();
+				await showYear(monthOf(12).getFullYear());
 				await months.getByRole('button', { name: monthName(12), exact: true }).click();
 				await expect(page.getByText(monthName(12), { exact: true })).toBeVisible();
 				await expect(picker).toBeFocused();
@@ -271,11 +291,28 @@ export const budget = {
 				await expectNothingPastTheRightEdge(page);
 			});
 
-			await step('arrow keys move between months and Enter picks one', async () => {
+			await step('arrow keys move across and down the grid, and Enter picks one', async () => {
+				const nextYear = String(new Date().getFullYear() + 1);
 				await picker.click();
+				await showYear(Number(nextYear));
+				await months.getByRole('button', { name: `June ${nextYear}`, exact: true }).click();
+				await expect(page.getByText(`June ${nextYear}`, { exact: true })).toBeVisible();
+				await expect(months).toHaveCount(0);
+				await expect(picker).toBeFocused();
+				await picker.click();
+				await expect(
+					months.getByRole('button', { name: `June ${nextYear}`, exact: true })
+				).toBeFocused();
 				await page.keyboard.press('ArrowLeft');
+				await expect(
+					months.getByRole('button', { name: `May ${nextYear}`, exact: true })
+				).toBeFocused();
+				await page.keyboard.press('ArrowDown');
+				await expect(
+					months.getByRole('button', { name: `August ${nextYear}`, exact: true })
+				).toBeFocused();
 				await page.keyboard.press('Enter');
-				await expect(page.getByText(monthName(10), { exact: true })).toBeVisible();
+				await expect(page.getByText(`August ${nextYear}`, { exact: true })).toBeVisible();
 			});
 		}
 	},
@@ -325,13 +362,15 @@ export const budget = {
 				'collapsing it hides its rows but keeps its totals and an overspent count',
 				async () => {
 					const row = page.getByRole('rowgroup').filter({ has: header(overspentGroup) });
-					const totals = await row.getByRole('row').first().getByRole('cell').allTextContents();
+					const totals = row.getByRole('row').first().getByRole('cell');
+					await expect(totals).toHaveText([/^−?\$[\d,]+\.\d\d ?Available ?−?\$[\d,]+\.\d\d$/]);
+					const shown = await totals.allTextContents();
+					const flagged = await row.getByText(/^Overspent by/).count();
 					await toggle(overspentGroup).click();
 					await expect(toggle(overspentGroup)).toHaveAttribute('aria-expanded', 'false');
 					await expect(row.getByRole('row')).toHaveCount(1);
-					await expect(row.getByRole('row').first().getByRole('cell')).toHaveText(totals);
-					await expect(header(overspentGroup)).toContainText(/\d+ overspent/);
-					await expect(header(overspentGroup)).toContainText(/\$[\d,]+\.\d\d assigned/);
+					await expect(totals).toHaveText(shown);
+					await expect(header(overspentGroup)).toContainText(`${String(flagged)} overspent`);
 				}
 			);
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, type Snippet } from 'svelte';
+	import { tick, untrack, type Snippet } from 'svelte';
 
 	import { attempt } from '$lib/attempt';
 	import { Input } from '$lib/components/ui/input';
@@ -30,11 +30,15 @@
 	let latest = 0;
 	const errorId = $props.id();
 
+	let draftOpened = false;
 	$effect.pre(() => {
-		if (editing) {
+		const opening = editing && !draftOpened;
+		draftOpened = editing;
+		if (!opening) return;
+		untrack(() => {
 			draft = pending ?? name;
 			error = '';
-		}
+		});
 	});
 
 	async function save(next: string) {
@@ -43,12 +47,12 @@
 		const saved = await attempt(() => onsave(next));
 		if (ticket !== latest) return;
 		pending = null;
-		if (!saved.ok) {
-			editing = true;
-			await tick();
-			draft = next;
-			error = saved.error?.message ?? "Budge couldn't rename it. Try again.";
-		}
+		if (saved.ok) return;
+		const typingAnotherName = editing;
+		editing = true;
+		await tick();
+		if (!typingAnotherName) draft = next;
+		error = saved.error?.message ?? "Budge couldn't rename it. Try again.";
 	}
 
 	function commit(): boolean {

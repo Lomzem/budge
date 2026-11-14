@@ -142,6 +142,13 @@ export const inspector = {
 				page
 					.getByRole('rowgroup')
 					.filter({ has: page.getByRole('rowheader', { name: new RegExp(`^${group}`) }) });
+			const cellsOf = (name: string) =>
+				page
+					.getByRole('row')
+					.filter({ has: page.getByRole('button', { name, exact: true }) })
+					.getByRole('cell');
+			const activity = (name: string) => centsIn(cellsOf(name).nth(2));
+			const available = (name: string) => centsIn(cellsOf(name).nth(3));
 
 			const overspent = await step('open the first overspent Category', async () => {
 				await openBudget(page);
@@ -165,17 +172,23 @@ export const inspector = {
 					await inspector.getByRole('button', { name: 'Cover from another Category' }).click();
 					const from = inspector.getByRole('button', { name: 'From', exact: true });
 					await expect(from).toBeFocused();
+					const overspentBy = await available(overspent);
+					expect(overspentBy).toBeLessThan(0);
 					const shortfall = cents(await inspector.getByLabel('Amount').inputValue());
-					expect(shortfall).toBeGreaterThan(0);
+					expect(shortfall).toBe(-overspentBy);
 					const richest = (await choicesOf(from))
 						.map((label) => ({ label, available: cents(/\((.*)\)$/.exec(label)?.[1] ?? '') }))
 						.sort((a, b) => b.available - a.available)[0];
 					if (richest === undefined || richest.available < shortfall) {
 						throw new Error('The fixture has no Category that can cover the shortfall.');
 					}
+					const donor = richest.label.replace(/ \(.*\)$/, '');
+					const donorBefore = await available(donor);
 					await choose(from, richest.label);
 					await inspector.getByLabel('Amount').press('Enter');
 					await expect(inspector).not.toContainText('Overspent by');
+					await expect.poll(() => available(overspent)).toBe(0);
+					await expect.poll(() => available(donor)).toBe(donorBefore - shortfall);
 					await expect(
 						inspector.getByRole('button', { name: 'Cover from another Category' })
 					).toHaveCount(0);
@@ -203,15 +216,26 @@ export const inspector = {
 				).toBeVisible();
 			});
 
-			await step('Move to group puts it in Savings Goals and keeps it open', async () => {
-				await inspector.getByRole('button', { name: 'Sample Market actions' }).click();
-				await page.getByRole('menuitem', { name: 'Move to group' }).click();
-				await page.getByRole('menuitem', { name: 'Savings Goals' }).click();
-				await expect(
-					rowgroup('Savings Goals').getByRole('button', { name: 'Sample Market', exact: true })
-				).toBeVisible();
-				await expect(inspector.getByRole('heading', { name: 'Sample Market' })).toBeVisible();
-			});
+			await step(
+				'Move to group into a collapsed Savings Goals opens that group to show it, and keeps it open',
+				async () => {
+					const savingsToggle = rowgroup('Savings Goals')
+						.getByRole('rowheader')
+						.getByRole('button', { name: /^Savings Goals/ });
+					await savingsToggle.click();
+					await expect(savingsToggle).toHaveAttribute('aria-expanded', 'false');
+					const actions = inspector.getByRole('button', { name: 'Sample Market actions' });
+					await actions.click();
+					await page.getByRole('menuitem', { name: 'Move to group' }).click();
+					await page.getByRole('menuitem', { name: 'Savings Goals' }).click();
+					await expect(savingsToggle).toHaveAttribute('aria-expanded', 'true');
+					await expect(
+						rowgroup('Savings Goals').getByRole('button', { name: 'Sample Market', exact: true })
+					).toBeVisible();
+					await expect(inspector.getByRole('heading', { name: 'Sample Market' })).toBeVisible();
+					await expect(actions).toBeFocused();
+				}
+			);
 
 			await step('Hide from budget closes the inspector and lists it as hidden', async () => {
 				await inspector.getByRole('button', { name: 'Sample Market actions' }).click();
@@ -228,6 +252,9 @@ export const inspector = {
 			});
 
 			await step('Delete… moves its history to the Category picked, then it is gone', async () => {
+				const diningOut = await activity('Dining Out');
+				expect(diningOut).not.toBe(0);
+				const coffee = await activity('Coffee');
 				await page.getByRole('button', { name: 'Dining Out', exact: true }).click();
 				await inspector.getByRole('button', { name: 'Dining Out actions' }).click();
 				await page.getByRole('menuitem', { name: 'Delete…' }).click();
@@ -239,6 +266,7 @@ export const inspector = {
 				await expect(page.locator('#main')).toBeFocused();
 				await page.reload();
 				await expect(page.getByRole('button', { name: 'Dining Out', exact: true })).toHaveCount(0);
+				await expect.poll(() => activity('Coffee')).toBe(coffee + diningOut);
 			});
 		}
 	}

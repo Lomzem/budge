@@ -62,18 +62,19 @@
 			error = 'Pick a Category Group.';
 			return;
 		}
+		const submitted = { name, groupName };
 		const added = await dialog.run('save', async () => {
 			if (kind === 'group') {
-				await createGroup({ name });
+				await createGroup({ name: submitted.name });
 				return;
 			}
 			let target = group?.id;
 			if (target === undefined) {
-				target = await createGroup({ name: groupName });
-				created = { id: target, name: groupName.trim() };
+				target = await createGroup({ name: submitted.groupName });
+				created = { id: target, name: submitted.groupName.trim() };
 				groupId = target;
 			}
-			await createCategory({ groupId: target, name });
+			await createCategory({ groupId: target, name: submitted.name });
 		});
 		if (added.ok) {
 			open = false;

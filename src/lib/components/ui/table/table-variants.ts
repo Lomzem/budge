@@ -12,7 +12,7 @@ export const tableColumnVariants = tv({
 			select: 'w-8 pr-0 sm:w-12',
 			amount: 'w-28 sm:w-32',
 			'amount-compact': 'w-22 xs:w-24 sm:w-32',
-			assigned: 'w-25 xs:w-28 sm:w-32',
+			assigned: 'w-30 xs:w-28 sm:w-32',
 			date: 'w-32',
 			name: 'w-44',
 			note: 'w-48'

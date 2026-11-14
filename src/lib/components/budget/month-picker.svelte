@@ -20,6 +20,7 @@
 	let open = $state(false);
 	let year = $state(Number(budget.month.slice(0, 4)));
 	let grid = $state<HTMLElement | null>(null);
+	let trigger = $state<HTMLElement | null>(null);
 
 	const monthIn = (shownYear: number, index: number) =>
 		`${String(shownYear)}-${String(index + 1).padStart(2, '0')}`;
@@ -39,10 +40,16 @@
 		open = false;
 	}
 
+	function returnFocusOnceClosed(event: Event) {
+		event.preventDefault();
+		if (!open) trigger?.focus({ preventScroll: true });
+	}
+
 	function focusChosen(event: Event) {
 		event.preventDefault();
 		void tick().then(() => {
-			const buttons = grid?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? [];
+			if (grid === null || grid.contains(document.activeElement)) return;
+			const buttons = grid.querySelectorAll<HTMLButtonElement>('button:not([disabled])');
 			const chosen = [...buttons].find((button) => button.hasAttribute('aria-current'));
 			(chosen ?? buttons[0])?.focus();
 		});
@@ -66,11 +73,19 @@
 		if (next) year = Number(budget.month.slice(0, 4));
 	}}
 >
-	<Popover.Trigger variant="inline" aria-label="{formatMonth(budget.month)}, choose a month">
+	<Popover.Trigger
+		bind:ref={trigger}
+		variant="inline"
+		aria-label="{formatMonth(budget.month)}, choose a month"
+	>
 		<span>{formatMonth(budget.month)}</span>
 		<ChevronDownIcon aria-hidden="true" class="size-4 text-muted-foreground" />
 	</Popover.Trigger>
-	<Popover.Content align="center" onOpenAutoFocus={focusChosen}>
+	<Popover.Content
+		align="center"
+		onOpenAutoFocus={focusChosen}
+		onCloseAutoFocus={returnFocusOnceClosed}
+	>
 		<div class="flex flex-col p-3">
 			<div class="flex items-center justify-between pb-2">
 				<Button

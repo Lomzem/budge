@@ -19,6 +19,33 @@ async function listedDates(page: Page) {
 		);
 }
 
+async function listedRows(page: Page) {
+	return await page
+		.getByRole('table')
+		.getByRole('button', { name: /edit Transaction on/ })
+		.evaluateAll((buttons) =>
+			buttons.map((button) => ({
+				payee: button.firstElementChild?.textContent.trim() ?? '',
+				date: (button.getAttribute('aria-label') ?? '').split(' on ').at(-1) ?? ''
+			}))
+		);
+}
+
+async function datesOnceListed(
+	page: Page,
+	expected: (rows: { payee: string; date: string }[]) => boolean
+) {
+	let dates: string[] = [];
+	await expect
+		.poll(async () => {
+			const rows = await listedRows(page);
+			dates = rows.map((row) => row.date);
+			return expected(rows);
+		})
+		.toBe(true);
+	return dates;
+}
+
 async function listedPayees(page: Page) {
 	return await page
 		.getByRole('table')
@@ -91,20 +118,25 @@ export const search = {
 			await step(
 				'Last 30 days fills From and To with local dates and lists only rows inside them; a typed From reads as custom dates',
 				async () => {
-					await choose(page.getByLabel('Category', { exact: true }), 'Any Category');
-					const everyDate = await listedDates(page);
 					const today = localToday();
 					const inRange = new Set(
 						Array.from({ length: 30 }, (_, back) => formatDate(addDays(today, -back)))
 					);
-					expect(everyDate.some((date) => !inRange.has(date))).toBe(true);
+					await choose(page.getByLabel('Category', { exact: true }), 'Any Category');
+					const unapprovedAndUncategorizedSoNeverAGiftsRow = 'SAMPLE BOOKSHOP 0193';
+					const everyDate = await datesOnceListed(
+						page,
+						(rows) =>
+							rows.some((row) => row.payee === unapprovedAndUncategorizedSoNeverAGiftsRow) &&
+							rows.some((row) => !inRange.has(row.date))
+					);
 					await choose(page.getByLabel('Dates', { exact: true }), 'Last 30 days');
 					await expect(page.getByLabel('From', { exact: true })).toHaveValue(addDays(today, -29));
 					await expect(page.getByLabel('To', { exact: true })).toHaveValue(today);
-					await expect
-						.poll(async () => (await listedDates(page)).every((date) => inRange.has(date)))
-						.toBe(true);
-					expect((await listedDates(page)).length).toBeGreaterThan(0);
+					await datesOnceListed(
+						page,
+						(rows) => rows.length > 0 && rows.every((row) => inRange.has(row.date))
+					);
 					await page.getByLabel('From', { exact: true }).fill(addDays(today, -3));
 					await expect(page.getByLabel('Dates', { exact: true })).toHaveText('Custom dates');
 					await choose(page.getByLabel('Dates', { exact: true }), 'Any dates');

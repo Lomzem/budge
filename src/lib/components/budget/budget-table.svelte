@@ -75,7 +75,7 @@
 	{#if status?.text}
 		<span class="block text-xs whitespace-normal xs:pl-3 {status.class}">{status.text}</span>
 	{/if}
-	{#if category.target && category.target.needed > 0 && category.status !== 'overspent'}
+	{#if category.target && category.target.needed > 0}
 		<div class="mt-1 xs:pl-3">
 			<AssignTargetButton
 				categoryId={category.id}
@@ -94,13 +94,24 @@
 	{/each}
 {/snippet}
 
+{#snippet stackedAvailable(cents: number, tone: string)}
+	<span class="mt-1 block text-xs font-medium tabular-nums {tone}"
+		><span class="sr-only">Available </span>{formatCents(cents)}</span
+	>
+{/snippet}
+
 <Table.Root layout="fixed">
 	<Table.Header>
 		<Table.Row>
 			<Table.Head>Category</Table.Head>
-			<Table.Head width="assigned" align="end">Assigned</Table.Head>
+			<Table.Head width="assigned" align="end">
+				Assigned
+				{#if !roomy.current}<span class="block">Available</span>{/if}
+			</Table.Head>
 			<Table.Head width="amount" align="end" showFrom="screen-sm">Activity</Table.Head>
-			<Table.Head width="amount-compact" align="end">Available</Table.Head>
+			{#if roomy.current}
+				<Table.Head width="amount-compact" align="end">Available</Table.Head>
+			{/if}
 		</Table.Row>
 	</Table.Header>
 	{#each groups as group (group.id)}
@@ -108,7 +119,7 @@
 		{@const overspent = group.categories.filter((c) => c.status === 'overspent').length}
 		<Table.Body>
 			<Table.Row weight="group">
-				<Table.Head scope="rowgroup" variant="group" colspan={roomy.current ? undefined : 2}>
+				<Table.Head scope="rowgroup" variant="group">
 					<div class="flex items-start gap-1">
 						<button
 							type="button"
@@ -149,25 +160,26 @@
 							</Button>
 						{/if}
 					</div>
-					{#if !roomy.current}
-						<span class="block pl-5 text-xs font-medium text-muted-foreground tabular-nums">
-							{formatCents(group.assigned)} assigned
-						</span>
-					{/if}
 				</Table.Head>
-				{#if roomy.current}
-					<Table.Cell align="end" numeric>
-						<span class="font-medium">{formatCents(group.assigned)}</span>
-					</Table.Cell>
-				{/if}
+				<Table.Cell align="end" numeric>
+					<span class="font-medium">{formatCents(group.assigned)}</span>
+					{#if !roomy.current}
+						{@render stackedAvailable(
+							group.available,
+							group.available < 0 ? 'text-destructive' : ''
+						)}
+					{/if}
+				</Table.Cell>
 				<Table.Cell align="end" numeric showFrom="screen-sm">
 					<span class="font-medium">{formatCents(group.activity)}</span>
 				</Table.Cell>
-				<Table.Cell align="end" numeric>
-					<span class={['font-medium', group.available < 0 && 'text-destructive']}
-						>{formatCents(group.available)}</span
-					>
-				</Table.Cell>
+				{#if roomy.current}
+					<Table.Cell align="end" numeric>
+						<span class={['font-medium', group.available < 0 && 'text-destructive']}
+							>{formatCents(group.available)}</span
+						>
+					</Table.Cell>
+				{/if}
 			</Table.Row>
 			{#if !shut}
 				{#each group.categories as category (category.id)}
@@ -181,13 +193,19 @@
 								label="Assigned for {category.name}"
 								onsave={(cents: number) => budget.setAssigned(category.id, cents)}
 							/>
+							{#if !roomy.current}
+								{@render stackedAvailable(category.available, status?.class ?? '')}
+							{/if}
 						</Table.Cell>
 						<Table.Cell align="end" numeric showFrom="screen-sm">
 							{formatCents(category.activity)}
 						</Table.Cell>
-						<Table.Cell align="end" numeric>
-							<span class={['font-medium', status?.class]}>{formatCents(category.available)}</span>
-						</Table.Cell>
+						{#if roomy.current}
+							<Table.Cell align="end" numeric>
+								<span class={['font-medium', status?.class]}>{formatCents(category.available)}</span
+								>
+							</Table.Cell>
+						{/if}
 					</Table.Row>
 				{:else}
 					<Table.Row>

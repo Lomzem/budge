@@ -18,6 +18,17 @@ async function act(page: Page, name: string, action: string) {
 	await page.getByRole('menuitem', { name: action }).click();
 }
 
+async function settled(page: Page) {
+	await page.evaluate(
+		() =>
+			new Promise<void>((resolve) => {
+				requestAnimationFrame(() => {
+					resolve();
+				});
+			})
+	);
+}
+
 async function openCategories(page: Page) {
 	await page.goto('/categories');
 	await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
@@ -34,10 +45,14 @@ async function orderIn(scope: Locator) {
 }
 
 async function groupOrder(page: Page) {
-	return (await page.getByRole('heading', { level: 2 }).allInnerTexts()).map((name) => name.trim());
+	return (await page.getByRole('main').getByRole('heading', { level: 2 }).allInnerTexts()).map(
+		(name) => name.trim()
+	);
 }
 
 async function drag(page: Page, handle: Locator, onto: Locator) {
+	await handle.scrollIntoViewIfNeeded();
+	await onto.scrollIntoViewIfNeeded();
 	const from = await handle.boundingBox();
 	const to = await onto.boundingBox();
 	if (from === null || to === null) throw new Error('A drag needs both rows on screen.');
@@ -45,6 +60,29 @@ async function drag(page: Page, handle: Locator, onto: Locator) {
 	await page.mouse.down();
 	await page.mouse.move(from.x + from.width / 2, to.y + 2, { steps: 8 });
 	await page.mouse.up();
+}
+
+async function touchDragToTheBottomEdge(page: Page, handle: Locator, until: Locator) {
+	const from = await handle.boundingBox();
+	const height = page.viewportSize()?.height;
+	if (from === null || height === undefined) throw new Error('A drag needs its handle on screen.');
+	const finger = await page.context().newCDPSession(page);
+	const x = from.x + from.width / 2;
+	const touch = async (type: 'touchStart' | 'touchMove' | 'touchEnd', y: number) => {
+		await finger.send('Input.dispatchTouchEvent', {
+			type,
+			touchPoints: type === 'touchEnd' ? [] : [{ x, y }]
+		});
+	};
+	const start = from.y + from.height / 2;
+	const nearTheBottomEdge = height - 100;
+	await touch('touchStart', start);
+	for (let step = 1; step <= 8; step++) {
+		await touch('touchMove', start + ((nearTheBottomEdge - start) * step) / 8);
+	}
+	await expect(until).toBeInViewport();
+	await touch('touchEnd', nearTheBottomEdge);
+	await finger.detach();
 }
 
 export const categories = {
@@ -91,26 +129,76 @@ export const categories = {
 				).toBeVisible();
 			});
 
-			await step('add a Category with a new group in the same dialog', async () => {
+			await step('a new group needs its own name even when the Category is named', async () => {
 				await openCategories(page);
 				await page.getByRole('button', { name: 'Add Category', exact: true }).click();
 				const addCategory = page.getByRole('dialog', { name: 'Add Category' });
 				await choose(addCategory.getByLabel('Category Group'), 'New Category Group…');
-				await expect(addCategory.getByLabel('Group name')).toBeFocused();
-				await addCategory.getByRole('button', { name: 'Add' }).click();
-				await expect(addCategory).toBeVisible();
-				await addCategory.getByLabel('Group name').fill('Smoke Test Group');
+				const groupName = addCategory.getByLabel('Group name');
+				await expect(groupName).toBeFocused();
 				await addCategory.getByLabel('Name', { exact: true }).fill('Smoke Test Category');
 				await addCategory.getByRole('button', { name: 'Add' }).click();
-				await expect(addCategory).toBeHidden();
-				await page.reload();
-				await expect(
-					groupOf(page, 'Smoke Test Group').getByRole('button', {
-						name: 'Smoke Test Category',
-						exact: true
-					})
-				).toBeVisible();
+				await expect(addCategory).toBeVisible();
+				await expect(groupName).toBeFocused();
+				expect(
+					await groupName.evaluate((field: HTMLInputElement) => field.validity.valueMissing)
+				).toBe(true);
+				expect(
+					await addCategory
+						.getByLabel('Name', { exact: true })
+						.evaluate((field: HTMLInputElement) => field.validity.valid)
+				).toBe(true);
 			});
+
+			await step(
+				'when the group is made but the Category is refused, a retry adds it to that same group',
+				async () => {
+					const addCategory = page.getByRole('dialog', { name: 'Add Category' });
+					await addCategory.getByLabel('Group name').fill('Smoke Test Group');
+					const spacesPassTheFormButNotTheServer = '   ';
+					await addCategory
+						.getByLabel('Name', { exact: true })
+						.fill(spacesPassTheFormButNotTheServer);
+					await addCategory.getByRole('button', { name: 'Add' }).click();
+					await expect(addCategory.getByRole('alert')).toHaveText('Enter a name.');
+					await expect(addCategory.getByLabel('Category Group')).toHaveText('Smoke Test Group');
+					await expect(addCategory.getByLabel('Group name')).toBeHidden();
+					await addCategory.getByLabel('Name', { exact: true }).fill('Smoke Test Category');
+					await addCategory.getByRole('button', { name: 'Add' }).click();
+					await expect(addCategory).toBeHidden();
+					await page.reload();
+					await expect(groupOf(page, 'Smoke Test Group')).toHaveCount(1);
+					await expect
+						.poll(() => orderIn(groupOf(page, 'Smoke Test Group')))
+						.toEqual(['Smoke Test Group', 'Smoke Test Category']);
+				}
+			);
+
+			await step(
+				'a name edited while the new group is still being made does not change the Category being added',
+				async () => {
+					const createdGroup = await holdResponseTo(page, 'categories:createGroup');
+					await openCategories(page);
+					await page.getByRole('button', { name: 'Add Category', exact: true }).click();
+					const addCategory = page.getByRole('dialog', { name: 'Add Category' });
+					await choose(addCategory.getByLabel('Category Group'), 'New Category Group…');
+					await addCategory.getByLabel('Group name').fill('Sample Held Group');
+					const name = addCategory.getByLabel('Name', { exact: true });
+					await name.fill('Sample Submitted Category');
+					await addCategory.getByRole('button', { name: 'Add' }).click();
+					await createdGroup.held;
+					await name.fill('Sample Edited Afterwards');
+					createdGroup.release();
+					await expect(addCategory).toBeHidden();
+					await page.reload();
+					await expect
+						.poll(() => orderIn(groupOf(page, 'Sample Held Group')))
+						.toEqual(['Sample Held Group', 'Sample Submitted Category']);
+					await expect(page.getByRole('button', { name: 'Sample Edited Afterwards' })).toHaveCount(
+						0
+					);
+				}
+			);
 
 			await step('a click opens its menu on the first action', async () => {
 				const trigger = page.getByRole('button', { name: 'Smoke Test Category actions' });
@@ -140,6 +228,9 @@ export const categories = {
 					await expect(
 						page.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
 					).toBeFocused();
+					await expect(
+						page.getByRole('button', { name: 'Move Smoke Test Renamed', exact: true })
+					).toBeAttached();
 					await page.reload();
 					await expect(
 						page.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
@@ -152,6 +243,9 @@ export const categories = {
 				const field = page.getByRole('textbox', { name: 'Category Group name' });
 				await field.fill('Smoke Test Shelf');
 				await field.press('Enter');
+				await expect(
+					page.getByRole('button', { name: 'Move Smoke Test Shelf', exact: true })
+				).toBeAttached();
 				await page.reload();
 				await expect(groupOf(page, 'Smoke Test Shelf')).toBeVisible();
 			});
@@ -192,13 +286,9 @@ export const categories = {
 			await step('open the Categories page at phone width', async () => {
 				await page.setViewportSize({ width: 320, height: 640 });
 				await openCategories(page);
-				expect(await orderIn(everyday)).toEqual([
-					'Everyday',
-					'Groceries',
-					'Dining Out',
-					'Coffee',
-					'Transit'
-				]);
+				await expect
+					.poll(() => orderIn(everyday))
+					.toEqual(['Everyday', 'Groceries', 'Dining Out', 'Coffee', 'Transit']);
 			});
 
 			await step(
@@ -232,6 +322,28 @@ export const categories = {
 					.toEqual([...before.filter((name) => name !== 'Savings Goals'), 'Savings Goals']);
 			});
 
+			const touchedOrder = await step<string[]>(
+				'a finger holding a group near the bottom edge scrolls to a group off screen and drops it last',
+				async () => {
+					const before = await groupOrder(page);
+					const [first] = before;
+					if (first === undefined) throw new Error('The fixture has no Category Groups.');
+					await page
+						.getByRole('heading', { level: 1, name: 'Categories' })
+						.scrollIntoViewIfNeeded();
+					const lastHandle = page.getByRole('button', { name: /^Move / }).last();
+					await expect(lastHandle).not.toBeInViewport();
+					await touchDragToTheBottomEdge(
+						page,
+						page.getByRole('button', { name: `Move ${first}`, exact: true }),
+						lastHandle
+					);
+					const after = [...before.slice(1), first];
+					await expect.poll(() => groupOrder(page)).toEqual(after);
+					return after;
+				}
+			);
+
 			await step('dragging Transit by its handle onto Coffee puts it first', async () => {
 				await page.setViewportSize({ width: 1280, height: 800 });
 				await drag(
@@ -249,7 +361,7 @@ export const categories = {
 				await expect
 					.poll(() => orderIn(everyday))
 					.toEqual(['Everyday', 'Transit', 'Coffee', 'Groceries', 'Dining Out']);
-				expect((await groupOrder(page)).at(-1)).toBe('Savings Goals');
+				expect(await groupOrder(page)).toEqual(touchedOrder);
 				await openBudget(page);
 				const rows = page
 					.getByRole('rowgroup')
@@ -260,50 +372,62 @@ export const categories = {
 		}
 	},
 	'late-rename': {
-		title: 'renaming again while the first rename is still on its way keeps the name typed last',
+		title:
+			'a rename still on its way neither overwrites a name being typed nor wins over a later rename',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			const renamed = await holdResponseTo(page, 'categories:rename');
 			const field = page.getByRole('textbox', { name: 'Category name' });
+			const named = (name: string) => page.getByRole('button', { name, exact: true });
+			const handleOf = (name: string) =>
+				page.getByRole('button', { name: `Move ${name}`, exact: true });
 
 			await step('rename Groceries in place and hold the save', async () => {
 				await openCategories(page);
-				await page.getByRole('button', { name: 'Groceries', exact: true }).click();
+				await named('Groceries').click();
 				await field.fill('Sample Slow Groceries');
 				await field.press('Enter');
 				await renamed.held;
-				await expect(
-					page.getByRole('button', { name: 'Sample Slow Groceries', exact: true })
-				).toBeFocused();
+				await expect(named('Sample Slow Groceries')).toBeFocused();
 			});
 
-			await step('rename it again while the first save is held', async () => {
-				await page.getByRole('button', { name: 'Sample Slow Groceries', exact: true }).click();
-				await expect(field).toHaveValue('Sample Slow Groceries');
+			await step(
+				'the held save landing while another name is being typed leaves that name in the field',
+				async () => {
+					await named('Sample Slow Groceries').click();
+					await expect(field).toHaveValue('Sample Slow Groceries');
+					await field.fill('Sample Typed Groceries');
+					renamed.landEarliest();
+					await expect(handleOf('Sample Slow Groceries')).toBeVisible();
+					await settled(page);
+					await expect(field).toHaveValue('Sample Typed Groceries');
+					await expect(field).toBeFocused();
+					await field.press('Enter');
+					await expect(named('Sample Typed Groceries')).toBeFocused();
+				}
+			);
+
+			await step('rename it again while that save is held', async () => {
+				await named('Sample Typed Groceries').click();
+				await expect(field).toHaveValue('Sample Typed Groceries');
 				await field.fill('Sample Fast Groceries');
 				await field.press('Enter');
 			});
 
-			await step('the first save landing does not bring back its name', async () => {
-				renamed.releaseEarliest();
-				await expect(
-					page.getByRole('button', { name: 'Sample Fast Groceries', exact: true })
-				).toBeVisible();
-				await expect(
-					page.getByRole('button', { name: 'Sample Slow Groceries', exact: true })
-				).toHaveCount(0);
+			await step('the earlier save landing does not bring back its name', async () => {
+				renamed.landEarliest();
+				await expect(handleOf('Sample Typed Groceries')).toBeVisible();
+				await settled(page);
+				await expect(named('Sample Fast Groceries')).toBeVisible();
+				await expect(named('Sample Typed Groceries')).toHaveCount(0);
 			});
 
 			await step('the name typed last stays, after a reload too', async () => {
 				renamed.release();
-				await expect(
-					page.getByRole('button', { name: 'Sample Fast Groceries', exact: true })
-				).toBeVisible();
+				await expect(named('Sample Fast Groceries')).toBeVisible();
 				await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 				await page.reload();
-				await expect(
-					page.getByRole('button', { name: 'Sample Fast Groceries', exact: true })
-				).toBeVisible();
+				await expect(named('Sample Fast Groceries')).toBeVisible();
 			});
 		}
 	}

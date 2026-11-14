@@ -7,7 +7,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { useQuery } from 'convex-svelte';
 	import { Result } from 'effect';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { MediaQuery, SvelteSet } from 'svelte/reactivity';
 
 	import { goto, replaceState } from '$app/navigation';
@@ -135,6 +135,23 @@
 		if (selected) lastSelected = selected;
 	});
 	const inspected = $derived(selected ?? lastSelected);
+	const selectedGroupId = $derived(
+		selectedId === null
+			? undefined
+			: view?.groups.find((group) => group.categories.some((c) => c.id === selectedId))?.id
+	);
+	let selectedPlacement: { id: Id<'categories'>; group: Id<'categoryGroups'> } | null = null;
+	$effect.pre(() => {
+		const id = selectedId;
+		const group = selectedGroupId;
+		if (id === null || group === undefined) return;
+		const movedGroups = selectedPlacement?.id === id && selectedPlacement.group !== group;
+		selectedPlacement = { id, group };
+		if (movedGroups)
+			untrack(() => {
+				expandGroupOf(id);
+			});
+	});
 
 	interface Need {
 		text: string;
