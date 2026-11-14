@@ -15,7 +15,7 @@ Divide one Transaction across Categories and memos while preserving its total an
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/splits.ts`, also run by `bun run test:e2e:local`):
 
-- `splits/lines`: a split shows Split in the list, and lines are added, edited and removed (`split-create`, `split-edit`, `split-remove`).
+- `splits/lines`: a split shows Split in the list, and lines are added, edited and removed (`split-create`, `split-edit`, `split-remove`). It first holds the `payees:lastCategory` answer (`e2e/heldResponse.ts`) with the pointer over `Split across Categories` in the open Category list; when the answer comes the trigger reads `Uncategorized`, the list holds still, and the click picks Split.
 - `splits/restart`: leaving Split and choosing it again starts from the current amount and Category.
 
 The recipes below cover what the journeys leave out.

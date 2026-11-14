@@ -36,7 +36,7 @@ Preconditions:
 ## Gotchas
 
 - Recall runs for a nonblank Payee only while Category is Uncategorized and no Category choice was made; editing an already categorized, split or Transfer Transaction keeps its selection.
-- **Manual drive:** during recall require `Looking up the remembered Category…` and disabled Save; lookup failure shows `Budge couldn't look up this Payee's remembered Category. Pick one to save.` and requires an explicit Category choice. Category loading/failure also blocks unresolved recall; the latter says `Budge couldn't load the Categories. Pick Uncategorized or a Transfer to save.`
+- **Manual drive:** during recall require the Category trigger to read `Looking up the remembered Category…` (a placeholder, not an option in the list) and disabled Save; lookup failure shows `Budge couldn't look up this Payee's remembered Category. Pick one to save.` and requires an explicit Category choice. Category loading/failure also blocks unresolved recall; the latter says `Budge couldn't load the Categories. Pick Uncategorized or a Transfer to save.`
 - **Manual drive:** select an observed Payee through the list filter and require only its Transactions; this filter is distinct from typing Payee in the dialog.
 
 - `payees.rename` exists publicly but is not wired to UI. Record that missing entry point explicitly.

@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 
+import { withholdQueryResult } from '../heldResponse';
 import { choose, openAccount, type Journey } from './journey';
 
 export const splits = {
@@ -13,16 +14,31 @@ export const splits = {
 			const dialog = page.getByRole('dialog');
 			const remainder = dialog.getByText(/(left to split|over the amount|Fully split)$/);
 
-			await step('start a $50.00 Transaction on Card and choose Split', async () => {
-				await page.goto('/');
-				await openAccount(page, 'Card');
-				await page.getByRole('button', { name: 'Add Transaction' }).click();
-				await dialog.getByLabel('Payee').fill('Smoke Test Warehouse');
-				const minusSignTheDirectionOverridesInTheLines = '-50.00';
-				await dialog.getByLabel('Amount').fill(minusSignTheDirectionOverridesInTheLines);
-				await dialog.getByLabel('Memo', { exact: true }).fill(memo);
-				await choose(dialog.getByLabel('Category or Transfer'), 'Split across Categories');
-			});
+			await step(
+				'start a $50.00 Transaction on Card and point at Split while the Payee’s remembered Category is still being looked up; the list holds still when the answer comes, so the click picks Split',
+				async () => {
+					const lookup = await withholdQueryResult(page, 'payees:lastCategory');
+					await page.goto('/');
+					await openAccount(page, 'Card');
+					await page.getByRole('button', { name: 'Add Transaction' }).click();
+					await dialog.getByLabel('Payee').fill('Smoke Test Warehouse');
+					const minusSignTheDirectionOverridesInTheLines = '-50.00';
+					await dialog.getByLabel('Amount').fill(minusSignTheDirectionOverridesInTheLines);
+					await dialog.getByLabel('Memo', { exact: true }).fill(memo);
+					const category = dialog.getByLabel('Category or Transfer');
+					await expect(category).toHaveText('Looking up the remembered Category…');
+					await category.click();
+					const split = page.getByRole('option', { name: 'Split across Categories', exact: true });
+					const box = await split.boundingBox();
+					if (box === null) throw new Error('Split across Categories is not on screen');
+					const pointer = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+					await page.mouse.move(pointer.x, pointer.y);
+					lookup.release();
+					await expect(category).toHaveText('Uncategorized');
+					await page.mouse.click(pointer.x, pointer.y);
+					await expect(category).toHaveText('Split across Categories');
+				}
+			);
 
 			await step(
 				'the lines start empty with the whole amount left, Save points at the first unfinished line, and each fix moves the alert on',

@@ -209,21 +209,8 @@
 	}
 
 	function selectionChoices(): Choices {
-		const { selection, transferAccounts } = shown;
-		const looking = selection.kind === 'recalling' || selection.kind === 'recallFailed';
+		const { transferAccounts } = shown;
 		return [
-			...(looking
-				? [
-						{
-							value: optionOf(selection),
-							label:
-								selection.kind === 'recalling'
-									? 'Looking up the remembered Category…'
-									: 'Pick a Category',
-							disabled: true
-						}
-					]
-				: []),
 			{ value: optionOf({ kind: 'uncategorized' }), label: 'Uncategorized' },
 			...(startingBalance
 				? []
@@ -640,6 +627,9 @@
 						}
 					}
 					{...marked('transaction-category')}
+					placeholder={shown.selection.kind === 'recalling'
+						? 'Looking up the remembered Category…'
+						: 'Pick a Category'}
 					choices={selectionChoices()}
 				/>
 				{#if shown.selection.kind === 'recallFailed'}
