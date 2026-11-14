@@ -38,7 +38,7 @@ Preconditions:
 ## Gotchas
 
 - **Load:** a hard load of any Section paints the sidebar (or the phone tab bar) with the Sections at once, with `Loading…` in the page area; the Accounts list and badges join when the owner check finishes. Only a forbidden account or an unreachable server shows the centered Budge screen.
-- **Focus after a dialog:** closing any dialog focuses what opened it, else the destination its page names (each feature file lists them), else `#main`; focus on `<body>` after a dialog closes is a bug.
+- **Focus after a dialog:** closing any dialog focuses what opened it (for a dialog opened from a menu item, the menu's trigger), else the destination its page names (each feature file lists them), else `#main`; focus on `<body>` after a dialog closes is a bug. When another dialog stays open beneath it, focus stays inside that dialog: on its opener, destination or fallback when inside it, else its first focusable control.
 - **Manual drive:** keyboard-activate `Skip to content` and require focus on `#main`. In the sidebar, verify the Unapproved and Bank badges, Cash/Credit group totals and each Account balance against the Accounts page.
 
 - Desktop Chromium mobile emulation does not prove iOS installation, safe areas, standalone auth or resume. No real-device proof in this run.

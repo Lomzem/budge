@@ -118,15 +118,20 @@ export const accounts = {
 				await expect(savings).toBeHidden();
 			});
 
-			await step("Checking's dialog and balance show the new starting balance", async () => {
-				await openAccount(page, 'Checking');
-				const reopened = await openStartingBalance(page, 'Checking');
-				await expect(reopened.getByTestId('current-starting-balance')).toHaveText(
-					`Now ${formatCents(startAfter)}`
-				);
-				await page.keyboard.press('Escape');
-				await expect(page.getByTestId('account-balance')).toHaveText(balanceAfter);
-			});
+			await step(
+				"Checking's dialog and balance show the new starting balance, and Escape returns focus to Checking's actions",
+				async () => {
+					await openAccount(page, 'Checking');
+					const reopened = await openStartingBalance(page, 'Checking');
+					await expect(reopened.getByTestId('current-starting-balance')).toHaveText(
+						`Now ${formatCents(startAfter)}`
+					);
+					await page.keyboard.press('Escape');
+					await expect(reopened).toBeHidden();
+					await expect(page.getByRole('button', { name: 'Checking actions' })).toBeFocused();
+					await expect(page.getByTestId('account-balance')).toHaveText(balanceAfter);
+				}
+			);
 		}
 	},
 	'start-edit': {
@@ -412,11 +417,17 @@ export const accounts = {
 				}
 			);
 
-			await step("Savings' actions offer its confirmed starting balance to keep", async () => {
-				await openAccount(page, 'Savings');
-				const again = await openStartingBalance(page, 'Savings');
-				await expect(again.getByLabel('Starting balance')).toHaveValue('1000.00');
-			});
+			await step(
+				"Savings' actions offer its confirmed starting balance to keep, and confirming it returns focus to Savings' actions",
+				async () => {
+					await openAccount(page, 'Savings');
+					const again = await openStartingBalance(page, 'Savings');
+					await expect(again.getByLabel('Starting balance')).toHaveValue('1000.00');
+					await again.getByRole('button', { name: 'Confirm' }).click();
+					await expect(again).toBeHidden();
+					await expect(page.getByRole('button', { name: 'Savings actions' })).toBeFocused();
+				}
+			);
 		}
 	},
 	'setup-correct': {

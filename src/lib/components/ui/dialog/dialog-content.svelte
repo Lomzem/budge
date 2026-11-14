@@ -9,7 +9,7 @@
 	import Scrollbar from '../scroll-area/scroll-area-scrollbar.svelte';
 	import { untrack, type Snippet } from 'svelte';
 	import type { ComponentProps } from 'svelte';
-	import { focusedElement, restoreFocus, type FocusReturn } from '$lib/focusReturn';
+	import { dialogOpener, restoreFocus, type FocusReturn } from '$lib/focusReturn';
 
 	let {
 		ref = $bindable(null),
@@ -66,12 +66,12 @@
 		)}
 		{...restProps}
 		onOpenAutoFocus={(event: Event) => {
-			opened = focusedElement();
+			opened = dialogOpener();
 			onOpenAutoFocus?.(event);
 		}}
 		onCloseAutoFocus={(event: Event) => {
 			event.preventDefault();
-			restoreFocus(returnFocus, opened);
+			restoreFocus(returnFocus, opened, ref);
 		}}
 	>
 		<ScrollAreaPrimitive.Root data-slot="scroll-area" class="relative flex min-h-0 flex-1 flex-col">
