@@ -21,7 +21,7 @@ Reuse a Payee's remembered Category, change it only when the owner checks Rememb
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/payees.ts`, also run by `bun run test:e2e:local`):
 
 - `payees/last-category`: the Category memory recipe up to keeping an explicitly picked Category.
-- `payees/remember`: a one-off row pick leaves the remembered Rent; by keyboard (ArrowDown, Shift+Tab to Remember, Space, Tab, Enter) the same Category is remembered and announced; in the dialog a new Payee's unchecked save stays unremembered and a checked one is remembered; on a 320 px phone Remember is clear of the tab bar.
+- `payees/remember`: a one-off row pick leaves the remembered Rent; by keyboard (ArrowDown, Tab into the list, Tab to Remember, Space, Shift+Tab twice back to the search, Enter) the same Category is remembered and announced; in the dialog a new Payee's unchecked save stays unremembered and a checked one is remembered; on a 320 px phone Remember is clear of the tab bar.
 
 The recipes below cover what the journeys leave out.
 
@@ -30,7 +30,7 @@ Preconditions:
 - Authenticated baseline from the index; reseed before independent mutations.
 
 - **Category memory:** open Add Transaction on Checking; fill Payee `Sample Landlord`, expect the `Category or Transfer` combobox to read Rent. Change Payee to `Sample Verification Florist`, expect Uncategorized. Return to Sample Landlord, explicitly select Groceries, change Payee away and back; require Groceries retained. Escape to cancel.
-- **Rename memory:** import an invented row with Bank Text `SAMPLE MEMORY 9001`, edit its Payee to `Sample Verification Shop`, categorize Groceries and Save. An imported Payee edit remembers every attached Bank Row’s exact Bank Text; manually repeat with multiple attached rows. Import a different-date/identity row with the exact same Bank Text; require the friendly Payee and Groceries after reload. Import text differing by one character and require no friendly rename. Open details to prove Bank Text stayed unchanged.
+- **Rename memory:** import an invented row with Bank Text `SAMPLE MEMORY 9001`, edit its Payee to `Sample Verification Shop`, categorize Groceries, check `Remember for Sample Verification Shop’s later imports` and Save. An imported Payee edit remembers every attached Bank Row’s exact Bank Text on its own; the Category is remembered only because Remember was checked. Manually repeat with multiple attached rows. Import a different-date/identity row with the exact same Bank Text; require the friendly Payee and Groceries after reload. Renaming alone: repeat with Bank Text `SAMPLE MEMORY 9002`, Payee `Sample Verification Kiosk`, Groceries and Remember left unchecked; the next exact-text import must show `Sample Verification Kiosk` with Uncategorized. Import text differing by one character and require no friendly rename. Open details to prove Bank Text stayed unchanged.
 - **Global rename:** record no UI entry as blocked, not passed by editing one Transaction. When a UI is provided, require all historical rows and search to adopt the new name and duplicate-name refusal. Inspect `convex/payees.ts` for the current public contract; direct API mutation is API coverage only and not a substitute for this user journey.
 
 ## Gotchas

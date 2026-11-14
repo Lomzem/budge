@@ -92,17 +92,22 @@ export const payees = {
 			});
 
 			await step(
-				'by keyboard, Remember picks the same Groceries again and makes it the remembered one',
+				'by keyboard, Tab through the list reaches Remember, which picks the same Groceries again and makes it the remembered one',
 				async () => {
+					const inTheList = listbox.locator(':focus');
 					await landlordRow.focus();
 					await page.keyboard.press('ArrowDown');
 					await expect(search).toBeFocused();
-					await page.keyboard.press('Shift+Tab');
+					await page.keyboard.press('Tab');
+					await expect(inTheList).toHaveCount(1);
+					await page.keyboard.press('Tab');
 					await expect(remember('Sample Landlord')).toBeFocused();
 					await page.keyboard.press('Space');
 					await expect(remember('Sample Landlord')).toBeChecked();
 					await expect(listbox.getByRole('option', { name: 'Transfer: Savings' })).toBeDisabled();
-					await page.keyboard.press('Tab');
+					await page.keyboard.press('Shift+Tab');
+					await expect(inTheList).toHaveCount(1);
+					await page.keyboard.press('Shift+Tab');
 					await expect(search).toBeFocused();
 					await page.keyboard.press('Enter');
 					await expect(listbox).toBeHidden();
