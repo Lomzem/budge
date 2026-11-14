@@ -1,0 +1,46 @@
+import { chromium, expect } from '@playwright/test';
+import { answerInsteadOfServer } from '../../e2e/heldResponse';
+import { readFile, writeFile } from 'node:fs/promises';
+const root = process.cwd();
+const {appUrl} = JSON.parse(await readFile('.local-app/running.json','utf8'));
+const browser = await chromium.launch({headless:true});
+try {
+ const context = await browser.newContext({baseURL:appUrl,storageState:'.local-app/storage-state.json',viewport:{width:320,height:640},timezoneId:'America/Los_Angeles'});
+ const page = await context.newPage();
+ if (process.argv.includes('--ready')) {
+  await page.setViewportSize({width:1280,height:800});
+  await page.goto('/');
+  await expect(page.getByRole('heading',{name:'Budget',exact:true,level:1})).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'Assigned for Groceries',exact:true})).toBeVisible();
+  console.log('Authenticated Budget and fixture readiness passed');
+ } else {
+ const sync = await answerInsteadOfServer(page,'bankConnections:syncNow');
+ await page.goto('/bank');
+ const card = page.getByRole('article',{name:'Sample Community Bank',exact:true});
+ await expect(card).toBeVisible();
+ await card.getByRole('button',{name:'Sync now',exact:true}).click();
+ await sync.called;
+ await card.getByRole('button',{name:'Sample Community Bank actions',exact:true}).click();
+ await page.getByRole('menuitem',{name:'Stop syncing Sample Statement Savings ending 6604',exact:true}).click();
+ await expect(card.getByRole('status')).toContainText('Stopped syncing');
+ const before = await card.getByRole('status').innerText();
+ await page.screenshot({path:root+'/test-results/ticket-09-review/before-late-sync.png'});
+ sync.answer({kind:'synced',added:0,matched:0,held:0});
+ await expect(card.getByRole('status')).toHaveText('No Transactions added.');
+ const after = await card.getByRole('status').innerText();
+ await page.screenshot({path:root+'/test-results/ticket-09-review/after-late-sync.png'});
+ const persisted = await card.getByRole('region',{name:'Ignored bank Accounts',exact:true}).innerText();
+ console.log(JSON.stringify({before,after,persisted}));
+ await page.reload();
+ await expect(card.getByRole('region',{name:'Ignored bank Accounts',exact:true})).toContainText('Sample Statement Savings');
+ // New synthetic result, sized like the long reconnect result in the open question.
+ await card.getByRole('button',{name:'Sync now',exact:true}).click();
+ await expect(card.getByRole('button',{name:'Syncing…'})).toBeVisible();
+ sync.answer({kind:'synced',added:123,matched:123,held:123});
+ await expect(card.getByRole('status')).toContainText('123 Transactions added.');
+ const text = card.locator('.line-clamp-2').filter({hasText:'123 Transactions added.'});
+ console.log('Clipping', await text.evaluate(el=>({text:el.textContent,scroll:el.scrollHeight,height:el.clientHeight})));
+ await page.screenshot({path:root+'/test-results/ticket-09-review/clipped-result.png'});
+ await writeFile(root+'/test-results/ticket-09-review/result.aria.yml',await card.ariaSnapshot());
+ }
+} finally {await browser.close();}

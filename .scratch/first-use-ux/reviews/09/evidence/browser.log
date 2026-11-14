@@ -1,0 +1,6 @@
+{"before":"Stopped syncing Sample Statement Savings ending 6604. Its Transactions stay in Savings.","after":"No Transactions added.","persisted":"Ignored bank Accounts\n\nBudge skips their transactions. Bring one back and set it up to choose where its new transactions go, from the next sync. The ones it already brought in stay where they are.\n\nSample Statement Savings\nEnding 6604\nBring back"}
+Clipping {
+  text: "123 Transactions added. 123 wait for setup below. 123 matched Transactions you entered.",
+  scroll: 96,
+  height: 48,
+}
