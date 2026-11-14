@@ -1,9 +1,10 @@
 import { expect, type Page } from '@playwright/test';
 
-import { holdResponseTo } from '../heldResponse';
-import { openAccount, type Journey } from './journey';
+import { answerInsteadOfServer, holdResponseTo } from '../heldResponse';
+import { expectClearOf, expectNothingPastTheRightEdge, openAccount, type Journey } from './journey';
 
 const notSetUp = "Bank sync isn't set up on this server.";
+const syncThatHeldRowsForSetup = { kind: 'synced', added: 1, matched: 0, held: 2 };
 const SLOWER_THAN_RECENT_INPUT_MS = 1_000;
 const noLogin = 'A sample connection with no bank login, so it can’t sync or reconnect.';
 
@@ -83,6 +84,54 @@ export const plaid = {
 					await expect(communityBank).toContainText(`${notSetUp} Last successful sync`);
 				}
 			);
+		}
+	},
+	'sync-waiting': {
+		title:
+			'a Sync now that leaves rows waiting for setup says so in full, and Set up comes next by keyboard (the answer stands in for Plaid, which the local server cannot reach)',
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const sync = await answerInsteadOfServer(page, 'bankConnections:syncNow');
+			const creditUnion = card(page, 'Sample Credit Union');
+			const waiting = '1 Transaction added. 2 wait for setup below.';
+			const tabBar = page.getByRole('navigation', { name: 'Sections', exact: true });
+
+			for (const width of [320, 390, 1280]) {
+				await step(
+					`at ${String(width)} px, the result names what waits and stays whole`,
+					async () => {
+						await page.goto('about:blank');
+						await page.setViewportSize({ width, height: width < 640 ? 740 : 800 });
+						await openBank(page);
+						const syncNow = creditUnion.getByRole('button', { name: 'Sync now' });
+						await syncNow.click();
+						await sync.called;
+						await expect(creditUnion.getByRole('button', { name: 'Syncing…' })).toBeFocused();
+						sync.answer(syncThatHeldRowsForSetup);
+						await expect(creditUnion.getByRole('status')).toHaveText(waiting);
+						const shown = creditUnion.getByRole('paragraph').getByText(waiting, { exact: true });
+						await expect(shown).toBeVisible();
+						expect(await shown.evaluate((text) => text.scrollHeight <= text.clientHeight)).toBe(
+							true
+						);
+						await shown.scrollIntoViewIfNeeded();
+						await expectClearOf(shown, ...(width < 640 ? [tabBar] : []));
+						await expectNothingPastTheRightEdge(page);
+					}
+				);
+
+				await step(`at ${String(width)} px, Tab from Sync now reaches Set up`, async () => {
+					await page.keyboard.press('Tab');
+					const setUp = creditUnion.getByRole('button', { name: /^Set up / }).first();
+					await expect(setUp).toBeFocused();
+					const name = (await setUp.getAttribute('aria-label'))?.replace(/^Set up /, '') ?? '';
+					await page.keyboard.press('Enter');
+					const dialog = page.getByRole('dialog', { name, exact: true });
+					await expect(dialog).toBeVisible();
+					await page.keyboard.press('Escape');
+					await expect(dialog).toBeHidden();
+				});
+			}
 		}
 	},
 	attention: {

@@ -69,6 +69,40 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 	};
 }
 
+export async function answerInsteadOfServer(page: Page, udfPath: string) {
+	const asked: unknown[] = [];
+	let browser: WebSocketRoute | undefined;
+	const { promise: called, resolve: markCalled } = Promise.withResolvers<undefined>();
+
+	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => {
+		browser = socket;
+		const server = socket.connectToServer();
+		socket.onMessage((frame) => {
+			const message = parse(frame);
+			if (message.type === 'Action' && message.udfPath === udfPath) {
+				asked.push(message.requestId);
+				markCalled(undefined);
+			} else {
+				server.send(frame);
+			}
+		});
+		server.onMessage((frame) => {
+			socket.send(frame);
+		});
+	});
+
+	return {
+		called,
+		answer(result: unknown) {
+			const requestId = asked.shift();
+			if (requestId === undefined) throw new Error(`No ${udfPath} call is waiting`);
+			browser?.send(
+				JSON.stringify({ type: 'ActionResponse', requestId, success: true, result, logLines: [] })
+			);
+		}
+	};
+}
+
 export async function pausableSync(page: Page) {
 	const queued: Frame[] = [];
 	let browser: WebSocketRoute | undefined;
