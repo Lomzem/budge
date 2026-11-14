@@ -25,6 +25,7 @@ function fakePlaid(signer: Signer) {
 		accountsOutage: false,
 		institutionDown: false,
 		quiet: false,
+		onlyUnmapped: false,
 		unmappedRows: 0,
 		moreAccounts: 0,
 		card: false,
@@ -126,9 +127,10 @@ function fakePlaid(signer: Signer) {
 	return { paths, bodies, state, fetch };
 }
 
-function syncAnswer(state: { quiet: boolean; unmappedRows: number }) {
+function syncAnswer(state: { quiet: boolean; onlyUnmapped: boolean; unmappedRows: number }) {
 	if (state.quiet) return { ...syncPage, added: [], modified: [], removed: [] };
-	return { ...syncPage, added: [...syncPage.added, ...unmappedRows(state.unmappedRows)] };
+	const mapped = state.onlyUnmapped ? [] : syncPage.added;
+	return { ...syncPage, added: [...mapped, ...unmappedRows(state.unmappedRows)] };
 }
 
 function unmappedRows(count: number) {
@@ -655,22 +657,48 @@ describe('a bank Account the owner adds at the bank', () => {
 		expect(plaid.paths).not.toContain('/accounts/get');
 	});
 
-	test("Sync now reports this run's additions and the rows waiting for that Account, not a running total", async () => {
-		const backend = await connectedBudget();
-		plaid.state.unmappedRows = 3;
+	describe.each([
+		{
+			entry: 'Sync now',
+			run: ({ owner, connectionId }: Awaited<ReturnType<typeof connectedBudget>>) =>
+				owner.action(api.bankConnections.syncNow, { connectionId })
+		},
+		{
+			entry: 'a sync after Reconnect',
+			run: ({ owner, connectionId }: Awaited<ReturnType<typeof connectedBudget>>) =>
+				owner.action(api.bankConnections.syncAfterReconnect, { connectionId })
+		}
+	])("$entry reports this run's counts, not a running total", ({ run }) => {
+		test('the Transactions it added and the rows waiting for that Account, then zeros for a quiet run', async () => {
+			const backend = await connectedBudget();
+			plaid.state.unmappedRows = 3;
 
-		expect(
-			await backend.owner.action(api.bankConnections.syncNow, {
-				connectionId: backend.connectionId
-			})
-		).toEqual({ kind: 'synced', added: 2, matched: 0, held: 3 });
+			expect(await run(backend)).toEqual({ kind: 'synced', added: 2, matched: 0, held: 3 });
 
-		plaid.state.quiet = true;
-		expect(
-			await backend.owner.action(api.bankConnections.syncNow, {
-				connectionId: backend.connectionId
-			})
-		).toEqual({ kind: 'synced', added: 0, matched: 0, held: 0 });
+			plaid.state.quiet = true;
+			expect(await run(backend)).toEqual({ kind: 'synced', added: 0, matched: 0, held: 0 });
+		});
+
+		test('a row matching a Transaction the owner entered counts as matched, not added', async () => {
+			const backend = await connectedBudget();
+			await backend.owner.mutation(api.transactions.create, {
+				accountId: backend.accounts.Checking,
+				date: '2026-08-13',
+				amount: -4_250,
+				payee: 'Grocer',
+				memo: 'weekly shop'
+			});
+
+			expect(await run(backend)).toEqual({ kind: 'synced', added: 1, matched: 1, held: 0 });
+		});
+
+		test('a run that only brings rows for that Account adds nothing and says they wait', async () => {
+			const backend = await connectedBudget();
+			plaid.state.onlyUnmapped = true;
+			plaid.state.unmappedRows = 2;
+
+			expect(await run(backend)).toEqual({ kind: 'synced', added: 0, matched: 0, held: 2 });
+		});
 	});
 
 	test('a sync after Reconnect holds it for the owner to map', async () => {
