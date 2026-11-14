@@ -1,6 +1,6 @@
 # 12: Open, babysit, merge, and verify production delivery without CodeRabbit
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -32,6 +32,17 @@ Proof: reuse deterministic CI and the focused judge evidence rather than authori
 - The all-local-refs historical secret scan failed at `scripts/local/redacted-log.test.ts:31`, rule `stripe-access-token`. Its commit is outside both delivery branches. Fully redacted scans of each outgoing range passed; no exclusions or hook bypasses added.
 - Monitoring blocker: the required event-driven `watch_pull_request` tool is absent from the exposed tool catalog and a direct invocation is not callable. Do not replace it with polling. PR creation and remaining checks can proceed; merge and production verification remain pending until their evidence is obtained.
 - Principles affecting choices: Prove It Works requires latest-head CI and terminal production evidence; Sequence Verifiable Units keeps main push, integration, CI and deployment separate; Make Operations Idempotent prompted checking for an existing PR before creation; Fix Root Causes separated unrelated historical scan findings from outgoing commits; Guard the Context Window keeps command logs in temporary artifacts and records concise resumption evidence here.
+
+### Production delivery, 2026-11-14
+
+- Updated [PR #31](https://github.com/Lomzem/budge/pull/31) with the post-approval focus race fix `b1707bc`, its red-then-green proof, ticket 11's continued judge approval, and green CI on `cdad432b3ae8a128e37e1cc9ce1ad205c4d6e205`. Preserved the requested closing attribution and marked ready. Immediately before merge, checked the exact unchanged head, MERGEABLE state, successful checks/gitleaks/E2E (56 passed), Vercel preview and preview comments. External review remained skipped under the owner's explicit exception; no review requested and no PR watch created.
+- Merged using the repository's usual merge-commit method with an exact-head guard. GitHub reports MERGED at 16:13:45 UTC; fetched `origin/main` and verified merge commit `f0af9429b9f488f0d24b8b84ec505106df5fb6c4`, with parents `3b68c84` and `cdad432`.
+- Confirmed Vercel project `budge` uses `main` as production branch and the documented coupled Convex/frontend build before merging. No configuration changed, no manual deployment, migration, seed, reset, budget mutation or separate start-date repair ran.
+- [Production deployment](https://vercel.com/lawjay-lees-projects/budge/GB39QCB3j2JGVv2YMdiq4vD2Ms72): `dpl_GB39QCB3j2JGVv2YMdiq4vD2Ms72`, target `production`, exact source `f0af9429b9f488f0d24b8b84ec505106df5fb6c4`, terminal state `READY`, production alias `budge.lomzem.dev`. Provider build-event stream observed the production Convex target, “Deployed Convex functions” at 16:14:41.264 UTC, “Build Completed” at 16:14:41.763 UTC and “Deployment completed” at 16:14:47.158 UTC. This verifies the coupled backend deploy and frontend delivery for the merge, rather than a preview or local build.
+- Read-only live smoke after READY: production root reaches `/sign-in`; “Sign in to Budge”, GitHub and email controls are present. `/`, `/accounts`, `/categories`, `/bank`, and `/settings` each reach sign-in successfully. Authenticated navigation and changed-UI visibility are **blocked**: the browser has no existing production owner session. Did not attempt an alternate identity or mint a session. No credential requested or exposed. Production delivery succeeded, but end-to-end production health is not fully verified; ticket remains open as `ready-for-human` pending that owner-session smoke.
+- Local evidence (ignored): `test-results/verify-budge/production-f0af942/summary.json` and `sign-in.png`. Used verify-budge's feature map and evidence conventions, with the explicit production read-only scope overriding its local fixture lifecycle. No local app started; closed this run's browser tabs.
+- Local review of this delivery-record-only diff, performed inline because the owner prohibited subagents: Standards — no findings; Spec — remaining authenticated smoke explicitly blocked, so no `done` claim. No implementation or tests added; reused the recorded CI and judge proof. Final PR-head CI passed; the separate post-merge main CI was still running when the delivery record was prepared.
+- Principles affecting choices: Prove It Works required the provider's terminal READY state, exact merge SHA and coupled Convex success marker, and prevented calling blocked UI checks passed. Sequence Verifiable Units separated exact-head merge, production deployment, read-only smoke and record push. Make Operations Idempotent prompted reading current PR/deployment state and guarding the merge against a moved head instead of replaying deployment commands.
 
 ## Testing gate (shared by every ticket)
 
