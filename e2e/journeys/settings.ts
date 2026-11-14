@@ -239,6 +239,7 @@ export const settings = {
 				for (const name of ['Checking', 'Savings', 'Card']) {
 					await expect(preview.getByRole('region', { name, exact: true })).toBeVisible();
 				}
+				await expect(preview.getByRole('button', { name: 'Cancel' })).toBeFocused();
 				const checking = preview.getByRole('region', { name: 'Checking', exact: true });
 				await expect(checking).toContainText(
 					new RegExp(`Its Starting Balance of \\$[\\d,.]+ on ${formatDate(saved)}, plus`)
@@ -251,6 +252,24 @@ export const settings = {
 				await expect(budget.getByRole('row', { name: /^Ready to Assign/ })).toBeVisible();
 				await expect(budget).toContainText('starts with nothing carried over');
 			});
+
+			await step(
+				'Tab reads the preview top to bottom: Close, the lists that fold in, Cancel, then Move',
+				async () => {
+					const lists = preview.getByText(/Transactions? that fold in$/);
+					const cancel = preview.getByRole('button', { name: 'Cancel' });
+					await cancel.focus();
+					await page.keyboard.press('Tab');
+					await expect(preview.getByRole('button', { name: 'Move start date' })).toBeFocused();
+					await page.keyboard.press('Tab');
+					await expect(preview.getByRole('button', { name: 'Close' })).toBeFocused();
+					await page.keyboard.press('Tab');
+					await expect(lists.first()).toBeFocused();
+					await cancel.focus();
+					await page.keyboard.press('Shift+Tab');
+					await expect(lists.last()).toBeFocused();
+				}
+			);
 
 			await step('halfway down the preview, its Cancel button is wholly on screen', async () => {
 				const body = preview.locator('[data-slot="dialog-body"]');
