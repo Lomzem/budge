@@ -69,6 +69,23 @@ Two related changes:
 - Typecheck, lint and lint:ui pass in the main checkout.
 - `bun run test:e2e:local`: 56 passed in 8.5 minutes (`test-e2e-local.log`).
 
-**Open questions:**
-- Dialogs opened from a menu (delete category or group, rename, the account page's starting balance) have no semantic continuation. When the menu trigger is gone they now land on `#main` where they used to land on `<body>`. Each could name its row or menu button.
-- If the Unlock button leaves while the Edit dialog stays open, its confirmation falls back to `#main` outside the open dialog (it used to be `<body>`). The Payee field may be the better continuation.
+**Open questions:** both are resolved by the follow-up below.
+
+#### Follow-up: menu openers and nested dialogs (Opus 5.5, 2026-11-14)
+
+The coordinator ruled that both open questions were regressions against "no behavior change". Both are fixed in the resolver, with no per-caller changes.
+
+- **Menu-opened dialogs.** The wrappers record the opener through `dialogOpener()`. When the focused element is inside a `role="menu"` content, it records the trigger whose `aria-controls` names that menu (bits sets it while the menu is open). The continuation and fallback still follow. Finding: HEAD already returned focus to the trigger on every probed path (pointer and keyboard; Starting balance and Rename). That is because bits' menu content refocuses its trigger before the dialog's focus scope registers. The mapping guards that ordering; no journey reaches it today.
+- **Nested dialogs.** `restoreFocus(destinations, opened, closing)` finds the topmost dialog still open (`data-state="open"`, excluding the closing content). While one is open, every destination must lie inside it; when none does, focus goes to its first focusable control, else to the dialog itself. Unlock over Edit Transaction now stays in Edit. Other nesting: only the Target dialog over the phone inspector. It already kept focus in the inspector at HEAD (probe) and still does.
+- Docs: the `AGENTS.md` rule row, the `shell.md` gotcha, and the `accounts.md` and `reconciliation.md` journey entries.
+
+**Proof** (`followup-red-green.txt`):
+- New assertions:
+  - accounts/start-late-save: Escape focuses `Checking actions`.
+  - accounts/setup-check: Confirm focuses `Savings actions`.
+  - reconciliation/difference: focus is inside the Edit dialog after Unlock.
+- Red on HEAD: only reconciliation/difference failed.
+- The menu assertions were already green on HEAD. Each fails under a control that drops the account page's opener.
+- Green: all 56 dialog journeys pass.
+- `bun run check` passed (924 tests, capacity:check included).
+- `bun run test:e2e:local`: 56 passed in 8.8 minutes (`followup-test-e2e-local.log`).
