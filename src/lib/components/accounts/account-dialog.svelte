@@ -12,6 +12,7 @@
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { formatDate } from '$lib/domain/dates';
 	import { parseCents } from '$lib/domain/money';
+	import { mainRegion } from '$lib/focusReturn';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
@@ -55,7 +56,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content>
+	<Dialog.Content returnFocus={{ fallback: mainRegion }}>
 		<Dialog.Header>
 			<Dialog.Title>Add Account</Dialog.Title>
 			{#if cutoverDate}

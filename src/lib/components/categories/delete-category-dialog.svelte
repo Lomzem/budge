@@ -8,6 +8,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import SelectField from '$lib/components/select-field.svelte';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+	import { mainRegion } from '$lib/focusReturn';
 
 	import type { ManagedGroup } from './types';
 
@@ -62,7 +63,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content>
+	<Dialog.Content returnFocus={{ fallback: mainRegion }}>
 		<Dialog.Header>
 			<Dialog.Title>Delete {category?.name ?? 'Category'}</Dialog.Title>
 			<Dialog.Description>

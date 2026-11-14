@@ -20,6 +20,7 @@
 	import { formatCents } from '$lib/domain/money';
 	import { SPLIT_LINE_LIMIT } from '$lib/domain/splits';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+	import type { FocusReturn } from '$lib/focusReturn';
 
 	import { categoryChoices, labelOf, rememberCopy, transferChoices } from './categoryChoices';
 	import {
@@ -60,7 +61,7 @@
 		preset?: string | undefined;
 		defaultAccountId?: Id<'accounts'> | undefined;
 
-		returnFocus?: () => HTMLElement | undefined;
+		returnFocus: FocusReturn;
 
 		ondone?: (message: string) => void;
 
@@ -311,11 +312,11 @@
 		);
 	}
 
-	function focusAfterConfirm(event: Event) {
-		if (open) return;
-		event.preventDefault();
-		returnFocus?.()?.focus();
-	}
+	const confirmFocus: FocusReturn = {
+		opener: (opened) => (open ? opened : (returnFocus.opener?.(null) ?? null)),
+		continuation: () => (open ? undefined : returnFocus.continuation?.()),
+		fallback: () => returnFocus.fallback()
+	};
 
 	async function deleteTransaction() {
 		if (!transaction) return;
@@ -448,12 +449,7 @@
 			event.preventDefault();
 			document.getElementById('transaction-payee')?.focus();
 		}}
-		onCloseAutoFocus={(event: Event) => {
-			const target = returnFocus?.();
-			if (target === undefined) return;
-			event.preventDefault();
-			target.focus();
-		}}
+		{returnFocus}
 	>
 		<Dialog.Header>
 			<Dialog.Title>{transaction ? 'Edit Transaction' : 'Add Transaction'}</Dialog.Title>
@@ -733,7 +729,7 @@
 </Dialog.Root>
 
 <AlertDialog.Root bind:open={confirmDelete}>
-	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
+	<AlertDialog.Content returnFocus={confirmFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>
 				{transaction?.transfer ? 'Delete this Transfer?' : 'Delete this Transaction?'}
@@ -762,7 +758,7 @@
 		if (!next) confirmBankRemoval = null;
 	}}
 >
-	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
+	<AlertDialog.Content returnFocus={confirmFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>
 				{transaction?.transfer ? 'Delete this Transfer too?' : 'Delete this Transaction too?'}
@@ -790,7 +786,7 @@
 </AlertDialog.Root>
 
 <AlertDialog.Root bind:open={confirmUnlock}>
-	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
+	<AlertDialog.Content returnFocus={confirmFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>Unlock this Transaction?</AlertDialog.Title>
 			<AlertDialog.Description>
@@ -806,7 +802,7 @@
 </AlertDialog.Root>
 
 <AlertDialog.Root bind:open={confirmDiscard}>
-	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
+	<AlertDialog.Content returnFocus={confirmFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>Discard your changes?</AlertDialog.Title>
 			<AlertDialog.Description>

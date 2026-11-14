@@ -11,6 +11,7 @@
 	import { localToday } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
 	import { formatUnapprovedCount, UNAPPROVED_COUNT_LIMIT } from '$lib/domain/unapproved';
+	import { mainRegion } from '$lib/focusReturn';
 
 	let {
 		open = $bindable(false),
@@ -98,6 +99,7 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content
+		returnFocus={{ fallback: mainRegion }}
 		onOpenAutoFocus={(event: Event) => {
 			event.preventDefault();
 			const touch = matchMedia('(pointer: coarse)').matches;

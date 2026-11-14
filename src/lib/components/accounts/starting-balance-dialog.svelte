@@ -2,6 +2,7 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+	import type { FocusReturn } from '$lib/focusReturn';
 
 	import StartingBalanceStep from './starting-balance-step.svelte';
 
@@ -16,7 +17,7 @@
 		returnFocus
 	}: {
 		onconfirmed?: (account: Checked) => void;
-		returnFocus?: () => HTMLElement | undefined;
+		returnFocus: FocusReturn;
 	} = $props();
 
 	const dialog = new DialogSession<{ account: Checked }>();
@@ -32,14 +33,7 @@
 		if (!isOpen) dialog.dismiss();
 	}}
 >
-	<Dialog.Content
-		onCloseAutoFocus={(event: Event) => {
-			const target = returnFocus?.();
-			if (target === undefined) return;
-			event.preventDefault();
-			target.focus();
-		}}
-	>
+	<Dialog.Content {returnFocus}>
 		{#if dialog.current !== null}
 			{@const session = dialog.current}
 			{#key session}

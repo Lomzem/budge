@@ -13,6 +13,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+	import type { FocusReturn } from '$lib/focusReturn';
 
 	import { labelOf, waitingNote } from './held';
 
@@ -36,7 +37,7 @@
 	}: {
 		onsettled: (connectionAccountId: Id<'connectionAccounts'>, outcome: string) => void;
 		onconfirmed: (account: MappedAccount) => void;
-		returnFocus?: () => HTMLElement | undefined;
+		returnFocus: FocusReturn;
 	} = $props();
 
 	const client = useConvexClient();
@@ -166,14 +167,7 @@
 		if (!isOpen) dialog.dismiss();
 	}}
 >
-	<Dialog.Content
-		onCloseAutoFocus={(event: Event) => {
-			const target = returnFocus?.();
-			if (target === undefined) return;
-			event.preventDefault();
-			target.focus();
-		}}
-	>
+	<Dialog.Content {returnFocus}>
 		{#if dialog.current !== null}
 			{@const session = dialog.current}
 			{#key session}

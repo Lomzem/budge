@@ -5,6 +5,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { localToday } from '$lib/domain/dates';
+	import type { FocusReturn } from '$lib/focusReturn';
 
 	import LaterCutoverPreview from './later-cutover-preview.svelte';
 
@@ -14,12 +15,16 @@
 		today: string;
 	}
 
-	let { onmoved, onclosed }: { onmoved: () => void; onclosed: () => void } = $props();
+	let { onmoved, returnFocus }: { onmoved: () => void; returnFocus: FocusReturn } = $props();
 
 	const setCutoverDate = useMutation(api.settings.setCutoverDate);
 	const applyLaterCutover = useMutation(api.settings.applyLaterCutover);
 	const dialog = new DialogSession<Opening, 'move' | 'apply'>();
 	let error = $state('');
+
+	export function isOpen() {
+		return dialog.current !== null;
+	}
 
 	export function open(from: string, to: string) {
 		error = '';
@@ -58,17 +63,11 @@
 
 <Dialog.Root
 	open={dialog.current !== null}
-	onOpenChange={(isOpen) => {
-		if (!isOpen) dialog.dismiss();
+	onOpenChange={(next) => {
+		if (!next) dialog.dismiss();
 	}}
 >
-	<Dialog.Content
-		size="wide"
-		onCloseAutoFocus={(event: Event) => {
-			event.preventDefault();
-			onclosed();
-		}}
-	>
+	<Dialog.Content size="wide" {returnFocus}>
 		{#if dialog.current !== null}
 			{@const session = dialog.current}
 			{#key session}

@@ -28,6 +28,7 @@
 	import { BULK_CATEGORIZE_LIMIT } from '$lib/domain/bulkCategorize';
 	import { formatUnapprovedCount, UNAPPROVED_COUNT_LIMIT } from '$lib/domain/unapproved';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+	import { mainRegion, type FocusReturn } from '$lib/focusReturn';
 	import { usePaginatedQuery } from '$lib/paginatedQuery.svelte';
 
 	import {
@@ -407,19 +408,31 @@
 		dialogOpen = true;
 	}
 
-	function returnFocus() {
-		if (editingSnapshot === undefined) return addButton ?? undefined;
+	function editedRow() {
+		if (editingSnapshot === undefined) return addButton;
+		if (deletedId === editingSnapshot._id) return null;
+		return editButtonOf(editingSnapshot);
+	}
+
+	function neighborOfEdited() {
 		const remaining = listed.filter((row) => row._id !== deletedId);
-		const candidates =
-			deletedId === editingSnapshot._id
-				? [remaining[editingAt], remaining[editingAt - 1]]
-				: [editingSnapshot, listed[editingAt], listed[editingAt - 1]];
-		for (const candidate of candidates) {
+		for (const candidate of [remaining[editingAt], remaining[editingAt - 1]]) {
 			const button = editButtonOf(candidate);
 			if (button !== undefined) return button;
 		}
-		return addButton ?? undefined;
+		return addButton;
 	}
+
+	const editingFocus: FocusReturn = {
+		opener: editedRow,
+		continuation: neighborOfEdited,
+		fallback: mainRegion
+	};
+	const removalFocus: FocusReturn = {
+		opener: (opened) => (afterRemoval === undefined ? opened : null),
+		continuation: () => afterRemoval,
+		fallback: mainRegion
+	};
 
 	function categoryOf(row: Row) {
 		if (row.transfer) return `${row.amount < 0 ? 'To' : 'From'} ${row.transfer.accountName}`;
@@ -827,6 +840,7 @@
 							aria-disabled={resolving}
 							aria-label="Delete it: {payee}, {formatDate(row.date)}"
 							onclick={() => {
+								afterRemoval = undefined;
 								removal.open({ row, importId: bankChange._id, payee });
 							}}
 						>
@@ -1154,7 +1168,7 @@
 	transaction={editing}
 	{preset}
 	defaultAccountId={accountId}
-	{returnFocus}
+	returnFocus={editingFocus}
 	ondone={(message: string) => {
 		retireUndoOf(editingSnapshot?._id);
 		announce(message);
@@ -1171,15 +1185,7 @@
 		if (!next) removal.dismiss();
 	}}
 >
-	<AlertDialog.Content
-		onCloseAutoFocus={(event: Event) => {
-			const target = afterRemoval;
-			afterRemoval = undefined;
-			if (target === undefined) return;
-			event.preventDefault();
-			target.focus();
-		}}
-	>
+	<AlertDialog.Content returnFocus={removalFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>
 				{confirmRemoval?.row.transfer

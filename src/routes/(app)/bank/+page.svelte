@@ -21,6 +21,7 @@
 	import HeldAccountDialog from '$lib/components/bank/held-account-dialog.svelte';
 	import CutoverDate from '$lib/components/settings/cutover-date.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { mainRegion, type FocusReturn } from '$lib/focusReturn';
 
 	const accounts = getAccounts();
 	const bank = getBankConnections();
@@ -125,20 +126,20 @@
 		startingBalance?.open(account);
 	}
 
-	function focusAfterDialog(): HTMLElement | undefined {
-		const from = settingUp;
-		settingUp = null;
-		if (landed) {
-			landed = false;
-			return nextLink ?? undefined;
-		}
-		if (from === null) return undefined;
-		const card = document.getElementById(`connection-${from.connectionId}`)?.closest('article');
-		if (!card) return connectButton ?? undefined;
-		const opener = card.querySelector<HTMLElement>(`[data-setup="${from.connectionAccountId}"]`);
-		const check = card.querySelector<HTMLElement>(`[data-check="${from.connectionAccountId}"]`);
-		return opener ?? check ?? card;
-	}
+	const afterSetup: FocusReturn = {
+		opener: (opened) => (landed || settingUp !== null ? null : opened),
+		continuation: () => {
+			if (landed) return nextLink;
+			if (settingUp === null) return undefined;
+			const { connectionId, connectionAccountId } = settingUp;
+			const card = document.getElementById(`connection-${connectionId}`)?.closest('article');
+			if (!card) return connectButton;
+			const setup = card.querySelector<HTMLElement>(`[data-setup="${connectionAccountId}"]`);
+			const check = card.querySelector<HTMLElement>(`[data-check="${connectionAccountId}"]`);
+			return setup ?? check ?? card;
+		},
+		fallback: mainRegion
+	};
 
 	function confirmed(account: { _id: Id<'accounts'>; name: string }) {
 		const history = bank.all
@@ -289,11 +290,11 @@
 		outcomes.set(connectionAccountId, outcome);
 	}}
 	onconfirmed={confirmed}
-	returnFocus={focusAfterDialog}
+	returnFocus={afterSetup}
 />
 
 <StartingBalanceDialog
 	bind:this={startingBalance}
 	onconfirmed={confirmed}
-	returnFocus={focusAfterDialog}
+	returnFocus={afterSetup}
 />

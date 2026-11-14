@@ -9,6 +9,7 @@
 	import Scrollbar from '../scroll-area/scroll-area-scrollbar.svelte';
 	import { untrack, type Snippet } from 'svelte';
 	import type { ComponentProps } from 'svelte';
+	import { focusedElement, restoreFocus, type FocusReturn } from '$lib/focusReturn';
 
 	let {
 		ref = $bindable(null),
@@ -17,14 +18,19 @@
 		children,
 		showCloseButton = true,
 		size = 'default',
+		returnFocus,
+		onOpenAutoFocus,
 		...restProps
-	}: WithoutChildrenOrChild<DialogPrimitive.ContentProps> & {
+	}: Omit<WithoutChildrenOrChild<DialogPrimitive.ContentProps>, 'onCloseAutoFocus'> & {
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DialogPortal>>;
 		children: Snippet;
 		showCloseButton?: boolean;
 
 		size?: 'default' | 'wide';
+		returnFocus: FocusReturn;
 	} = $props();
+
+	let opened: HTMLElement | null = null;
 
 	let body: HTMLElement | null = $state(null);
 	let scrolled = $state(false);
@@ -59,6 +65,14 @@
 			className
 		)}
 		{...restProps}
+		onOpenAutoFocus={(event: Event) => {
+			opened = focusedElement();
+			onOpenAutoFocus?.(event);
+		}}
+		onCloseAutoFocus={(event: Event) => {
+			event.preventDefault();
+			restoreFocus(returnFocus, opened);
+		}}
 	>
 		<ScrollAreaPrimitive.Root data-slot="scroll-area" class="relative flex min-h-0 flex-1 flex-col">
 			<ScrollAreaPrimitive.Viewport

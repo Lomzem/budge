@@ -4,17 +4,23 @@
 	import AlertDialogOverlay from './alert-dialog-overlay.svelte';
 	import AlertDialogPortal from './alert-dialog-portal.svelte';
 	import type { ComponentProps } from 'svelte';
+	import { focusedElement, restoreFocus, type FocusReturn } from '$lib/focusReturn';
 
 	let {
 		ref = $bindable(null),
 		class: className,
 		size = 'default',
 		portalProps,
+		returnFocus,
+		onOpenAutoFocus,
 		...restProps
-	}: WithoutChild<AlertDialogPrimitive.ContentProps> & {
+	}: Omit<WithoutChild<AlertDialogPrimitive.ContentProps>, 'onCloseAutoFocus'> & {
 		size?: 'default' | 'sm';
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof AlertDialogPortal>>;
+		returnFocus: FocusReturn;
 	} = $props();
+
+	let opened: HTMLElement | null = null;
 </script>
 
 <AlertDialogPortal {...portalProps}>
@@ -28,5 +34,13 @@
 			className
 		)}
 		{...restProps}
+		onOpenAutoFocus={(event: Event) => {
+			opened = focusedElement();
+			onOpenAutoFocus?.(event);
+		}}
+		onCloseAutoFocus={(event: Event) => {
+			event.preventDefault();
+			restoreFocus(returnFocus, opened);
+		}}
 	/>
 </AlertDialogPortal>

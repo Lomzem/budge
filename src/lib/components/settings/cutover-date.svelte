@@ -8,6 +8,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { dayOfMonth, formatDate, localToday, monthOf } from '$lib/domain/dates';
+	import { mainRegion } from '$lib/focusReturn';
 
 	import LaterCutoverDialog from './later-cutover-dialog.svelte';
 
@@ -26,11 +27,11 @@
 	let error = $state('');
 	let saving = $state(false);
 	let undoing = $state(false);
-	let previewing = $state(false);
 	let undone = $state('');
 	let dateInput: HTMLInputElement | null = $state(null);
 	let changeButton: HTMLElement | null = $state(null);
-	let preview: { open: (from: string, to: string) => void } | undefined = $state();
+	let preview: { open: (from: string, to: string) => void; isOpen: () => boolean } | undefined =
+		$state();
 
 	async function startChange() {
 		if (cutoverDate !== null) date = cutoverDate;
@@ -66,7 +67,6 @@
 		event.preventDefault();
 		if (cutoverDate !== null && date > cutoverDate) {
 			error = '';
-			previewing = true;
 			preview?.open(cutoverDate, date);
 			return;
 		}
@@ -99,7 +99,7 @@
 			class="flex flex-wrap items-center gap-2"
 			onsubmit={submit}
 			onkeydown={(event) => {
-				if (event.key !== 'Escape' || cutoverDate === null || previewing) return;
+				if (event.key !== 'Escape' || cutoverDate === null || preview?.isOpen() === true) return;
 				event.preventDefault();
 				error = '';
 				void stopChange();
@@ -161,9 +161,9 @@
 	onmoved={() => {
 		changing = false;
 	}}
-	onclosed={async () => {
-		previewing = false;
-		await tick();
-		(changing ? dateInput : changeButton)?.focus();
+	returnFocus={{
+		opener: () => dateInput,
+		continuation: () => changeButton,
+		fallback: mainRegion
 	}}
 />

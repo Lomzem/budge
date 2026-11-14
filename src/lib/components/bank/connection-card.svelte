@@ -25,6 +25,7 @@
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { formatAgo } from '$lib/domain/freshness';
+	import { mainRegion } from '$lib/focusReturn';
 
 	import { labelOf, rowsOf } from './held';
 
@@ -558,12 +559,7 @@
 </article>
 
 <AlertDialog.Root bind:open={confirmRemove}>
-	<AlertDialog.Content
-		onCloseAutoFocus={(event: Event) => {
-			event.preventDefault();
-			menuButton?.focus();
-		}}
-	>
+	<AlertDialog.Content returnFocus={{ continuation: () => menuButton, fallback: mainRegion }}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>Remove {connection.name}?</AlertDialog.Title>
 			<AlertDialog.Description>

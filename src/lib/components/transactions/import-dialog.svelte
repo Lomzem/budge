@@ -16,6 +16,7 @@
 	import type { BankFile } from '$lib/domain/bankFiles';
 	import { formatDate } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
+	import { mainRegion } from '$lib/focusReturn';
 	import { readBankFile } from '$lib/import';
 	import { readPublicError } from '$lib/publicError';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
@@ -145,6 +146,7 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content
+		returnFocus={{ fallback: mainRegion }}
 		size="wide"
 		onOpenAutoFocus={(event: Event) => {
 			if (defaultAccountId === undefined) return;

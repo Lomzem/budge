@@ -15,6 +15,7 @@
 	import { formatDate } from '$lib/domain/dates';
 	import { formatSynced } from '$lib/domain/freshness';
 	import { formatCents } from '$lib/domain/money';
+	import { mainRegion } from '$lib/focusReturn';
 
 	import type { PageProps } from './$types';
 
@@ -218,7 +219,7 @@
 	</div>
 	<RenameAccountDialog bind:open={renameOpen} accountId={account._id} currentName={account.name} />
 	<ReconcileDialog bind:open={reconcileOpen} {account} {onReconciled} />
-	<StartingBalanceDialog bind:this={startingBalance} />
+	<StartingBalanceDialog bind:this={startingBalance} returnFocus={{ fallback: mainRegion }} />
 {:else if accounts.loaded}
 	<h1 class="text-2xl font-bold tracking-tight">No such Account</h1>
 	<p class="mt-2 text-muted-foreground">

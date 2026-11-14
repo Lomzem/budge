@@ -31,6 +31,7 @@
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
 	import { formatBankChangeCount } from '$lib/domain/bankChanges';
+	import { mainRegion } from '$lib/focusReturn';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 
 	const accounts = getAccounts();
@@ -597,9 +598,7 @@
 				event.preventDefault();
 				document.getElementById('category-inspector')?.focus({ preventScroll: true });
 			}}
-			onCloseAutoFocus={(event: Event) => {
-				event.preventDefault();
-			}}
+			returnFocus={{ fallback: mainRegion }}
 		>
 			{@render inspector()}
 		</Dialog.Content>

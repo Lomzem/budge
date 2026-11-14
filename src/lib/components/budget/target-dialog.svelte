@@ -12,6 +12,7 @@
 	import { isRepeatInterval, MAX_REPEAT_MONTHS } from '$lib/domain/budget';
 	import { isIsoDate, ordinal } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
+	import { mainRegion } from '$lib/focusReturn';
 
 	import type { TargetDefinition } from './status';
 
@@ -86,7 +87,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content>
+	<Dialog.Content returnFocus={{ fallback: mainRegion }}>
 		<Dialog.Header>
 			<Dialog.Title>{category.target ? 'Edit Target' : 'Add Target'}: {category.name}</Dialog.Title>
 		</Dialog.Header>
