@@ -41,6 +41,32 @@ async function expectUnclipped(text: Locator) {
 	expect(clippedBy, `${String(text)} is clipped`).toBeNull();
 }
 
+async function useATouchScreen(page: Page) {
+	const emulation = await page.context().newCDPSession(page);
+	await emulation.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+	await expect.poll(() => page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+	return async () => {
+		await emulation.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+		await emulation.detach();
+	};
+}
+
+async function expectTapTargetHeight(target: Locator, height: number) {
+	await target.scrollIntoViewIfNeeded();
+	const missedAt = await target.evaluate(
+		(element, reach) => {
+			const box = element.getBoundingClientRect();
+			const x = box.left + box.width / 2;
+			const middle = box.top + box.height / 2;
+			return [middle - reach, middle + reach].filter(
+				(y) => document.elementFromPoint(x, y)?.closest('button') !== element
+			);
+		},
+		height / 2 - 1
+	);
+	expect(missedAt, `${String(target)} misses taps within ${String(height)} px`).toEqual([]);
+}
+
 async function tap(target: Locator) {
 	const box = await target.boundingBox();
 	if (box === null) throw new Error(`${String(target)} has no box on screen.`);
@@ -182,10 +208,11 @@ export const plaid = {
 
 			for (const width of [320, 390]) {
 				await step(
-					`at ${String(width)} px, the largest Reconnect result reads whole, and Details opens by touch and by keyboard`,
+					`at ${String(width)} px on a touch screen, the largest Reconnect result reads whole, and Details takes a 44 px tall tap and opens by touch and by keyboard`,
 					async () => {
 						await page.goto('about:blank');
 						await page.setViewportSize({ width, height: 740 });
+						const stopTouching = await useATouchScreen(page);
 						await openBank(page);
 						const stopFakingPlaidLink = await fakePlaidLinkOnceTheCachedPageLoaded(page);
 						const reconnect = creditUnion.getByRole('button', { name: 'Reconnect', exact: true });
@@ -212,6 +239,7 @@ export const plaid = {
 						const detail = creditUnion.getByText(matched, { exact: true });
 						await expect(details).toHaveAttribute('aria-expanded', 'false');
 						await expect(detail).toBeHidden();
+						await expectTapTargetHeight(details, 44);
 						await tap(details);
 						await expect(details).toHaveAttribute('aria-expanded', 'true');
 						await expect(detail).toBeVisible();
@@ -225,6 +253,7 @@ export const plaid = {
 						await page.keyboard.press('Space');
 						await expect(detail).toBeVisible();
 						await stopFakingPlaidLink();
+						await stopTouching();
 					}
 				);
 			}

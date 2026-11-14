@@ -405,7 +405,11 @@
 								{:else}
 									<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
 								{/if}
-								<span class="line-clamp-3 min-w-0 sm:line-clamp-2"
+								<span
+									class={[
+										'line-clamp-3 min-w-0 sm:line-clamp-2',
+										result.detail !== undefined && 'pointer-coarse:-my-2.5 pointer-coarse:py-2.5'
+									]}
 									><span>{result.text}</span>
 									{#if aside !== undefined}<span class="text-muted-foreground">{aside}</span>{/if}
 									{#if result.detail !== undefined}<Collapsible.Trigger>
