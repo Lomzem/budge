@@ -1,0 +1,93 @@
+// Reruns transactions/select-categorize against this checkout's running app to look for the
+// reviewer's lost "1 selected": `--cpu N` throttles the page's CPU through CDP, `--sync-at <step
+// prefix>` runs `bun run sync` (what `bun run typecheck` starts with) when that step begins.
+import { spawn, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+
+import { chromium } from '@playwright/test';
+
+import { journeys, journeyTimeZone } from '../../e2e/journeys/index';
+
+const arg = (name: string) => {
+	const at = process.argv.indexOf(name);
+	return at === -1 ? undefined : process.argv[at + 1];
+};
+const cpu = Number(arg('--cpu') ?? '1');
+const iterations = Number(arg('--iterations') ?? '1');
+const syncAt = arg('--sync-at');
+const watchAt = arg('--watch-at');
+const syncDelay = Number(arg('--sync-delay') ?? '0');
+const name = arg('--journey') ?? 'transactions/select-categorize';
+const journey = journeys.find((candidate) => candidate.name === name);
+if (journey === undefined) throw new Error(`no journey ${name}`);
+const { appUrl } = JSON.parse(readFileSync('.local-app/running.json', 'utf8')) as { appUrl: string };
+
+const results: string[] = [];
+for (let run = 1; run <= iterations; run++) {
+	const seeded = spawnSync('bun', ['run', 'app', 'seed', journey.fixture], { stdio: 'ignore' });
+	if (seeded.status !== 0) throw new Error('seed failed');
+	const browser = await chromium.launch();
+	const started = Date.now();
+	const at = () => `${String(Date.now() - started).padStart(6)}ms`;
+	const events: string[] = [];
+	try {
+		const context = await browser.newContext({
+			baseURL: appUrl,
+			storageState: '.local-app/storage-state.json',
+			timezoneId: journeyTimeZone
+		});
+		const page = await context.newPage();
+		if (cpu > 1) {
+			const cdp = await context.newCDPSession(page);
+			await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
+		}
+		page.on('framenavigated', (frame) => {
+			if (frame === page.mainFrame()) events.push(`${at()} navigated ${new URL(frame.url()).pathname}`);
+		});
+		page.on('console', (message) => {
+			if (message.text().startsWith('[vite]') || message.text().startsWith('[watch]')) events.push(`${at()} console ${message.text()}`);
+		});
+		await journey.run(page, {
+			step: async (stepName, body) => {
+				events.push(`${at()} step ${stepName.slice(0, 60)}`);
+				if (watchAt !== undefined && stepName.startsWith(watchAt)) {
+					await page.evaluate(() => {
+						const t0 = performance.now();
+						let last = '';
+						const look = () => {
+							const bar = document.querySelector('[data-selection-bar]');
+							const box = [...document.querySelectorAll('[role=checkbox]')].find((b) =>
+								(b.getAttribute('aria-label') ?? '').startsWith('Select Sample Warehouse Club,')
+							);
+							const now = `url=${location.search} bar=${bar?.textContent?.replace(/\s+/g, ' ').slice(0, 60) ?? 'none'} club=${box?.getAttribute('aria-checked') ?? 'absent'}`;
+							if (now !== last) console.log(`[watch] ${String(Math.round(performance.now() - t0))}ms ${now}`);
+							last = now;
+						};
+						new MutationObserver(look).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+						look();
+					});
+				}
+				if (syncAt !== undefined && stepName.startsWith(syncAt)) {
+					setTimeout(() => {
+						events.push(`${at()} starting bun run sync`);
+						spawn('bun', ['run', 'sync'], { stdio: 'ignore' }).on('exit', (code) =>
+							events.push(`${at()} bun run sync exited ${String(code)}`)
+						);
+					}, syncDelay);
+				}
+				return body();
+			},
+			keepAsEvidence: () => Promise.resolve('')
+		});
+		results.push(`run ${String(run)} cpu ${String(cpu)}x: pass`);
+		console.log(events.join("\n"));
+	} catch (error) {
+		const message = error instanceof Error ? error.message.split('\n').slice(0, 4).join(' | ') : String(error);
+		results.push(`run ${String(run)} cpu ${String(cpu)}x: FAIL ${message}`);
+		console.log(events.join('\n'));
+	} finally {
+		await browser.close();
+	}
+	console.log(results.at(-1));
+}
+console.log(results.join('\n'));

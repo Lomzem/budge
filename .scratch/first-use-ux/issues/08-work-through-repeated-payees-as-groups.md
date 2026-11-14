@@ -1,6 +1,6 @@
 # 08: Work through repeated Payees as groups
 
-**Status:** landed — review pending
+**Status:** done
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
@@ -61,3 +61,55 @@ Evidence is under `test-results/ticket-08/`.
 - A group's box names its section (`Unapproved`); with `Approve them too` the approved rows move to an `Approved` group of the same Payee, which is correct but may surprise.
 - `splits/lines` failed once in the full suite and passed three times alone; worth watching for a timing race in the Split choice.
 - Grouping is per loaded page; a Payee with history past `Show more` shows `N shown`, not its total. Saying the total would need a count query.
+
+### Review fixes 2026-11-13 (commits 88b3988..b1d8bdf on `feat/first-use-ux`)
+
+Made in a detached worktree (`budge-t08-fix`, since removed) and fast-forwarded onto the branch. Evidence is copied to `test-results/ticket-08-fix/` and `test-results/verify-budge/t08fix-*` in the main checkout. The stress harness is kept beside the review as `reviews/08/selection-stress.ts.txt`.
+
+**P2: Undo and Show more focus followed date order, not the shown order (fixed, 88b3988).**
+
+- One display-order lookup in `transaction-table.svelte`: `firstShown(ids, controlOf)` takes candidate IDs, walks `listed` (the shown order, grouped or not), and returns the first row's control; each caller keeps its own fallback (`approveAllButton` for Undo). Both Undo kinds pass `touchedBy(entry)`. Show more keeps the IDs loaded before `loadMore`, derives the new ones once the page arrives, and focuses the first of them as shown. Receipts and mutation order are unchanged.
+- `transactions/payee-groups` gained steps 9 and 10: fifty newer `SAMPLE ZOO 9902` rows and one older `SAMPLE ARCADE 3301` row are imported and the page reloaded (an exhausted first page grows to take new rows, so the reload is what puts ARCADE past `Show more`). Show more must focus ARCADE's edit button; with one ZOO row and ARCADE checked, Undo after Gifts must focus ARCADE's Category and Undo after `Approve 2 selected` its Approve.
+- Red: `t08fix-red-showmore-2` (unfixed code; step 9, focus not on ARCADE), `t08fix-red-undo-receipt-order` (Undo through receipt order; step 10, Category), `t08fix-red-undo-approved-receipt-order` (receipt order for the approved kind only; step 10, Approve). `t08fix-red-showmore` is void: it ran before the reload was added and ARCADE was already on page 1. Green: `t08fix-green-order`.
+
+**P2: the Payee lookup's status shifted Split from under the pointer (fixed, 4c7037d).**
+
+- At the picker/dialog boundary: `selectionChoices()` no longer adds the disabled `Looking up the remembered Category…`/`Pick a Category` option; the dialog passes that text as the `CategoryPicker`'s `placeholder`, so the trigger still says it (with `data-placeholder`) while the open list's options and geometry stay put when the lookup resolves. Options stay keyed by value. `splits/lines` does not wait for the lookup.
+- `splits/lines` step 1 now holds `payees:lastCategory` with `withholdQueryResult`, asserts the trigger reads the lookup text, opens the list, rests the pointer on `Split across Categories`, releases the answer, waits for `Uncategorized`, then clicks the same point and requires `Split across Categories`, the reviewer's `split-race.ts` interleaving.
+- Red: `t08fix-red-split-race` (the click picked `Ready to Assign`). Green: `t08fix-green-split-race` (`splits/lines`, `payees/last-category`). This is the likely cause of the `splits/lines` flake recorded at landing.
+
+**Item 3: the lost `1 selected` in `transactions/select-categorize` (explained; not an app race; journey and skill fixed, b1d8bdf).**
+
+- The reviewer's trace shows two page reloads the journey never asked for (`[vite] connecting...` and fresh Convex `InitialConnect`) during the final `1 selected` wait, while `bun run check` ran in the same checkout. Reproduced: running `bun run sync` (the first thing `typecheck` does) while the journey runs makes Vite reload the page about a second later (`stress-sync.log`: sync exits at 6.8 s, unrequested reload at 7.8 s), and the reload drops the in-page selection. Started at offsets into the late-save step, it fails the journey at several assertions depending on where the reload lands (`stress-sync-delay-{1000,1100,1200,1300,1400}.log`; 600 ms and 0 ms passed because the reload landed before the step's own state). I did not land a reload exactly on the `1 selected` line; the trace and these runs make the cause the reload, not the save's ownership. Without a concurrent sync, the late-save step passed every run, including six at 4× CPU (`stress-cpu4*.log`, `stress-cpu4-green.log`). Fix: verify-budge's Launch step now says not to run `check`, `typecheck` or `sync` in a checkout while its app drives a journey.
+- Found on the way, a real journey race: at 4× CPU the next step (`a Split in the selection…`) failed 5 of 5 (`stress-cpu4.log`, `stress-cpu4-watch.log`). It typed `Warehouse` and checked the club row at once; the row was still visible in the unfiltered list, so the check landed inside the 300 ms search pause and the search, applying after, started the selection over (watch log: checked at 155 ms, cleared at 507 ms). The journey now waits for the bookshop row to leave before checking. Green: 3 of 3 at 4× CPU (`stress-cpu4-green.log`). Product behavior is unchanged: a check made before a pending search applies is cleared with the rest of the selection, as ticket 07 decided for searches; see Open questions.
+
+**Open questions answered (owner decisions, recorded)**
+
+- Group order stays alphabetical.
+- Rows approved with `Approve them too` keep moving to the `Approved` section; the outcome wording was read again and left as it is.
+- The heading keeps `N shown` with no count query.
+- Show more leaves a group's box mixed and never selects the new rows; the review confirmed it, and it is kept.
+
+**Authoring gate (test-audit)**
+
+- payee-groups steps 9 and 10: contract is focus on the first affected row in the shown order after Show more and both Undo kinds; regression is any date- or receipt-order lookup; existing proof only had lists where the two orders agree; owner is the browser journey, since focus exists only there; no seam.
+- splits/lines step 1: contract is that the open Category list holds still when the lookup answers, so the pointed option is the picked one; regression is a status row inside the options; held at the real Convex WebSocket boundary (`e2e/heldResponse.ts`); `payees/last-category` owns the recall outcome, not the list geometry.
+- select-categorize step 9: a synchronization on a visible outcome (the narrowed list), no new contract.
+
+**Checks**
+
+- `bun run check` in the worktree, which includes `capacity:check` there: passed, 908 tests (`check.log`). Rerun after a Prettier fix to the journey.
+- Affected journeys `t08fix-affected`: 12 passed (payees last-category, remember; splits lines, restart; transactions create, late-save, categorize, categorize-late, approve-all-undo, select-categorize, payee-groups, approve-phone) (`affected.log`).
+- Full `bun run test:e2e:local` on the final tree: 54 passed in 8.6 min (`e2e-local.log`). The Clerk FAPI retry lines are the known teardown noise.
+- Hooks, including `gitleaks --redact`, ran on each commit: no leaks.
+- The worktree app was stopped with `bun run app down` and the worktree removed.
+
+**Principles that changed a choice**
+
+- fix-root-causes: the focus fix went into one shown-order lookup that all three callers use, rather than patching each sort; the picker fix moved the status out of the options instead of making `splits/lines` wait.
+- prove-it-works: the receipt-order red runs were made per Undo kind, so each caller's use of the lookup is proven, not only Show more's.
+- test-behavior-not-implementation: the search-race fix waits on the narrowed list a person sees, not on the URL, which changes before the search applies.
+
+**Open questions**
+
+- A row checked while a typed search is still pending is lost when the search applies. A person is unlikely to beat the 300 ms pause, but the search could apply at once on a check, or the check could wait for it. Left as ticket 07 decided.
