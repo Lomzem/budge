@@ -132,10 +132,20 @@ Repeat in each judge's own report file before aggregation.
 
 | Finding ID | Fixed / answered / deferred | Commit, check and counter-evidence or reason + follow-up | Affected judge's re-check result and SHA |
 | ---------- | --------------------------- | -------------------------------------------------------- | ---------------------------------------- |
-| <ID>       | <disposition>               | <evidence>                                               | <result>                                 |
+| sol-a-1, sol-b-1, opus-4 (minor) | fixed | `80dda30`: a search or filter keeps checked rows it still shows and says which left; bulk scope unchanged. Red/green `selection-*` in `.scratch/first-use-ux/reviews/11/round-1/fix-evidence/`. | pending round 2 |
+| sol-a-2, sol-b-2, opus-6 (minor/nit; G8) | fixed | `4ce2459`: root cause was the dev stylesheet swap re-registering font faces; faces now live in the page shell. Layout guard unchanged. Cold-load loops `font-*-loop.log`, `font-diag/`. | pending round 2 |
+| opus-1 (major) | fixed | `ca0239c`: when a Bank-card dialog's opener vanishes, focus goes to the next surviving control (Categorize its Transactions, then Check balance, then the card), never `<body>`. `focus-notice-*`. | pending round 2 |
+| opus-2 (major) | fixed | `460de2a`: once setup is confirmed, the earlier-Transactions note is muted information with its link and counts in no "need you" count. `notice-count-red`, `focus-notice-green`. | pending round 2 |
+| opus-3 (minor) | fixed | `e63354d`: no 0.00 placeholder; an empty Confirm says what to enter at the field; a confirmed Starting Balance is prefilled. Unconfirmed stays empty on purpose (the user enters what the bank showed). `balance-*`; no separate red for the bank-Account prefill. | pending round 2 |
+| opus-5 (minor) | fixed | `9036e26`: a plain move to a date after today says the coming days' bank transactions won't come in. `preview-*`. | pending round 2 |
+| opus-7 (nit) | answered | Already met: the focus trap gives Close → disclosures → Cancel → Move, opening on Cancel. `3494f52` pins the order in `settings/later-start`. `preview-green`. | pending round 2 |
+| opus-8 (nit) | fixed | `a1c8a9b`: singular copy for one Transaction. | pending round 2 |
+| opus-9 (nit) | answered | Every action in the selection bar is needed for the selection task; 145 px at 320×640 leaves the rows scrollable and reachable. No change. | pending round 2 |
+| opus-10 (nit) | fixed / answered | `e6b43ba`: the `xs` Button has a 44 px touch hit area (Details). The fixed-height result slot is deliberate layout stability; the 16 px phone dialog bottom gap is kept. `details-red-2`, `details-green-4`. | pending round 2 |
 
-- Changes since initial review; affected tasks/approvals invalidated:
-- Re-run checks/journeys with commands, exit codes, revision and evidence:
+- Changes since initial review; affected tasks/approvals invalidated: `80dda30`–`ec73b1f` change selection, focus after Bank-card dialogs, the remap note and its counts, Starting Balance entry, later-start copy, Details touch size and font registration. No round-1 approval exists; round 2 re-inspects T1–T10 on the new revision.
+- Coverage rule for round 2 (coordinator clarification): the round-1 matrix asked for a full cross-product of viewports, themes and inputs, which no judge could complete, and counted external Plaid behavior as required. Round 2 requires what the protocol states: every scoped task at desktop 1280×800 and phone 320×640, and keyboard completion of each task with a keyboard path. 390 px, dark theme, long names and the listed states are targeted samples. G1 (real Plaid) and the G2 states that need a production seam are declared environment gaps, owned by deterministic tests, not required judge cells.
+- Re-run checks/journeys with commands, exit codes, revision and evidence: at `ec73b1f`, `bun run check` passed (capacity in a worktree, exit 0); 39 affected journeys passed (`final-affected`); `bun run test:e2e:local` 56 passed.
 - Carry-forward rationale for unaffected evidence; judge confirmation links:
 
 | Judge | Actual model / reasoning | Final SHA explicitly approved | Separate overall score /10 | Report / re-check evidence | Required coverage complete; no open blocker/major |
