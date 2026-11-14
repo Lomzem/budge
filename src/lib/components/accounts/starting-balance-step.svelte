@@ -39,17 +39,29 @@
 	const owed = $derived(account.kind === 'creditCard');
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? evidence.data?.since ?? null);
 	const since = $derived(cutoverDate === null ? null : formatDate(cutoverDate));
-	const fed = $derived(
-		bank.all.some((connection) => connection.feeds.some((one) => one.accountId === account._id))
+	const feeds = $derived(
+		bank.all.flatMap((connection) =>
+			connection.feeds.filter((one) => one.accountId === account._id)
+		)
+	);
+	const fed = $derived(feeds.length > 0);
+	const confirmed = $derived(
+		bank.loaded && current.data != null && feeds.every((one) => one.startingBalanceConfirmed)
+	);
+	const asks = $derived(
+		`Enter ${owed ? 'what you owed' : 'the balance your bank showed'} on ${since ?? 'the cutover date'}.`
 	);
 
 	const step = new DialogSession<object, 'suggest' | 'confirm'>();
 	const suggesting = $derived(step.pending('suggest'));
 	const saving = $derived(step.pending('confirm'));
 	let balance = $state('');
+	let field = $state<HTMLInputElement | null>(null);
+	let kept: string | null = null;
 	let synced = $state(true);
 	let suggestion = $state('');
 	let error = $state('');
+	let invalid = $state('');
 	let asked = $state<{
 		bankBalance: number;
 		imported: Imported;
@@ -58,6 +70,12 @@
 	let unasked = $state('Asking the bank…');
 	const imported = $derived(asked?.imported ?? evidence.data?.imported);
 	const source = $derived(asked?.source ?? evidence.data?.source);
+
+	$effect(() => {
+		if (kept !== null || !confirmed || current.data == null || balance !== '') return;
+		kept = typed(shown(current.data));
+		balance = kept;
+	});
 
 	onMount(() => {
 		step.open({});
@@ -111,7 +129,9 @@
 			const amount = typed(shown(outcome.startingBalance));
 			const basis =
 				'This is an estimate: open What it’s based on, and check it before you confirm.';
-			if (balance === typedBefore) {
+			if (kept !== null && balance === kept) {
+				suggestion = `Budge estimates ${amount}. The confirmed balance stays. ${basis}`;
+			} else if (balance === typedBefore) {
 				balance = amount;
 				suggestion = `Budge filled in an estimate. ${basis}`;
 			} else {
@@ -133,12 +153,15 @@
 		event.preventDefault();
 		const cents = parseCents(balance);
 		if (cents === undefined) {
-			error = 'Enter the balance as an amount, such as 1,250.00.';
+			error = '';
+			invalid = balance.trim() === '' ? asks : 'Enter the balance as an amount, such as 1,250.00.';
+			field?.focus();
 			return;
 		}
 		const accountId = account._id;
 		const startingBalance = owed ? -cents : cents;
 		error = '';
+		invalid = '';
 		const saved = await step.run('confirm', () =>
 			client.mutation(api.accounts.setStartingBalance, { accountId, startingBalance })
 		);
@@ -167,12 +190,17 @@
 		</Label>
 		<Input
 			id="starting-balance"
+			bind:ref={field}
 			bind:value={balance}
 			inputmode="decimal"
-			placeholder={suggesting && synced ? 'Asking the bank…' : '0.00'}
+			placeholder={suggesting && synced ? 'Asking the bank…' : undefined}
 			autocomplete="off"
-			required
+			aria-invalid={invalid === '' ? undefined : true}
+			aria-describedby={invalid === '' ? undefined : 'starting-balance-error'}
 		/>
+		<p id="starting-balance-error" role="alert" class="text-sm text-destructive empty:hidden">
+			{invalid}
+		</p>
 		{#if current.data != null}
 			<p class="text-sm text-muted-foreground tabular-nums" data-testid="current-starting-balance">
 				Now {formatCents(shown(current.data))}{owed ? ' owed' : ''}

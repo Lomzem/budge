@@ -66,7 +66,7 @@ export const accounts = {
 			const savingsEntry = '9,999.99';
 
 			const before = await step(
-				'save $100 more on Checking, hold the save, and dismiss',
+				'Checking offers its current starting balance; save $100 more, hold the save, and dismiss',
 				async () => {
 					await page.goto('/');
 					await openAccount(page, 'Checking');
@@ -77,6 +77,9 @@ export const accounts = {
 							/^Now /,
 							''
 						) ?? null
+					);
+					await expect(checking.getByLabel('Starting balance')).toHaveValue(
+						(start / 100).toFixed(2)
 					);
 					await checking.getByLabel('Starting balance').fill(typed(start + 10_000));
 					await checking.getByRole('button', { name: 'Confirm' }).click();
@@ -346,6 +349,8 @@ export const accounts = {
 				async () => {
 					await check.click();
 					await expect(dialog.getByRole('button', { name: 'Suggest again' })).toBeEnabled();
+					await expect(dialog.getByLabel('Starting balance')).toHaveValue('');
+					await expect(dialog.getByLabel('Starting balance')).not.toHaveAttribute('placeholder');
 					await expect(dialog).toHaveAccessibleDescription(
 						/^Budge records it on [A-Z][a-z]{2} 1, \d{4}, the cutover date\. Confirm or correct it\./
 					);
@@ -358,6 +363,18 @@ export const accounts = {
 					await expect(dialog).toContainText('Unknown. Not available to Budge.');
 					await expect(dialog).toContainText("Unknown. The bank doesn't say whether");
 					await expect(dialog).toContainText("A working connection doesn't prove it either.");
+				}
+			);
+
+			await step(
+				'Confirm with the field empty asks, at the field, for the balance the bank showed on the cutover date',
+				async () => {
+					const field = dialog.getByLabel('Starting balance');
+					const asks = /^Enter the balance your bank showed on [A-Z][a-z]{2} 1, \d{4}\.$/;
+					await dialog.getByRole('button', { name: 'Confirm' }).click();
+					await expect(dialog.getByRole('alert').filter({ hasText: asks })).toBeVisible();
+					await expect(field).toBeFocused();
+					await expect(field).toHaveAccessibleDescription(asks);
 				}
 			);
 
@@ -394,6 +411,12 @@ export const accounts = {
 					await expect(savings.getByRole('button', { name: /starting balance$/ })).toHaveCount(0);
 				}
 			);
+
+			await step("Savings' actions offer its confirmed starting balance to keep", async () => {
+				await openAccount(page, 'Savings');
+				const again = await openStartingBalance(page, 'Savings');
+				await expect(again.getByLabel('Starting balance')).toHaveValue('1000.00');
+			});
 		}
 	},
 	'setup-correct': {
