@@ -44,6 +44,10 @@ _Avoid_: Balancing, sync check
 The party on the other side of a Transaction.
 _Avoid_: Merchant, vendor, counterparty
 
+**Remembered Category**:
+The Category you chose to remember for a Payee, which fills in later imported Transactions from that Payee and new ones you enter for it. It changes only when you ask to remember a Category, never through a one-off edit, so it need not be the Category the Payee's latest Transaction has; imports it fills in are still Unapproved.
+_Avoid_: Last Category, default Category
+
 ## Budgeting
 
 **Ready to Assign**:
