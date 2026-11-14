@@ -218,7 +218,7 @@
 							value: optionOf(selection),
 							label:
 								selection.kind === 'recalling'
-									? 'Looking up the last Category…'
+									? 'Looking up the remembered Category…'
 									: 'Pick a Category',
 							disabled: true
 						}

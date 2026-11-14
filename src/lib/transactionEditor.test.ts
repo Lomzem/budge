@@ -93,7 +93,7 @@ function payloadOf(draft: Draft, world: World, candidates = noCandidates) {
 	return view(draft, world, candidates).payload;
 }
 
-describe('recalling the Payee’s last Category', () => {
+describe('recalling the Payee’s Remembered Category', () => {
 	const typed = newDraft({ payee: '  Corner Market ', amount: '12.50' });
 
 	test('asks about the trimmed Payee only while nothing was picked', () => {
@@ -135,7 +135,7 @@ describe('recalling the Payee’s last Category', () => {
 		{
 			failure: 'the lookup fails',
 			changes: { payeeMemory: failed },
-			message: "Budge couldn't look up this Payee's last Category. Pick one to save."
+			message: "Budge couldn't look up this Payee's remembered Category. Pick one to save."
 		},
 		{
 			failure: 'the Categories fail to load',

@@ -15,7 +15,7 @@ async function filledInFor(page: Page, payee: string) {
 	const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
 	await dialog.getByLabel('Payee').fill(payee);
 	const category = dialog.getByLabel('Category or Transfer');
-	await expect(category).not.toHaveText('Looking up the last Category…');
+	await expect(category).not.toHaveText('Looking up the remembered Category…');
 	const filled = (await category.innerText()).trim();
 	await page.keyboard.press('Escape');
 	await page
@@ -28,7 +28,7 @@ async function filledInFor(page: Page, payee: string) {
 
 export const payees = {
 	'last-category': {
-		title: "a Payee's last Category fills in, and picking another Category keeps it",
+		title: "a Payee's remembered Category fills in, and picking another Category keeps it",
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
@@ -41,7 +41,7 @@ export const payees = {
 				await page.getByRole('button', { name: 'Add Transaction' }).click();
 			});
 
-			await step("a known Payee fills in its last Category; a new one doesn't", async () => {
+			await step("a known Payee fills in its remembered Category; a new one doesn't", async () => {
 				const seedsRentPayee = 'Sample Landlord';
 				await payee.fill(seedsRentPayee);
 				await expect(category).toHaveText('Rent');

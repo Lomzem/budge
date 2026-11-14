@@ -31,7 +31,7 @@ Every picker is a shadcn-svelte Select: a `combobox` button labeled like the old
 | [Splits](splits.md)                 | Lines, remainder, unsplit, card lines                                                        | 11         |
 | [Reconciliation](reconciliation.md) | Equal/adjustment, locks, Unlock                                                              | 12         |
 | [Imports](imports.md)               | Capital One CSV/QFX, Discover CSV, preview, matching, Unmatch, Approve                       | 14         |
-| [Payees](payees.md)                 | Last Category, exact Bank Text rename memory, API-only global rename                         | 15         |
+| [Payees](payees.md)                 | Remembered Category, exact Bank Text rename memory, API-only global rename                   | 15         |
 | [Search](search.md)                 | Payee/memo/split/Bank Text, all filters, empty/reset                                         | 16         |
 | [Bank changes](bank-changes.md)     | Held, quiet changes/removals, accept/keep resolutions (`bank-sync`)                          | 19, 21     |
 | [Plaid](plaid.md)                   | Status, Sync now, needs-attention, consent, reconnect, webhook/daily                         | 17, 18, 20 |

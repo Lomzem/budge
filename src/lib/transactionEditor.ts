@@ -262,7 +262,7 @@ function selectionOf(draft: Draft, world: World): Selection {
 	if (memory.kind === 'failed') {
 		return {
 			kind: 'recallFailed',
-			message: "Budge couldn't look up this Payee's last Category. Pick one to save."
+			message: "Budge couldn't look up this Payee's remembered Category. Pick one to save."
 		};
 	}
 	if (memory.data === null) return { kind: 'uncategorized' };
