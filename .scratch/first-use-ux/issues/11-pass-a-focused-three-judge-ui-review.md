@@ -95,3 +95,11 @@ The coordinator ruled that both open questions were regressions against "no beha
 - On `1d463b6`, Sol A, Sol B and Opus each scored 9/10 and approved independently, with full required coverage and no open blocker or major.
 - Reports: `reviews/11/round-2/`.
 - Each finding's disposition is in [round 2](11-ui-review-round-2.md#coordinator-disposition-and-final-gate). All eight round-2 minors and nits are deferred with reasons to `first-use-ux-polish` 01. Nothing was changed after the approved commit.
+
+### After approval: CI found a sub-frame focus race (`b1707bc`)
+
+- **CI failure:** PR #31's E2E job failed in `settings/later-start`. After Escape, focus stayed on Save instead of the date field.
+- **Cause:** bits-ui moves focus into an opening dialog on the next animation frame. An Escape that arrives before then closes the dialog while focus is still outside it. `restoreFocus` read that as "focus already settled" and skipped the opener.
+- **Fix (Opus):** the dialog wrappers record whether focus ever entered the dialog. Only a dialog that focus entered keeps the early return. Any other dialog follows its opener, then continuation, then fallback.
+- **Proof:** a new journey step clicks Save and presses Escape at once. Under the production-build runner it failed 7 of 8 times before the fix and passed 25 of 25 after. `bun run check` and `test:e2e:local` (56 of 56) pass.
+- **Gate decision (coordinator):** the approval on `1d463b6` still holds. The change only affects a dialog closed within one frame of opening, which no judge could observe and which is not a material UX change. Focus return at normal speed, including the judged Escape-to-date-field behaviour, is unchanged.
