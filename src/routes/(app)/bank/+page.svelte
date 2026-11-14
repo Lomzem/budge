@@ -32,6 +32,12 @@
 	let next: { to: 'categorize' | 'history'; accountId: Id<'accounts'>; name: string } | null =
 		$state(null);
 	let connectButton: HTMLButtonElement | null = $state(null);
+	let nextLink: HTMLAnchorElement | null = $state(null);
+	let settingUp: {
+		connectionId: Id<'bankConnections'>;
+		connectionAccountId: Id<'connectionAccounts'>;
+	} | null = null;
+	let landed = false;
 	let order: Id<'bankConnections'>[] = $state([]);
 	let cutoverUnsetOnArrival = $state(false);
 
@@ -105,9 +111,33 @@
 		result = (await bank.connect()) ?? '';
 	}
 
+	function setUp(account: HeldAccount) {
+		settingUp = { connectionId: account.connectionId, connectionAccountId: account._id };
+		landed = false;
+		heldDialog?.open(account);
+	}
+
 	function check(accountId: Id<'accounts'>) {
 		const account = accounts.find(accountId);
-		if (account !== undefined) startingBalance?.open(account);
+		if (account === undefined) return;
+		settingUp = null;
+		landed = false;
+		startingBalance?.open(account);
+	}
+
+	function focusAfterDialog(): HTMLElement | undefined {
+		const from = settingUp;
+		settingUp = null;
+		if (landed) {
+			landed = false;
+			return nextLink ?? undefined;
+		}
+		if (from === null) return undefined;
+		const card = document.getElementById(`connection-${from.connectionId}`)?.closest('article');
+		if (!card) return connectButton ?? undefined;
+		const opener = card.querySelector<HTMLElement>(`[data-setup="${from.connectionAccountId}"]`);
+		const check = card.querySelector<HTMLElement>(`[data-check="${from.connectionAccountId}"]`);
+		return opener ?? check ?? card;
 	}
 
 	function confirmed(account: { _id: Id<'accounts'>; name: string }) {
@@ -121,6 +151,7 @@
 			result = `${account.name}'s starting balance is confirmed.`;
 			next = { to: 'categorize', accountId: account._id, name: account.name };
 		}
+		landed = true;
 	}
 </script>
 
@@ -201,9 +232,7 @@
 							<ConnectionCard
 								{connection}
 								{outcomes}
-								onsetup={(account: HeldAccount) => {
-									heldDialog?.open(account);
-								}}
+								onsetup={setUp}
 								oncheck={check}
 								onremoved={(connectionId: Id<'bankConnections'>, report: string) => {
 									void removed(connectionId, report);
@@ -226,12 +255,14 @@
 		{result}
 		{#if result !== '' && next?.to === 'categorize'}
 			<a
+				bind:this={nextLink}
 				href="{resolve('/accounts')}?account={next.accountId}&category=uncategorized"
 				class="font-medium underline underline-offset-4 hover:no-underline"
 				>Categorize its Transactions</a
 			>
 		{:else if result !== '' && next?.to === 'history'}
 			<a
+				bind:this={nextLink}
 				href={resolve('/(app)/accounts/[accountId]', { accountId: next.accountId })}
 				class="font-medium underline underline-offset-4 hover:no-underline">Open {next.name}</a
 			>
@@ -258,6 +289,11 @@
 		outcomes.set(connectionAccountId, outcome);
 	}}
 	onconfirmed={confirmed}
+	returnFocus={focusAfterDialog}
 />
 
-<StartingBalanceDialog bind:this={startingBalance} onconfirmed={confirmed} />
+<StartingBalanceDialog
+	bind:this={startingBalance}
+	onconfirmed={confirmed}
+	returnFocus={focusAfterDialog}
+/>

@@ -11,7 +11,13 @@
 		name: string;
 	}
 
-	let { onconfirmed }: { onconfirmed?: (account: Checked) => void } = $props();
+	let {
+		onconfirmed,
+		returnFocus
+	}: {
+		onconfirmed?: (account: Checked) => void;
+		returnFocus?: () => HTMLElement | undefined;
+	} = $props();
 
 	const dialog = new DialogSession<{ account: Checked }>();
 
@@ -26,7 +32,14 @@
 		if (!isOpen) dialog.dismiss();
 	}}
 >
-	<Dialog.Content>
+	<Dialog.Content
+		onCloseAutoFocus={(event: Event) => {
+			const target = returnFocus?.();
+			if (target === undefined) return;
+			event.preventDefault();
+			target.focus();
+		}}
+	>
 		{#if dialog.current !== null}
 			{@const session = dialog.current}
 			{#key session}

@@ -31,10 +31,12 @@
 
 	let {
 		onsettled,
-		onconfirmed
+		onconfirmed,
+		returnFocus
 	}: {
 		onsettled: (connectionAccountId: Id<'connectionAccounts'>, outcome: string) => void;
 		onconfirmed: (account: MappedAccount) => void;
+		returnFocus?: () => HTMLElement | undefined;
 	} = $props();
 
 	const client = useConvexClient();
@@ -164,7 +166,14 @@
 		if (!isOpen) dialog.dismiss();
 	}}
 >
-	<Dialog.Content>
+	<Dialog.Content
+		onCloseAutoFocus={(event: Event) => {
+			const target = returnFocus?.();
+			if (target === undefined) return;
+			event.preventDefault();
+			target.focus();
+		}}
+	>
 		{#if dialog.current !== null}
 			{@const session = dialog.current}
 			{#key session}

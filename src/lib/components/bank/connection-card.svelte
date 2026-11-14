@@ -334,6 +334,7 @@
 								<Button
 									variant="outline"
 									size="sm"
+									data-check={feed.connectionAccountId}
 									aria-label="Check {feed.name}'s starting balance"
 									onclick={() => {
 										oncheck(feed.accountId);
