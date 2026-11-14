@@ -23,7 +23,7 @@
 				<ScrollAreaPrimitive.Viewport
 					{...props}
 					data-slot="scroll-area-viewport"
-					class="min-h-0 flex-1 scroll-py-1 overscroll-contain p-1"
+					class="min-h-0 flex-1 scroll-py-1 overscroll-contain p-1 focus-visible:-outline-offset-2"
 				>
 					{@render children?.()}
 				</ScrollAreaPrimitive.Viewport>
