@@ -14,3 +14,9 @@ Current phase: two isolated fresh Opus 5.5 implementation agents running from sp
 - Budget task: node:delegated-task:command%3Amcp%3A3b488d9c-bba3-4e99-817f-ef86db429e81%3Adelegate-task%3A85078bef-79fb-461a-8f0a-2a8d4fe958c3
 - Transactions task: node:delegated-task:command%3Amcp%3A3b488d9c-bba3-4e99-817f-ef86db429e81%3Adelegate-task%3A599a6a8f-4ef5-40a4-9c29-6d0682dadeb3
 - Both use provider claudeAgent / claude-opus-5-5 with inherited defaults; no further delegation permitted. They own only their slice and their ticket. They must commit, verify in their own app, clean up, and return hashes and evidence. Parent then integrates; fresh Opus integration/copy agent still to be commissioned.
+
+## Transactions integrated
+
+- Opus transaction slice completed at 2fc2f15 in /home/lomzem/.t3/worktrees/budge/t3-31b947c5-5d3de6743af1f7ef. Parent cherry-picked as c7d354b. Parent directly inspected save/reset guards and real journey summaries and independently ran transactionFilters + featureMap tests: 20/20 passed. No full suite yet. Evidence summaries ux-transactions-2 (18/19; phone assertion failure), ux-transactions-3 (phone pass), app reported cleaned up. These are precommit working-tree journey runs; final clean-revision judges still required.
+- Fresh native Sol read-only local review agents /root/transactions_standards and /root/transactions_spec running, pinned c7d354b, diff96d902f...c7d354b. Report destinations test-results/ux-efficiency/reviews/transactions-{standards,spec}.md. Standards also audits changed tests and analysis-only /correct. They must not launch apps or change source.
+- Fresh isolated Opus copy agent launched for items21–26 only, task node:delegated-task:command%3Amcp%3A3b488d9c-bba3-4e99-817f-ef86db429e81%3Adelegate-task%3A478973f9-4f9e-45e5-b2b4-198756ef0b5b. Handle in functions store copy_task. Parent integrates when done. Budget/Categories remains running; do not poll it.
