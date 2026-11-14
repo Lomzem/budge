@@ -182,11 +182,30 @@ export const settings = {
 					await expect(preview).toContainText(
 						`Nothing is dated before ${formatDate(cutover)}, so moving the date changes no balance and no Transaction.`
 					);
+					await expect(preview).not.toContainText('is after today');
 					await preview.getByRole('button', { name: 'Move start date' }).click();
 					await expect(preview).toBeHidden();
 					await expectCutover(page, cutover);
 					await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
 					await page.reload();
+					await expectCutover(page, cutover);
+				}
+			);
+
+			await step(
+				'a date after today with nothing dated before it says the coming days’ bank transactions won’t come in',
+				async () => {
+					const future = addDays(localToday(), 17);
+					await region.getByRole('button', { name: 'Change' }).click();
+					await saveCutover(page, future);
+					const preview = previewDialog(page, future);
+					await expect(preview).toContainText(
+						`${formatDate(future)} is after today. Bank transactions dated before it, including the coming days, won't be brought in.`
+					);
+					await expect(preview.getByRole('button', { name: 'Cancel' })).toBeFocused();
+					await preview.getByRole('button', { name: 'Cancel' }).click();
+					await expect(preview).toBeHidden();
+					await page.keyboard.press('Escape');
 					await expectCutover(page, cutover);
 				}
 			);

@@ -137,6 +137,12 @@
 	<p>
 		Nothing is dated before {newDate}, so moving the date changes no balance and no Transaction.
 	</p>
+	{#if to > today}
+		<p>
+			{newDate} is after today. Bank transactions dated before it, including the coming days, won't be
+			brought in.
+		</p>
+	{/if}
 {:else}
 	{#if shown.kind === 'blocked'}
 		<section
