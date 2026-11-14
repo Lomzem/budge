@@ -9,6 +9,7 @@ export const tableColumnVariants = tv({
 			fill: 'w-full max-w-0',
 			action: 'w-28',
 			check: 'w-16 sm:w-20',
+			select: 'w-8 pr-0 sm:w-12',
 			amount: 'w-28 sm:w-32',
 			'amount-compact': 'w-24 sm:w-32',
 			date: 'w-32',
@@ -26,12 +27,14 @@ export const tableColumnVariants = tv({
 			'screen-xs': 'hidden xs:table-cell',
 			'screen-sm': 'hidden sm:table-cell'
 		},
+		hideFrom: { never: '', lg: '@lg:hidden' },
 		numeric: { true: 'tabular-nums', false: '' }
 	},
 	defaultVariants: {
 		align: 'start',
 		width: 'auto',
 		showFrom: 'always',
+		hideFrom: 'never',
 		numeric: false
 	}
 });

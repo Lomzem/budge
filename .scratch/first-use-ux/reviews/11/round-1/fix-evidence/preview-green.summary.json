@@ -1,0 +1,171 @@
+{
+	"result": "passed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "2212e039bd6bfbe380b42081229e2f8950adf9f3",
+	"uncommittedChanges": true,
+	"appUrl": "http://127.0.0.1:5173",
+	"journeys": [
+		{
+			"name": "settings/cutover",
+			"title": "the first cutover date gates Add Account, survives reload and cancel, bounds the months, and moves later through a preview when nothing is dated before",
+			"fixture": "empty-budget",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "before a date, there is no Cancel and Add Account points to Budget",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/01-before-a-date-there-is-no-cancel-and-add-account-points-to-b.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/01-before-a-date-there-is-no-cancel-and-add-account-points-to-b.aria.yml"
+				},
+				{
+					"name": "saving the first date keeps it on the Budget, then in Settings",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/02-saving-the-first-date-keeps-it-on-the-budget-then-in-setting.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/02-saving-the-first-date-keeps-it-on-the-budget-then-in-setting.aria.yml"
+				},
+				{
+					"name": "a change cancelled by button or Escape keeps the date; a saved one moves it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/03-a-change-cancelled-by-button-or-escape-keeps-the-date-a-save.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/03-a-change-cancelled-by-button-or-escape-keeps-the-date-a-save.aria.yml"
+				},
+				{
+					"name": "Previous month stops at the cutover month",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/04-previous-month-stops-at-the-cutover-month.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/04-previous-month-stops-at-the-cutover-month.aria.yml"
+				},
+				{
+					"name": "a later date with nothing dated before it moves through its preview",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/05-a-later-date-with-nothing-dated-before-it-moves-through-its-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/05-a-later-date-with-nothing-dated-before-it-moves-through-its-.aria.yml"
+				},
+				{
+					"name": "a date after today with nothing dated before it says the coming days’ bank transactions won’t come in",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/06-a-date-after-today-with-nothing-dated-before-it-says-the-com.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/06-a-date-after-today-with-nothing-dated-before-it-says-the-com.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/cutover/trace.zip"
+		},
+		{
+			"name": "settings/later-start",
+			"title": "a later cutover date opens a preview of the Starting Balances and budget it would leave; Cancel and Escape change nothing",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "a later date opens a readable preview",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/01-a-later-date-opens-a-readable-preview.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/01-a-later-date-opens-a-readable-preview.aria.yml"
+				},
+				{
+					"name": "Tab reads the preview top to bottom: Close, the lists that fold in, Cancel, then Move",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/02-tab-reads-the-preview-top-to-bottom-close-the-lists-that-fol.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/02-tab-reads-the-preview-top-to-bottom-close-the-lists-that-fol.aria.yml"
+				},
+				{
+					"name": "halfway down the preview, its Cancel button is wholly on screen",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/03-halfway-down-the-preview-its-cancel-button-is-wholly-on-scre.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/03-halfway-down-the-preview-its-cancel-button-is-wholly-on-scre.aria.yml"
+				},
+				{
+					"name": "Cancel and Escape close it and keep the date",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/04-cancel-and-escape-close-it-and-keep-the-date.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/04-cancel-and-escape-close-it-and-keep-the-date.aria.yml"
+				},
+				{
+					"name": "a date after today says why it has no preview",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/05-a-date-after-today-says-why-it-has-no-preview.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/05-a-date-after-today-says-why-it-has-no-preview.aria.yml"
+				},
+				{
+					"name": "on a 320 px phone, the preview with every list open stays within the screen",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/06-on-a-320-px-phone-the-preview-with-every-list-open-stays-wit.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/06-on-a-320-px-phone-the-preview-with-every-list-open-stays-wit.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-start/trace.zip"
+		},
+		{
+			"name": "settings/later-move",
+			"title": "confirming a later cutover date with Reconciled history needs its unlock, folds the history in, and Settings undoes it, on desktop and on 320 and 390 px phones",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "reconcile Card and leave one earlier Checking row uncleared",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/01-reconcile-card-and-leave-one-earlier-checking-row-uncleared.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/01-reconcile-card-and-leave-one-earlier-checking-row-uncleared.aria.yml"
+				},
+				{
+					"name": "the preview names the cleared-balance change and asks for the unlock",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/02-the-preview-names-the-cleared-balance-change-and-asks-for-th.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/02-the-preview-names-the-cleared-balance-change-and-asks-for-th.aria.yml"
+				},
+				{
+					"name": "Move start date folds the history in and Settings offers the undo on return",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/03-move-start-date-folds-the-history-in-and-settings-offers-the.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/03-move-start-date-folds-the-history-in-and-settings-offers-the.aria.yml"
+				},
+				{
+					"name": "Undo move by keyboard puts the date and the history back",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/04-undo-move-by-keyboard-puts-the-date-and-the-history-back.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/04-undo-move-by-keyboard-puts-the-date-and-the-history-back.aria.yml"
+				},
+				{
+					"name": "on a 320 px phone, the move and its Undo stay on screen and clear of the tab bar and the dialog's header",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/05-on-a-320-px-phone-the-move-and-its-undo-stay-on-screen-and-c.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/05-on-a-320-px-phone-the-move-and-its-undo-stay-on-screen-and-c.aria.yml"
+				},
+				{
+					"name": "on a 390 px phone, the move and its Undo stay on screen and clear of the tab bar and the dialog's header",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/06-on-a-390-px-phone-the-move-and-its-undo-stay-on-screen-and-c.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/06-on-a-390-px-phone-the-move-and-its-undo-stay-on-screen-and-c.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/later-move/trace.zip"
+		},
+		{
+			"name": "settings/start",
+			"title": "the Budget and the Bank page propose the first of the local month, not the UTC one, on each side of a month boundary, and a file import starts there",
+			"fixture": "empty-budget",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "a minute before the month turns, last month’s first day is proposed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/start/01-a-minute-before-the-month-turns-last-month-s-first-day-is-pr.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/start/01-a-minute-before-the-month-turns-last-month-s-first-day-is-pr.aria.yml"
+				},
+				{
+					"name": "a minute after, the Bank page proposes the new month’s first day and saves it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/start/02-a-minute-after-the-bank-page-proposes-the-new-month-s-first-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/start/02-a-minute-after-the-bank-page-proposes-the-new-month-s-first-.aria.yml"
+				},
+				{
+					"name": "a bank file into a new Account brings in only rows from the start",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/start/03-a-bank-file-into-a-new-account-brings-in-only-rows-from-the-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/start/03-a-bank-file-into-a-new-account-brings-in-only-rows-from-the-.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-green/settings/start/trace.zip"
+		}
+	]
+}

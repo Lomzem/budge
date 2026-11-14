@@ -1,0 +1,36 @@
+import { expect, test } from 'vitest';
+import { api, internal } from './_generated/api';
+import { startBudget, useOwnerEnv, publicErrorCode } from './test.helper';
+useOwnerEnv();
+async function setup() {
+ const b = await startBudget({accounts:{Checking:['cash',10000],Card:['creditCard',0]},groups:{Everyday:['Old','New','Other']}});
+ const ids = [];
+ for (const accountId of Object.values(b.accounts)) ids.push(await b.owner.mutation(api.transactions.create,{accountId,date:'2026-08-12',amount:-100,payee:'Invented Review',memo:'',categoryId:b.categories.Old}));
+ await b.owner.mutation(api.transactions.unapprove,{transactionIds:ids});
+ return {...b,ids};
+}
+test('cache rebuild equals bulk apply and Undo across cash and card',async()=>{
+ const b=await setup();
+ const totals=()=>b.t.run(async ctx=>(await ctx.db.query('monthlyTotals').collect()).map(({_id,_creationTime,...r})=>r).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))));
+ const record=await b.owner.mutation(api.transactions.categorizeMany,{transactionIds:b.ids,categoryId:b.categories.New,approve:true});
+ const changed=await totals(); await b.t.mutation(internal.monthlyTotals.rebuild,{}); expect(await totals()).toEqual(changed);
+ await b.owner.mutation(api.transactions.undoCategorizeMany,record);
+ const undone=await totals(); await b.t.mutation(internal.monthlyTotals.rebuild,{}); expect(await totals()).toEqual(undone);
+});
+test('deleted previous Category prevents every other restoration',async()=>{
+ const b=await setup();
+ const record=await b.owner.mutation(api.transactions.categorizeMany,{transactionIds:b.ids,categoryId:b.categories.New,approve:true});
+ await b.owner.mutation(api.categories.remove,{categoryId:b.categories.Old,destinationId:b.categories.Other});
+ expect(await publicErrorCode(b.owner.mutation(api.transactions.undoCategorizeMany,record))).toBe('NOT_FOUND');
+ const rows=await b.owner.query(api.transactions.list,{paginationOpts:{numItems:50,cursor:null}});
+ for(const id of b.ids) expect(rows.page.find(r=>r._id===id)).toMatchObject({categoryId:b.categories.New,approved:true});
+});
+test('a subsequent unapprove then approve is undone by old receipt',async()=>{
+ const b=await setup(); const id=b.ids[0]!;
+ const record=await b.owner.mutation(api.transactions.categorizeMany,{transactionIds:[id],categoryId:b.categories.New,approve:true});
+ await b.owner.mutation(api.transactions.unapprove,{transactionIds:[id]});
+ await b.owner.mutation(api.transactions.approve,{transactionId:id});
+ await b.owner.mutation(api.transactions.undoCategorizeMany,record);
+ const rows=await b.owner.query(api.transactions.list,{paginationOpts:{numItems:50,cursor:null}});
+ expect(rows.page.find(r=>r._id===id)?.approved).toBe(false);
+});

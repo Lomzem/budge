@@ -1,0 +1,6 @@
+background-change-from-another-tab: CAUGHT (expected CAUGHT) OK
+The page shifted without user input or a requested operation's result:
+  /accounts/ks7c7ph4a39pwq3sd9fg65p6b98j520j moved by 0.0111: <tr> Nov 9, 2026 Sample Transit Pass 11/9/26 Transit Transit −$25 [288.0,424.0,945.0,41.0 → 288.0,465.0,945.0,41.0]; <tr> Nov 1, 2026 Sample Landlord 11/1/26 Rent Rent −$1,450.00 [288.0,547.0,945.0,41.0 → 288.0,588.0,945.0,41.0]; <tr> Nov 2, 2026 Sample Transit Pass 11/2/26 Transit Transit −$25 [288.0,465.0,945.0,41.0 → 288.0,506.0,945.0,41.0]; <tr> Oct 26, 2026 Sample Transit Pass 10/26/26 Transit Transit −$ [288.0,588.0,945.0,41.0 → 288.0,629.0,945.0,41.0]; <tr> Nov 1, 2026 Sample Employer Payroll 11/1/26 Ready to Assign  [288.0,506.0,945.0,41.0 → 288.0,547.0,945.0,41.0]control-no-change: NOT CAUGHT (expected NOT CAUGHT) OK
+no shift reportedinjected-insert-with-nothing-pending: CAUGHT (expected CAUGHT) OK
+The page shifted without user input or a requested operation's result:
+  /accounts/ks7c7ph4a39pwq3sd9fg65p6b98j520j moved by 0.0664: <div> Checking Cash Account Entered by hand or from bank files Bal [288.0,32.0,945.0,768.0 → 288.0,152.0,945.0,648.0]

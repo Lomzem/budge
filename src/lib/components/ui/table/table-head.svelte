@@ -11,9 +11,12 @@
 		align,
 		width,
 		showFrom,
+		hideFrom,
 		numeric,
+		variant = 'label',
 		...restProps
-	}: WithElementRef<Omit<HTMLThAttributes, 'align'>> & TableColumnVariants = $props();
+	}: WithElementRef<Omit<HTMLThAttributes, 'align'>> &
+		TableColumnVariants & { variant?: 'label' | 'group' } = $props();
 </script>
 
 <th
@@ -21,7 +24,8 @@
 	data-slot="table-head"
 	class={cn(
 		'h-10 px-2 pb-2 text-left align-bottom text-xs font-medium whitespace-nowrap text-muted-foreground sm:px-3',
-		tableColumnVariants({ align, width, showFrom, numeric }),
+		variant === 'group' && 'h-auto py-3 align-middle text-sm whitespace-normal',
+		tableColumnVariants({ align, width, showFrom, hideFrom, numeric }),
 		className
 	)}
 	{...restProps}

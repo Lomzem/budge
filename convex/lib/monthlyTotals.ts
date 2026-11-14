@@ -2,13 +2,13 @@ import { addMonths, monthOf } from '../../src/lib/domain/dates';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
-type Counted = Pick<
+export type Counted = Pick<
 	Doc<'transactions'>,
 	'accountId' | 'date' | 'amount' | 'categoryId' | 'transferTransactionId' | 'split'
 >;
 type Key = Pick<Doc<'monthlyTotals'>, 'month' | 'accountId' | 'bucket'>;
 
-function keyOf(transaction: Counted): Key {
+export function keyOf(transaction: Counted): Key {
 	return {
 		month: monthOf(transaction.date),
 		accountId: transaction.accountId,
@@ -32,23 +32,40 @@ export function lineCounted(
 }
 
 export async function countTransaction(ctx: MutationCtx, transaction: Counted, sign: 1 | -1) {
-	if (transaction.split === true) return;
-	const key = keyOf(transaction);
-	const delta = sign * transaction.amount;
-	const row = await ctx.db
-		.query('monthlyTotals')
-		.withIndex('by_month_account_bucket', (q) =>
-			q.eq('month', key.month).eq('accountId', key.accountId).eq('bucket', key.bucket)
-		)
-		.unique();
-	const amount = (row?.amount ?? 0) + delta;
-	const count = (row?.count ?? 0) + sign;
-	if (row === null) {
-		if (count > 0) await ctx.db.insert('monthlyTotals', { ...key, amount, count });
-	} else if (count <= 0) {
-		await ctx.db.delete('monthlyTotals', row._id);
-	} else {
-		await ctx.db.patch('monthlyTotals', row._id, { amount, count });
+	await countTransactions(ctx, [transaction], sign);
+}
+
+export async function countTransactions(
+	ctx: MutationCtx,
+	transactions: readonly Counted[],
+	sign: 1 | -1
+) {
+	const changes = new Map<string, Key & { amount: number; count: number }>();
+	for (const transaction of transactions) {
+		if (transaction.split === true) continue;
+		const key = keyOf(transaction);
+		const id = `${key.month}|${key.accountId}|${key.bucket}`;
+		const change = changes.get(id) ?? { ...key, amount: 0, count: 0 };
+		change.amount += sign * transaction.amount;
+		change.count += sign;
+		changes.set(id, change);
+	}
+	for (const { amount: delta, count: counted, ...key } of changes.values()) {
+		const row = await ctx.db
+			.query('monthlyTotals')
+			.withIndex('by_month_account_bucket', (q) =>
+				q.eq('month', key.month).eq('accountId', key.accountId).eq('bucket', key.bucket)
+			)
+			.unique();
+		const amount = (row?.amount ?? 0) + delta;
+		const count = (row?.count ?? 0) + counted;
+		if (row === null) {
+			if (count > 0) await ctx.db.insert('monthlyTotals', { ...key, amount, count });
+		} else if (count <= 0) {
+			await ctx.db.delete('monthlyTotals', row._id);
+		} else {
+			await ctx.db.patch('monthlyTotals', row._id, { amount, count });
+		}
 	}
 }
 

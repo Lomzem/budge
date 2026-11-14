@@ -1,0 +1,10 @@
+# settings/later-move with confirm and Undo at 320 px and 390 px (bun run app verify, worktree app, dev server)
+# t04-later-move-phone (first try, page.goto('/settings') at each width): steps 1-6 passed; journey failed its layout-shift guard:
+#   /settings moved by 0.0000: <span> Categories Categories [228.0,614.0,69.0,20.0 -> 231.5,614.0,62.0,20.0]
+#   Repeated twice (r1, r2). Diagnosis (diag-fast.ts): ~115 ms after a full load at 390 px the dev server's
+#   re-fetched Atkinson font arrives inside font-display: optional's block period, so the bold tab labels
+#   switch from 'Atkinson Fallback' metrics (Budget 46 px) to Atkinson (41 px) and the centered labels move.
+#   Dev-server only: the font is requested again on every load (no immutable cache), unlike the built app.
+# Journey now reaches Settings by tapping the tab bar, as a phone user does (no full reload):
+t04-later-move-phone-a: passed
+t04-later-move-phone-b: passed

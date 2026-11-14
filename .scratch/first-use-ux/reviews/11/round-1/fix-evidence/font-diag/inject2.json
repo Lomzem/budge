@@ -1,0 +1,278 @@
+[
+ {
+  "run": 0,
+  "shifts": 0,
+  "fcp": [
+   "first-paint@1516",
+   "first-contentful-paint@1516"
+  ],
+  "fontRes": [
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 1409,
+    "end": 2918,
+    "init": "link"
+   }
+  ],
+  "platform": {
+   "Categories": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 4
+    }
+   ],
+   "Budget": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 6
+    }
+   ],
+   "h1": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 4
+    }
+   ]
+  },
+  "log": [
+   {
+    "t": 1412,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 1412,
+    "kind": "add LINK",
+    "attrs": "rel,href,type",
+    "font": false
+   },
+   {
+    "t": 1412,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 1412,
+    "kind": "add LINK",
+    "attrs": "rel,href,as,type,crossorigin",
+    "font": false
+   },
+   {
+    "t": 1412,
+    "kind": "add STYLE",
+    "attrs": "",
+    "font": true
+   },
+   {
+    "t": 1415,
+    "kind": "add STYLE",
+    "attrs": "data-sveltekit",
+    "font": false
+   },
+   {
+    "t": 1417,
+    "kind": "dcl",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|unloaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 1419,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 1500,
+    "kind": "first-raf",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 1865,
+    "kind": "add STYLE",
+    "attrs": "type,data-vite-dev-id",
+    "font": false
+   },
+   {
+    "t": 1889,
+    "kind": "remove STYLE",
+    "attrs": "data-sveltekit",
+    "font": false
+   },
+   {
+    "t": 1889,
+    "kind": "add STYLE",
+    "attrs": "id",
+    "font": false
+   },
+   {
+    "t": 2924,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 6150,
+    "kind": "inject"
+   },
+   {
+    "t": 6150,
+    "kind": "add STYLE",
+    "attrs": "",
+    "font": false
+   },
+   {
+    "t": 7154,
+    "kind": "remove injected"
+   },
+   {
+    "t": 7154,
+    "kind": "remove STYLE",
+    "attrs": "",
+    "font": false
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "shifts": 0,
+  "fcp": [
+   "first-paint@676",
+   "first-contentful-paint@676"
+  ],
+  "fontRes": [
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 560,
+    "end": 2067,
+    "init": "link"
+   }
+  ],
+  "platform": {
+   "Categories": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 4
+    }
+   ],
+   "Budget": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 6
+    }
+   ],
+   "h1": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 4
+    }
+   ]
+  },
+  "log": [
+   {
+    "t": 563,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 563,
+    "kind": "add LINK",
+    "attrs": "rel,href,type",
+    "font": false
+   },
+   {
+    "t": 563,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 563,
+    "kind": "add LINK",
+    "attrs": "rel,href,as,type,crossorigin",
+    "font": false
+   },
+   {
+    "t": 563,
+    "kind": "add STYLE",
+    "attrs": "",
+    "font": true
+   },
+   {
+    "t": 566,
+    "kind": "add STYLE",
+    "attrs": "data-sveltekit",
+    "font": false
+   },
+   {
+    "t": 568,
+    "kind": "dcl",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|unloaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 570,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 666,
+    "kind": "first-raf",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 978,
+    "kind": "add STYLE",
+    "attrs": "type,data-vite-dev-id",
+    "font": false
+   },
+   {
+    "t": 1027,
+    "kind": "remove STYLE",
+    "attrs": "data-sveltekit",
+    "font": false
+   },
+   {
+    "t": 1027,
+    "kind": "add STYLE",
+    "attrs": "id",
+    "font": false
+   },
+   {
+    "t": 2071,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 6460,
+    "kind": "inject"
+   },
+   {
+    "t": 6460,
+    "kind": "add STYLE",
+    "attrs": "",
+    "font": false
+   },
+   {
+    "t": 7462,
+    "kind": "remove injected"
+   },
+   {
+    "t": 7462,
+    "kind": "remove STYLE",
+    "attrs": "",
+    "font": false
+   }
+  ]
+ }
+]

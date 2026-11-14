@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 import { formatCents } from '../../src/lib/domain/money';
 import { holdResponseTo } from '../heldResponse';
@@ -32,7 +32,22 @@ async function openHeld(page: Page, bankAccount: string, waiting?: string) {
 	return held;
 }
 
-async function confirmStartingBalance(page: Page, label: string, amount: string) {
+function bankCard(page: Page, name: string) {
+	return page
+		.getByRole('list', { name: 'Bank Connections' })
+		.getByRole('article', { name, exact: true });
+}
+
+function feedOf(page: Page, connection: string, bankAccount: string) {
+	return bankCard(page, connection)
+		.getByRole('list', { name: `Where ${connection} goes` })
+		.getByRole('listitem')
+		.filter({ hasText: `from ${bankAccount}` });
+}
+
+const unconfirmed = 'Starting balance not confirmed';
+
+async function confirmStartingBalance(page: Page, label: string | RegExp, amount: string) {
 	const dialog = page.getByRole('dialog', { name: 'Starting balance' });
 	await expect(dialog.getByRole('button', { name: 'Suggest again' })).toBeEnabled();
 	await dialog.getByLabel(label).fill(amount);
@@ -51,7 +66,7 @@ export const accounts = {
 			const savingsEntry = '9,999.99';
 
 			const before = await step(
-				'save $100 more on Checking, hold the save, and dismiss',
+				'Checking offers its current starting balance; save $100 more, hold the save, and dismiss',
 				async () => {
 					await page.goto('/');
 					await openAccount(page, 'Checking');
@@ -62,6 +77,9 @@ export const accounts = {
 							/^Now /,
 							''
 						) ?? null
+					);
+					await expect(checking.getByLabel('Starting balance')).toHaveValue(
+						(start / 100).toFixed(2)
 					);
 					await checking.getByLabel('Starting balance').fill(typed(start + 10_000));
 					await checking.getByRole('button', { name: 'Confirm' }).click();
@@ -100,15 +118,20 @@ export const accounts = {
 				await expect(savings).toBeHidden();
 			});
 
-			await step("Checking's dialog and balance show the new starting balance", async () => {
-				await openAccount(page, 'Checking');
-				const reopened = await openStartingBalance(page, 'Checking');
-				await expect(reopened.getByTestId('current-starting-balance')).toHaveText(
-					`Now ${formatCents(startAfter)}`
-				);
-				await page.keyboard.press('Escape');
-				await expect(page.getByTestId('account-balance')).toHaveText(balanceAfter);
-			});
+			await step(
+				"Checking's dialog and balance show the new starting balance, and Escape returns focus to Checking's actions",
+				async () => {
+					await openAccount(page, 'Checking');
+					const reopened = await openStartingBalance(page, 'Checking');
+					await expect(reopened.getByTestId('current-starting-balance')).toHaveText(
+						`Now ${formatCents(startAfter)}`
+					);
+					await page.keyboard.press('Escape');
+					await expect(reopened).toBeHidden();
+					await expect(page.getByRole('button', { name: 'Checking actions' })).toBeFocused();
+					await expect(page.getByTestId('account-balance')).toHaveText(balanceAfter);
+				}
+			);
 		}
 	},
 	'start-edit': {
@@ -201,7 +224,7 @@ export const accounts = {
 					await choose.getByLabel('Name').fill('Rewards Card');
 					await choose.getByRole('radio', { name: 'Credit card' }).check();
 					await choose.getByRole('button', { name: 'Import its transactions' }).click();
-					await confirmStartingBalance(page, 'Amount owed on the cutover date', '100.00');
+					await confirmStartingBalance(page, /^Amount owed on /, '100.00');
 					await expect(held).toBeHidden();
 				}
 			);
@@ -258,7 +281,7 @@ export const accounts = {
 				await choose.getByRole('radio', { name: 'Into a new Account' }).check();
 				await choose.getByRole('radio', { name: 'Credit card' }).check();
 				await importIt.click();
-				await confirmStartingBalance(page, 'Amount owed on the cutover date', '0.00');
+				await confirmStartingBalance(page, /^Amount owed on /, '0.00');
 				await expect(held).toBeHidden();
 				await openAccount(page, 'Service Account');
 				await expect(page.getByRole('button', { name: /^SAMPLE SERVICE FEE/ })).toBeVisible();
@@ -281,15 +304,26 @@ export const accounts = {
 				return button;
 			});
 
-			await step('choosing Savings asks the owner to check its kind', async () => {
-				await intoSavings.check();
-				await expect(choose).toContainText(
-					"The bank didn't say what kind of account this is, so make sure it is a cash Account like Savings."
-				);
-				await choose.getByRole('button', { name: 'Import its transactions' }).click();
-				await confirmStartingBalance(page, 'Starting balance', '1,000.00');
-				await expect(held).toBeHidden();
-			});
+			await step(
+				'choosing Savings asks the owner to check its kind, and Escape from its starting balance lands on its Check balance',
+				async () => {
+					await intoSavings.check();
+					await expect(choose).toContainText(
+						"The bank didn't say what kind of account this is, so make sure it is a cash Account like Savings."
+					);
+					await choose.getByRole('button', { name: 'Import its transactions' }).click();
+					const starting = page.getByRole('dialog', { name: 'Starting balance' });
+					await expect(starting.getByRole('button', { name: 'Suggest again' })).toBeEnabled();
+					await page.keyboard.press('Escape');
+					await expect(starting).toBeHidden();
+					await expect(held).toBeHidden();
+					await expect(
+						feedOf(page, 'Sample Credit Union', 'Savings ending 6630').getByRole('button', {
+							name: "Check Savings's starting balance"
+						})
+					).toBeFocused();
+				}
+			);
 
 			await step('Savings lists its row', async () => {
 				await openAccount(page, 'Savings');
@@ -297,11 +331,242 @@ export const accounts = {
 			});
 		}
 	},
+	'setup-check': {
+		title:
+			"a mapped bank Account's starting balance stays unconfirmed until the owner confirms it, and its basis says what is unknown",
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const savings = feedOf(page, 'Sample Community Bank', 'Sample Statement Savings ending 6604');
+			const check = savings.getByRole('button', { name: "Check Savings's starting balance" });
+			const dialog = page.getByRole('dialog', { name: 'Starting balance for Savings' });
+
+			await step(
+				'the Bank card says Savings comes from Sample Statement Savings, its starting balance not confirmed',
+				async () => {
+					await page.goto('/bank');
+					await expect(savings.getByRole('link', { name: 'Savings' })).toBeVisible();
+					await expect(savings).toContainText(unconfirmed);
+				}
+			);
+
+			await step(
+				'its basis names the bank Account and calls what Budge cannot know unknown',
+				async () => {
+					await check.click();
+					await expect(dialog.getByRole('button', { name: 'Suggest again' })).toBeEnabled();
+					await expect(dialog.getByLabel('Starting balance')).toHaveValue('');
+					await expect(dialog.getByLabel('Starting balance')).not.toHaveAttribute('placeholder');
+					await expect(dialog).toHaveAccessibleDescription(
+						/^Budge records it on [A-Z][a-z]{2} 1, \d{4}, the cutover date\. Confirm or correct it\./
+					);
+					await dialog.getByText('What it’s based on').click();
+					await expect(dialog).toContainText(
+						'Sample Statement Savings ending 6604 at Sample Community Bank'
+					);
+					await expect(dialog.getByTestId('bank-balance')).toHaveText(/^Unknown\. /);
+					await expect(dialog.getByTestId('imported-since')).toHaveText('None');
+					await expect(dialog).toContainText('Unknown. Not available to Budge.');
+					await expect(dialog).toContainText("Unknown. The bank doesn't say whether");
+					await expect(dialog).toContainText("A working connection doesn't prove it either.");
+				}
+			);
+
+			await step(
+				'Confirm with the field empty asks, at the field, for the balance the bank showed on the cutover date',
+				async () => {
+					const field = dialog.getByLabel('Starting balance');
+					const asks = /^Enter the balance your bank showed on [A-Z][a-z]{2} 1, \d{4}\.$/;
+					await dialog.getByRole('button', { name: 'Confirm' }).click();
+					await expect(dialog.getByRole('alert').filter({ hasText: asks })).toBeVisible();
+					await expect(field).toBeFocused();
+					await expect(field).toHaveAccessibleDescription(asks);
+				}
+			);
+
+			await step('Cancel leaves it unconfirmed', async () => {
+				await dialog.getByRole('button', { name: 'Cancel' }).click();
+				await expect(dialog).toBeHidden();
+				await expect(check).toBeFocused();
+				await expect(savings).toContainText(unconfirmed);
+			});
+
+			await step(
+				'confirming it clears the problem, after a reload too, and points to categorizing',
+				async () => {
+					await check.click();
+					await confirmStartingBalance(page, 'Starting balance', '1,000.00');
+					const confirmed = page.getByRole('status').filter({ hasText: /^Savings/ });
+					await expect(confirmed).toHaveText(
+						"Savings's starting balance is confirmed. Categorize its Transactions"
+					);
+					await expect(savings).not.toContainText(unconfirmed);
+					await expect(
+						confirmed.getByRole('link', { name: 'Categorize its Transactions' })
+					).toBeFocused();
+					await page.keyboard.press('Enter');
+					await expect(
+						page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
+					).toBeVisible();
+					const filters = page.getByRole('search', { name: 'Search and filter Transactions' });
+					await expect(filters.getByLabel('Account', { exact: true })).toHaveText('Savings');
+					await expect(filters.getByLabel('Category', { exact: true })).toHaveText('Uncategorized');
+					await page.goto('/bank');
+					await expect(savings.getByRole('link', { name: 'Savings' })).toBeVisible();
+					await expect(savings).not.toContainText(unconfirmed);
+					await expect(savings.getByRole('button', { name: /starting balance$/ })).toHaveCount(0);
+				}
+			);
+
+			await step(
+				"Savings' actions offer its confirmed starting balance to keep, and confirming it returns focus to Savings' actions",
+				async () => {
+					await openAccount(page, 'Savings');
+					const again = await openStartingBalance(page, 'Savings');
+					await expect(again.getByLabel('Starting balance')).toHaveValue('1000.00');
+					await again.getByRole('button', { name: 'Confirm' }).click();
+					await expect(again).toBeHidden();
+					await expect(page.getByRole('button', { name: 'Savings actions' })).toBeFocused();
+				}
+			);
+		}
+	},
+	'setup-correct': {
+		title:
+			'a bank Account set up in the wrong Account is moved through Stop syncing and Bring back, confirmed in its new one, and its earlier Transactions are shown still in the old one',
+		fixture: 'bank-sync',
+		run: async (page, { step }) => {
+			const creditUnion = bankCard(page, 'Sample Credit Union');
+			const intoSavings = feedOf(page, 'Sample Credit Union', 'Sample Savings Plus ending 4417');
+
+			await step(
+				'at 390 px, set Sample Savings Plus up into Savings and skip its starting balance: its Check balance takes focus',
+				async () => {
+					await page.setViewportSize({ width: 390, height: 740 });
+					await openHeld(page, 'Sample Savings Plus ending 4417');
+					const choose = page.getByRole('dialog', { name: 'Sample Savings Plus ending 4417' });
+					await choose.getByRole('radio', { name: 'Into Savings' }).check();
+					await choose.getByRole('button', { name: 'Import its transactions' }).click();
+					const starting = page.getByRole('dialog', { name: 'Starting balance' });
+					await expect(starting.getByRole('button', { name: 'Suggest again' })).toBeEnabled();
+					await starting.getByRole('button', { name: 'Skip' }).click();
+					await expect(starting).toBeHidden();
+					await expect(
+						intoSavings.getByRole('button', { name: "Check Savings's starting balance" })
+					).toBeFocused();
+					await page.setViewportSize({ width: 1280, height: 800 });
+				}
+			);
+
+			await step('the card says it goes into Savings, starting balance not confirmed', async () => {
+				await expect(intoSavings.getByRole('link', { name: 'Savings' })).toBeVisible();
+				await expect(intoSavings).toContainText(unconfirmed);
+			});
+
+			await step('stop syncing it into Savings, and bring it back for setup', async () => {
+				await creditUnion.getByRole('button', { name: 'Sample Credit Union actions' }).click();
+				await page
+					.getByRole('menuitem', { name: 'Stop syncing Sample Savings Plus ending 4417' })
+					.click();
+				await expect(intoSavings).toHaveCount(0);
+				await expect(creditUnion.getByRole('status')).toHaveText(
+					'Stopped syncing Sample Savings Plus ending 4417. Its Transactions stay in Savings.'
+				);
+				await creditUnion
+					.getByRole('button', { name: 'Bring back Sample Savings Plus ending 4417' })
+					.click();
+				await expect(creditUnion.getByRole('status')).toHaveText(
+					'Brought back. Set it up to choose where its new transactions go.'
+				);
+				await expect(
+					creditUnion.getByRole('button', { name: 'Set up Sample Savings Plus ending 4417' })
+				).toBeFocused();
+			});
+
+			const plus = feedOf(page, 'Sample Credit Union', 'Sample Savings Plus ending 4417');
+			const stillInSavings =
+				'Its earlier Transactions are still in Savings. Only new ones come to Savings Plus.';
+			const bankNeeds = async () => {
+				const bank = page
+					.getByRole('navigation', { name: /^Sections/ })
+					.getByRole('link', { name: /^Bank\b/ });
+				const counted = /(\d+)\s*need you/.exec((await bank.textContent()) ?? '');
+				return Number(counted?.[1] ?? 0);
+			};
+			const colorOf = (shown: Locator) =>
+				shown.evaluate((element) => getComputedStyle(element).color);
+			let needsBefore = 0;
+
+			await step(
+				'set it up as a new Account and confirm its starting balance: the card and the status say its earlier Transactions are still in Savings, and its link takes focus',
+				async () => {
+					needsBefore = await bankNeeds();
+					await creditUnion
+						.getByRole('button', { name: 'Set up Sample Savings Plus ending 4417' })
+						.click();
+					const choose = page.getByRole('dialog', { name: 'Sample Savings Plus ending 4417' });
+					await choose.getByRole('radio', { name: 'Into a new Account' }).check();
+					await choose.getByLabel('Name').fill('Savings Plus');
+					await choose.getByRole('button', { name: 'Import its transactions' }).click();
+					await confirmStartingBalance(page, 'Starting balance', '500.00');
+					await expect(plus.getByRole('link', { name: 'Savings Plus' })).toBeVisible();
+					await expect(plus).not.toContainText(unconfirmed);
+					await expect(plus).toContainText(stillInSavings);
+					const confirmed = page.getByRole('status').filter({ hasText: /^Savings Plus/ });
+					await expect(confirmed).toHaveText(
+						"Savings Plus's starting balance is confirmed. Its bank Account's earlier Transactions are still in Savings. Open Savings"
+					);
+					await expect(confirmed.getByRole('link', { name: 'Open Savings' })).toBeFocused();
+					await page.reload();
+					await expect(plus).toContainText(stillInSavings);
+				}
+			);
+
+			await step(
+				'once confirmed, the notice reads as information and counts in no "need you" count',
+				async () => {
+					const notice = plus.getByText(/^Its earlier Transactions are still in/);
+					await expect(notice).toBeVisible();
+					expect(await colorOf(notice)).toBe(
+						await colorOf(plus.getByText('from Sample Savings Plus ending 4417'))
+					);
+					await expect.poll(bankNeeds).toBe(needsBefore - 1);
+					await page.goto('/');
+					const needed = needsBefore - 1;
+					await expect(
+						page
+							.getByRole('region', { name: 'Needs you' })
+							.getByRole('link', { name: /^Bank: \d+ things? needs? you$/ })
+					).toHaveAccessibleName(
+						`Bank: ${String(needed)} ${needed === 1 ? 'thing needs' : 'things need'} you`
+					);
+					await page.goto('/bank');
+					await expect(notice).toBeVisible();
+				}
+			);
+
+			await step('its earlier Transactions are in Savings, and not in Savings Plus', async () => {
+				await plus.getByRole('link', { name: 'Savings', exact: true }).click();
+				await expect(
+					page.getByRole('heading', { level: 1, name: 'Savings', exact: true })
+				).toBeVisible();
+				const earlier = [/^SAMPLE INTEREST PAID/, /^SAMPLE TRANSFER IN 5512/];
+				for (const row of earlier) {
+					await expect(page.getByRole('button', { name: row })).toBeVisible();
+				}
+				await openAccount(page, 'Savings Plus');
+				await expect(page.getByRole('button', { name: /^Starting Balance/ })).toBeVisible();
+				for (const row of earlier) {
+					await expect(page.getByRole('button', { name: row })).toHaveCount(0);
+				}
+			});
+		}
+	},
 	'held-ignore': {
 		title: 'an ignored held bank Account leaves the list and stays gone',
 		fixture: 'bank-sync',
 		run: async (page, { step }) => {
-			const held = await step('ignore Sample Holiday Club', async () => {
+			const creditUnion = bankCard(page, 'Sample Credit Union');
+			const held = await step('ignore Sample Holiday Club: its card takes focus', async () => {
 				const button = await openHeld(page, 'Sample Holiday Club ending 1180');
 				const choose = page.getByRole('dialog', { name: 'Sample Holiday Club ending 1180' });
 				await choose.getByRole('radio', { name: 'Nowhere: ignore this bank Account' }).check();
@@ -311,6 +576,7 @@ export const accounts = {
 				await choose.getByRole('button', { name: 'Ignore' }).click();
 				await expect(choose).toBeHidden();
 				await expect(button).toBeHidden();
+				await expect(creditUnion).toBeFocused();
 				return button;
 			});
 

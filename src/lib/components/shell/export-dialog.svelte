@@ -7,6 +7,7 @@
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { localToday } from '$lib/domain/dates';
 	import { downloadCsv, downloadJson, fetchExport, type BudgetExport } from '$lib/export';
+	import { mainRegion } from '$lib/focusReturn';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
@@ -54,7 +55,7 @@
 />
 
 <Dialog.Root bind:open={() => open, setOpen} onOpenChange={() => (error = '')}>
-	<Dialog.Content>
+	<Dialog.Content returnFocus={{ fallback: mainRegion }}>
 		<Dialog.Header>
 			<Dialog.Title>Export</Dialog.Title>
 			<Dialog.Description>

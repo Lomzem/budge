@@ -1,0 +1,18 @@
+run after-1 exit 1
+   transactions/select-categorize failed the journey took longer than 120 s.
+   plaid/sync-waiting passed 
+run after-2 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 
+run after-3 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 
+run after-4 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 
+run after-5 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 
+run after-6 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 

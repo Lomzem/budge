@@ -1,0 +1,1 @@
+export const BULK_CATEGORIZE_LIMIT = 250;

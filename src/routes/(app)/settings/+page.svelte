@@ -18,6 +18,7 @@
 	const theme = getTheme();
 	const clerk = useClerkContext();
 	const settings = useQuery(api.settings.get, {});
+	const lastMoveForCutoverRow = useQuery(api.settings.lastMove, {});
 	const installed = new MediaQuery('(display-mode: standalone)');
 	let exportOpen = $state(false);
 	let homeScreenOpen = $state(false);
@@ -35,7 +36,7 @@
 
 <div class="flex max-w-2xl flex-col gap-6">
 	<h1 class="text-2xl font-bold tracking-tight">Settings</h1>
-	{#if settings.data === undefined && settings.error === undefined}
+	{#if (settings.data === undefined && settings.error === undefined) || (lastMoveForCutoverRow.data === undefined && lastMoveForCutoverRow.error === undefined)}
 		<p role="status" class="text-muted-foreground">Loading…</p>
 	{:else}
 		<div class="flex flex-col divide-y rounded-lg border bg-card">

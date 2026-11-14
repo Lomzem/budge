@@ -7,6 +7,7 @@ import {
 import { v, type Infer } from 'convex/values';
 
 import { BANK_CHANGE_LIMIT } from '../src/lib/domain/bankChanges';
+import { BULK_CATEGORIZE_LIMIT } from '../src/lib/domain/bulkCategorize';
 import { UNAPPROVED_COUNT_LIMIT } from '../src/lib/domain/unapproved';
 
 import type { Doc, Id } from './_generated/dataModel';
@@ -16,6 +17,8 @@ import { publicError } from './lib/publicError';
 import { requireIsoDate } from './lib/settings';
 import { toRow } from './lib/transactionRows';
 import {
+	categorizeTransaction,
+	type CategoryChoice,
 	deleteTransaction,
 	markApproved,
 	markCleared,
@@ -33,7 +36,9 @@ const transactionRow = v.object({
 	accountName: v.string(),
 	date: v.string(),
 	amount: v.number(),
+	payeeId: v.union(v.id('payees'), v.null()),
 	payeeName: v.union(v.string(), v.null()),
+	rememberedCategoryId: v.union(v.id('categories'), v.null()),
 	startingBalance: v.boolean(),
 	categoryId: v.union(v.id('categories'), v.null()),
 
@@ -398,25 +403,158 @@ const transactionInput = {
 
 	transferAccountId: v.optional(v.id('accounts')),
 
-	transferTransactionId: v.optional(v.id('transactions'))
+	transferTransactionId: v.optional(v.id('transactions')),
+
+	rememberCategory: v.optional(v.boolean())
 };
 
 export const create = mutation({
 	args: transactionInput,
 	returns: v.id('transactions'),
-	handler: async (ctx, input) => {
+	handler: async (ctx, { rememberCategory = false, ...input }) => {
 		await requireOwner(ctx);
-		return await saveTransaction(ctx, null, input);
+		return await saveTransaction(ctx, null, input, { rememberCategory });
 	}
 });
 
 export const update = mutation({
 	args: { transactionId: v.id('transactions'), ...transactionInput },
 	returns: v.null(),
-	handler: async (ctx, { transactionId, ...input }) => {
+	handler: async (ctx, { transactionId, rememberCategory = false, ...input }) => {
 		await requireOwner(ctx);
-		await saveTransaction(ctx, await requireTransaction(ctx, transactionId), input);
+		await saveTransaction(ctx, await requireTransaction(ctx, transactionId), input, {
+			rememberCategory
+		});
 		return null;
+	}
+});
+
+export const categorize = mutation({
+	args: {
+		transactionId: v.id('transactions'),
+		choice: v.union(
+			v.object({ kind: v.literal('uncategorized') }),
+			v.object({
+				kind: v.literal('category'),
+				categoryId: v.id('categories'),
+				remember: v.optional(v.boolean())
+			}),
+			v.object({ kind: v.literal('transfer'), accountId: v.id('accounts') })
+		)
+	},
+	returns: v.null(),
+	handler: async (ctx, { transactionId, choice }) => {
+		await requireOwner(ctx);
+		await categorizeTransaction(ctx, await requireTransaction(ctx, transactionId), choice);
+		return null;
+	}
+});
+
+const bulkCategorized = v.object({
+	categoryId: v.union(v.id('categories'), v.null()),
+	changes: v.array(
+		v.object({
+			transactionId: v.id('transactions'),
+			previousCategoryId: v.union(v.id('categories'), v.null()),
+			approvedNow: v.boolean()
+		})
+	)
+});
+
+function requireBulkSize(count: number) {
+	if (count > BULK_CATEGORIZE_LIMIT) {
+		throw publicError(
+			'INVALID_INPUT',
+			`Pick at most ${String(BULK_CATEGORIZE_LIMIT)} Transactions at once.`
+		);
+	}
+}
+
+function choiceOf(categoryId: Id<'categories'> | null): CategoryChoice {
+	return categoryId === null ? { kind: 'uncategorized' } : { kind: 'category', categoryId };
+}
+
+export const categorizeMany = mutation({
+	args: {
+		transactionIds: v.array(v.id('transactions')),
+		categoryId: v.union(v.id('categories'), v.null()),
+		approve: v.boolean()
+	},
+	returns: bulkCategorized,
+	handler: async (ctx, { transactionIds, categoryId, approve }) => {
+		await requireOwner(ctx);
+		requireBulkSize(transactionIds.length);
+		const chosen: Doc<'transactions'>[] = [];
+		for (const transactionId of new Set(transactionIds)) {
+			const transaction = await requireTransaction(ctx, transactionId);
+			if (transaction.split === true || transaction.transferTransactionId !== undefined) {
+				throw publicError(
+					'INVALID_INPUT',
+					'Splits and Transfers keep their Categories. Leave them out and try again.'
+				);
+			}
+			chosen.push(transaction);
+		}
+		const changes: Infer<typeof bulkCategorized>['changes'] = [];
+		for (const transaction of chosen) {
+			const previousCategoryId = transaction.categoryId ?? null;
+			if (previousCategoryId !== categoryId) {
+				await categorizeTransaction(ctx, transaction, choiceOf(categoryId));
+			}
+			const approvedNow = approve && transaction.approved === false;
+			if (approvedNow) await markApproved(ctx, transaction._id);
+			if (previousCategoryId !== categoryId || approvedNow) {
+				changes.push({ transactionId: transaction._id, previousCategoryId, approvedNow });
+			}
+		}
+		return { categoryId, changes };
+	}
+});
+
+type BulkChange = Infer<typeof bulkCategorized>['changes'][number];
+
+async function undoOne(
+	ctx: MutationCtx,
+	categoryId: Id<'categories'> | null,
+	{ transactionId, previousCategoryId, approvedNow }: BulkChange,
+	exists: (id: Id<'categories'> | null) => Promise<boolean>
+): Promise<'restored' | 'kept' | 'untouched'> {
+	const transaction = await ctx.db.get('transactions', transactionId);
+	if (transaction === null) return 'untouched';
+	const keepsBulkCategory =
+		transaction.split !== true &&
+		transaction.transferTransactionId === undefined &&
+		(transaction.categoryId ?? null) === categoryId &&
+		previousCategoryId !== categoryId;
+	const keepsBulkApproval =
+		approvedNow && transaction.approved !== false && transaction.cleared !== 'reconciled';
+	const categoryGone = keepsBulkCategory && !(await exists(previousCategoryId));
+	if (keepsBulkCategory && !categoryGone) {
+		await categorizeTransaction(ctx, transaction, choiceOf(previousCategoryId));
+	}
+	if (keepsBulkApproval) await markUnapproved(ctx, transactionId);
+	if (categoryGone) return 'kept';
+	return keepsBulkCategory || keepsBulkApproval ? 'restored' : 'untouched';
+}
+
+export const undoCategorizeMany = mutation({
+	args: bulkCategorized.fields,
+	returns: v.object({ restored: v.number(), kept: v.number() }),
+	handler: async (ctx, { categoryId, changes }) => {
+		await requireOwner(ctx);
+		requireBulkSize(changes.length);
+		const stillExists = new Map<Id<'categories'>, boolean>();
+		const exists = async (id: Id<'categories'> | null) => {
+			if (id === null) return true;
+			const known = stillExists.get(id);
+			if (known !== undefined) return known;
+			const found = (await ctx.db.get('categories', id)) !== null;
+			stillExists.set(id, found);
+			return found;
+		};
+		const outcome = { restored: 0, kept: 0, untouched: 0 };
+		for (const change of changes) outcome[await undoOne(ctx, categoryId, change, exists)] += 1;
+		return { restored: outcome.restored, kept: outcome.kept };
 	}
 });
 

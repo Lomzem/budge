@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import { localToday } from '../../src/lib/domain/dates';
-import { centsIn, choose, openAccount, type Journey } from './journey';
+import { centsIn, choose, chooseBankFile, openAccount, type Journey } from './journey';
 
 const balance = (page: Page) => () => centsIn(page.getByTestId('account-balance'));
 
@@ -14,11 +14,7 @@ async function importRow(page: Page, bankText: string, type: 'Debit' | 'Credit')
 	await page.getByRole('button', { name: 'Import file' }).click();
 	const dialog = page.getByRole('dialog', { name: 'Import a bank file' });
 	await expect(dialog.getByLabel('Account')).not.toHaveText('Pick an Account');
-	await dialog.getByLabel('File').setInputFiles({
-		name: 'bank.csv',
-		mimeType: 'text/csv',
-		buffer: Buffer.from(csv)
-	});
+	await chooseBankFile(page, 'bank.csv', csv);
 	await expect(dialog.getByRole('status')).toHaveText(/^1 new Transaction/);
 	await dialog.getByRole('button', { name: /^Import \d+ rows?$/ }).click();
 	await expect(dialog).toBeHidden();
@@ -95,10 +91,13 @@ export const transfers = {
 			});
 
 			await step(
-				"making Checking's import a Transfer offers to link the Savings import",
+				"making Checking's import a Transfer from its row opens it with that Transfer and offers to link the Savings import",
 				async () => {
-					await page.getByRole('button', { name: /^SAMPLE E2E XFER OUT/ }).click();
-					await choose(dialog.getByLabel('Category or Transfer'), 'Transfer: Savings');
+					await choose(
+						page.getByRole('button', { name: /Category of SAMPLE E2E XFER OUT on / }),
+						'Transfer: Savings'
+					);
+					await expect(dialog.getByLabel('Category or Transfer')).toHaveText('Transfer: Savings');
 					await expect(
 						dialog.getByRole('radio', { name: /^Link the import SAMPLE E2E XFER IN/ })
 					).toBeChecked();

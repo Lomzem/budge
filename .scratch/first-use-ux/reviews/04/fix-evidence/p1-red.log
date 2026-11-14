@@ -1,0 +1,97 @@
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} vitest run convex/settings.test.ts
+
+ RUN  v5.0.5 /home/lomzem/proj/budge
+
+(node:72111) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ |convex| convex/settings.test.ts (34 tests | 6 failed) 451ms
+   ❯ applying a confirmed later cutover date (14)
+     × will not undo the move over its amount since, which Undo would overwrite, and changes nothing 19ms
+     × will not undo the move over its Category and memo since, which Undo would overwrite, and changes nothing 18ms
+     × will not undo the move over its Payee since, which Undo would overwrite, and changes nothing 21ms
+     × will not undo the move over its Cleared state since, which Undo would overwrite, and changes nothing 16ms
+     × will not undo the move over its approval since, which Undo would overwrite, and changes nothing 17ms
+     × will not undo the move over its deletion since, which Undo would overwrite, and changes nothing 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |convex| convex/settings.test.ts > applying a confirmed later cutover date > will not undo the move over its amount since, which Undo would overwrite, and changes nothing
+AssertionError: expected 'Checking\'s Starting Balance changed …' to match /Checking's Starting Balance changed s…/
+
+- Expected:
+/Checking's Starting Balance changed since the move \(its amount\)/
+
++ Received:
+"Checking's Starting Balance changed since, so the move can't be undone."
+
+ ❯ convex/settings.test.ts:956:6
+    954|      moved.owner.mutation(api.settings.undoLaterCutover, { moveId: mov…
+    955|     )
+    956|    ).toMatch(message);
+       |      ^
+    957|
+    958|    expect(await persisted(moved.t)).toEqual(edited);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  |convex| convex/settings.test.ts > applying a confirmed later cutover date > will not undo the move over its Category and memo since, which Undo would overwrite, and changes nothing
+ FAIL  |convex| convex/settings.test.ts > applying a confirmed later cutover date > will not undo the move over its Cleared state since, which Undo would overwrite, and changes nothing
+ FAIL  |convex| convex/settings.test.ts > applying a confirmed later cutover date > will not undo the move over its approval since, which Undo would overwrite, and changes nothing
+TypeError: .toMatch() expects to receive a string, but got undefined
+ ❯ convex/settings.test.ts:956:6
+    954|      moved.owner.mutation(api.settings.undoLaterCutover, { moveId: mov…
+    955|     )
+    956|    ).toMatch(message);
+       |      ^
+    957|
+    958|    expect(await persisted(moved.t)).toEqual(edited);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  |convex| convex/settings.test.ts > applying a confirmed later cutover date > will not undo the move over its Payee since, which Undo would overwrite, and changes nothing
+ConvexError: {"code":"INVALID_INPUT","message":"A starting balance has no Payee. Record a Transaction with that Payee instead."}
+ ❯ publicError convex/lib/publicError.ts:6:9
+      4|
+      5| export function publicError(code: PublicErrorCode, message?: string): …
+      6|  return new ConvexError(message === undefined ? { code } : { code, mes…
+       |         ^
+      7| }
+      8|
+ ❯ requireStartingBalanceEditable convex/lib/transactions.ts:183:35
+ ❯ saveTransaction convex/lib/transactions.ts:193:3
+ ❯ handler convex/transactions.ts:418:9
+ ❯ invokeFunction node_modules/convex/src/server/impl/registration_impl.ts:90:14
+ ❯ invokeMutation node_modules/convex/src/server/impl/registration_impl.ts:70:18
+ ❯ runMutationWithHandler node_modules/convex-test/dist/index.js:2266:31
+ ❯ Object.mutationFromPath node_modules/convex-test/dist/index.js:2409:32
+ ❯ mutation node_modules/convex-test/dist/index.js:2457:20
+ ❯ convex/settings.test.ts:949:4
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  |convex| convex/settings.test.ts > applying a confirmed later cutover date > will not undo the move over its deletion since, which Undo would overwrite, and changes nothing
+AssertionError: expected 'Checking\'s Starting Balance changed …' to match /Checking's Starting Balance was delet…/
+
+- Expected:
+/Checking's Starting Balance was deleted since the move/
+
++ Received:
+"Checking's Starting Balance changed since, so the move can't be undone."
+
+ ❯ convex/settings.test.ts:956:6
+    954|      moved.owner.mutation(api.settings.undoLaterCutover, { moveId: mov…
+    955|     )
+    956|    ).toMatch(message);
+       |      ^
+    957|
+    958|    expect(await persisted(moved.t)).toEqual(edited);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 28 passed (34)
+   Start at  13:01:56
+   Duration  983ms (tests 50%, import 28%, transform 16%, environment 5%)
+
+error: script "test" exited with code 1

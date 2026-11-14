@@ -166,7 +166,7 @@ export default defineConfig(
 						},
 						{
 							regex: '(^|/)monthlyTotals(\\.[cm]?[jt]s)?$',
-							importNames: ['countTransaction', 'rebuildTotals'],
+							importNames: ['countTransaction', 'countTransactions', 'rebuildTotals'],
 							message:
 								'Call an operation in convex/lib/transactions.ts; it keeps the monthly totals whole.'
 						}

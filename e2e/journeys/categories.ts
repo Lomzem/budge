@@ -1,7 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 
 import { holdResponseTo } from '../heldResponse';
-import { choicesOf, choose, openBudget, type Journey } from './journey';
+import {
+	choicesOf,
+	choose,
+	expectNothingPastTheRightEdge,
+	openBudget,
+	type Journey
+} from './journey';
 
 async function act(page: Page, name: string, action: string) {
 	const trigger = page.getByRole('button', {
@@ -75,10 +81,7 @@ export const categories = {
 				await expect(
 					page.getByRole('button', { name: 'Smoke Test Renamed (hidden) actions' })
 				).toBeVisible();
-				const scrollWidthAtTheNarrowestWidth = await page.evaluate(
-					() => document.documentElement.scrollWidth
-				);
-				expect(scrollWidthAtTheNarrowestWidth).toBeLessThanOrEqual(320);
+				await expectNothingPastTheRightEdge(page);
 			});
 
 			await step('delete the Category into Groceries, then its empty group', async () => {

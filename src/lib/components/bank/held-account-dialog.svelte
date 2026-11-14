@@ -13,6 +13,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+	import type { FocusReturn } from '$lib/focusReturn';
 
 	import { labelOf, waitingNote } from './held';
 
@@ -30,9 +31,13 @@
 	}
 
 	let {
-		onsettled
+		onsettled,
+		onconfirmed,
+		returnFocus
 	}: {
 		onsettled: (connectionAccountId: Id<'connectionAccounts'>, outcome: string) => void;
+		onconfirmed: (account: MappedAccount) => void;
+		returnFocus: FocusReturn;
 	} = $props();
 
 	const client = useConvexClient();
@@ -162,7 +167,7 @@
 		if (!isOpen) dialog.dismiss();
 	}}
 >
-	<Dialog.Content>
+	<Dialog.Content {returnFocus}>
 		{#if dialog.current !== null}
 			{@const session = dialog.current}
 			{#key session}
@@ -170,8 +175,10 @@
 					<StartingBalanceStep
 						account={session.mapped}
 						skippable
-						onDone={() => {
+						onDone={(confirmed) => {
+							const account = session.mapped;
 							dialog.close(session);
+							if (confirmed && account !== null) onconfirmed(account);
 						}}
 					/>
 				{:else}

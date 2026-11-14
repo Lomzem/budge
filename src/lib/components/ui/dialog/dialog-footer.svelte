@@ -23,7 +23,7 @@
 	bind:this={ref}
 	data-slot="dialog-footer"
 	class={cn(
-		'sticky -bottom-5 z-10 -mx-5 -mb-5 flex flex-col gap-2 rounded-b-xl border-t bg-muted px-5 py-4 sm:-bottom-6 sm:-mx-6 sm:-mb-6 sm:flex-row sm:items-center sm:gap-4 sm:px-6',
+		'sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-col gap-2 rounded-b-xl border-t bg-muted px-5 py-4 sm:-mx-6 sm:-mb-6 sm:flex-row sm:items-center sm:gap-4 sm:px-6',
 		className
 	)}
 	{...restProps}

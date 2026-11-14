@@ -2,6 +2,13 @@ import { v } from 'convex/values';
 
 import { mutation, query } from './_generated/server';
 import { ensureReadyToAssign } from './lib/categories';
+import {
+	applyLaterCutover as apply,
+	lastCutoverMove,
+	laterCutoverPreview,
+	previewLaterCutover as preview,
+	undoLaterCutover as undo
+} from './lib/laterCutover';
 import { readCutoverDate, requireIsoDate } from './lib/settings';
 import { requireOwner } from './lib/owner';
 import { publicError } from './lib/publicError';
@@ -29,6 +36,62 @@ export const setCutoverDate = mutation({
 		await ensureReadyToAssign(ctx);
 		if (settings === null) await ctx.db.insert('settings', { cutoverDate });
 		else await ctx.db.patch('settings', settings._id, { cutoverDate });
+		return null;
+	}
+});
+
+export const previewLaterCutover = query({
+	args: { cutoverDate: v.string(), today: v.string() },
+	returns: laterCutoverPreview,
+	handler: async (ctx, { cutoverDate, today }) => {
+		await requireOwner(ctx);
+		requireIsoDate(cutoverDate);
+		requireIsoDate(today);
+		return await preview(ctx, cutoverDate, today);
+	}
+});
+
+export const applyLaterCutover = mutation({
+	args: {
+		cutoverDate: v.string(),
+		today: v.string(),
+		fingerprint: v.string(),
+		unlockReconciled: v.boolean()
+	},
+	returns: v.id('cutoverMoves'),
+	handler: async (ctx, { cutoverDate, today, fingerprint, unlockReconciled }) => {
+		await requireOwner(ctx);
+		requireIsoDate(cutoverDate);
+		requireIsoDate(today);
+		return await apply(ctx, { to: cutoverDate, today, fingerprint, unlockReconciled });
+	}
+});
+
+export const lastMove = query({
+	args: {},
+	returns: v.union(
+		v.object({
+			moveId: v.id('cutoverMoves'),
+			from: v.string(),
+			to: v.string(),
+			movedAt: v.number()
+		}),
+		v.null()
+	),
+	handler: async (ctx) => {
+		await requireOwner(ctx);
+		const move = await lastCutoverMove(ctx);
+		if (move === null) return null;
+		return { moveId: move._id, from: move.from, to: move.to, movedAt: move._creationTime };
+	}
+});
+
+export const undoLaterCutover = mutation({
+	args: { moveId: v.id('cutoverMoves') },
+	returns: v.null(),
+	handler: async (ctx, { moveId }) => {
+		await requireOwner(ctx);
+		await undo(ctx, moveId);
 		return null;
 	}
 });

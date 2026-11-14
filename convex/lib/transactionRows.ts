@@ -1,5 +1,6 @@
 import type { Doc, Id } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
+import { lastCategoryOf } from './payees';
 import { bankRowsIn, payeeNameOf, splitLinesOf } from './transactions';
 
 export async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
@@ -9,13 +10,20 @@ export async function toRow(ctx: QueryCtx, transaction: Doc<'transactions'>) {
 		transaction.categoryId === undefined
 			? null
 			: await ctx.db.get('categories', transaction.categoryId);
+	const payee =
+		transaction.payeeId === undefined ? null : await ctx.db.get('payees', transaction.payeeId);
 	return {
 		_id: transaction._id,
 		accountId: transaction.accountId,
 		accountName: account?.name ?? '',
 		date: transaction.date,
 		amount: transaction.amount,
-		payeeName: await payeeNameOf(ctx, transaction),
+		payeeId: transaction.payeeId ?? null,
+		payeeName: await payeeNameOf(ctx, transaction, () => Promise.resolve(payee)),
+		rememberedCategoryId:
+			payee === null || transaction.kind === 'startingBalance'
+				? null
+				: ((await lastCategoryOf(ctx, payee)) ?? null),
 		startingBalance: transaction.kind === 'startingBalance',
 		categoryId: transaction.categoryId ?? null,
 		categoryName: category?.name ?? null,

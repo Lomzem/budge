@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog';
+	import { mainRegion } from '$lib/focusReturn';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
@@ -48,7 +49,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content>
+	<Dialog.Content returnFocus={{ fallback: mainRegion }}>
 		<Dialog.Header>
 			<Dialog.Title>{platform === 'computer' ? 'Install Budge' : 'Add to Home Screen'}</Dialog.Title
 			>

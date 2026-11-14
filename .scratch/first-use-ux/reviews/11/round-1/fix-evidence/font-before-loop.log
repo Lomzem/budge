@@ -1,0 +1,18 @@
+run before-01 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 
+run before-02 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 
+run before-03 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 
+run before-04 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 
+run before-05 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 
+run before-06 exit 0
+   transactions/select-categorize passed 
+   plaid/sync-waiting passed 

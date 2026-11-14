@@ -62,7 +62,7 @@ export const reconciliation = {
 			);
 
 			await step(
-				"opening it shows the lock; its amount can't be edited until an Unlock is confirmed",
+				"opening it shows the lock; its amount can't be edited until an Unlock is confirmed, which keeps focus in the Transaction",
 				async () => {
 					await adjustment.getByRole('button', { name: /^Reconciliation Adjustment/ }).click();
 					await expect(dialog.getByLabel('Amount')).toBeDisabled();
@@ -75,6 +75,7 @@ export const reconciliation = {
 					await confirm.getByRole('button', { name: 'Unlock' }).click();
 					await expect(dialog.getByLabel('Amount')).toBeEnabled();
 					await expect(dialog.getByRole('status').filter({ hasText: /^Unlocked/ })).toBeVisible();
+					await expect(dialog.and(page.locator(':focus-within'))).toBeVisible();
 					await page.keyboard.press('Escape');
 					await expect(dialog).toBeHidden();
 					await expect(adjustment.getByRole('checkbox', { name: /^Cleared/ })).toBeChecked();

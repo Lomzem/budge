@@ -1,0 +1,105 @@
+// usage: node diag-fonts.mjs <path> <width> <runs> <cpuRate> <outJson>
+import { chromium } from '@playwright/test';
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const [path, width, runs, rate, out] = process.argv.slice(2);
+const appUrl = JSON.parse(readFileSync('.local-app/running.json', 'utf8')).appUrl;
+const browser = await chromium.launch();
+const results = [];
+for (let i = 0; i < Number(runs); i++) {
+	const context = await browser.newContext({
+		baseURL: appUrl,
+		storageState: '.local-app/storage-state.json',
+		viewport: { width: Number(width), height: Number(width) < 640 ? 740 : 800 },
+		timezoneId: 'America/Los_Angeles'
+	});
+	const page = await context.newPage();
+	const delay = Number(process.env.FONT_DELAY_MS ?? 0);
+	const later = Number(process.env.LATER_FONT_DELAY_MS ?? 0);
+	let fontRequests = 0;
+	if (later > 0)
+		await page.route(/\.woff2/, async (route) => {
+			fontRequests += 1;
+			if (fontRequests > 1) await new Promise((r) => setTimeout(r, later));
+			await route.continue();
+		});
+	if (delay > 0)
+		await page.route(/\.woff2/, async (route) => {
+			await new Promise((r) => setTimeout(r, delay));
+			await route.continue();
+		}, { times: 1 });
+	const cdp = await context.newCDPSession(page);
+	if (Number(rate) > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(rate) });
+	await page.addInitScript(() => {
+		const log = (window.__diag = []);
+		const t = () => Math.round(performance.now());
+		new PerformanceObserver((list) => {
+			for (const e of list.getEntries())
+				log.push({
+					t: Math.round(e.startTime),
+					kind: 'shift',
+					value: e.value,
+					input: e.hadRecentInput,
+					sources: (e.sources || []).map((s) => ({
+						node: s.node instanceof Element ? s.node.outerHTML.slice(0, 80) : String(s.node?.textContent ?? s.node?.nodeName).slice(0, 40),
+						from: [s.previousRect.x, s.previousRect.width].map(Math.round),
+						to: [s.currentRect.x, s.currentRect.width].map(Math.round)
+					}))
+				});
+		}).observe({ type: 'layout-shift', buffered: true });
+		const faces = () =>
+			[...document.fonts].map((f) => `${f.family}|${f.unicodeRange.slice(0, 12)}|${f.status}`).join(' ; ');
+		for (const type of ['loading', 'loadingdone', 'loadingerror'])
+			document.fonts.addEventListener(type, () => log.push({ t: t(), kind: type, faces: faces() }));
+		new MutationObserver((records) => {
+			for (const r of records) {
+				for (const n of r.addedNodes)
+					if (n.nodeName === 'STYLE' || n.nodeName === 'LINK')
+						log.push({ t: t(), kind: 'add ' + n.nodeName, attrs: n.getAttributeNames().join(','), font: n.textContent?.includes('@font-face') ?? false });
+				for (const n of r.removedNodes)
+					if (n.nodeName === 'STYLE' || n.nodeName === 'LINK')
+						log.push({ t: t(), kind: 'remove ' + n.nodeName, attrs: n.getAttributeNames?.().join(','), font: n.textContent?.includes('@font-face') ?? false });
+			}
+		}).observe(document, { childList: true, subtree: true });
+		addEventListener('DOMContentLoaded', () => log.push({ t: t(), kind: 'dcl', faces: faces() }));
+		requestAnimationFrame(() => log.push({ t: t(), kind: 'first-raf', faces: faces() }));
+	});
+	await page.goto(path);
+	await page.getByRole('heading', { level: 1 }).first().waitFor();
+	await page.waitForTimeout(3000);
+	if (process.env.INJECT) {
+		await page.evaluate((css) => {
+			window.__diag.push({ t: Math.round(performance.now()), kind: 'inject' });
+			const style = document.createElement('style');
+			style.textContent = css;
+			document.head.append(style);
+		}, process.env.INJECT);
+		await page.waitForTimeout(1000);
+		await page.evaluate(() => {
+			window.__diag.push({ t: Math.round(performance.now()), kind: 'remove injected' });
+			document.head.lastElementChild.remove();
+		});
+		await page.waitForTimeout(1000);
+	}
+	const log = await page.evaluate(() => window.__diag);
+	const fontRes = await page.evaluate(() =>
+		performance.getEntriesByType('resource').filter((r) => r.name.includes('woff2')).map((r) => ({ name: r.name.split('/').pop(), start: Math.round(r.startTime), end: Math.round(r.responseEnd), init: r.initiatorType }))
+	);
+	const fcp = await page.evaluate(() => performance.getEntriesByType('paint').map((p) => `${p.name}@${Math.round(p.startTime)}`));
+	await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+	const doc = await cdp.send('DOM.getDocument', { depth: -1 });
+	const platform = {};
+	for (const label of ['Categories', 'Budget']) {
+		const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: doc.root.nodeId, selector: `nav[aria-label="Sections"] li:nth-child(${label === 'Budget' ? 1 : 3}) span.grid > span:last-child` }).catch(() => ({ nodeId: 0 }));
+		if (nodeId) {
+			platform[label] = (await cdp.send('CSS.getPlatformFontsForNode', { nodeId })).fonts;
+		}
+	}
+	const h1 = await cdp.send('DOM.querySelector', { nodeId: doc.root.nodeId, selector: 'h1' });
+	platform.h1 = h1.nodeId ? (await cdp.send('CSS.getPlatformFontsForNode', { nodeId: h1.nodeId })).fonts : null;
+	results.push({ run: i, shifts: log.filter((e) => e.kind === 'shift' && !e.input).length, fcp, fontRes, platform, log });
+	console.log(`run ${i}: shifts=${log.filter((e) => e.kind === 'shift').length} fcp=${fcp} fonts=${JSON.stringify(fontRes)} platform=${JSON.stringify(platform)}`);
+	await context.close();
+}
+writeFileSync(out, JSON.stringify(results, null, 1));
+await browser.close();

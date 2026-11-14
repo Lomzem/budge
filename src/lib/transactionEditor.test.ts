@@ -19,6 +19,7 @@ import {
 	optionOf,
 	recallQuery,
 	removeLine,
+	rowTransferAccounts,
 	type Saved,
 	view,
 	type World
@@ -77,6 +78,7 @@ function savedRow(changes: Partial<Saved> = {}): Saved {
 		date: '2026-10-30',
 		amount: -1250,
 		payeeName: 'Corner Market',
+		startingBalance: false,
 		memo: null,
 		categoryId: null,
 		categoryName: null,
@@ -91,7 +93,7 @@ function payloadOf(draft: Draft, world: World, candidates = noCandidates) {
 	return view(draft, world, candidates).payload;
 }
 
-describe('recalling the Payee’s last Category', () => {
+describe('recalling the Payee’s Remembered Category', () => {
 	const typed = newDraft({ payee: '  Corner Market ', amount: '12.50' });
 
 	test('asks about the trimmed Payee only while nothing was picked', () => {
@@ -133,7 +135,7 @@ describe('recalling the Payee’s last Category', () => {
 		{
 			failure: 'the lookup fails',
 			changes: { payeeMemory: failed },
-			message: "Budge couldn't look up this Payee's last Category. Pick one to save."
+			message: "Budge couldn't look up this Payee's remembered Category. Pick one to save."
 		},
 		{
 			failure: 'the Categories fail to load',
@@ -483,6 +485,18 @@ describe('transferring between Accounts', () => {
 			field: { kind: 'category' }
 		});
 	});
+
+	test.each([
+		{ row: 'a Checking outflow', from: checking, amount: -4000, offered: [savings, visa] },
+		{ row: 'a Checking inflow', from: checking, amount: 4000, offered: [savings] },
+		{ row: 'a card payment received', from: visa, amount: 4000, offered: [checking, savings] },
+		{ row: 'a card charge', from: visa, amount: -4000, offered: [] }
+	])(
+		'$row offers in place only the Transfers that keep its amount',
+		({ from, amount, offered }) => {
+			expect(rowTransferAccounts({ accountId: from._id, amount }, accounts)).toEqual(offered);
+		}
+	);
 
 	describe('linking the other side of an import', () => {
 		const imported = savedRow({ bankRows: [{}], payeeName: 'Transfer to savings' });

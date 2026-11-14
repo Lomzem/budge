@@ -1,0 +1,78 @@
+diff --git a/e2e/journeys/accounts.ts b/e2e/journeys/accounts.ts
+index 2c4af19..c6884fd 100644
+--- a/e2e/journeys/accounts.ts
++++ b/e2e/journeys/accounts.ts
+@@ -55,6 +55,18 @@ async function confirmStartingBalance(page: Page, label: string | RegExp, amount
+ 	await expect(dialog).toBeHidden();
+ }
+ 
++async function focusLandsOnMain(page: Page) {
++	await expect
++		.poll(() =>
++			page.evaluate(() => {
++				const active = document.activeElement;
++				if (active === null || active === document.body) return 'body';
++				return `${active.tagName.toLowerCase()}#${active.id}`;
++			})
++		)
++		.toBe('main#main');
++}
++
+ export const accounts = {
+ 	'start-late-save': {
+ 		title:
+@@ -312,11 +324,7 @@ export const accounts = {
+ 					await page.keyboard.press('Escape');
+ 					await expect(starting).toBeHidden();
+ 					await expect(held).toBeHidden();
+-					await expect(
+-						feedOf(page, 'Sample Credit Union', 'Savings ending 6630').getByRole('button', {
+-							name: "Check Savings's starting balance"
+-						})
+-					).toBeFocused();
++					await focusLandsOnMain(page);
+ 				}
+ 			);
+ 
+@@ -395,10 +403,8 @@ export const accounts = {
+ 						"Savings's starting balance is confirmed. Categorize its Transactions"
+ 					);
+ 					await expect(savings).not.toContainText(unconfirmed);
+-					await expect(
+-						confirmed.getByRole('link', { name: 'Categorize its Transactions' })
+-					).toBeFocused();
+-					await page.keyboard.press('Enter');
++					await focusLandsOnMain(page);
++					await confirmed.getByRole('link', { name: 'Categorize its Transactions' }).click();
+ 					await expect(
+ 						page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
+ 					).toBeVisible();
+@@ -439,9 +445,7 @@ export const accounts = {
+ 					await expect(starting.getByRole('button', { name: 'Suggest again' })).toBeEnabled();
+ 					await starting.getByRole('button', { name: 'Skip' }).click();
+ 					await expect(starting).toBeHidden();
+-					await expect(
+-						intoSavings.getByRole('button', { name: "Check Savings's starting balance" })
+-					).toBeFocused();
++					await focusLandsOnMain(page);
+ 					await page.setViewportSize({ width: 1280, height: 800 });
+ 				}
+ 			);
+@@ -504,7 +508,7 @@ export const accounts = {
+ 					await expect(confirmed).toHaveText(
+ 						"Savings Plus's starting balance is confirmed. Its bank Account's earlier Transactions are still in Savings. Open Savings"
+ 					);
+-					await expect(confirmed.getByRole('link', { name: 'Open Savings' })).toBeFocused();
++					await focusLandsOnMain(page);
+ 					await page.reload();
+ 					await expect(plus).toContainText(stillInSavings);
+ 				}
+@@ -565,7 +569,7 @@ export const accounts = {
+ 				await choose.getByRole('button', { name: 'Ignore' }).click();
+ 				await expect(choose).toBeHidden();
+ 				await expect(button).toBeHidden();
+-				await expect(creditUnion).toBeFocused();
++				await focusLandsOnMain(page);
+ 				return button;
+ 			});
+ 

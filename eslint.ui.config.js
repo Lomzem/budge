@@ -31,7 +31,7 @@ export default defineConfig(
 				{
 					selector: "SvelteElement[kind='html'][name.name='select']",
 					message:
-						'Use SelectField from $lib/components/select-field.svelte, built on the shadcn-svelte Select, instead of a native <select>.'
+						'Use SelectField from $lib/components/select-field.svelte (the shadcn-svelte Select), or CategoryPicker from $lib/components/category-picker.svelte for a Category, instead of a native <select>.'
 				},
 				...[
 					...["SvelteAttribute[key.name='class']", "CallExpression[callee.name='cn']"].flatMap(

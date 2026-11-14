@@ -16,6 +16,7 @@
 	import type { BankFile } from '$lib/domain/bankFiles';
 	import { formatDate } from '$lib/domain/dates';
 	import { formatCents } from '$lib/domain/money';
+	import { mainRegion } from '$lib/focusReturn';
 	import { readBankFile } from '$lib/import';
 	import { readPublicError } from '$lib/publicError';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
@@ -46,7 +47,16 @@
 	const saving = $derived(dialog.pending('save'));
 
 	const account = $derived(accounts.find(accountId));
+	const settingsLoaded = $derived(settings.data !== undefined);
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? null);
+	let fileFieldAwaitsSettings = $state(false);
+	let fileField = $state<HTMLInputElement | null>(null);
+
+	$effect(() => {
+		if (!settingsLoaded || !fileFieldAwaitsSettings || fileField === null) return;
+		fileFieldAwaitsSettings = false;
+		fileField.focus();
+	});
 
 	const preview = useQuery(
 		api.imports.preview,
@@ -81,6 +91,7 @@
 		file = undefined;
 		picks = [];
 		error = '';
+		fileFieldAwaitsSettings = false;
 	}
 
 	async function choose(event: Event & { currentTarget: HTMLInputElement }) {
@@ -88,11 +99,7 @@
 		file = undefined;
 		picks = [];
 		error = '';
-		if (chosen === undefined) return;
-		if (cutoverDate === null) {
-			error = 'Set the cutover date before importing.';
-			return;
-		}
+		if (chosen === undefined || cutoverDate === null) return;
 		const opened = await dialog.run('read', () => readBankFile(chosen, cutoverDate));
 		if (!opened.ok) error = "Budge couldn't read this file.";
 		else if (opened.value.ok) file = opened.value.file;
@@ -139,12 +146,19 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content
+		returnFocus={{ fallback: mainRegion }}
 		size="wide"
 		onOpenAutoFocus={(event: Event) => {
 			if (defaultAccountId === undefined) return;
+			if (!settingsLoaded) {
+				fileFieldAwaitsSettings = true;
+				return;
+			}
 			event.preventDefault();
-			document.getElementById('import-file')?.focus();
+			fileField?.focus();
 		}}
+		onkeydown={() => (fileFieldAwaitsSettings = false)}
+		onpointerdown={() => (fileFieldAwaitsSettings = false)}
 	>
 		<Dialog.Header>
 			<Dialog.Title>Import a bank file</Dialog.Title>
@@ -171,9 +185,13 @@
 					id="import-file"
 					type="file"
 					accept=".csv,.qfx,.ofx,text/csv"
+					bind:ref={fileField}
 					onchange={choose}
-					disabled={reading || saving}
+					disabled={!settingsLoaded || cutoverDate === null || reading || saving}
 				/>
+				{#if settingsLoaded && cutoverDate === null}
+					<p role="alert" class="text-destructive">Set the cutover date before importing.</p>
+				{/if}
 			</div>
 
 			{#if reading}

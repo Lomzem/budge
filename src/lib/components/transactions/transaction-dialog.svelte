@@ -11,6 +11,8 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import CategoryPicker from '$lib/components/category-picker.svelte';
+	import OptInChoice from '$lib/components/opt-in-choice.svelte';
 	import type { Choices } from '$lib/components/choices';
 	import SelectField from '$lib/components/select-field.svelte';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
@@ -18,6 +20,9 @@
 	import { formatCents } from '$lib/domain/money';
 	import { SPLIT_LINE_LIMIT } from '$lib/domain/splits';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+	import type { FocusReturn } from '$lib/focusReturn';
+
+	import { categoryChoices, labelOf, rememberCopy, transferChoices } from './categoryChoices';
 	import {
 		addLine,
 		choose,
@@ -28,13 +33,13 @@
 		followSaved,
 		linkQuery,
 		lookupOf,
+		memoryQuery,
 		NEW_SIDE,
 		openDraft,
 		optionOf,
-		recallQuery,
+		type Remembering,
 		removeLine,
 		savedCategoryOf,
-		unlisted,
 		view,
 		type World
 	} from '$lib/transactionEditor';
@@ -44,6 +49,7 @@
 	let {
 		open = $bindable(false),
 		transaction,
+		preset,
 		defaultAccountId,
 		returnFocus,
 		ondone,
@@ -52,9 +58,10 @@
 		open?: boolean;
 
 		transaction?: Row | undefined;
+		preset?: string | undefined;
 		defaultAccountId?: Id<'accounts'> | undefined;
 
-		returnFocus?: () => HTMLElement | undefined;
+		returnFocus: FocusReturn;
 
 		ondone?: (message: string) => void;
 
@@ -94,12 +101,18 @@
 
 	const locked = $derived(transaction?.reconciled === true && !unlocked);
 	const startingBalance = $derived(transaction?.startingBalance === true);
-	const flagged = $derived(transaction?.bankRows.filter((row) => row.state !== 'linked') ?? []);
+	let bankChangeAsActedOn = untrack(() => transaction);
+	const bankChangeShown = $derived.by(() => {
+		if (saving || !open) return bankChangeAsActedOn;
+		bankChangeAsActedOn = transaction;
+		return transaction;
+	});
+	const flagged = $derived(bankChangeShown?.bankRows.filter((row) => row.state !== 'linked') ?? []);
 	let bankChange: HTMLElement | null = $state(null);
 
 	const payeeMemory = useQuery(
 		api.payees.lastCategory,
-		() => (open ? recallQuery(draft) : undefined) ?? 'skip'
+		() => (open ? memoryQuery(draft) : undefined) ?? 'skip'
 	);
 	const world: World = $derived({
 		saved: transaction,
@@ -136,6 +149,7 @@
 		unlocked = false;
 		draft = freshDraft();
 		pristine = JSON.stringify(draft);
+		if (preset !== undefined) draft = choose(draft, preset, world);
 	}
 
 	function changed() {
@@ -195,54 +209,18 @@
 		if (added) document.getElementById(`split-category-${String(added.key)}`)?.focus();
 	}
 
-	function categoryChoices(savedId: string | undefined, savedName: string | undefined): Choices {
-		const data = categories.data;
-		const saved = savedId !== undefined && (!data || unlisted(data, savedId));
-		return [
-			...(saved ? [{ value: savedId, label: savedName ?? '' }] : []),
-			...(data?.readyToAssignId ? [{ value: data.readyToAssignId, label: 'Ready to Assign' }] : []),
-			...(data?.groups ?? []).map((group) => ({
-				group: group.name,
-				choices: group.categories.map((category) => ({ value: category._id, label: category.name }))
-			}))
-		];
-	}
-
 	function selectionChoices(): Choices {
-		const { selection, transferAccounts } = shown;
-		const looking = selection.kind === 'recalling' || selection.kind === 'recallFailed';
+		const { transferAccounts } = shown;
 		return [
-			...(looking
-				? [
-						{
-							value: optionOf(selection),
-							label:
-								selection.kind === 'recalling'
-									? 'Looking up the last Category…'
-									: 'Pick a Category',
-							disabled: true
-						}
-					]
-				: []),
 			{ value: optionOf({ kind: 'uncategorized' }), label: 'Uncategorized' },
 			...(startingBalance
 				? []
 				: [{ value: optionOf({ kind: 'split' }), label: 'Split across Categories' }]),
 			...categoryChoices(
-				transaction?.categoryId ?? undefined,
-				transaction?.categoryName ?? undefined
+				categories.data,
+				savedCategoryOf(transaction, transaction?.categoryId ?? '')
 			),
-			...(transferAccounts.length > 0 && !startingBalance
-				? [
-						{
-							group: 'Transfer to or from',
-							choices: transferAccounts.map((account) => ({
-								value: optionOf({ kind: 'transfer', accountId: account._id }),
-								label: `Transfer: ${account.name}`
-							}))
-						}
-					]
-				: [])
+			...(startingBalance ? [] : transferChoices(transferAccounts))
 		];
 	}
 
@@ -334,11 +312,11 @@
 		);
 	}
 
-	function focusAfterConfirm(event: Event) {
-		if (open) return;
-		event.preventDefault();
-		returnFocus?.()?.focus();
-	}
+	const confirmFocus: FocusReturn = {
+		opener: (opened) => (open ? opened : (returnFocus.opener?.(null) ?? null)),
+		continuation: () => (open ? undefined : returnFocus.continuation?.()),
+		fallback: () => returnFocus.fallback()
+	};
 
 	async function deleteTransaction() {
 		if (!transaction) return;
@@ -355,6 +333,19 @@
 	}
 </script>
 
+{#snippet remembering(offer: Remembering)}
+	{@const choices = selectionChoices()}
+	{#if offer.already}
+		<p class="text-sm text-muted-foreground">
+			{labelOf(choices, optionOf(shown.selection)) ?? 'This Category'} is remembered for {offer.payee}’s
+			later imports.
+		</p>
+	{:else}
+		{@const copy = rememberCopy(choices, offer.payee, offer.remembered)}
+		<OptInChoice bind:checked={draft.remember} label={copy.label} hint={copy.hint} />
+	{/if}
+{/snippet}
+
 {#snippet splitLines()}
 	<fieldset class="flex flex-col gap-3 rounded-lg border border-border p-3">
 		<legend class="px-1 text-sm font-medium">Split lines</legend>
@@ -366,13 +357,13 @@
 					<div class="flex flex-wrap items-end gap-2">
 						<div class="flex min-w-40 flex-1 flex-col gap-1">
 							<Label for={`split-category-${String(line.key)}`}>Line {number} Category</Label>
-							<SelectField
+							<CategoryPicker
 								id={`split-category-${String(line.key)}`}
 								required
 								bind:value={line.categoryId}
 								{...marked(`split-category-${String(line.key)}`)}
 								placeholder="Pick a Category"
-								choices={categoryChoices(saved?.id, saved?.name)}
+								choices={categoryChoices(categories.data, saved)}
 							/>
 						</div>
 						<div class="flex w-28 flex-col gap-1">
@@ -458,12 +449,7 @@
 			event.preventDefault();
 			document.getElementById('transaction-payee')?.focus();
 		}}
-		onCloseAutoFocus={(event: Event) => {
-			const target = returnFocus?.();
-			if (target === undefined) return;
-			event.preventDefault();
-			target.focus();
-		}}
+		{returnFocus}
 	>
 		<Dialog.Header>
 			<Dialog.Title>{transaction ? 'Edit Transaction' : 'Add Transaction'}</Dialog.Title>
@@ -491,12 +477,12 @@
 										>
 										on {formatDate(bankRow.date)}.
 									</p>
-									{#if transaction}
+									{#if bankChangeShown}
 										<p>
 											You have <strong class="tabular-nums"
-												>{formatCents(transaction.amount)}</strong
+												>{formatCents(bankChangeShown.amount)}</strong
 											>
-											on {formatDate(transaction.date)}.
+											on {formatDate(bankChangeShown.date)}.
 										</p>
 									{/if}
 								</div>
@@ -627,8 +613,9 @@
 				<Label for="transaction-category"
 					>{startingBalance ? 'Category' : 'Category or Transfer'}</Label
 				>
-				<SelectField
+				<CategoryPicker
 					id="transaction-category"
+					searchLabel={startingBalance ? 'Search Categories' : 'Search Categories and Transfers'}
 					bind:value={
 						() => optionOf(shown.selection),
 						(option: string) => {
@@ -636,10 +623,16 @@
 						}
 					}
 					{...marked('transaction-category')}
+					placeholder={shown.selection.kind === 'recalling'
+						? 'Looking up the remembered Category…'
+						: 'Pick a Category'}
 					choices={selectionChoices()}
 				/>
 				{#if shown.selection.kind === 'recallFailed'}
 					<p class="text-sm text-destructive" role="alert">{shown.selection.message}</p>
+				{/if}
+				{#if shown.remembering}
+					{@render remembering(shown.remembering)}
 				{/if}
 				{#if shown.selection.kind === 'split'}
 					{@render splitLines()}
@@ -736,7 +729,7 @@
 </Dialog.Root>
 
 <AlertDialog.Root bind:open={confirmDelete}>
-	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
+	<AlertDialog.Content returnFocus={confirmFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>
 				{transaction?.transfer ? 'Delete this Transfer?' : 'Delete this Transaction?'}
@@ -765,7 +758,7 @@
 		if (!next) confirmBankRemoval = null;
 	}}
 >
-	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
+	<AlertDialog.Content returnFocus={confirmFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>
 				{transaction?.transfer ? 'Delete this Transfer too?' : 'Delete this Transaction too?'}
@@ -793,7 +786,7 @@
 </AlertDialog.Root>
 
 <AlertDialog.Root bind:open={confirmUnlock}>
-	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
+	<AlertDialog.Content returnFocus={confirmFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>Unlock this Transaction?</AlertDialog.Title>
 			<AlertDialog.Description>
@@ -809,7 +802,7 @@
 </AlertDialog.Root>
 
 <AlertDialog.Root bind:open={confirmDiscard}>
-	<AlertDialog.Content onCloseAutoFocus={focusAfterConfirm}>
+	<AlertDialog.Content returnFocus={confirmFocus}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>Discard your changes?</AlertDialog.Title>
 			<AlertDialog.Description>

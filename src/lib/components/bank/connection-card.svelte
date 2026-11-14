@@ -1,8 +1,10 @@
 <script lang="ts">
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
@@ -11,15 +13,19 @@
 	import { resolve } from '$app/paths';
 	import type { Id } from '$convex/_generated/dataModel';
 	import {
+		feedNeedsYou,
 		getBankConnections,
 		type BankConnection,
+		type Feed,
 		type HeldAccount,
 		type Report
 	} from '$lib/bankConnections.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
+	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { formatAgo } from '$lib/domain/freshness';
+	import { mainRegion } from '$lib/focusReturn';
 
 	import { labelOf, rowsOf } from './held';
 
@@ -27,18 +33,45 @@
 		connection,
 		outcomes,
 		onsetup,
+		oncheck,
 		onremoved
 	}: {
 		connection: BankConnection;
 		outcomes: ReadonlyMap<Id<'connectionAccounts'>, string>;
 		onsetup: (account: HeldAccount) => void;
+		oncheck: (accountId: Id<'accounts'>) => void;
 		onremoved: (connectionId: Id<'bankConnections'>, report: string) => void;
 	} = $props();
 
 	const bank = getBankConnections();
 	const syncing = $derived(bank.syncing.has(connection._id));
 	const reconnecting = $derived(bank.linking === connection._id);
+	let generation = 0;
+	let running: 'Syncing…' | 'Reconnecting…' | null = $state(null);
 	let result: Report | null = $state(null);
+	let missed: string[] = $state([]);
+	let detailsOpen = $state(false);
+
+	async function run(
+		operation: string,
+		shownWhileRunning: typeof running,
+		work: () => Promise<Report | null>
+	): Promise<boolean> {
+		const mine = ++generation;
+		missed = [];
+		detailsOpen = false;
+		running = shownWhileRunning;
+		result = null;
+		const report = await work();
+		if (mine === generation) {
+			running = null;
+			result = report;
+			return true;
+		}
+		const failure = report?.failed ? `${operation} failed: ${report.text}` : null;
+		if (failure !== null && !missed.includes(failure)) missed.push(failure);
+		return false;
+	}
 
 	const withoutCode = (message: string) => message.replace(/ \([A-Z_]+\)(?=\.?$)/, '');
 
@@ -46,12 +79,14 @@
 	const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
 	const problems = $derived.by((): { tone: 'warn' | 'bad'; text: string }[] => {
+		const late = missed.map((text) => ({ tone: 'bad' as const, text }));
 		if (!connection.bankLogin) {
 			return [
 				{
 					tone: 'warn',
 					text: 'A sample connection with no bank login, so it can’t sync or reconnect.'
-				}
+				},
+				...late
 			];
 		}
 		const found: { tone: 'warn' | 'bad'; text: string }[] = [];
@@ -80,22 +115,24 @@
 		if (connection.overdue) {
 			found.push({ tone: 'warn', text: 'Has missed its daily sync. Try Sync now.' });
 		}
-		return found;
+		return [...found, ...late];
 	});
+	const feedsNeedYou = $derived(connection.feeds.some(feedNeedsYou));
 	const synced = $derived(
 		connection.lastSyncedAt === null
 			? 'Never synced.'
 			: `Last successful sync ${formatAgo(connection.lastSyncedAt, bank.now)}.`
 	);
-	const pending = $derived.by(() => {
+	const shown = $derived.by(() => {
+		if (running !== null || result !== null) return running;
 		if (syncing) return 'Syncing…';
-		if (reconnecting) return 'Reconnecting…';
-		return null;
+		return reconnecting ? 'Reconnecting…' : null;
 	});
+	const aside = $derived.by(() => (result?.failed ? synced : undefined));
 	const slotText = $derived.by(() => {
-		if (pending !== null) return pending;
+		if (shown !== null) return shown;
 		if (result === null) return synced;
-		return result.failed ? `${result.text} ${synced}` : result.text;
+		return aside === undefined ? result.text : `${result.text} ${aside}`;
 	});
 	const reconnectBlocked = $derived(!connection.bankLogin || bank.linking !== null || syncing);
 	const paused = $derived(connection.bankLogin && connection.status === 'needsAttention');
@@ -125,6 +162,7 @@
 	}
 	let seen: Seen[] = $state([]);
 	const held = $derived(bank.heldFrom(connection._id));
+	const nothingNeedsYou = $derived(problems.length === 0 && !feedsNeedYou && held.length === 0);
 
 	$effect(() => {
 		const known = untrack(() => seen);
@@ -160,19 +198,16 @@
 	let restoring = $state<Id<'connectionAccounts'> | null>(null);
 	let menuButton: HTMLButtonElement | null = $state(null);
 
-	async function stopSyncing(feed: BankConnection['feeds'][number]) {
-		result = null;
-		result = await bank.stopSyncing(feed.connectionAccountId, feed.name);
+	async function stopSyncing(feed: Feed) {
+		await run('Stop syncing', null, () => bank.stopSyncing(feed));
 	}
 
 	async function restore(connectionAccountId: Id<'connectionAccounts'>) {
 		if (restoring !== null) return;
 		restoring = connectionAccountId;
-		result = null;
-		const report = await bank.restore(connectionAccountId);
+		const owned = await run('Bring back', null, () => bank.restore(connectionAccountId));
 		restoring = null;
-		result = report;
-		if (report.failed) return;
+		if (!owned || result?.failed !== false) return;
 		await tick();
 		document.querySelector<HTMLElement>(`[data-setup="${connectionAccountId}"]`)?.focus();
 	}
@@ -180,27 +215,34 @@
 	async function remove() {
 		if (removing) return;
 		removing = true;
-		const report = await bank.remove(connection._id);
+		let removed = null as Report | null;
+		await run('Remove connection', null, async () => {
+			const report = await bank.remove(connection._id);
+			if (report.failed) return report;
+			removed = report;
+			return null;
+		});
 		removing = false;
 		confirmRemove = false;
-		if (report.failed) result = report;
-		else onremoved(connection._id, `${connection.name}: ${report.text}`);
+		if (removed !== null) onremoved(connection._id, `${connection.name}: ${removed.text}`);
 	}
 
 	async function sync() {
 		if (paused && !reconnecting) {
-			result = { failed: true, text: 'Reconnect first. The bank paused syncing until you do.' };
+			const refusal = {
+				failed: true,
+				text: 'Reconnect first. The bank paused syncing until you do.'
+			};
+			await run('Sync now', null, () => Promise.resolve(refusal));
 			return;
 		}
 		if (syncBlocked) return;
-		result = null;
-		result = await bank.sync(connection._id);
+		await run('Sync now', 'Syncing…', () => bank.sync(connection._id));
 	}
 
 	async function reconnect() {
 		if (reconnectBlocked) return;
-		result = null;
-		result = await bank.reconnect(connection._id);
+		await run('Reconnect', 'Reconnecting…', () => bank.reconnect(connection._id));
 	}
 </script>
 
@@ -236,7 +278,7 @@
 				<DropdownMenu.Content align="end">
 					{#each connection.feeds as feed (feed.connectionAccountId)}
 						<DropdownMenu.Item onSelect={() => void stopSyncing(feed)}>
-							Stop syncing {feed.name}
+							Stop syncing {labelOf({ name: feed.bankName, mask: feed.mask })}
 						</DropdownMenu.Item>
 					{/each}
 					{#if connection.feeds.length > 0}
@@ -249,22 +291,77 @@
 			</DropdownMenu.Root>
 		</div>
 		<div class="flex flex-col gap-1 sm:pl-13">
-			<p class="text-sm break-words text-muted-foreground">
-				{#if connection.feeds.length === 0}
+			{#if connection.feeds.length === 0}
+				<p class="text-sm break-words text-muted-foreground">
 					Feeds no Budge Account yet.{paused && held.length === 0
 						? ' Reconnect to see its accounts and choose where they go.'
 						: ''}
-				{:else}
-					Feeds
-					{#each connection.feeds as feed, index (feed.accountId)}
-						<a
-							href={resolve('/(app)/accounts/[accountId]', { accountId: feed.accountId })}
-							class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
-							>{feed.name}</a
-						>{index < connection.feeds.length - 1 ? ', ' : '.'}
+				</p>
+			{:else}
+				<ul aria-label="Where {connection.name} goes" class="flex flex-col gap-2">
+					{#each connection.feeds as feed (feed.connectionAccountId)}
+						<li class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+							<div class="flex min-w-0 flex-1 basis-48 flex-col text-sm">
+								<span class="break-words text-muted-foreground">
+									<a
+										href={resolve('/(app)/accounts/[accountId]', { accountId: feed.accountId })}
+										class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
+										>{feed.name}</a
+									>
+									from {labelOf({ name: feed.bankName, mask: feed.mask })}
+								</span>
+								{#if !feed.startingBalanceConfirmed}
+									<span class="flex items-start gap-1.5 font-medium text-warning">
+										<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+										<span class="min-w-0">Starting balance not confirmed</span>
+									</span>
+								{/if}
+								{#if feed.historyIn !== null}
+									<span
+										class={[
+											'flex items-start gap-1.5',
+											feed.startingBalanceConfirmed
+												? 'text-muted-foreground'
+												: 'font-medium text-warning'
+										]}
+									>
+										{#if feed.startingBalanceConfirmed}
+											<InfoIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+										{:else}
+											<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+										{/if}
+										<span class="min-w-0 break-words">
+											Its earlier Transactions are still in
+											<a
+												href={resolve('/(app)/accounts/[accountId]', {
+													accountId: feed.historyIn.accountId
+												})}
+												class={[
+													'underline underline-offset-4 hover:no-underline',
+													feed.startingBalanceConfirmed && 'font-medium text-foreground'
+												]}>{feed.historyIn.name}</a
+											>. Only new ones come to {feed.name}.
+										</span>
+									</span>
+								{/if}
+							</div>
+							{#if !feed.startingBalanceConfirmed}
+								<Button
+									variant="outline"
+									size="sm"
+									data-check={feed.connectionAccountId}
+									aria-label="Check {feed.name}'s starting balance"
+									onclick={() => {
+										oncheck(feed.accountId);
+									}}
+								>
+									Check balance
+								</Button>
+							{/if}
+						</li>
 					{/each}
-				{/if}
-			</p>
+				</ul>
+			{/if}
 			{#if problems.length > 0}
 				<ul id="problems-{connection._id}" class="flex flex-col gap-1">
 					{#each problems as problem (problem.text)}
@@ -287,39 +384,64 @@
 			{/if}
 		</div>
 		<div
-			class="flex flex-col gap-x-4 gap-y-3 sm:flex-row sm:items-start sm:justify-between sm:pl-13"
+			class="flex flex-col gap-x-4 gap-y-3 sm:pl-13 xl:flex-row xl:items-start xl:justify-between"
 		>
-			<div title={slotText} class="h-10 min-w-0 sm:h-12 sm:flex-1 sm:pt-2">
-				<p
-					class={[
-						'flex min-w-0 items-start gap-1.5 text-sm break-words',
-						pending === null && result?.failed ? 'text-destructive' : 'text-muted-foreground'
-					]}
-				>
-					{#if pending !== null}
-						<RefreshCwIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 animate-spin" />
-						<span class="line-clamp-2 min-w-0">{pending}</span>
-					{:else if result !== null}
-						{#if result.failed}
-							<TriangleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-						{:else}
-							<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
-						{/if}
-						<span class="line-clamp-2 min-w-0"
-							>{result.text}
-							{#if result.failed}<span class="text-muted-foreground">{synced}</span>{/if}</span
+			<div class="min-w-0 xl:flex-1">
+				<Collapsible.Root bind:open={detailsOpen}>
+					<div title={slotText} class="h-18 min-w-0 sm:h-12 xl:h-14 xl:pt-2">
+						<p
+							class={[
+								'flex min-w-0 items-start gap-1.5 text-sm break-words',
+								shown === null && result?.failed ? 'text-destructive' : 'text-muted-foreground'
+							]}
 						>
-					{:else}
-						{#if problems.length === 0}
-							<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
-						{:else}
-							<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-						{/if}
-						<span class="line-clamp-2 min-w-0">{synced}</span>
+							{#if shown !== null}
+								<RefreshCwIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 animate-spin" />
+								<span class="line-clamp-3 min-w-0 sm:line-clamp-2">{shown}</span>
+							{:else if result !== null}
+								{#if result.failed}
+									<TriangleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+								{:else if nothingNeedsYou}
+									<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
+								{:else}
+									<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+								{/if}
+								<span
+									class={[
+										'line-clamp-3 min-w-0 sm:line-clamp-2',
+										result.detail !== undefined && 'pointer-coarse:-my-2.5 pointer-coarse:py-2.5'
+									]}
+									><span>{result.text}</span>
+									{#if aside !== undefined}<span class="text-muted-foreground">{aside}</span>{/if}
+									{#if result.detail !== undefined}<Collapsible.Trigger>
+											{#snippet child({ props })}<Button variant="link" size="xs" {...props}
+													>Details<ChevronDownIcon
+														aria-hidden="true"
+														class={['transition-transform', detailsOpen && 'rotate-180']}
+													/></Button
+												>{/snippet}
+										</Collapsible.Trigger>{/if}</span
+								>
+							{:else}
+								{#if nothingNeedsYou}
+									<CircleCheckIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-funded" />
+								{:else}
+									<ClockIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+								{/if}
+								<span class="line-clamp-3 min-w-0 sm:line-clamp-2">{synced}</span>
+							{/if}
+						</p>
+					</div>
+					{#if result?.detail !== undefined}
+						<Collapsible.Content>
+							<p class="pt-1 pl-5.5 text-sm break-words text-muted-foreground">{result.detail}</p>
+						</Collapsible.Content>
 					{/if}
-				</p>
+				</Collapsible.Root>
 			</div>
-			<span role="status" class="sr-only">{result?.text ?? ''}</span>
+			<span role="status" class="sr-only"
+				>{[result?.text, result?.detail].filter(Boolean).join(' ')}</span
+			>
 			<div class="grid grid-cols-2 gap-2 sm:flex">
 				<div class="grid sm:w-36">
 					<Button
@@ -404,8 +526,8 @@
 		>
 			<h4 id="ignored-{connection._id}" class="font-bold">Ignored bank Accounts</h4>
 			<p class="pb-1 text-sm text-muted-foreground">
-				Budge skips their transactions. Bring one back to set it up; it picks up new transactions
-				from the next sync.
+				Budge skips their transactions. Bring one back and set it up to choose where its new
+				transactions go, from the next sync. The ones it already brought in stay where they are.
 			</p>
 			<ul class="flex flex-col divide-y">
 				{#each connection.ignored as ignored (ignored.connectionAccountId)}
@@ -437,12 +559,7 @@
 </article>
 
 <AlertDialog.Root bind:open={confirmRemove}>
-	<AlertDialog.Content
-		onCloseAutoFocus={(event: Event) => {
-			event.preventDefault();
-			menuButton?.focus();
-		}}
-	>
+	<AlertDialog.Content returnFocus={{ continuation: () => menuButton, fallback: mainRegion }}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>Remove {connection.name}?</AlertDialog.Title>
 			<AlertDialog.Description>

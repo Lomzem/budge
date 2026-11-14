@@ -1,0 +1,3733 @@
+$ bun e2e/run-local.ts
+e2e-local: copying /home/lomzem/proj/budge-focus-fix into /tmp/budge-e2e-r8TJPR
+e2e-local: bindings: {"cloud":35243,"site":35244,"preview":41085}
+✔ Successfully set CLERK_JWT_ISSUER_DOMAIN
+✔ Successfully set BUDGE_OWNER_SUBJECT
+e2e-local: target: local-anonymous (anonymous-agent, http://127.0.0.1:35243)
+[WebServer] $ vite build
+[WebServer] [PLUGIN_TIMINGS] JavaScript callbacks ran for 7.4s. The build took 5.6s. Callbacks such as `closeBundle` run after the build ends, so callback time can be more than build time.
+[WebServer] The slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+[WebServer]   - plugin vite-plugin-sveltekit-compile writeBundle (60%, 3.4s, 1 call)
+[WebServer]   - plugin vite-plugin-sveltekit-compile closeBundle (33%, 1.8s, 1 call)
+[WebServer]   - plugin vite-plugin-svelte:compile transform (19%, 1.1s, 416 calls)
+[WebServer] Additional callback time came from the callbacks below and from callbacks under 1s.
+[WebServer] 2 callbacks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:
+[WebServer]   - plugin vite-plugin-sveltekit-guard resolveId (4326 calls)
+[WebServer]   - plugin vite:asset load (2 calls)
+[WebServer] See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.
+[WebServer] 
+[WebServer] $ vite preview --host "127.0.0.1" --port "41085" --strictPort
+[dotenv@17.2.2] injecting env (2) from .env.local,.env -- tip: 📡 version env with Radar: https://dotenvx.com/radar
+
+Running 56 tests using 1 worker
+
+(node:542946) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete |
+--------------------------------------
+accounts           | 0      | 0 of 0 |
+assignments        | 0      | 0 of 0 |
+bankConnections    | 0      | 0 of 0 |
+categories         | 0      | 0 of 0 |
+categoryGroups     | 0      | 0 of 0 |
+connectionAccounts | 0      | 0 of 0 |
+cutoverMoveHistory | 0      | 0 of 0 |
+cutoverMoves       | 0      | 0 of 0 |
+imports            | 0      | 0 of 0 |
+monthlyTotals      | 0      | 0 of 0 |
+payeeRenames       | 0      | 0 of 0 |
+payees             | 0      | 0 of 0 |
+settings           | 0      | 0 of 0 |
+transactionSplits  | 0      | 0 of 0 |
+transactions       | 0      | 0 of 0 |
+webhookKeyLookups  | 0      | 0 of 0 |
+webhookKeys        | 0      | 0 of 0 |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:542968) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:542887) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/journeys.test.ts:10:3 › accounts/start-late-save › a starting balance saved from a dismissed dialog lands, and leaves the next Account's dialog alone (7.8s)
+(node:543230) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:543245) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 e2e/journeys.test.ts:10:3 › accounts/start-edit › editing a starting balance offers only the edits it allows, and saving it still works (5.6s)
+(node:543525) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:543589) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:543597) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   3 e2e/journeys.test.ts:10:3 › accounts/held-map › a held bank Account brought into an existing Account adds its rows and resets its Starting Balance (6.0s)
+(node:543647) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 31 of 31 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 20 of 20 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 94 of 94 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:543661) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:543669) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   4 e2e/journeys.test.ts:10:3 › accounts/held-new-card › a held card becomes a new credit-card Account whose Starting Balance is the amount owed (6.0s)
+(node:543701) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 4 of 4   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 15 of 15 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 32 of 32 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 20 of 20 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 95 of 95 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:543715) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:543723) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   5 e2e/journeys.test.ts:10:3 › accounts/held-unknown-kind › a held bank Account the bank never described asks for its type instead of assuming cash (6.7s)
+(node:543757) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 4 of 4   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 15 of 15 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 32 of 32 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 19 of 19 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 94 of 94 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:543773) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:543788) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   6 e2e/journeys.test.ts:10:3 › accounts/held-legacy-name › a held bank Account recorded with a name but no kind is never preselected into the same-named Account (6.0s)
+(node:543844) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 31 of 31 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 19 of 19 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 93 of 93 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:543858) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:543873) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   7 e2e/journeys.test.ts:10:3 › accounts/setup-check › a mapped bank Account's starting balance stays unconfirmed until the owner confirms it, and its basis says what is unknown (9.0s)
+(node:543922) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:543938) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:543947) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   8 e2e/journeys.test.ts:10:3 › accounts/setup-correct › a bank Account set up in the wrong Account is moved through Stop syncing and Bring back, confirmed in its new one, and its earlier Transactions are shown still in the old one (9.3s)
+(node:543997) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 4 of 4   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 32 of 32 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 20 of 20 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 95 of 95 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544013) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:544021) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓   9 e2e/journeys.test.ts:10:3 › accounts/held-ignore › an ignored held bank Account leaves the list and stays gone (7.2s)
+(node:544074) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 14 of 14 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544092) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:544100) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  10 e2e/journeys.test.ts:10:3 › bank-changes/take-the-banks › taking the bank's version updates a changed row in its editor and deletes a removed one from its row (6.7s)
+(node:544135) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 91 of 91 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544149) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:544157) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  11 e2e/journeys.test.ts:10:3 › bank-changes/late-delete › a delete that finishes after its confirmation was dismissed leaves the next confirmation open (6.5s)
+(node:544197) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 90 of 90 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544212) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:544220) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  12 e2e/journeys.test.ts:10:3 › bank-changes/keep-mine › keeping mine, from the row or its editor, clears the bank flag and leaves my Transaction as I edited it (5.5s)
+(node:544262) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544277) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  13 e2e/journeys.test.ts:10:3 › budget/assign › editing Assigned inline moves on to the next Category, changes Ready to Assign, and reloads and other months keep it (10.4s)
+(node:544354) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544368) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  14 e2e/journeys.test.ts:10:3 › budget/assign-back › putting Assigned back while the first save is still on its way saves the amount typed last (6.9s)
+(node:544415) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544432) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  15 e2e/journeys.test.ts:10:3 › budget/needs-you › each Needs you item leads to what needs the owner: a filtered register or the overspent Category (7.4s)
+(node:544472) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544494) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  16 e2e/journeys.test.ts:10:3 › categories/manage › a Category can be added, renamed, hidden, and deleted, down to 320 px (12.2s)
+(node:544552) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544568) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  17 e2e/journeys.test.ts:10:3 › categories/late-rename › a rename that finishes after its dialog closed leaves the reopened dialog alone (5.8s)
+(node:544609) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544626) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  18 e2e/journeys.test.ts:10:3 › credit-cards/debt › a card's Payment Category shows the card debt not yet covered (4.3s)
+(node:544662) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544676) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  19 e2e/journeys.test.ts:10:3 › export/files › exports every table as JSON and paced CSV downloads, past Chromium’s ten-file burst limit (8.2s)
+(node:544708) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544752) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  20 e2e/journeys.test.ts:10:3 › imports/twin › a relabelled re-import of an imported row asks by its own label whether it is already here (6.3s)
+(node:544792) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 5 of 5   |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 15 of 15 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 90 of 90 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544806) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  21 e2e/journeys.test.ts:10:3 › imports/approve › an imported row arrives Unapproved and Approve clears it; the File field waits for the cutover date (6.0s)
+(node:544846) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 4 of 4   |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 14 of 14 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 89 of 89 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544862) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  22 e2e/journeys.test.ts:10:3 › imports/late-save › an import save that finishes after the dialog was closed leaves the next opening alone (5.8s)
+(node:544892) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 4 of 4   |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 14 of 14 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 89 of 89 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544908) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  23 e2e/journeys.test.ts:10:3 › inspector/move-money › the inspector moves money by keyboard, and opens as a dialog on a phone that steps between Categories (7.3s)
+(node:544947) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:544975) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  24 e2e/journeys.test.ts:10:3 › payees/last-category › a Payee's remembered Category fills in, and picking another Category keeps it (5.7s)
+(node:545015) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545029) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  25 e2e/journeys.test.ts:10:3 › payees/remember › a Category picked from a row or the dialog changes the Payee's remembered one only when Remember is checked, by keyboard and on a 320 px phone (11.4s)
+(node:545083) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 14 of 14 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 90 of 90 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545106) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  26 e2e/journeys.test.ts:10:3 › plaid/status › the Bank page shows when each Bank Connection last synced, and Sync now reports back (4.8s)
+(node:545138) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545152) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:545160) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  27 e2e/journeys.test.ts:10:3 › plaid/late-sync › two Sync nows that finish late each report only on their own connection, and the result moves nothing (6.9s)
+(node:545226) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545240) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:545248) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  28 e2e/journeys.test.ts:10:3 › plaid/sync-waiting › a Sync now that leaves rows waiting for setup says so in full, Set up comes next by keyboard, and the largest Reconnect result keeps its summary whole with its matches under Details (the answers stand in for Plaid, which the local server cannot reach) (12.2s)
+(node:545305) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545321) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:545329) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  29 e2e/journeys.test.ts:10:3 › plaid/superseded-sync › a Sync now that finishes after a newer Stop syncing or Bring back leaves their report and focus, and its late failure still shows (the answers stand in for Plaid) (5.9s)
+(node:545366) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545381) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:545389) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  30 e2e/journeys.test.ts:10:3 › plaid/attention › a Bank Connection that needs a reconnect says so, the Budget points to it, and a failed reconnect leaves it asking (5.0s)
+(node:545451) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545467) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:545475) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  31 e2e/journeys.test.ts:10:3 › plaid/consent › a Bank Connection whose consent is ending offers to renew it, and its Account links to it (5.5s)
+(node:545531) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545546) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:545561) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  32 e2e/journeys.test.ts:10:3 › plaid/late-renew › a held renew blocks every other Reconnect but not Sync now, and reports on its own connection (4.9s)
+(node:545593) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545608) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:545616) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  33 e2e/journeys.test.ts:10:3 › plaid/remove › removing a Bank Connection asks first, waits for bank sync to sign out of the bank, and moves focus to the next card (7.0s)
+(node:545655) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 3 of 3   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545669) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:545677) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  34 e2e/journeys.test.ts:10:3 › plaid/stop-and-bring-back › an Account stops syncing from its bank, and the Bank card brings that bank Account back for setup (6.7s)
+(node:545743) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545758) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  35 e2e/journeys.test.ts:10:3 › reconciliation/difference › reconciling the seeded Card records the difference as a locked adjustment (7.7s)
+(node:545801) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 14 of 14 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 89 of 89 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545815) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  36 e2e/journeys.test.ts:10:3 › search/filters › search finds Transactions by Bank Text and split memo, and filters narrow the list (8.3s)
+(node:545856) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:545871) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  37 e2e/journeys.test.ts:10:3 › search/phone › the search and filters are labeled and fit a 320 px screen (5.3s)
+(node:545902) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  38 e2e/journeys.test.ts:10:3 › settings/start › the Budget and the Bank page propose the first of the local month, not the UTC one, on each side of a month boundary, and a file import starts there (7.6s)
+(node:545981) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete |
+--------------------------------------
+accounts           | 0      | 1 of 1 |
+assignments        | 0      | 0 of 0 |
+bankConnections    | 0      | 0 of 0 |
+categories         | 0      | 1 of 1 |
+categoryGroups     | 0      | 1 of 1 |
+connectionAccounts | 0      | 0 of 0 |
+cutoverMoveHistory | 0      | 0 of 0 |
+cutoverMoves       | 0      | 0 of 0 |
+imports            | 0      | 1 of 1 |
+monthlyTotals      | 0      | 2 of 2 |
+payeeRenames       | 0      | 0 of 0 |
+payees             | 0      | 1 of 1 |
+settings           | 0      | 1 of 1 |
+transactionSplits  | 0      | 0 of 0 |
+transactions       | 0      | 2 of 2 |
+webhookKeyLookups  | 0      | 0 of 0 |
+webhookKeys        | 0      | 0 of 0 |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+  ✓  39 e2e/journeys.test.ts:10:3 › settings/cutover › the first cutover date gates Add Account, survives reload and cancel, bounds the months, and moves later through a preview when nothing is dated before (13.7s)
+(node:546039) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete |
+--------------------------------------
+accounts           | 0      | 0 of 0 |
+assignments        | 0      | 0 of 0 |
+bankConnections    | 0      | 0 of 0 |
+categories         | 0      | 1 of 1 |
+categoryGroups     | 0      | 1 of 1 |
+connectionAccounts | 0      | 0 of 0 |
+cutoverMoveHistory | 0      | 0 of 0 |
+cutoverMoves       | 0      | 0 of 0 |
+imports            | 0      | 0 of 0 |
+monthlyTotals      | 0      | 0 of 0 |
+payeeRenames       | 0      | 0 of 0 |
+payees             | 0      | 0 of 0 |
+settings           | 0      | 1 of 1 |
+transactionSplits  | 0      | 0 of 0 |
+transactions       | 0      | 0 of 0 |
+webhookKeyLookups  | 0      | 0 of 0 |
+webhookKeys        | 0      | 0 of 0 |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546055) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  40 e2e/journeys.test.ts:10:3 › settings/later-start › a later cutover date opens a preview of the Starting Balances and budget it would leave; Cancel and Escape change nothing (9.8s)
+(node:546130) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546144) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  41 e2e/journeys.test.ts:10:3 › settings/later-move › confirming a later cutover date with Reconciled history needs its unlock, folds the history in, and Settings undoes it, on desktop and on 320 and 390 px phones (12.7s)
+(node:546200) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete     |
+------------------------------------------
+accounts           | 0      | 3 of 3     |
+assignments        | 0      | 36 of 36   |
+bankConnections    | 0      | 1 of 1     |
+categories         | 0      | 14 of 14   |
+categoryGroups     | 0      | 5 of 5     |
+connectionAccounts | 0      | 0 of 0     |
+cutoverMoveHistory | 0      | 201 of 201 |
+cutoverMoves       | 0      | 3 of 3     |
+imports            | 0      | 3 of 3     |
+monthlyTotals      | 0      | 29 of 29   |
+payeeRenames       | 0      | 0 of 0     |
+payees             | 0      | 14 of 14   |
+settings           | 0      | 1 of 1     |
+transactionSplits  | 0      | 2 of 2     |
+transactions       | 0      | 88 of 88   |
+webhookKeyLookups  | 0      | 0 of 0     |
+webhookKeys        | 0      | 0 of 0     |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546215) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  42 e2e/journeys.test.ts:10:3 › shell/navigate › the owner lands on the Budget, and the sidebar or the phone tab bar reaches all five Sections (6.2s)
+(node:546256) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546270) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:546278) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  43 e2e/journeys.test.ts:10:3 › shell/phone-pages › on a 390 px phone every Section and an Account register load and scroll without moving (20.4s)
+(node:546353) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546368) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  44 e2e/journeys.test.ts:10:3 › splits/lines › a split shows "Split" in the list, and its lines can be added, edited, and removed (9.1s)
+(node:546408) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 14 of 14 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 4 of 4   |
+transactions       | 0      | 89 of 89 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546422) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  45 e2e/journeys.test.ts:10:3 › splits/restart › leaving Split and choosing it again starts fresh from the current amount and Category (7.8s)
+(node:546486) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546500) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  46 e2e/journeys.test.ts:10:3 › targets/monthly › a Target shows its progress, "Assign $X" funds it, and it is listed as Upcoming (7.2s)
+(node:546540) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546554) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  47 e2e/journeys.test.ts:10:3 › transactions/create › adding a Transaction changes the Account balance (5.5s)
+(node:546594) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 14 of 14 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 89 of 89 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546609) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  48 e2e/journeys.test.ts:10:3 › transactions/late-save › a save that finishes after the dialog was closed leaves the next opening alone (4.6s)
+(node:546640) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 14 of 14 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 89 of 89 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546654) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  49 e2e/journeys.test.ts:10:3 › transactions/categorize › a Category or Transfer is searched for and saved from its row, by keyboard and on a 320 px phone, survives reload, and leaves the row Unapproved (9.0s)
+(node:546712) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 89 of 89 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546728) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:546736) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  50 e2e/journeys.test.ts:10:3 › transactions/categorize-late › a Category picked while the row’s earlier pick is still saving, or still looking for a Transfer to link, wins, and the earlier pick finishing late does not put it back (10.2s)
+(node:546782) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 31 of 31 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546797) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:546806) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  51 e2e/journeys.test.ts:10:3 › transactions/approve-all-undo › Unapproved Transactions come first under their own heading, and Approve all or Approve shown can be undone (8.0s)
+(node:546847) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546862) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:546877) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  52 e2e/journeys.test.ts:10:3 › transactions/select-categorize › Transactions picked one by one, across Payees and within one, take a Category, and approval only when asked; Undo puts back what changed and a search keeps only the checked rows it shows (14.1s)
+(node:546952) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:546966) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  53 e2e/journeys.test.ts:10:3 › transactions/payee-groups › grouped by Payee, a mixed-purpose Payee’s shown rows are picked at once, some are left out, and the same selection gives each part its own Category (11.4s)
+(node:547009) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete     |
+------------------------------------------
+accounts           | 0      | 3 of 3     |
+assignments        | 0      | 36 of 36   |
+bankConnections    | 0      | 1 of 1     |
+categories         | 0      | 14 of 14   |
+categoryGroups     | 0      | 5 of 5     |
+connectionAccounts | 0      | 0 of 0     |
+cutoverMoveHistory | 0      | 0 of 0     |
+cutoverMoves       | 0      | 0 of 0     |
+imports            | 0      | 59 of 59   |
+monthlyTotals      | 0      | 33 of 33   |
+payeeRenames       | 0      | 0 of 0     |
+payees             | 0      | 17 of 17   |
+settings           | 0      | 1 of 1     |
+transactionSplits  | 0      | 2 of 2     |
+transactions       | 0      | 144 of 144 |
+webhookKeyLookups  | 0      | 0 of 0     |
+webhookKeys        | 0      | 0 of 0     |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:547023) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:547031) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  54 e2e/journeys.test.ts:10:3 › transactions/approve-phone › on a 320 px phone, an Unapproved Transaction opens from its Payee and can be approved (5.6s)
+(node:547086) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 4 of 4   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 7 of 7   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 15 of 15 |
+monthlyTotals      | 0      | 30 of 30 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 18 of 18 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 92 of 92 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:547100) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Clerk Testing] FAPI request failed after 4 attempts: <redacted>/v1/client/sessions/<redacted>/tokens?debug=skip_cache&__clerk_api_version=2026-08-20&_clerk_js_version=6.43.0&<redacted> (Error: route.fetch: Test ended.)
+  ✓  55 e2e/journeys.test.ts:10:3 › transfers/pair › a Transfer appears in both Accounts, and deleting one side deletes both (6.8s)
+(node:547140) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+- Importing /tmp/budge-e2e-r8TJPR/.local-app/no-rows.jsonl (0 bytes)
+
+Import change summary:
+table              | create | delete   |
+----------------------------------------
+accounts           | 0      | 3 of 3   |
+assignments        | 0      | 36 of 36 |
+bankConnections    | 0      | 1 of 1   |
+categories         | 0      | 14 of 14 |
+categoryGroups     | 0      | 5 of 5   |
+connectionAccounts | 0      | 0 of 0   |
+cutoverMoveHistory | 0      | 0 of 0   |
+cutoverMoves       | 0      | 0 of 0   |
+imports            | 0      | 3 of 3   |
+monthlyTotals      | 0      | 29 of 29 |
+payeeRenames       | 0      | 0 of 0   |
+payees             | 0      | 13 of 13 |
+settings           | 0      | 1 of 1   |
+transactionSplits  | 0      | 2 of 2   |
+transactions       | 0      | 88 of 88 |
+webhookKeyLookups  | 0      | 0 of 0   |
+webhookKeys        | 0      | 0 of 0   |
+Once the import has started, it will run in the background.
+Interrupting `npx convex import` will not cancel it.
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+- Importing
+
+✔ Imported "settings" (0 documents)
+- Importing "settings"
+
+√ Added 0 documents to table "settings".
+(node:547155) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  56 e2e/journeys.test.ts:10:3 › transfers/import-link › a Transfer from an import links the other import instead of a duplicate (7.1s)
+
+  Slow test file: e2e/journeys.test.ts (7.3m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  56 passed (8.8m)
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-kit sync

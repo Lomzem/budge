@@ -1,0 +1,126 @@
+{
+	"result": "passed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "2212e039bd6bfbe380b42081229e2f8950adf9f3",
+	"uncommittedChanges": true,
+	"appUrl": "http://127.0.0.1:5173",
+	"journeys": [
+		{
+			"name": "plaid/sync-waiting",
+			"title": "a Sync now that leaves rows waiting for setup says so in full, Set up comes next by keyboard, and the largest Reconnect result keeps its summary whole with its matches under Details (the answers stand in for Plaid, which the local server cannot reach)",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "at 320 px, the result names what waits and stays whole",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/01-at-320-px-the-result-names-what-waits-and-stays-whole.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/01-at-320-px-the-result-names-what-waits-and-stays-whole.aria.yml"
+				},
+				{
+					"name": "at 320 px, Tab from Sync now reaches Set up",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/02-at-320-px-tab-from-sync-now-reaches-set-up.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/02-at-320-px-tab-from-sync-now-reaches-set-up.aria.yml"
+				},
+				{
+					"name": "at 390 px, the result names what waits and stays whole",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/03-at-390-px-the-result-names-what-waits-and-stays-whole.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/03-at-390-px-the-result-names-what-waits-and-stays-whole.aria.yml"
+				},
+				{
+					"name": "at 390 px, Tab from Sync now reaches Set up",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/04-at-390-px-tab-from-sync-now-reaches-set-up.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/04-at-390-px-tab-from-sync-now-reaches-set-up.aria.yml"
+				},
+				{
+					"name": "at 1280 px, the result names what waits and stays whole",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/05-at-1280-px-the-result-names-what-waits-and-stays-whole.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/05-at-1280-px-the-result-names-what-waits-and-stays-whole.aria.yml"
+				},
+				{
+					"name": "at 1280 px, Tab from Sync now reaches Set up",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/06-at-1280-px-tab-from-sync-now-reaches-set-up.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/06-at-1280-px-tab-from-sync-now-reaches-set-up.aria.yml"
+				},
+				{
+					"name": "at 320 px on a touch screen, the largest Reconnect result reads whole, and Details takes a 44 px tall tap and opens by touch and by keyboard",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/07-at-320-px-on-a-touch-screen-the-largest-reconnect-result-rea.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/07-at-320-px-on-a-touch-screen-the-largest-reconnect-result-rea.aria.yml"
+				},
+				{
+					"name": "at 390 px on a touch screen, the largest Reconnect result reads whole, and Details takes a 44 px tall tap and opens by touch and by keyboard",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/08-at-390-px-on-a-touch-screen-the-largest-reconnect-result-rea.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/08-at-390-px-on-a-touch-screen-the-largest-reconnect-result-rea.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/sync-waiting/trace.zip"
+		},
+		{
+			"name": "plaid/late-sync",
+			"title": "two Sync nows that finish late each report only on their own connection, and the result moves nothing",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Sync now on Sample Community Bank, and hold it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/late-sync/01-sync-now-on-sample-community-bank-and-hold-it.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/late-sync/01-sync-now-on-sample-community-bank-and-hold-it.aria.yml"
+				},
+				{
+					"name": "Sync now on Sample Credit Union while the first is held",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/late-sync/02-sync-now-on-sample-credit-union-while-the-first-is-held.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/late-sync/02-sync-now-on-sample-credit-union-while-the-first-is-held.aria.yml"
+				},
+				{
+					"name": "each released result reports on its own card while the other keeps syncing",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/late-sync/03-each-released-result-reports-on-its-own-card-while-the-other.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/late-sync/03-each-released-result-reports-on-its-own-card-while-the-other.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/late-sync/trace.zip"
+		},
+		{
+			"name": "plaid/superseded-sync",
+			"title": "a Sync now that finishes after a newer Stop syncing or Bring back leaves their report and focus, and its late failure still shows (the answers stand in for Plaid)",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Sync now, then Stop syncing while it runs",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/superseded-sync/01-sync-now-then-stop-syncing-while-it-runs.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/superseded-sync/01-sync-now-then-stop-syncing-while-it-runs.aria.yml"
+				},
+				{
+					"name": "the older Sync now succeeds late and leaves the Stop syncing report",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/superseded-sync/02-the-older-sync-now-succeeds-late-and-leaves-the-stop-syncing.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/superseded-sync/02-the-older-sync-now-succeeds-late-and-leaves-the-stop-syncing.aria.yml"
+				},
+				{
+					"name": "Sync now again, then Bring back while it runs",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/superseded-sync/03-sync-now-again-then-bring-back-while-it-runs.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/superseded-sync/03-sync-now-again-then-bring-back-while-it-runs.aria.yml"
+				},
+				{
+					"name": "the older Sync now fails late: the Bring back report and focus stay, and the failure shows",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/superseded-sync/04-the-older-sync-now-fails-late-the-bring-back-report-and-focu.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/superseded-sync/04-the-older-sync-now-fails-late-the-bring-back-report-and-focu.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-details-green-4/plaid/superseded-sync/trace.zip"
+		}
+	]
+}

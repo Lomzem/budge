@@ -7,6 +7,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+	import { mainRegion } from '$lib/focusReturn';
 
 	import type { RenameTarget } from './types';
 
@@ -43,7 +44,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content>
+	<Dialog.Content returnFocus={{ fallback: mainRegion }}>
 		<Dialog.Header>
 			<Dialog.Title>
 				{target?.kind === 'group' ? 'Rename Category Group' : 'Rename Category'}

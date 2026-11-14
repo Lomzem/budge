@@ -1,0 +1,66 @@
+import {chromium,expect} from '@playwright/test';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {openAccount,chooseBankFile,choose,expectNothingPastTheRightEdge,expectClearOf} from '../../e2e/journeys/journey';
+import {localToday,addDays} from '../../src/lib/domain/dates';
+const {appUrl}=JSON.parse(readFileSync('.local-app/running.json','utf8'));
+const browser=await chromium.launch();
+try {
+ const context=await browser.newContext({baseURL:appUrl,storageState:'.local-app/storage-state.json',timezoneId:'America/Los_Angeles',viewport:{width:1280,height:800}});
+ const page=await context.newPage();
+ await page.goto('/'); await openAccount(page,'Savings');
+ const date=(s:string)=>{const [y,m,d]=s.split('-');return `${m}/${d}/${y}`;};
+ const today=localToday();
+ async function importRows(rows:string[],name:string){
+  await page.getByRole('button',{name:'Import file'}).click();
+  const dialog=page.getByRole('dialog',{name:'Import a bank file'});
+  await chooseBankFile(page,name,['Account Number,Transaction Description,Transaction Date,Transaction Type,Transaction Amount,Balance',...rows].join('\n'));
+  await expect(dialog.getByRole('status')).toContainText(`${rows.length} new Transactions`);
+  await dialog.getByRole('button',{name:/^Import \d+ rows?$/}).click(); await expect(dialog).toBeHidden();
+ }
+ await importRows([
+  `0000,ZZZ Review,${date(today)},Debit,1.01,100.00`,
+  `0000,AAA Review,${date(addDays(today,-1))},Debit,1.02,100.00`
+ ],'focus.csv');
+ await page.getByRole('button',{name:'Group by Payee'}).click();
+ const select=(name:string)=>page.getByRole('checkbox',{name:new RegExp(`^Select the \\d+ Unapproved shown from ${name}$`)});
+ await select('AAA Review').check();await select('ZZZ Review').check();
+ await choose(page.getByRole('button',{name:'Category for 2 selected Transactions'}),'Groceries');
+ await expect(page.getByRole('button',{name:'Undo',exact:true})).toBeFocused();
+ await page.getByRole('button',{name:'Undo',exact:true}).click();
+ const focus=await page.locator(':focus').getAttribute('aria-label');console.log('After Undo focus:',focus);
+ writeFileSync('test-results/ticket-08-review/undo-focus.aria.yml',await page.locator('body').ariaSnapshot());
+ await page.screenshot({path:'test-results/ticket-08-review/undo-focus.png'});
+ await page.getByRole('button',{name:/^Approve ZZZ Review,/}).click();
+ console.log('After approve focus:',await page.locator(':focus').getAttribute('aria-label'));
+ await expect(page.getByRole('button',{name:/^Approve AAA Review,/})).toBeFocused();
+ await importRows(Array.from({length:55},(_,i)=>`0000,LOAD Review,${date(today)},Debit,${((i+1000)/100).toFixed(2)},100.00`),'load.csv');
+ await page.reload();
+ await expect(select('LOAD Review')).toHaveAccessibleName('Select the 50 Unapproved shown from LOAD Review');
+ await select('LOAD Review').check();await expect(page.getByText('50 selected',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Show more',exact:true}).click();
+ await expect(select('LOAD Review')).toHaveAccessibleName('Select the 55 Unapproved shown from LOAD Review');
+ await expect(select('LOAD Review')).toHaveAttribute('aria-checked','mixed');
+ await expect(page.getByText('50 selected',{exact:true})).toBeVisible();
+ console.log('Loading more adds 5 unchecked rows; selection remains 50');
+ await page.getByRole('button',{name:'Clear selection',exact:true}).click();
+ await importRows(Array.from({length:200},(_,i)=>`0000,LOAD Review,${date(today)},Debit,${((i+10000)/100).toFixed(2)},100.00`),'cap.csv');
+ while(await page.getByRole('button',{name:'Show more',exact:true}).count()){
+  await page.getByRole('button',{name:'Show more',exact:true}).click();
+  await page.waitForFunction(()=>!document.querySelector('[data-slot=button][disabled]'));
+ }
+ await expect(select('LOAD Review')).toHaveAccessibleName('Select the 255 Unapproved shown from LOAD Review');
+ await select('LOAD Review').check();
+ await expect(page.getByRole('button',{name:'Category for 255 selected Transactions'})).toBeDisabled();
+ await expect(page.getByText('Categorize at most 250 at once.',{exact:true})).toBeVisible();
+ console.log('255-row group: categorization disabled; limit message visible');
+ await page.getByRole('button',{name:'Clear selection',exact:true}).click();
+ for(const width of [320,390]){
+  await page.setViewportSize({width,height:640});await select('LOAD Review').scrollIntoViewIfNeeded(); await select('LOAD Review').check();
+  await expectClearOf(select('LOAD Review'),page.getByRole('navigation',{name:'Sections',exact:true}),page.locator('[data-selection-bar]'));
+  await expectNothingPastTheRightEdge(page);
+  await page.screenshot({path:`test-results/ticket-08-review/groups-${width}.png`});
+  console.log('Phone clear of tab bar and selection bar:',width);
+  await page.getByRole('button',{name:'Clear selection',exact:true}).click();
+ }
+ await context.close();
+}finally{await browser.close();}

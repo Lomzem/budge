@@ -1,0 +1,81 @@
+## focus-red (HEAD 830b678 plus the new assertions): failed
+passed  accounts/start-late-save
+passed  accounts/setup-check
+failed  reconciliation/difference  step: opening it shows the lock; its amount can't be edited until an Unlock is confirmed, which keeps focus in the Transaction | expect(locator).toBeVisible() failed  Locator: getByRole('dialog').and(locator(':focus-within'))
+
+## menu-probe (HEAD: pointer and keyboard, Starting balance and Rename, from Checking actions (probe steps not committed)): passed
+passed  accounts/start-late-save
+
+## nested-probe-head3 (HEAD: phone inspector, Add Target, Save (probe journey not committed)): passed
+passed  targets/phone-probe
+
+## menu-control-no-opener (fix with dialogOpener returning null): failed
+failed  accounts/start-late-save  step: Checking's dialog and balance show the new starting balance, and Escape returns focus to Checking's actions | expect(locator).toBeFocused() failed  Locator:  getByRole('button', { name: 'Checking actions' })
+failed  accounts/setup-check  step: Cancel leaves it unconfirmed | expect(locator).toBeFocused() failed  Locator:  getByRole('list', { name: 'Bank Connections' }).getByRole('article', { name: 'Sample Community Bank', exact: true }).getByRole('list', { name: 'Where Sample Community Bank goes' }).getByRole('listitem').filter({ hasText: 'from Sample Statement Savings ending 6604' }).getByRole('button', { name: 'Check Savings\'s starting balance' })
+
+## menu-control-account-opener (fix with the account page Starting balance opener forced to null): failed
+failed  accounts/start-late-save  step: Checking's dialog and balance show the new starting balance, and Escape returns focus to Checking's actions | expect(locator).toBeFocused() failed  Locator:  getByRole('button', { name: 'Checking actions' })
+failed  accounts/setup-check  step: Savings' actions offer its confirmed starting balance to keep, and confirming it returns focus to Savings' actions | expect(locator).toBeFocused() failed  Locator:  getByRole('button', { name: 'Savings actions' })
+
+## focus-green (fix, plus the phone inspector probe): passed
+passed  accounts/start-late-save
+passed  accounts/setup-check
+passed  reconciliation/difference
+passed  targets/phone-probe
+## focus-followup-dialogs (fix, all 56 journeys): passed
+passed  accounts/start-late-save
+passed  accounts/start-edit
+passed  accounts/held-map
+passed  accounts/held-new-card
+passed  accounts/held-unknown-kind
+passed  accounts/held-legacy-name
+passed  accounts/setup-check
+passed  accounts/setup-correct
+passed  accounts/held-ignore
+passed  bank-changes/take-the-banks
+passed  bank-changes/late-delete
+passed  bank-changes/keep-mine
+passed  budget/assign
+passed  budget/assign-back
+passed  budget/needs-you
+passed  categories/manage
+passed  categories/late-rename
+passed  credit-cards/debt
+passed  export/files
+passed  imports/twin
+passed  imports/approve
+passed  imports/late-save
+passed  inspector/move-money
+passed  payees/last-category
+passed  payees/remember
+passed  plaid/status
+passed  plaid/late-sync
+passed  plaid/sync-waiting
+passed  plaid/superseded-sync
+passed  plaid/attention
+passed  plaid/consent
+passed  plaid/late-renew
+passed  plaid/remove
+passed  plaid/stop-and-bring-back
+passed  reconciliation/difference
+passed  search/filters
+passed  search/phone
+passed  settings/start
+passed  settings/cutover
+passed  settings/later-start
+passed  settings/later-move
+passed  shell/navigate
+passed  shell/phone-pages
+passed  splits/lines
+passed  splits/restart
+passed  targets/monthly
+passed  transactions/create
+passed  transactions/late-save
+passed  transactions/categorize
+passed  transactions/categorize-late
+passed  transactions/approve-all-undo
+passed  transactions/select-categorize
+passed  transactions/payee-groups
+passed  transactions/approve-phone
+passed  transfers/pair
+passed  transfers/import-link

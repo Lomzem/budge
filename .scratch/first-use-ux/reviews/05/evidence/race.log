@@ -1,0 +1,1 @@
+VERIFIED: Groceries saved while Transfer lookup was held; releasing old lookup overwrote it with To Savings, persisted after reload.

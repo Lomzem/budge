@@ -15,7 +15,7 @@ Compare cleared balance to the bank, record a difference when needed, and lock r
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/reconciliation.ts`, also run by `bun run test:e2e:local`):
 
-- `reconciliation/difference`: a $1.00 difference on the seeded Card becomes a locked Reconciliation Adjustment, and Unlock reopens it (`reconcile-adjust`, `reconcile-lock`, `reconcile-unlock`).
+- `reconciliation/difference`: a $1.00 difference on the seeded Card becomes a locked Reconciliation Adjustment, and Unlock reopens it, with focus kept inside Edit Transaction after the confirmation closes (`reconcile-adjust`, `reconcile-lock`, `reconcile-unlock`).
 
 The recipes below cover what the journeys leave out.
 

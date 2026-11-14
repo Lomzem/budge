@@ -1,0 +1,498 @@
+[
+ {
+  "run": 0,
+  "shifts": 1,
+  "fcp": [
+   "first-paint@596",
+   "first-contentful-paint@596"
+  ],
+  "fontRes": [
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 465,
+    "end": 804,
+    "init": "link"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2?import&url",
+    "start": 556,
+    "end": 567,
+    "init": "script"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 982,
+    "end": 984,
+    "init": "link"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 1013,
+    "end": 1015,
+    "init": "link"
+   }
+  ],
+  "platform": {
+   "Categories": [
+    {
+     "familyName": "Atkinson Hyperlegible Next",
+     "postScriptName": "AtkinsonHyperlegibleNext-Regular",
+     "isCustomFont": true,
+     "glyphCount": 4
+    }
+   ],
+   "Budget": [
+    {
+     "familyName": "Atkinson Hyperlegible Next",
+     "postScriptName": "AtkinsonHyperlegibleNext-Regular",
+     "isCustomFont": true,
+     "glyphCount": 6
+    }
+   ],
+   "h1": [
+    {
+     "familyName": "Atkinson Hyperlegible Next",
+     "postScriptName": "AtkinsonHyperlegibleNext-Regular",
+     "isCustomFont": true,
+     "glyphCount": 4
+    }
+   ]
+  },
+  "log": [
+   {
+    "t": 468,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 468,
+    "kind": "add LINK",
+    "attrs": "rel,href,type",
+    "font": false
+   },
+   {
+    "t": 468,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 471,
+    "kind": "add LINK",
+    "attrs": "rel,href,as,type,crossorigin",
+    "font": false
+   },
+   {
+    "t": 471,
+    "kind": "add STYLE",
+    "attrs": "data-sveltekit",
+    "font": true
+   },
+   {
+    "t": 473,
+    "kind": "dcl",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|unloaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 475,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 571,
+    "kind": "first-raf",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 809,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 981,
+    "kind": "add STYLE",
+    "attrs": "type,data-vite-dev-id",
+    "font": true
+   },
+   {
+    "t": 1012,
+    "kind": "remove STYLE",
+    "attrs": "data-sveltekit",
+    "font": true
+   },
+   {
+    "t": 1012,
+    "kind": "add STYLE",
+    "attrs": "id",
+    "font": false
+   },
+   {
+    "t": 1020,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 1021,
+    "kind": "shift",
+    "value": 0.00002756345872899927,
+    "input": false,
+    "sources": [
+     {
+      "node": "<span class=\"grid text-center\"><span aria-hidden=\"true\" class=\"invisible col-sta",
+      "from": [
+       183,
+       62
+      ],
+      "to": [
+       179,
+       69
+      ]
+     }
+    ]
+   },
+   {
+    "t": 1023,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "shifts": 2,
+  "fcp": [
+   "first-paint@448",
+   "first-contentful-paint@448"
+  ],
+  "fontRes": [
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 328,
+    "end": 635,
+    "init": "link"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2?import&url",
+    "start": 412,
+    "end": 421,
+    "init": "script"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 806,
+    "end": 808,
+    "init": "link"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 832,
+    "end": 833,
+    "init": "link"
+   }
+  ],
+  "platform": {
+   "Categories": [
+    {
+     "familyName": "Atkinson Hyperlegible Next",
+     "postScriptName": "AtkinsonHyperlegibleNext-Regular",
+     "isCustomFont": true,
+     "glyphCount": 4
+    }
+   ],
+   "Budget": [
+    {
+     "familyName": "Atkinson Hyperlegible Next",
+     "postScriptName": "AtkinsonHyperlegibleNext-Regular",
+     "isCustomFont": true,
+     "glyphCount": 6
+    }
+   ],
+   "h1": [
+    {
+     "familyName": "Atkinson Hyperlegible Next",
+     "postScriptName": "AtkinsonHyperlegibleNext-Regular",
+     "isCustomFont": true,
+     "glyphCount": 4
+    }
+   ]
+  },
+  "log": [
+   {
+    "t": 331,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 331,
+    "kind": "add LINK",
+    "attrs": "rel,href,type",
+    "font": false
+   },
+   {
+    "t": 331,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 334,
+    "kind": "add LINK",
+    "attrs": "rel,href,as,type,crossorigin",
+    "font": false
+   },
+   {
+    "t": 334,
+    "kind": "add STYLE",
+    "attrs": "data-sveltekit",
+    "font": true
+   },
+   {
+    "t": 336,
+    "kind": "dcl",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|unloaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 339,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 435,
+    "kind": "first-raf",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 641,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 805,
+    "kind": "add STYLE",
+    "attrs": "type,data-vite-dev-id",
+    "font": true
+   },
+   {
+    "t": 831,
+    "kind": "remove STYLE",
+    "attrs": "data-sveltekit",
+    "font": true
+   },
+   {
+    "t": 831,
+    "kind": "add STYLE",
+    "attrs": "id",
+    "font": false
+   },
+   {
+    "t": 837,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 837,
+    "kind": "shift",
+    "value": 0.00002756345872899927,
+    "input": false,
+    "sources": [
+     {
+      "node": "<span class=\"grid text-center\"><span aria-hidden=\"true\" class=\"invisible col-sta",
+      "from": [
+       183,
+       62
+      ],
+      "to": [
+       179,
+       69
+      ]
+     }
+    ]
+   },
+   {
+    "t": 839,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 2216,
+    "kind": "shift",
+    "value": 0.004524242147552958,
+    "input": false,
+    "sources": [
+     {
+      "node": "<section aria-labelledby=\"connections-heading\" class=\"flex flex-col gap-3\"><h2 i",
+      "from": [
+       16,
+       273
+      ],
+      "to": [
+       16,
+       273
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "run": 2,
+  "shifts": 1,
+  "fcp": [
+   "first-paint@1012",
+   "first-contentful-paint@1012"
+  ],
+  "fontRes": [
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 898,
+    "end": 1204,
+    "init": "link"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2?import&url",
+    "start": 982,
+    "end": 990,
+    "init": "script"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 1356,
+    "end": 1358,
+    "init": "link"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 1385,
+    "end": 1387,
+    "init": "link"
+   }
+  ],
+  "platform": {
+   "Categories": [
+    {
+     "familyName": "Atkinson Hyperlegible Next",
+     "postScriptName": "AtkinsonHyperlegibleNext-Regular",
+     "isCustomFont": true,
+     "glyphCount": 4
+    }
+   ],
+   "Budget": [
+    {
+     "familyName": "Atkinson Hyperlegible Next",
+     "postScriptName": "AtkinsonHyperlegibleNext-Regular",
+     "isCustomFont": true,
+     "glyphCount": 6
+    }
+   ],
+   "h1": [
+    {
+     "familyName": "Atkinson Hyperlegible Next",
+     "postScriptName": "AtkinsonHyperlegibleNext-Regular",
+     "isCustomFont": true,
+     "glyphCount": 4
+    }
+   ]
+  },
+  "log": [
+   {
+    "t": 901,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 901,
+    "kind": "add LINK",
+    "attrs": "rel,href,type",
+    "font": false
+   },
+   {
+    "t": 901,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 904,
+    "kind": "add LINK",
+    "attrs": "rel,href,as,type,crossorigin",
+    "font": false
+   },
+   {
+    "t": 905,
+    "kind": "add STYLE",
+    "attrs": "data-sveltekit",
+    "font": true
+   },
+   {
+    "t": 907,
+    "kind": "dcl",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|unloaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 909,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 1004,
+    "kind": "first-raf",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 1208,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 1355,
+    "kind": "add STYLE",
+    "attrs": "type,data-vite-dev-id",
+    "font": true
+   },
+   {
+    "t": 1384,
+    "kind": "remove STYLE",
+    "attrs": "data-sveltekit",
+    "font": true
+   },
+   {
+    "t": 1384,
+    "kind": "add STYLE",
+    "attrs": "id",
+    "font": false
+   },
+   {
+    "t": 1391,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 1392,
+    "kind": "shift",
+    "value": 0.00002756345872899927,
+    "input": false,
+    "sources": [
+     {
+      "node": "<span class=\"grid text-center\"><span aria-hidden=\"true\" class=\"invisible col-sta",
+      "from": [
+       183,
+       62
+      ],
+      "to": [
+       179,
+       69
+      ]
+     }
+    ]
+   },
+   {
+    "t": 1393,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   }
+  ]
+ }
+]

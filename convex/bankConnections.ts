@@ -17,6 +17,7 @@ import {
 	type MutationCtx,
 	type QueryCtx
 } from './_generated/server';
+import { historyElsewhere, isStartingBalanceConfirmed } from './lib/accounts';
 import { applyBankChange, applyBankRemoval, syncedBankRow } from './lib/bankChanges';
 import { applyBankRows, planBankRows, requireBankRow, type IncomingRow } from './lib/imports';
 import { holdBankRow, updateBankRow } from './lib/transactions';
@@ -36,7 +37,7 @@ import {
 } from './lib/plaidWebhook';
 import { publicError } from './lib/publicError';
 import { runEffect } from './lib/runEffect';
-import { requireCutoverDate } from './lib/settings';
+import { readCutoverDate, requireCutoverDate } from './lib/settings';
 import {
 	applyArgs,
 	applyResult,
@@ -92,7 +93,11 @@ export const list = query({
 				v.object({
 					connectionAccountId: v.id('connectionAccounts'),
 					accountId: v.id('accounts'),
-					name: v.string()
+					name: v.string(),
+					bankName: v.union(v.string(), v.null()),
+					mask: v.union(v.string(), v.null()),
+					startingBalanceConfirmed: v.boolean(),
+					historyIn: v.union(v.object({ accountId: v.id('accounts'), name: v.string() }), v.null())
 				})
 			),
 			ignored: v.array(
@@ -107,9 +112,10 @@ export const list = query({
 	handler: async (ctx, { now }) => {
 		await requireOwner(ctx);
 		const connections = await ctx.db.query('bankConnections').take(MAX_BANK_CONNECTIONS);
+		const cutoverDate = await readCutoverDate(ctx);
 		return await Promise.all(
 			connections.map(async (connection) => ({
-				...(await bankAccountsOf(ctx, connection._id)),
+				...(await bankAccountsOf(ctx, connection._id, cutoverDate)),
 				_id: connection._id,
 				name: connection.name,
 				status: connection.status,
@@ -123,7 +129,11 @@ export const list = query({
 	}
 });
 
-async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>) {
+async function bankAccountsOf(
+	ctx: QueryCtx,
+	connectionId: Id<'bankConnections'>,
+	cutoverDate: string | null
+) {
 	const inState = (state: 'mapped' | 'ignored') =>
 		ctx.db
 			.query('connectionAccounts')
@@ -136,6 +146,10 @@ async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>
 		connectionAccountId: Id<'connectionAccounts'>;
 		accountId: Id<'accounts'>;
 		name: string;
+		bankName: string | null;
+		mask: string | null;
+		startingBalanceConfirmed: boolean;
+		historyIn: { accountId: Id<'accounts'>; name: string } | null;
 	}[] = [];
 	const ignored: {
 		connectionAccountId: Id<'connectionAccounts'>;
@@ -153,14 +167,27 @@ async function bankAccountsOf(ctx: QueryCtx, connectionId: Id<'bankConnections'>
 		if (row.state !== 'mapped') continue;
 		const account = await ctx.db.get('accounts', row.accountId);
 		if (account !== null) {
-			feeds.push({ connectionAccountId: row._id, accountId: account._id, name: account.name });
+			feeds.push({
+				connectionAccountId: row._id,
+				accountId: account._id,
+				name: account.name,
+				bankName: row.name ?? null,
+				mask: row.mask ?? null,
+				startingBalanceConfirmed: isStartingBalanceConfirmed(row, cutoverDate),
+				historyIn: await historyElsewhere(ctx, row)
+			});
 		}
 	}
 	return { feeds, ignored };
 }
 
 const ownerSyncResult = v.union(
-	v.object({ kind: v.literal('synced'), added: v.number(), matched: v.number() }),
+	v.object({
+		kind: v.literal('synced'),
+		added: v.number(),
+		matched: v.number(),
+		held: v.number()
+	}),
 	v.object({ kind: v.literal('busy') }),
 	v.object({ kind: v.literal('noToken') })
 );
@@ -462,7 +489,7 @@ async function ownerSync(
 	if (outcome.kind === 'missing') throw publicError('NOT_FOUND');
 	if (outcome.kind === 'paused') throw publicError(needsLogin.code, needsLogin.message);
 	if (outcome.kind !== 'synced') return outcome;
-	return { kind: 'synced', added: outcome.added, matched: outcome.matched };
+	return { kind: 'synced', added: outcome.added, matched: outcome.matched, held: outcome.held };
 }
 
 export const service = query({
@@ -843,7 +870,7 @@ async function applyBankChanges(
 	for (const { externalAccountId, ...row } of modified) {
 		const checked = requireBankRow(row, cutoverDate);
 		const target = await connectionAccountOf(ctx, connectionId, externalAccountId);
-		if (await changeHeldRow(ctx, target._id, checked)) continue;
+		if (await changeUnlinkedRow(ctx, target._id, checked, payees)) continue;
 		if (target.state !== 'mapped') {
 			if (target.state === 'held') totals.held += await holdRows(ctx, target._id, [checked]);
 			continue;
@@ -880,14 +907,18 @@ async function applyBankRemovals(
 	}
 }
 
-async function changeHeldRow(
+async function changeUnlinkedRow(
 	ctx: MutationCtx,
 	connectionAccountId: Id<'connectionAccounts'>,
-	row: IncomingRow
+	row: IncomingRow,
+	payees: ImportedPayees
 ) {
 	const held = await importOf(ctx, connectionAccountId, row.sourceId);
 	if (held === null || held.transactionId !== undefined) return false;
-	if (held.state !== 'held') return true;
+	if (held.state !== 'held') {
+		await applyBankChange(ctx, held, row, payees);
+		return true;
+	}
 	await updateBankRow(ctx, held, {
 		date: row.date,
 		amount: row.amount,

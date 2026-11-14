@@ -1,0 +1,49 @@
+{
+	"result": "failed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "2212e039bd6bfbe380b42081229e2f8950adf9f3",
+	"uncommittedChanges": true,
+	"appUrl": "http://127.0.0.1:5173",
+	"journeys": [
+		{
+			"name": "accounts/setup-correct",
+			"title": "a bank Account set up in the wrong Account is moved through Stop syncing and Bring back, confirmed in its new one, and its earlier Transactions are shown still in the old one",
+			"fixture": "bank-sync",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "at 390 px, set Sample Savings Plus up into Savings and skip its starting balance: its Check balance takes focus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/01-at-390-px-set-sample-savings-plus-up-into-savings-and-skip-i.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/01-at-390-px-set-sample-savings-plus-up-into-savings-and-skip-i.aria.yml"
+				},
+				{
+					"name": "the card says it goes into Savings, starting balance not confirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/02-the-card-says-it-goes-into-savings-starting-balance-not-conf.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/02-the-card-says-it-goes-into-savings-starting-balance-not-conf.aria.yml"
+				},
+				{
+					"name": "stop syncing it into Savings, and bring it back for setup",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/03-stop-syncing-it-into-savings-and-bring-it-back-for-setup.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/03-stop-syncing-it-into-savings-and-bring-it-back-for-setup.aria.yml"
+				},
+				{
+					"name": "set it up as a new Account and confirm its starting balance: the card and the status say its earlier Transactions are still in Savings, and its link takes focus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/04-set-it-up-as-a-new-account-and-confirm-its-starting-balance-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/04-set-it-up-as-a-new-account-and-confirm-its-starting-balance-.aria.yml"
+				},
+				{
+					"name": "once confirmed, the notice reads as information and counts in no \"need you\" count",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/05-once-confirmed-the-notice-reads-as-information-and-counts-in-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/05-once-confirmed-the-notice-reads-as-information-and-counts-in-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-notice-count-red/accounts/setup-correct/trace.zip",
+			"error": "expect(received).toBe(expected) // Object.is equality\n\nExpected: 8\nReceived: 9\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate"
+		}
+	]
+}

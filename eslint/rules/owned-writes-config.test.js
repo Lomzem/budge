@@ -41,11 +41,12 @@ test.each([
 test('only the owners import the search-text and totals updaters', async () => {
 	const imports = [
 		"import { refreshDerivedFields } from './lib/transactions';",
-		"import { countTransaction, rebuildTotals } from './lib/monthlyTotals';",
-		'export { refreshDerivedFields, countTransaction, rebuildTotals };\n'
+		"import { countTransaction, countTransactions, rebuildTotals } from './lib/monthlyTotals';",
+		'export { refreshDerivedFields, countTransaction, countTransactions, rebuildTotals };\n'
 	].join('\n');
 
 	expect(await lint('convex/categories.ts', imports)).toEqual([
+		'no-restricted-imports',
 		'no-restricted-imports',
 		'no-restricted-imports',
 		'no-restricted-imports'

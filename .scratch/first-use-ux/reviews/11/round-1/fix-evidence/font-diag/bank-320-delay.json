@@ -1,0 +1,289 @@
+[
+ {
+  "run": 0,
+  "shifts": 0,
+  "fcp": [
+   "first-paint@1876",
+   "first-contentful-paint@1876"
+  ],
+  "fontRes": [
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 1856,
+    "end": 2176,
+    "init": "link"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2?import&url",
+    "start": 1952,
+    "end": 2255,
+    "init": "script"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 2366,
+    "end": 2673,
+    "init": "link"
+   }
+  ],
+  "platform": {
+   "Categories": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 4
+    }
+   ],
+   "Budget": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 6
+    }
+   ],
+   "h1": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 4
+    }
+   ]
+  },
+  "log": [
+   {
+    "t": 1859,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 1859,
+    "kind": "add LINK",
+    "attrs": "rel,href,type",
+    "font": false
+   },
+   {
+    "t": 1859,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 1862,
+    "kind": "add LINK",
+    "attrs": "rel,href,as,type,crossorigin",
+    "font": false
+   },
+   {
+    "t": 1862,
+    "kind": "add STYLE",
+    "attrs": "data-sveltekit",
+    "font": true
+   },
+   {
+    "t": 1864,
+    "kind": "dcl",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|unloaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 1866,
+    "kind": "first-raf",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 1872,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 2185,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 2365,
+    "kind": "add STYLE",
+    "attrs": "type,data-vite-dev-id",
+    "font": true
+   },
+   {
+    "t": 2392,
+    "kind": "remove STYLE",
+    "attrs": "data-sveltekit",
+    "font": true
+   },
+   {
+    "t": 2392,
+    "kind": "add STYLE",
+    "attrs": "id",
+    "font": false
+   },
+   {
+    "t": 2397,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 2675,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   }
+  ]
+ },
+ {
+  "run": 1,
+  "shifts": 1,
+  "fcp": [
+   "first-paint@984",
+   "first-contentful-paint@984"
+  ],
+  "fontRes": [
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 865,
+    "end": 1174,
+    "init": "link"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2?import&url",
+    "start": 948,
+    "end": 1252,
+    "init": "script"
+   },
+   {
+    "name": "atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "start": 1329,
+    "end": 1638,
+    "init": "link"
+   }
+  ],
+  "platform": {
+   "Categories": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 4
+    }
+   ],
+   "Budget": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 6
+    }
+   ],
+   "h1": [
+    {
+     "familyName": "Liberation Sans",
+     "postScriptName": "LiberationSans",
+     "isCustomFont": false,
+     "glyphCount": 4
+    }
+   ]
+  },
+  "log": [
+   {
+    "t": 868,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 868,
+    "kind": "add LINK",
+    "attrs": "rel,href,type",
+    "font": false
+   },
+   {
+    "t": 868,
+    "kind": "add LINK",
+    "attrs": "rel,href",
+    "font": false
+   },
+   {
+    "t": 871,
+    "kind": "add LINK",
+    "attrs": "rel,href,as,type,crossorigin",
+    "font": false
+   },
+   {
+    "t": 871,
+    "kind": "add STYLE",
+    "attrs": "data-sveltekit",
+    "font": true
+   },
+   {
+    "t": 873,
+    "kind": "dcl",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|unloaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 875,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 971,
+    "kind": "first-raf",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|unloaded"
+   },
+   {
+    "t": 1187,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 1304,
+    "kind": "add STYLE",
+    "attrs": "type,data-vite-dev-id",
+    "font": true
+   },
+   {
+    "t": 1328,
+    "kind": "remove STYLE",
+    "attrs": "data-sveltekit",
+    "font": true
+   },
+   {
+    "t": 1328,
+    "kind": "add STYLE",
+    "attrs": "id",
+    "font": false
+   },
+   {
+    "t": 1335,
+    "kind": "loading",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loading ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 1639,
+    "kind": "loadingdone",
+    "faces": "Atkinson Hyperlegible Next|U+0-FF, U+13|loaded ; Atkinson Hyperlegible Next|U+100-2BA, U|unloaded ; Atkinson Fallback|U+0-10FFFF|loaded"
+   },
+   {
+    "t": 2432,
+    "kind": "shift",
+    "value": 0.0028790631848064283,
+    "input": false,
+    "sources": [
+     {
+      "node": "<section aria-labelledby=\"connections-heading\" class=\"flex flex-col gap-3\"><h2 i",
+      "from": [
+       16,
+       273
+      ],
+      "to": [
+       0,
+       0
+      ]
+     }
+    ]
+   }
+  ]
+ }
+]

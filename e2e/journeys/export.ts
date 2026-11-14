@@ -11,6 +11,8 @@ const tablesABackupRestores = [
 	'categories',
 	'categoryGroups',
 	'connectionAccounts',
+	'cutoverMoveHistory',
+	'cutoverMoves',
 	'imports',
 	'payeeRenames',
 	'payees',

@@ -6,10 +6,12 @@ import { SvelteSet } from 'svelte/reactivity';
 import { api } from '$convex/_generated/api';
 import type { Id } from '$convex/_generated/dataModel';
 import { attempt } from '$lib/attempt';
+import { labelOf } from '$lib/components/bank/held';
 import { openPlaidLink } from '$lib/plaidLink';
 
 export type BankConnection = FunctionReturnType<typeof api.bankConnections.list>[number];
 export type HeldAccount = FunctionReturnType<typeof api.heldAccounts.list>[number];
+export type Feed = BankConnection['feeds'][number];
 export type SyncOutcome = FunctionReturnType<typeof api.bankConnections.syncNow>;
 
 const MINUTE = 60_000;
@@ -21,6 +23,10 @@ export function needsALook(connection: BankConnection) {
 		connection.overdue ||
 		connection.consentEndsAt !== null
 	);
+}
+
+export function feedNeedsYou(feed: Feed) {
+	return !feed.startingBalanceConfirmed;
 }
 
 const shortDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
@@ -37,7 +43,21 @@ export function attentionOf(connection: BankConnection): string | null {
 
 export interface Report {
 	text: string;
+	detail?: string;
 	failed: boolean;
+}
+
+const transactions = (count: number) =>
+	count === 1 ? '1 Transaction' : `${String(count)} Transactions`;
+
+function describeRun({ added, matched, held }: { added: number; matched: number; held: number }) {
+	const additions = added === 0 ? 'No Transactions added.' : `${transactions(added)} added.`;
+	const waiting =
+		held === 0 ? '' : ` ${String(held)} ${held === 1 ? 'waits' : 'wait'} for setup below.`;
+	const report: Report = { text: additions + waiting, failed: false };
+	if (matched === 0) return report;
+	const entered = matched === 1 ? 'a Transaction' : 'Transactions';
+	return { ...report, detail: `${String(matched)} matched ${entered} you entered.` };
 }
 
 export function describeSync(outcome: SyncOutcome): Report {
@@ -45,21 +65,12 @@ export function describeSync(outcome: SyncOutcome): Report {
 	if (outcome.kind === 'noToken') {
 		return { text: 'This Bank Connection has no bank login, so it never syncs.', failed: true };
 	}
-	return {
-		text: `Synced. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`,
-		failed: false
-	};
+	return describeRun(outcome);
 }
 
 export function describeReconnect(outcome: SyncOutcome): Report {
-	if (outcome.kind === 'synced') {
-		return {
-			text: `Reconnected. Added ${String(outcome.added)}, Matched ${String(outcome.matched)}.`,
-			failed: false
-		};
-	}
 	const synced = describeSync(outcome);
-	return { text: `Reconnected. ${synced.text}`, failed: synced.failed };
+	return { ...synced, text: `Reconnected. ${synced.text}` };
 }
 
 export class BankConnections {
@@ -84,7 +95,11 @@ export class BankConnections {
 	readonly needingAttention = $derived(
 		this.all.filter((connection) => connection.status === 'needsAttention')
 	);
-	readonly needingYou = $derived(this.held.length + this.all.filter(needsALook).length);
+	readonly needingYou = $derived(
+		this.held.length +
+			this.all.filter(needsALook).length +
+			this.all.flatMap((connection) => connection.feeds).filter(feedNeedsYou).length
+	);
 	readonly broken = $derived(
 		this.all.some(
 			(connection) => connection.status === 'needsAttention' || connection.lastError !== null
@@ -178,12 +193,16 @@ export class BankConnections {
 				};
 	}
 
-	async stopSyncing(connectionAccountId: Id<'connectionAccounts'>, name: string): Promise<Report> {
+	async stopSyncing(feed: Feed): Promise<Report> {
+		const { connectionAccountId } = feed;
 		const stopped = await attempt(() =>
 			this.#client.mutation(api.heldAccounts.stopSyncing, { connectionAccountId })
 		);
 		return stopped.ok
-			? { text: `Stopped syncing ${name}. Its Transactions stay.`, failed: false }
+			? {
+					text: `Stopped syncing ${labelOf({ name: feed.bankName, mask: feed.mask })}. Its Transactions stay in ${feed.name}.`,
+					failed: false
+				}
 			: {
 					text: stopped.error?.message ?? "Budge couldn't stop syncing. Try again.",
 					failed: true
@@ -195,7 +214,10 @@ export class BankConnections {
 			this.#client.mutation(api.heldAccounts.restore, { connectionAccountId })
 		);
 		return restored.ok
-			? { text: 'Brought back. Set it up to choose where its rows go.', failed: false }
+			? {
+					text: 'Brought back. Set it up to choose where its new transactions go.',
+					failed: false
+				}
 			: {
 					text: restored.error?.message ?? "Budge couldn't bring it back. Try again.",
 					failed: true

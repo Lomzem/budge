@@ -20,6 +20,8 @@ import { writeReport } from './report.js';
 import { capacityPassed, limits } from './limits.ts';
 import { loadavg, cpus, freemem } from 'node:os';
 import { MAX_FILE_ROWS } from '../../convex/lib/imports.ts';
+import { LATER_CUTOVER_READS } from '../../convex/lib/laterCutover.ts';
+import { BULK_CATEGORIZE_LIMIT } from '../../src/lib/domain/bulkCategorize.ts';
 
 const checkMode = process.argv[2] === '--check';
 const started = performance.now();
@@ -198,6 +200,173 @@ async function rebuildTrial(count, run) {
 	return belowHalf(record);
 }
 
+const sameCounts = (a, b) =>
+	JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+
+function cutoverShapes() {
+	const R = LATER_CUTOVER_READS;
+	const common = {
+		assignments: R.earlierAssignments,
+		totals: R.monthlyTotals - 100,
+		bankRows: R.bankRows
+	};
+	const accounts = Math.min(R.accounts, R.transactions);
+	const pairs = Math.floor(R.transactions / 20);
+	return [
+		{
+			name: 'startingBalances',
+			accounts,
+			transferPairs: 0,
+			others: R.transactions - accounts,
+			lines: 0,
+			...common
+		},
+		{
+			name: 'splitLines',
+			accounts: 10,
+			transferPairs: pairs,
+			others: R.transactions - 10 - 2 * pairs,
+			lines: R.splitLines,
+			...common
+		}
+	];
+}
+
+async function seedCutover(shape) {
+	await emptyEveryTable(checkout, deployment);
+	await call('cutoverBase', { accounts: shape.accounts });
+	for (let start = 0; start < shape.assignments; start += 1000)
+		await call('cutoverAssignments', {
+			start,
+			count: Math.min(1000, shape.assignments - start)
+		});
+	const history = shape.transferPairs + shape.others;
+	for (let start = 0; start < history; start += 50)
+		await call('cutoverHistory', {
+			start,
+			count: Math.min(50, history - start),
+			transferPairs: shape.transferPairs,
+			lines: shape.lines,
+			bankRows: shape.bankRows,
+			others: shape.others
+		});
+	await call('rebuild');
+	const rebuilt = (await call('totals', {}, true)).rows;
+	for (let start = 0; start < shape.totals - rebuilt; start += 1000)
+		await call('cutoverTotalsFill', {
+			start,
+			count: Math.min(1000, shape.totals - rebuilt - start)
+		});
+	const seeded = await call('cutoverState', {}, true);
+	save(`cutover-seeded-${shape.name}.json`, { shape, seeded });
+	const expected = {
+		cutoverDate: '2020-01-01',
+		transactions: shape.accounts + 2 * shape.transferPairs + shape.others,
+		splitLines: shape.lines,
+		linkedBankRows: shape.bankRows,
+		assignments: shape.assignments,
+		totals: Math.max(rebuilt, shape.totals)
+	};
+	if (!sameCounts(seeded, expected))
+		throw new Error(`cutover seed differs: ${JSON.stringify(seeded)}`);
+	return seeded;
+}
+
+async function cutoverTrial(shape, run) {
+	const seeded = await seedCutover(shape);
+	const today = new Date().toISOString().slice(0, 10);
+	const scenario = `cutover-${shape.name}`;
+	const count = seeded.transactions;
+	const preview = await measured('cutoverPreview', { today }, scenario, count, run, true);
+	if (preview.error || preview.result.result.kind !== 'ready')
+		throw new Error(
+			`cutover preview not ready: ${preview.error ?? JSON.stringify(preview.result.result).slice(0, 300)}`
+		);
+	const { fingerprint } = preview.result.result;
+	const apply = await measured('cutoverApply', { today, fingerprint }, scenario, count, run);
+	const applied = await call('cutoverState', {}, true);
+	save(`cutover-applied-${shape.name}-${run}.json`, applied);
+	if (apply.error) return [preview, apply];
+	if (applied.cutoverDate !== '2024-01-01' || applied.transactions !== shape.accounts)
+		throw new Error(`apply skipped work: ${JSON.stringify(applied)}`);
+	const undo = await measured('cutoverUndo', { moveId: apply.result.result }, scenario, count, run);
+	const undone = await call('cutoverState', {}, true);
+	save(`cutover-undone-${shape.name}-${run}.json`, undone);
+	if (!undo.error && !sameCounts(undone, seeded))
+		throw new Error(`undo did not restore the seeded counts: ${JSON.stringify(undone)}`);
+	return [preview, apply, undo];
+}
+
+async function cutoverCapacity(runs) {
+	const measuredRecords = [];
+	for (const shape of cutoverShapes())
+		for (let run = 1; run <= runs; run++) measuredRecords.push(...(await cutoverTrial(shape, run)));
+	return {
+		passed: capacityPassed(measuredRecords),
+		belowHalf: measuredRecords.every(belowHalf),
+		bounds: LATER_CUTOVER_READS
+	};
+}
+
+async function bulkTrial(count, run) {
+	await emptyEveryTable(checkout, deployment);
+	const { accountId, categoryId } = await call('initialize');
+	const bulkCategoryId = await call('bulkBase', { categoryId });
+	for (let start = 0; start < count; start += 100) {
+		await call('bulkRows', {
+			accountId,
+			categoryId,
+			start,
+			count: Math.min(100, count - start)
+		});
+		await new Promise((resolve) => setTimeout(resolve, 250));
+	}
+	await call('rebuild');
+	const transactionIds = await call('bulkIds', {}, true);
+	const seeded = await call('bulkState', { categoryId: bulkCategoryId }, true);
+	const expectedSeed = { inCategory: 0, unapproved: count, totalsInCategory: 0 };
+	if (transactionIds.length !== count || !sameCounts(seeded, expectedSeed))
+		throw new Error(`bulk seed differs: ${JSON.stringify(seeded)}`);
+	const scenario = 'bulk-categorize';
+	const categorize = await measured(
+		'bulkCategorize',
+		{ transactionIds, categoryId: bulkCategoryId },
+		scenario,
+		count,
+		run
+	);
+	if (categorize.error) return [categorize];
+	const changed = await call('bulkState', { categoryId: bulkCategoryId }, true);
+	save(`bulk-categorized-${count}-${run}.json`, changed);
+	if (
+		categorize.result.result.changes.length !== count ||
+		!sameCounts(changed, { inCategory: count, unapproved: 0, totalsInCategory: count })
+	)
+		throw new Error(`bulk categorize skipped work: ${JSON.stringify(changed)}`);
+	const undo = await measured(
+		'bulkUndo',
+		{ record: categorize.result.result },
+		scenario,
+		count,
+		run
+	);
+	const undone = await call('bulkState', { categoryId: bulkCategoryId }, true);
+	save(`bulk-undone-${count}-${run}.json`, undone);
+	if (!undo.error && (undo.result.result.restored !== count || !sameCounts(undone, expectedSeed)))
+		throw new Error(`bulk undo did not restore the seed: ${JSON.stringify(undone)}`);
+	return [categorize, undo];
+}
+
+async function bulkCapacity(count, runs) {
+	const measuredRecords = [];
+	for (let run = 1; run <= runs; run++) measuredRecords.push(...(await bulkTrial(count, run)));
+	return {
+		passed: capacityPassed(measuredRecords),
+		belowHalf: measuredRecords.every(belowHalf),
+		transactions: count
+	};
+}
+
 async function trials(scenario, count, phase = 'workflow', evaluated = []) {
 	const judged = (row) =>
 		row.scenario === scenario &&
@@ -258,21 +427,43 @@ async function checkCapacity() {
 		);
 		process.exitCode = 1;
 	}
-	return { passed, maxFileRows: MAX_FILE_ROWS, seconds: (performance.now() - started) / 1000 };
+	const cutover = await cutoverCapacity(1);
+	if (!cutover.passed) {
+		console.error(
+			'Later cutover capacity contract failed; reduce LATER_CUTOVER_READS or reduce measured preview/apply/undo work.'
+		);
+		process.exitCode = 1;
+	}
+	const bulk = await bulkCapacity(BULK_CATEGORIZE_LIMIT, 1);
+	if (!bulk.passed) {
+		console.error(
+			'Bulk categorize capacity contract failed; reduce BULK_CATEGORIZE_LIMIT or reduce measured categorize/undo work.'
+		);
+		process.exitCode = 1;
+	}
+	return {
+		passed: passed && cutover.passed && bulk.passed,
+		maxFileRows: MAX_FILE_ROWS,
+		cutover,
+		bulk,
+		seconds: (performance.now() - started) / 1000
+	};
 }
 
 const [scenario, countText] = checkMode ? [] : process.argv.slice(2);
 const count = Number(countText);
 if (
 	scenario !== undefined &&
-	(!['qfx', 'csv', 'history'].includes(scenario) ||
+	scenario !== 'cutover' &&
+	(!['qfx', 'csv', 'history', 'bulk'].includes(scenario) ||
 		!Number.isSafeInteger(count) ||
 		count < 1 ||
 		(scenario === 'history' && count % 60 !== 0) ||
-		(scenario !== 'history' && count > MAX_FILE_ROWS))
+		(['qfx', 'csv'].includes(scenario) && count > MAX_FILE_ROWS) ||
+		(scenario === 'bulk' && count > BULK_CATEGORIZE_LIMIT))
 )
 	throw new Error(
-		`usage: bun run capacity [qfx|csv|history COUNT]; imports admit at most ${MAX_FILE_ROWS} rows`
+		`usage: bun run capacity [qfx|csv|history|bulk COUNT | cutover]; imports admit at most ${MAX_FILE_ROWS} rows, bulk categorize at most ${BULK_CATEGORIZE_LIMIT}`
 	);
 save('manifest.json', {
 	limits,
@@ -286,6 +477,8 @@ try {
 	await deployHarness();
 	const summary = {};
 	if (checkMode) summary.check = await checkCapacity();
+	else if (scenario === 'cutover') summary.cutover = await cutoverCapacity(3);
+	else if (scenario === 'bulk') summary.bulk = await bulkCapacity(count, 3);
 	else if (scenario !== undefined) summary[scenario] = await trials(scenario, count);
 	else {
 		for (const source of ['qfx', 'csv'])

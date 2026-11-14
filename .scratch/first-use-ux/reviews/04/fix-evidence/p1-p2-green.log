@@ -1,0 +1,22 @@
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} vitest run convex/bankChanges.test.ts convex/settings.test.ts convex/review-cutover.test.ts convex/imports.test.ts convex/bankConnections.test.ts convex/monthlyTotals.test.ts
+
+ RUN  v5.0.5 /home/lomzem/proj/budge
+
+(node:73039) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73042) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73044) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73043) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73041) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73040) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  6 passed (6)
+      Tests  157 passed (157)
+   Start at  13:04:34
+   Duration  2.02s (tests 53%, import 32%, transform 8%, environment 6%)
+

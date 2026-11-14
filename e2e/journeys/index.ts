@@ -16,10 +16,12 @@ import { settings } from './settings';
 import { shell } from './shell';
 import { splits } from './splits';
 import { targets } from './targets';
+import { requireJourneyTimeZone } from './timeZone';
 import { transactions } from './transactions';
 import { transfers } from './transfers';
 
 export type { Journey, JourneyContext } from './journey';
+export { journeyTimeZone, useJourneyTimeZone } from './timeZone';
 
 const byFeature: Record<string, Record<string, Journey>> = {
 	accounts,
@@ -54,6 +56,7 @@ export const journeys: readonly NamedJourney[] = Object.entries(byFeature).flatM
 			name: `${feature}/${key}`,
 			feature,
 			run: async (page, context) => {
+				await requireJourneyTimeZone(page);
 				const layoutShifts = await watchUnpromptedLayoutShifts(page);
 				await journey.run(page, context);
 				await layoutShifts.assertNone();

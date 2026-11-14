@@ -1,0 +1,122 @@
+{
+	"result": "failed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "2212e039bd6bfbe380b42081229e2f8950adf9f3",
+	"uncommittedChanges": true,
+	"appUrl": "http://127.0.0.1:5173",
+	"journeys": [
+		{
+			"name": "settings/cutover",
+			"title": "the first cutover date gates Add Account, survives reload and cancel, bounds the months, and moves later through a preview when nothing is dated before",
+			"fixture": "empty-budget",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "before a date, there is no Cancel and Add Account points to Budget",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/01-before-a-date-there-is-no-cancel-and-add-account-points-to-b.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/01-before-a-date-there-is-no-cancel-and-add-account-points-to-b.aria.yml"
+				},
+				{
+					"name": "saving the first date keeps it on the Budget, then in Settings",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/02-saving-the-first-date-keeps-it-on-the-budget-then-in-setting.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/02-saving-the-first-date-keeps-it-on-the-budget-then-in-setting.aria.yml"
+				},
+				{
+					"name": "a change cancelled by button or Escape keeps the date; a saved one moves it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/03-a-change-cancelled-by-button-or-escape-keeps-the-date-a-save.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/03-a-change-cancelled-by-button-or-escape-keeps-the-date-a-save.aria.yml"
+				},
+				{
+					"name": "Previous month stops at the cutover month",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/04-previous-month-stops-at-the-cutover-month.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/04-previous-month-stops-at-the-cutover-month.aria.yml"
+				},
+				{
+					"name": "a later date with nothing dated before it moves through its preview",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/05-a-later-date-with-nothing-dated-before-it-moves-through-its-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/05-a-later-date-with-nothing-dated-before-it-moves-through-its-.aria.yml"
+				},
+				{
+					"name": "a date after today with nothing dated before it says the coming days’ bank transactions won’t come in",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/06-a-date-after-today-with-nothing-dated-before-it-says-the-com-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/06-a-date-after-today-with-nothing-dated-before-it-says-the-com-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/cutover/trace.zip",
+			"error": "expect(locator).toContainText(expected) failed\n\nLocator: getByRole('dialog', { name: 'Start on Dec 1, 2026?' })\nExpected substring: \"Dec 1, 2026 is after today. Bank transactions dated before it, including the coming days, won't be brought in.\"\nReceived string:    \"Start on Dec 1, 2026? A preview of moving the cutover date from Oct 5, 2026. Nothing changes until you move it. Nothing is dated before Dec 1, 2026, so moving the date changes no balance and no Transaction.  Cancel Move start date     Close\"\nTimeout: 5000ms\n\nCall log:\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n  - Expect \"toContainText\" getByRole('dialog', { name: 'Start on Dec 1, 2026?' }) with timeout 5000ms\n  - waiting for getByRole('dialog', { name: 'Start on Dec 1, 2026?' })\n    14 × locator resolved to <div id=\"bits-c15\" role=\"dialog\" tabindex=\"-1\" aria-modal=\"true\" data-state=\"open\" data-dialog-content=\"\" data-slot=\"dialog-content\" aria-labelledby=\"bits-c18\" aria-describedby=\"bits-c19\" class=\"fixed top-4 left-1/2 z-50 flex max-h-dialog-height w-full max-w-dialog-width -translate-x-1/2 flex-col overflow-hidden rounded-xl bg-popover text-sm text-popover-foreground shadow-xl ring-1 ring-border duration-150 outline-none sm:top-16 sm:max-h-dialog-height-sm data-open:animate-in data-open:fade-in-0 dat…>…</div>\n       - unexpected value \"Start on Dec 1, 2026? A preview of moving the cutover date from Oct 5, 2026. Nothing changes until you move it. Nothing is dated before Dec 1, 2026, so moving the date changes no balance and no Transaction.  Cancel Move start date     Close\"\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n"
+		},
+		{
+			"name": "settings/later-start",
+			"title": "a later cutover date opens a preview of the Starting Balances and budget it would leave; Cancel and Escape change nothing",
+			"fixture": "budget-with-accounts",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "a later date opens a readable preview",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/01-a-later-date-opens-a-readable-preview.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/01-a-later-date-opens-a-readable-preview.aria.yml"
+				},
+				{
+					"name": "Tab reads the preview top to bottom: Close, the lists that fold in, Cancel, then Move",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/02-tab-reads-the-preview-top-to-bottom-close-the-lists-that-fol.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/02-tab-reads-the-preview-top-to-bottom-close-the-lists-that-fol.aria.yml"
+				},
+				{
+					"name": "halfway down the preview, its Cancel button is wholly on screen",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/03-halfway-down-the-preview-its-cancel-button-is-wholly-on-scre.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/03-halfway-down-the-preview-its-cancel-button-is-wholly-on-scre.aria.yml"
+				},
+				{
+					"name": "Cancel and Escape close it and keep the date",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/04-cancel-and-escape-close-it-and-keep-the-date.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/04-cancel-and-escape-close-it-and-keep-the-date.aria.yml"
+				},
+				{
+					"name": "a date after today says why it has no preview",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/05-a-date-after-today-says-why-it-has-no-preview.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/05-a-date-after-today-says-why-it-has-no-preview.aria.yml"
+				},
+				{
+					"name": "on a 320 px phone, the preview with every list open stays within the screen",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/06-on-a-320-px-phone-the-preview-with-every-list-open-stays-wit.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/06-on-a-320-px-phone-the-preview-with-every-list-open-stays-wit.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-start/trace.zip"
+		},
+		{
+			"name": "settings/later-move",
+			"title": "confirming a later cutover date with Reconciled history needs its unlock, folds the history in, and Settings undoes it, on desktop and on 320 and 390 px phones",
+			"fixture": "budget-with-accounts",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "reconcile Card and leave one earlier Checking row uncleared",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-move/01-reconcile-card-and-leave-one-earlier-checking-row-uncleared.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-move/01-reconcile-card-and-leave-one-earlier-checking-row-uncleared.aria.yml"
+				},
+				{
+					"name": "the preview names the cleared-balance change and asks for the unlock",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-move/02-the-preview-names-the-cleared-balance-change-and-asks-for-th-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-move/02-the-preview-names-the-cleared-balance-change-and-asks-for-th-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-preview-red/settings/later-move/trace.zip",
+			"error": "expect(locator).toContainText(expected) failed\n\nLocator: getByRole('dialog', { name: 'Start on Nov 1, 2026?' })\nTimeout: 5000ms\nExpected pattern: /Checking: 1 Transaction \\((\\S+)\\) that hasn't cleared counts in the Starting Balance as if it had, so the cleared balance changes by \\1\\./\nReceived string:  \"Start on Nov 1, 2026? A preview of moving the cutover date from Sep 1, 2026. Nothing changes until you move it.  Starting Balances on Nov 1, 2026 Checking $7,436.00 Its Starting Balance of $2,418.37 on Sep 1, 2026, plus 18 Transactions dated before Nov 1, 2026.  18 Transactions that fold in Sample Landlord Sep 1, 2026, Rent −$1,450.00Sample Employer Payroll Sep 1, 2026, Ready to Assign $2,310.42Sample Transit Pass Sep 7, 2026, Transit −$25.00Sample Transit Pass Sep 14, 2026, Transit −$25.00Sample Employer Payroll Sep 15, 2026, Ready to Assign $2,310.42Transfer with Savings Sep 16, 2026 −$500.00Sample Utility Co Sep 20, 2026, Utilities −$125.97Sample Transit Pass Sep 21, 2026, Transit −$25.00Sample Transit Pass Sep 28, 2026, Transit −$25.00Sample Landlord Oct 1, 2026, Rent −$1,450.00Sample Employer Payroll Oct 1, 2026, Ready to Assign, Uncleared $2,310.42Transfer with Card Oct 3, 2026 −$400.00Sample Transit Pass Oct 5, 2026, Transit −$25.00Sample Transit Pass Oct 12, 2026, Transit −$25.00Sample Employer Payroll Oct 15, 2026, Ready to Assign $2,310.42Sample Transit Pass Oct 19, 2026, Transit −$25.00Sample Utility Co Oct 20, 2026, Utilities −$98.08Sample Transit Pass Oct 26, 2026, Transit −$25.00Savings $8,662.24 Its Starting Balance of $8,150.00 on Sep 1, 2026, plus 3 Transactions dated before Nov 1, 2026.  3 Transactions that fold in Transfer with Checking Sep 16, 2026 $500.00Savings Interest Sep 28, 2026, Ready to Assign $6.12Savings Interest Oct 28, 2026, Ready to Assign $6.12Card $1,459.73 owed Its Starting Balance of $612.48 owed on Sep 1, 2026, plus 46 Transactions dated before Nov 1, 2026.  46 Transactions that fold in Sample Noodle Bar Sep 1, 2026, Dining Out, Reconciled −$19.77Sample Taco Stand Sep 4, 2026, Dining Out, Reconciled −$29.08Sample Market Sep 5, 2026, Groceries, Reconciled −$66.08Sample Taco Stand Sep 5, 2026, Dining Out, Reconciled −$30.76Sample Coffee Shop Sep 6, 2026, Coffee, Reconciled −$5.58Sample Coffee Shop Sep 7, 2026, Coffee, Reconciled −$6.53Sample Coffee Shop Sep 8, 2026, Coffee, Reconciled −$5.89Sample Coffee Shop Sep 9, 2026, Coffee, Reconciled −$6.18Sample Coffee Shop Sep 10, 2026, Coffee, Reconciled −$6.45Sample Coffee Shop Sep 11, 2026, Coffee, Reconciled −$5.33Sample Grocer Sep 12, 2026, Groceries, Reconciled −$104.46Sample Coffee Shop Sep 13, 2026, Coffee, Reconciled −$6.68Sample Coffee Shop Sep 15, 2026, Coffee, Reconciled −$4.72Sample Coffee Shop Sep 16, 2026, Coffee, Reconciled −$6.60Sample Coffee Shop Sep 17, 2026, Coffee, Reconciled −$5.02Sample Coffee Shop Sep 18, 2026, Coffee, Reconciled −$5.26Sample Market Sep 19, 2026, Groceries, Reconciled −$83.15Sample Coffee Shop Sep 19, 2026, Coffee, Reconciled −$4.45Sample Noodle Bar Sep 22, 2026, Dining Out, Reconciled −$27.91Sample Coffee Shop Sep 25, 2026, Coffee, Reconciled −$4.57Sample Noodle Bar Sep 25, 2026, Dining Out, Reconciled −$41.23Sample Market Sep 26, 2026, Groceries, Reconciled −$98.90Sample Coffee Shop Sep 30, 2026, Coffee, Reconciled −$4.45Sample Coffee Shop Oct 1, 2026, Coffee, Reconciled −$4.50Sample Taco Stand Oct 1, 2026, Dining Out, Reconciled −$35.86Sample Coffee Shop Oct 2, 2026, Coffee, Reconciled −$4.36Sample Grocer Oct 3, 2026, Groceries, Reconciled −$52.13Transfer with Checking Oct 3, 2026, Reconciled $400.00Sample Coffee Shop Oct 6, 2026, Coffee, Reconciled −$4.50Sample Noodle Bar Oct 6, 2026, Dining Out, Reconciled −$40.01Sample Coffee Shop Oct 7, 2026, Coffee, Reconciled −$5.83Sample Coffee Shop Oct 9, 2026, Coffee, Reconciled −$6.73Sample Grocer Oct 10, 2026, Groceries, Reconciled −$73.50Sample Warehouse Club Oct 10, 2026, Split, Reconciled −$86.40Sample Coffee Shop Oct 13, 2026, Coffee, Reconciled −$6.33Sample Coffee Shop Oct 14, 2026, Coffee, Reconciled −$6.15Sample Coffee Shop Oct 15, 2026, Coffee, Reconciled −$4.09Sample Market Oct 17, 2026, Groceries, Reconciled −$101.26Sample Coffee Shop Oct 17, 2026, Coffee, Reconciled −$6.74Sample Coffee Shop Oct 19, 2026, Coffee, Reconciled −$5.44Sample Coffee Shop Oct 21, 2026, Coffee, Reconciled −$4.21Sample Market Oct 24, 2026, Groceries, Reconciled −$75.71Sample Noodle Bar Oct 28, 2026, Dining Out, Reconciled −$40.45Sample Coffee Shop Oct 30, 2026, Coffee, Reconciled −$4.27Sample Market Oct 31, 2026, Groceries, Reconciled −$94.77Sample Coffee Shop Oct 31, 2026, Coffee, Reconciled −$4.96 November 2026 budget Available Now After Ready to Assign Now $12,826.88 $12,826.88 $15,242.83 Card Now $1,165.91 $1,165.91 $318.66Utilities Now $165.95 $165.95 $130.00Phone Now $135.00 $135.00 $45.00Internet Now $180.00 $180.00 $60.00Groceries Now $188.88 $188.88 $232.99Dining Out Now −$54.21 −$54.21 $30.86Coffee Now −$42.50 −$42.50 $23.32Emergency Fund Now $1,500.00 $1,500.00 $500.00Vacation Now $450.00 $450.00 $150.00Gifts Now $117.75 $117.75 $50.00Car Repairs Now $225.00 $225.00 $75.00   The $6,140.00 assigned in September 2026 and October 2026 goes, and November 2026 starts with nothing carried over. Worth checking Checking: 1 Transaction ($2,310.42) that haven't cleared count in the Starting Balance as if they had, so the cleared balance changes by $2,310.42.Card: 46 Transactions (−$847.25) you reconciled become part of the Starting Balance.   Unlock the Reconciled history Reconciled Transactions and Starting Balances above fold into new Starting Balances,\n\t\t\t\t\t\twhich are cleared but not reconciled. Settings offers Undo move until the date moves again.  Cancel Move start date     Close\"\n\nCall log:\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n  - Expect \"toContainText\" getByRole('dialog', { name: 'Start on Nov 1, 2026?' }) with timeout 5000ms\n  - waiting for getByRole('dialog', { name: 'Start on Nov 1, 2026?' })\n    14 × locator resolved to <div id=\"bits-c15\" role=\"dialog\" tabindex=\"-1\" aria-modal=\"true\" data-state=\"open\" data-dialog-content=\"\" data-slot=\"dialog-content\" aria-labelledby=\"bits-c18\" aria-describedby=\"bits-c19\" class=\"fixed top-4 left-1/2 z-50 flex max-h-dialog-height w-full max-w-dialog-width -translate-x-1/2 flex-col overflow-hidden rounded-xl bg-popover text-sm text-popover-foreground shadow-xl ring-1 ring-border duration-150 outline-none sm:top-16 sm:max-h-dialog-height-sm data-open:animate-in data-open:fade-in-0 dat…>…</div>\n       - unexpected value \"Start on Nov 1, 2026? A preview of moving the cutover date from Sep 1, 2026. Nothing changes until you move it.  Starting Balances on Nov 1, 2026 Checking $7,436.00 Its Starting Balance of $2,418.37 on Sep 1, 2026, plus 18 Transactions dated before Nov 1, 2026.  18 Transactions that fold in Sample Landlord Sep 1, 2026, Rent −$1,450.00Sample Employer Payroll Sep 1, 2026, Ready to Assign $2,310.42Sample Transit Pass Sep 7, 2026, Transit −$25.00Sample Transit Pass Sep 14, 2026, Transit −$25.00Sample Employer Payroll Sep 15, 2026, Ready to Assign $2,310.42Transfer with Savings Sep 16, 2026 −$500.00Sample Utility Co Sep 20, 2026, Utilities −$125.97Sample Transit Pass Sep 21, 2026, Transit −$25.00Sample Transit Pass Sep 28, 2026, Transit −$25.00Sample Landlord Oct 1, 2026, Rent −$1,450.00Sample Employer Payroll Oct 1, 2026, Ready to Assign, Uncleared $2,310.42Transfer with Card Oct 3, 2026 −$400.00Sample Transit Pass Oct 5, 2026, Transit −$25.00Sample Transit Pass Oct 12, 2026, Transit −$25.00Sample Employer Payroll Oct 15, 2026, Ready to Assign $2,310.42Sample Transit Pass Oct 19, 2026, Transit −$25.00Sample Utility Co Oct 20, 2026, Utilities −$98.08Sample Transit Pass Oct 26, 2026, Transit −$25.00Savings $8,662.24 Its Starting Balance of $8,150.00 on Sep 1, 2026, plus 3 Transactions dated before Nov 1, 2026.  3 Transactions that fold in Transfer with Checking Sep 16, 2026 $500.00Savings Interest Sep 28, 2026, Ready to Assign $6.12Savings Interest Oct 28, 2026, Ready to Assign $6.12Card $1,459.73 owed Its Starting Balance of $612.48 owed on Sep 1, 2026, plus 46 Transactions dated before Nov 1, 2026.  46 Transactions that fold in Sample Noodle Bar Sep 1, 2026, Dining Out, Reconciled −$19.77Sample Taco Stand Sep 4, 2026, Dining Out, Reconciled −$29.08Sample Market Sep 5, 2026, Groceries, Reconciled −$66.08Sample Taco Stand Sep 5, 2026, Dining Out, Reconciled −$30.76Sample Coffee Shop Sep 6, 2026, Coffee, Reconciled −$5.58Sample Coffee Shop Sep 7, 2026, Coffee, Reconciled −$6.53Sample Coffee Shop Sep 8, 2026, Coffee, Reconciled −$5.89Sample Coffee Shop Sep 9, 2026, Coffee, Reconciled −$6.18Sample Coffee Shop Sep 10, 2026, Coffee, Reconciled −$6.45Sample Coffee Shop Sep 11, 2026, Coffee, Reconciled −$5.33Sample Grocer Sep 12, 2026, Groceries, Reconciled −$104.46Sample Coffee Shop Sep 13, 2026, Coffee, Reconciled −$6.68Sample Coffee Shop Sep 15, 2026, Coffee, Reconciled −$4.72Sample Coffee Shop Sep 16, 2026, Coffee, Reconciled −$6.60Sample Coffee Shop Sep 17, 2026, Coffee, Reconciled −$5.02Sample Coffee Shop Sep 18, 2026, Coffee, Reconciled −$5.26Sample Market Sep 19, 2026, Groceries, Reconciled −$83.15Sample Coffee Shop Sep 19, 2026, Coffee, Reconciled −$4.45Sample Noodle Bar Sep 22, 2026, Dining Out, Reconciled −$27.91Sample Coffee Shop Sep 25, 2026, Coffee, Reconciled −$4.57Sample Noodle Bar Sep 25, 2026, Dining Out, Reconciled −$41.23Sample Market Sep 26, 2026, Groceries, Reconciled −$98.90Sample Coffee Shop Sep 30, 2026, Coffee, Reconciled −$4.45Sample Coffee Shop Oct 1, 2026, Coffee, Reconciled −$4.50Sample Taco Stand Oct 1, 2026, Dining Out, Reconciled −$35.86Sample Coffee Shop Oct 2, 2026, Coffee, Reconciled −$4.36Sample Grocer Oct 3, 2026, Groceries, Reconciled −$52.13Transfer with Checking Oct 3, 2026, Reconciled $400.00Sample Coffee Shop Oct 6, 2026, Coffee, Reconciled −$4.50Sample Noodle Bar Oct 6, 2026, Dining Out, Reconciled −$40.01Sample Coffee Shop Oct 7, 2026, Coffee, Reconciled −$5.83Sample Coffee Shop Oct 9, 2026, Coffee, Reconciled −$6.73Sample Grocer Oct 10, 2026, Groceries, Reconciled −$73.50Sample Warehouse Club Oct 10, 2026, Split, Reconciled −$86.40Sample Coffee Shop Oct 13, 2026, Coffee, Reconciled −$6.33Sample Coffee Shop Oct 14, 2026, Coffee, Reconciled −$6.15Sample Coffee Shop Oct 15, 2026, Coffee, Reconciled −$4.09Sample Market Oct 17, 2026, Groceries, Reconciled −$101.26Sample Coffee Shop Oct 17, 2026, Coffee, Reconciled −$6.74Sample Coffee Shop Oct 19, 2026, Coffee, Reconciled −$5.44Sample Coffee Shop Oct 21, 2026, Coffee, Reconciled −$4.21Sample Market Oct 24, 2026, Groceries, Reconciled −$75.71Sample Noodle Bar Oct 28, 2026, Dining Out, Reconciled −$40.45Sample Coffee Shop Oct 30, 2026, Coffee, Reconciled −$4.27Sample Market Oct 31, 2026, Groceries, Reconciled −$94.77Sample Coffee Shop Oct 31, 2026, Coffee, Reconciled −$4.96 November 2026 budget Available Now After Ready to Assign Now $12,826.88 $12,826.88 $15,242.83 Card Now $1,165.91 $1,165.91 $318.66Utilities Now $165.95 $165.95 $130.00Phone Now $135.00 $135.00 $45.00Internet Now $180.00 $180.00 $60.00Groceries Now $188.88 $188.88 $232.99Dining Out Now −$54.21 −$54.21 $30.86Coffee Now −$42.50 −$42.50 $23.32Emergency Fund Now $1,500.00 $1,500.00 $500.00Vacation Now $450.00 $450.00 $150.00Gifts Now $117.75 $117.75 $50.00Car Repairs Now $225.00 $225.00 $75.00   The $6,140.00 assigned in September 2026 and October 2026 goes, and November 2026 starts with nothing carried over. Worth checking Checking: 1 Transaction ($2,310.42) that haven't cleared count in the Starting Balance as if they had, so the cleared balance changes by $2,310.42.Card: 46 Transactions (−$847.25) you reconciled become part of the Starting Balance.   Unlock the Reconciled history Reconciled Transactions and Starting Balances above fold into new Starting Balances,\n\t\t\t\t\t\twhich are cleared but not reconciled. Settings offers Undo move until the date moves again.  Cancel Move start date     Close\"\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n"
+		}
+	]
+}

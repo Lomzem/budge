@@ -1,0 +1,37 @@
+{
+	"result": "failed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "2212e039bd6bfbe380b42081229e2f8950adf9f3",
+	"uncommittedChanges": true,
+	"appUrl": "http://127.0.0.1:5173",
+	"journeys": [
+		{
+			"name": "accounts/setup-check",
+			"title": "a mapped bank Account's starting balance stays unconfirmed until the owner confirms it, and its basis says what is unknown",
+			"fixture": "bank-sync",
+			"result": "failed",
+			"steps": [
+				{
+					"name": "the Bank card says Savings comes from Sample Statement Savings, its starting balance not confirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-empty-red/accounts/setup-check/01-the-bank-card-says-savings-comes-from-sample-statement-savin.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-empty-red/accounts/setup-check/01-the-bank-card-says-savings-comes-from-sample-statement-savin.aria.yml"
+				},
+				{
+					"name": "its basis names the bank Account and calls what Budge cannot know unknown",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-empty-red/accounts/setup-check/02-its-basis-names-the-bank-account-and-calls-what-budge-cannot.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-empty-red/accounts/setup-check/02-its-basis-names-the-bank-account-and-calls-what-budge-cannot.aria.yml"
+				},
+				{
+					"name": "Confirm with the field empty asks, at the field, for the balance the bank showed on the cutover date",
+					"result": "failed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-empty-red/accounts/setup-check/03-confirm-with-the-field-empty-asks-at-the-field-for-the-balan-failed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-empty-red/accounts/setup-check/03-confirm-with-the-field-empty-asks-at-the-field-for-the-balan-failed.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-balance-empty-red/accounts/setup-check/trace.zip",
+			"error": "expect(locator).toHaveText(expected) failed\n\nLocator: getByRole('dialog', { name: 'Starting balance for Savings' }).getByRole('alert')\nExpected pattern: /^Enter the balance your bank showed on [A-Z][a-z]{2} 1, \\d{4}\\.$/\nReceived string:  \"\"\nTimeout: 5000ms\n\nCall log:\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n  - Expect \"toHaveText\" getByRole('dialog', { name: 'Starting balance for Savings' }).getByRole('alert') with timeout 5000ms\n  - waiting for getByRole('dialog', { name: 'Starting balance for Savings' }).getByRole('alert')\n    14 × locator resolved to <p role=\"alert\" class=\"text-sm text-destructive sm:min-h-10 sm:min-w-0 sm:flex-1\"></p>\n       - unexpected value \"\"\n  - taking page screenshot\n  - waiting for fonts to load...\n  - fonts loaded\n"
+		}
+	]
+}

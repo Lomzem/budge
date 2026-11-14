@@ -39,6 +39,7 @@ export interface Draft {
 	readonly lines: Line[];
 	readonly choice: Choice;
 	readonly picked: boolean;
+	remember: boolean;
 	readonly link: string | undefined;
 	readonly nextLineKey: number;
 	readonly filledFrom: SavedSize | null;
@@ -52,6 +53,7 @@ interface SavedSize {
 export interface Saved extends SavedSize {
 	readonly accountId: Id<'accounts'>;
 	readonly payeeName: string | null;
+	readonly startingBalance: boolean;
 	readonly memo: string | null;
 	readonly categoryId: Id<'categories'> | null;
 	readonly categoryName: string | null;
@@ -101,8 +103,15 @@ export type Payload =
 	| { readonly kind: 'invalid'; readonly message: string; readonly field: Field }
 	| { readonly kind: 'ready'; readonly fields: Fields };
 
+export interface Remembering {
+	readonly payee: string;
+	readonly remembered: Id<'categories'> | null | undefined;
+	readonly already: boolean;
+}
+
 export interface View<Candidate> {
 	readonly selection: Selection;
+	readonly remembering: Remembering | undefined;
 	readonly transferAccounts: readonly AccountChoice[];
 	readonly cardPayment: boolean;
 	readonly remainder: number | undefined;
@@ -136,7 +145,7 @@ function directionOf(cents: number): Direction {
 	return cents < 0 ? 'outflow' : 'inflow';
 }
 
-function choiceOf(saved: Saved): Choice {
+function choiceOf(saved: Pick<Saved, 'transfer' | 'splits' | 'categoryId'>): Choice {
 	if (saved.transfer) return { kind: 'transfer', accountId: saved.transfer.accountId };
 	if (saved.splits) return { kind: 'split' };
 	if (saved.categoryId !== null) return { kind: 'category', categoryId: saved.categoryId };
@@ -161,6 +170,7 @@ export function openDraft(start: {
 			lines: [],
 			choice: { kind: 'uncategorized' },
 			picked: false,
+			remember: false,
 			link: undefined,
 			nextLineKey: 0,
 			filledFrom: null
@@ -183,6 +193,7 @@ export function openDraft(start: {
 		lines,
 		choice: choiceOf(saved),
 		picked: false,
+		remember: false,
 		link: undefined,
 		nextLineKey: lines.length,
 		filledFrom: { date: saved.date, amount: saved.amount }
@@ -210,8 +221,26 @@ function recallsCategory(draft: Draft) {
 }
 
 export function recallQuery(draft: Draft): { name: string } | undefined {
+	return recallsCategory(draft) ? memoryQuery(draft) : undefined;
+}
+
+export function memoryQuery(draft: Draft): { name: string } | undefined {
 	const name = draft.payee.trim();
-	return recallsCategory(draft) && name !== '' ? { name } : undefined;
+	return name === '' ? undefined : { name };
+}
+
+function rememberingOf(
+	draft: Draft,
+	world: World,
+	choice: Choice | undefined
+): Remembering | undefined {
+	const query = memoryQuery(draft);
+	if (choice?.kind !== 'category' || query === undefined || world.saved?.startingBalance) {
+		return undefined;
+	}
+	const memory = world.payeeMemory;
+	const remembered = memory.kind === 'loaded' && !memory.stale ? memory.data : undefined;
+	return { payee: query.name, remembered, already: remembered === choice.categoryId };
 }
 
 function categoryIn(world: World, id: string): Id<'categories'> | undefined {
@@ -233,7 +262,7 @@ function selectionOf(draft: Draft, world: World): Selection {
 	if (memory.kind === 'failed') {
 		return {
 			kind: 'recallFailed',
-			message: "Budge couldn't look up this Payee's last Category. Pick one to save."
+			message: "Budge couldn't look up this Payee's remembered Category. Pick one to save."
 		};
 	}
 	if (memory.data === null) return { kind: 'uncategorized' };
@@ -291,6 +320,33 @@ function transferAccountsOf(draft: Draft, accounts: readonly AccountChoice[]) {
 function isCardPayment(draft: Draft, selection: Selection, accounts: readonly AccountChoice[]) {
 	if (selection.kind !== 'transfer') return false;
 	return !(isCash(accounts, draft.accountId) && isCash(accounts, selection.accountId));
+}
+
+export type RowChoice = Exclude<Choice, { readonly kind: 'split' }>;
+
+export function savedOptionOf(saved: Pick<Saved, 'transfer' | 'splits' | 'categoryId'>): string {
+	return optionOf(choiceOf(saved));
+}
+
+export function rowChoiceFor(option: string): RowChoice | undefined {
+	if (option === UNCATEGORIZED_OPTION) return { kind: 'uncategorized' };
+	if (option === SPLIT_OPTION || option === UNRESOLVED_OPTION) return undefined;
+	if (option.startsWith(TRANSFER_OPTION)) {
+		return { kind: 'transfer', accountId: option.slice(TRANSFER_OPTION.length) as Id<'accounts'> };
+	}
+	return { kind: 'category', categoryId: option as Id<'categories'> };
+}
+
+export function rowTransferAccounts(
+	row: { readonly accountId: string; readonly amount: number },
+	accounts: readonly AccountChoice[]
+): AccountChoice[] {
+	const fromCash = isCash(accounts, row.accountId);
+	return accounts.filter((account) => {
+		if (account._id === row.accountId) return false;
+		if (fromCash) return account.kind === 'cash' || row.amount <= 0;
+		return account.kind === 'cash' && row.amount >= 0;
+	});
 }
 
 export function choose(draft: Draft, option: string, world: World): Draft {
@@ -471,7 +527,8 @@ function payloadOf(
 	world: World,
 	choice: Choice,
 	transferAccounts: readonly AccountChoice[],
-	linked: { readonly _id: Id<'transactions'> } | undefined
+	linked: { readonly _id: Id<'transactions'> } | undefined,
+	remembering: Remembering | undefined
 ): Payload {
 	const account = world.accounts.find((a) => a._id === draft.accountId);
 	const amount = signedAmount(draft);
@@ -486,7 +543,12 @@ function payloadOf(
 		case 'category':
 			return {
 				kind: 'ready',
-				fields: { ...shared, payee: draft.payee, categoryId: choice.categoryId }
+				fields: {
+					...shared,
+					payee: draft.payee,
+					categoryId: choice.categoryId,
+					...(draft.remember && remembering?.already === false ? { rememberCategory: true } : {})
+				}
 			};
 		case 'split': {
 			const splits = splitsOf(draft, world);
@@ -526,6 +588,7 @@ export function view<Candidate extends { readonly _id: Id<'transactions'> }>(
 			? (draft.link ?? NEW_SIDE)
 			: (candidates[0]?._id ?? NEW_SIDE);
 	const choice = resolvedChoice(selection);
+	const remembering = rememberingOf(draft, world, choice);
 	const linkLoading = linkQuery(draft, world) !== undefined && linkCandidates.kind === 'loading';
 	const payload: Payload =
 		choice === undefined || linkLoading
@@ -535,10 +598,12 @@ export function view<Candidate extends { readonly _id: Id<'transactions'> }>(
 					world,
 					choice,
 					transferAccounts,
-					candidates.find((candidate) => candidate._id === link)
+					candidates.find((candidate) => candidate._id === link),
+					remembering
 				);
 	return {
 		selection,
+		remembering,
 		transferAccounts,
 		cardPayment: isCardPayment(draft, selection, world.accounts),
 		remainder: remainderOf(draft),

@@ -266,7 +266,8 @@ async function editLikeTheOwner(
 			payee: payee?.name ?? '',
 			categoryId: transaction.categoryId,
 			memo: transaction.memo ?? ''
-		})
+		}),
+		{ rememberCategory: false }
 	);
 }
 

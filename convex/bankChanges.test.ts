@@ -1070,3 +1070,69 @@ describe('the Bank changes list', () => {
 		});
 	});
 });
+
+describe('a bank change that arrives while a later cutover date move can still be undone', () => {
+	async function movedPastGrocer() {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(new Date('2026-08-20T18:00:00Z'));
+		onTestFinished(() => {
+			vi.useRealTimers();
+		});
+		const budget = await syncedBudget();
+		const confirmed = { cutoverDate: '2026-08-15', today: '2026-08-20' };
+		const preview = await budget.owner.query(api.settings.previewLaterCutover, confirmed);
+		assert(preview.kind === 'ready', `expected a ready preview, got ${preview.kind}`);
+		const moveId = await budget.owner.mutation(api.settings.applyLaterCutover, {
+			...confirmed,
+			fingerprint: preview.fingerprint,
+			unlockReconciled: false
+		});
+		expect((await budget.rows()).map((row) => row.payeeName)).toEqual(['SAMPLE PAYROLL']);
+		return { budget, moveId };
+	}
+
+	test('comes back with the folded Transaction as a bank change to resolve', async () => {
+		const { budget, moveId } = await movedPastGrocer();
+		await budget.sync(changes({ modified: [grocerChanged] }));
+
+		await budget.owner.mutation(api.settings.undoLaterCutover, { moveId });
+
+		const restored = await budget.row('SAMPLE GROCER 0193');
+		expect(restored).toMatchObject({
+			date: '2026-08-14',
+			amount: -4_250,
+			bankRows: [{ state: 'changed', date: '2026-08-16', amount: -4_550 }]
+		});
+		expect(await budget.balance()).toBe(100_000 + 231_042 - 4_250);
+		await budget.expectTotalsRebuild();
+		const importId = restored.bankRows[0]?._id;
+		assert(importId !== undefined, 'No Bank Row');
+		await budget.owner.mutation(api.imports.resolveBankChange, { importId, keep: 'bank' });
+		expect(await budget.row('SAMPLE GROCER 0193')).toMatchObject({
+			date: '2026-08-16',
+			amount: -4_550,
+			bankRows: [{ state: 'linked' }]
+		});
+	});
+
+	test.each([
+		{ change: 'removes it', page: () => changes({ removed: [grocer.transaction_id] }) },
+		{
+			change: 'moves it before the new cutover date',
+			page: () => changes({ modified: [{ ...grocer, date: '2026-08-10' }] })
+		}
+	])(
+		'stops the move from being undone when the bank $change, and changes nothing',
+		async ({ page }) => {
+			const { budget, moveId } = await movedPastGrocer();
+			await budget.sync(page());
+			const synced = await budget.snapshot();
+
+			expect(
+				await publicErrorMessage(budget.owner.mutation(api.settings.undoLaterCutover, { moveId }))
+			).toMatch(/The bank removed SAMPLE GROCER 0193 \(2026-08-14\) or moved it before 2026-08-15/);
+
+			expect(await budget.snapshot()).toEqual(synced);
+		}
+	);
+});

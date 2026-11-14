@@ -1,0 +1,6 @@
+$ bun run sync && PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-check --tsconfig ./tsconfig.json --fail-on-warnings
+$ PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-kit sync
+1794652751386 START "/home/lomzem/proj/budge"
+1794652751389 ERROR "src/lib/components/bank/connection-card.svelte" 562:23 "Property 'fallback' is missing in type '{ continuation: () => HTMLButtonElement | null; }' but required in type 'FocusReturn'."
+1794652751389 COMPLETED 1690 FILES 1 ERRORS 0 WARNINGS 1 FILES_WITH_PROBLEMS
+error: script "typecheck:app" exited with code 1

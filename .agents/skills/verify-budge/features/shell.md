@@ -23,7 +23,7 @@ Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, 
 - `shell/navigate`: Budget landing, every sidebar Section, a wheel over the Budget table and the sidebar scrolling the page, then the 320 px tab bar to every Section and an Account (`shell-nav`).
 - `shell/phone-pages`: at 390 px, every Section and the Checking register load and scroll to the end (`shell-stable`).
 
-Every journey runs under the layout-shift guard (`e2e/journeys/layoutShift.ts`): a shift not caused by recent input fails the journey and names the elements that moved.
+Every journey runs under the layout-shift guard (`e2e/journeys/layoutShift.ts`): a shift fails the journey and names the elements that moved unless it comes within 500 ms of input, or while a request sent within 500 ms of input is pending and up to 500 ms after its result arrives (a mutation once the page has synced its commit, a new query once its first result lands). Background updates and page loads with no input still fail.
 
 The recipes below cover what the journeys leave out.
 
@@ -38,6 +38,7 @@ Preconditions:
 ## Gotchas
 
 - **Load:** a hard load of any Section paints the sidebar (or the phone tab bar) with the Sections at once, with `Loading…` in the page area; the Accounts list and badges join when the owner check finishes. Only a forbidden account or an unreachable server shows the centered Budge screen.
+- **Focus after a dialog:** closing any dialog focuses what opened it (for a dialog opened from a menu item, the menu's trigger), else the destination its page names (each feature file lists them), else `#main`; focus on `<body>` after a dialog closes is a bug. When another dialog stays open beneath it, focus stays inside that dialog: on its opener, destination or fallback when inside it, else its first focusable control.
 - **Manual drive:** keyboard-activate `Skip to content` and require focus on `#main`. In the sidebar, verify the Unapproved and Bank badges, Cash/Credit group totals and each Account balance against the Accounts page.
 
 - Desktop Chromium mobile emulation does not prove iOS installation, safe areas, standalone auth or resume. No real-device proof in this run.

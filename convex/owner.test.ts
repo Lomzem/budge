@@ -21,6 +21,7 @@ function sampleArgs(ids: {
 	payeeId: Id<'payees'>;
 	connectionId: Id<'bankConnections'>;
 	connectionAccountId: Id<'connectionAccounts'>;
+	moveId: Id<'cutoverMoves'>;
 }) {
 	const {
 		accountId,
@@ -30,7 +31,8 @@ function sampleArgs(ids: {
 		importId,
 		payeeId,
 		connectionId,
-		connectionAccountId
+		connectionAccountId,
+		moveId
 	} = ids;
 
 	const entry = { accountId, date: '2026-08-14', amount: -500, payee: 'Corner Grocer', memo: '' };
@@ -40,6 +42,15 @@ function sampleArgs(ids: {
 		'export:page': { table: 'accounts', paginationOpts: { numItems: 10, cursor: null } },
 		'settings:get': {},
 		'settings:setCutoverDate': { cutoverDate: '2026-08-01' },
+		'settings:previewLaterCutover': { cutoverDate: '2026-08-15', today: '2026-08-20' },
+		'settings:applyLaterCutover': {
+			cutoverDate: '2026-08-15',
+			today: '2026-08-20',
+			fingerprint: 'synthetic-fingerprint',
+			unlockReconciled: false
+		},
+		'settings:lastMove': {},
+		'settings:undoLaterCutover': { moveId },
 		'accounts:list': {},
 		'accounts:create': { name: 'Wallet', kind: 'cash', startingBalance: 0 },
 		'accounts:rename': { accountId, name: 'Wallet' },
@@ -49,6 +60,12 @@ function sampleArgs(ids: {
 		'transactions:list': { paginationOpts: { numItems: 10, cursor: null } },
 		'transactions:create': entry,
 		'transactions:update': { transactionId, ...entry },
+		'transactions:categorize': { transactionId, choice: { kind: 'uncategorized' } },
+		'transactions:categorizeMany': { transactionIds: [transactionId], categoryId, approve: false },
+		'transactions:undoCategorizeMany': {
+			categoryId,
+			changes: [{ transactionId, previousCategoryId: null, approvedNow: false }]
+		},
 		'transactions:remove': { transactionId },
 		'transactions:setCleared': { transactionId, cleared: true },
 		'transactions:unlock': { transactionId },
@@ -85,6 +102,7 @@ function sampleArgs(ids: {
 		'heldAccounts:stopSyncing': { connectionAccountId },
 		'heldAccounts:restore': { connectionAccountId },
 		'heldAccounts:suggestStartingBalance': { accountId },
+		'heldAccounts:startingBalanceEvidence': { accountId },
 		'payees:lastCategory': { name: 'Corner Grocer' },
 		'payees:list': {},
 		'payees:rename': { payeeId, name: 'Corner Market' },
@@ -223,6 +241,14 @@ describe('the owner guard', () => {
 				externalId: 'account-synthetic-savings',
 				state: 'held'
 			});
+			const moveId = await ctx.db.insert('cutoverMoves', {
+				from: '2026-07-01',
+				to: '2026-08-01',
+				fingerprint: 'synthetic-fingerprint',
+				state: 'applied',
+				startingBalances: [],
+				assignments: []
+			});
 			return {
 				accountId,
 				transactionId,
@@ -231,7 +257,8 @@ describe('the owner guard', () => {
 				importId,
 				payeeId,
 				connectionId,
-				connectionAccountId
+				connectionAccountId,
+				moveId
 			};
 		});
 		const sample = sampleArgs(ids);

@@ -1,0 +1,75 @@
+import { afterEach, beforeEach, expect, test, vi, assert } from 'vitest';
+import { api, internal } from './_generated/api';
+import { startBudget, useOwnerEnv, publicErrorMessage } from './test.helper';
+useOwnerEnv();
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-13T12:00:00Z')); });
+afterEach(() => vi.useRealTimers());
+async function setup() {
+ const b = await startBudget({cutoverDate:'2026-09-01', accounts:{Checking:['cash',10000], Card:['creditCard',-2000]},groups:{Daily:['Food','Other']}});
+ const entry = await b.owner.mutation(api.transactions.create,{accountId:b.accounts.Checking,date:'2026-10-15',amount:-1000,payee:'Shop',memo:'old',categoryId:b.categories.Food});
+ const preview = await b.owner.query(api.settings.previewLaterCutover,{cutoverDate:'2026-11-01',today:'2026-11-13'});
+ assert(preview.kind === 'ready');
+ const args={cutoverDate:'2026-11-01',today:'2026-11-13',fingerprint:preview.fingerprint,unlockReconciled:true};
+ const moveId = await b.owner.mutation(api.settings.applyLaterCutover,args);
+ const starting = await b.t.run(ctx=>ctx.db.query('transactions').withIndex('by_accountId_and_kind',q=>q.eq('accountId',b.accounts.Checking).eq('kind','startingBalance')).unique());
+ assert(starting);
+ return {...b,moveId,starting,args,entry};
+}
+test.each(['memo','category','cleared','approval'])('undo refuses overwriting postmove Starting Balance %s',async field=>{
+ const b=await setup();
+ if(field==='cleared') await b.owner.mutation(api.transactions.setCleared,{transactionId:b.starting._id,cleared:false});
+ else if(field==='approval') await b.owner.mutation(api.transactions.unapprove,{transactionIds:[b.starting._id]});
+ else await b.owner.mutation(api.transactions.update,{transactionId:b.starting._id,accountId:b.accounts.Checking,date:'2026-11-01',amount:9000,payee:'',memo:field==='memo'?'new note':b.starting.memo??'',categoryId:field==='category'?b.categories.Other:b.starting.categoryId});
+ expect(await publicErrorMessage(b.owner.mutation(api.settings.undoLaterCutover,{moveId:b.moveId}))).toBeDefined();
+});
+test('undo preserves unrelated later edit and rebuilt cache',async()=>{
+ const b=await setup();
+ const id=await b.owner.mutation(api.transactions.create,{accountId:b.accounts.Checking,date:'2026-11-04',amount:-321,payee:'Later',memo:'preserve',categoryId:b.categories.Other});
+ await b.owner.mutation(api.budget.setAssigned,{month:'2026-11',categoryId:b.categories.Other,amount:123});
+ await b.owner.mutation(api.settings.undoLaterCutover,{moveId:b.moveId});
+ expect(await b.t.run(ctx=>ctx.db.get('transactions',id))).toMatchObject({amount:-321,memo:'preserve'});
+ expect((await b.owner.query(api.accounts.list,{})).find(a=>a.name==='Checking')?.balance).toBe(8679);
+ const totals=()=>b.t.run(async ctx=>(await ctx.db.query('monthlyTotals').collect()).map(({_id,_creationTime,...r})=>JSON.stringify(r)).sort());
+ const before=await totals(); await b.t.mutation(internal.monthlyTotals.rebuild,{}); expect(await totals()).toEqual(before);
+});
+test('undo rejects first move after a second move',async()=>{
+ const b=await setup(); const p=await b.owner.query(api.settings.previewLaterCutover,{cutoverDate:'2026-11-02',today:'2026-11-13'}); assert(p.kind==='ready');
+ const second=await b.owner.mutation(api.settings.applyLaterCutover,{cutoverDate:'2026-11-02',today:'2026-11-13',fingerprint:p.fingerprint,unlockReconciled:true});
+ expect(await publicErrorMessage(b.owner.mutation(api.settings.undoLaterCutover,{moveId:b.moveId}))).toMatch(/moved again/);
+ await b.owner.mutation(api.settings.undoLaterCutover,{moveId:second});
+ expect(await publicErrorMessage(b.owner.mutation(api.settings.undoLaterCutover,{moveId:b.moveId}))).toBeDefined();
+});
+test('a bank modification received while folded remains visible after undo',async()=>{
+ const b=await startBudget({cutoverDate:'2026-09-01',accounts:{Checking:['cash',10000]}});
+ const connectionId=await b.t.run(async ctx=>{
+ const id=await ctx.db.insert('bankConnections',{name:'Synthetic',status:'ok',syncLeaseUntil:123,provider:{kind:'plaid',itemId:'fake',encryptedToken:'fake'}});
+ await ctx.db.insert('connectionAccounts',{connectionId:id,externalId:'external',state:'mapped',accountId:b.accounts.Checking}); return id;
+ });
+ const row={externalAccountId:'external',sourceId:'bank-1',date:'2026-10-15',amount:-1000,bankText:'SYNTHETIC'};
+ const sync=(fromCursor:string|null,nextCursor:string,rows:typeof row[],modified:typeof row[])=>b.t.mutation(internal.bankConnections.apply,{connectionId,lease:123,fromCursor,nextCursor,hasMore:false,rows,modified,removed:[],release:false,attentionNotices:0});
+ await sync(null,'first',[row],[]);
+ const p=await b.owner.query(api.settings.previewLaterCutover,{cutoverDate:'2026-11-01',today:'2026-11-13'}); assert(p.kind==='ready');
+ const moveId=await b.owner.mutation(api.settings.applyLaterCutover,{cutoverDate:'2026-11-01',today:'2026-11-13',fingerprint:p.fingerprint,unlockReconciled:true});
+ // Acquire the next page's valid lease, as the real sync driver does.
+ const connection=await b.t.run(ctx=>ctx.db.get('bankConnections',connectionId)); assert(connection);
+ const synced=await b.t.mutation(internal.bankConnections.apply,{connectionId,lease:connection.syncLeaseUntil!,fromCursor:'first',nextCursor:'second',hasMore:false,rows:[],modified:[{...row,date:'2026-11-03',amount:-1500}],removed:[],release:false,attentionNotices:0});
+ expect(synced.kind).toBe('applied');
+ await b.owner.mutation(api.settings.undoLaterCutover,{moveId});
+ const result=await b.owner.query(api.transactions.list,{accountId:b.accounts.Checking,paginationOpts:{cursor:null,numItems:100}});
+ const restored=result.page.find(t=>t.payeeName==='SYNTHETIC'); assert(restored);
+ expect(restored.bankRows[0]?.amount).toBe(-1500);
+ expect(restored.bankRows[0]?.state).toBe('changed');
+});
+test.each([
+ ['2026-11-01T09:59:00Z','2026-10-31',true],
+ ['2026-11-01T10:00:00Z','2026-11-02',true],
+ ['2026-03-08T09:59:00Z','2026-03-07',true],
+ ['2026-03-08T10:01:00Z','2026-03-09',true],
+ ['2026-11-01T09:59:00Z','2026-11-02',false],
+ ['2026-11-01T12:00:00Z','2026-10-31',false],
+] as const)('server-clock envelope at %s allows %s: %s',async(now,today,allowed)=>{
+ vi.setSystemTime(new Date(now)); const b=await startBudget({cutoverDate:'2026-01-01',accounts:{Checking:['cash',100]}});
+ const p=await b.owner.query(api.settings.previewLaterCutover,{cutoverDate:'2026-02-01',today}); assert(p.kind==='ready');
+ const message=await publicErrorMessage(b.owner.mutation(api.settings.applyLaterCutover,{cutoverDate:'2026-02-01',today,fingerprint:p.fingerprint,unlockReconciled:true}));
+ expect(message===undefined).toBe(allowed);
+});

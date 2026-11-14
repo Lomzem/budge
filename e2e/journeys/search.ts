@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
-import { choose, type Journey } from './journey';
+import { choose, expectNothingPastTheRightEdge, type Journey } from './journey';
 
 async function openAllAccounts(page: Page) {
 	await page.goto('/accounts');
@@ -96,9 +96,7 @@ export const search = {
 			await step('search works with nothing scrolling sideways', async () => {
 				await page.getByRole('searchbox', { name: 'Search' }).fill('0042');
 				await expect.poll(() => listedPayees(page)).toEqual(['Sample Coffee Shop']);
-				expect(
-					await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
-				).toBe(true);
+				await expectNothingPastTheRightEdge(page);
 			});
 		}
 	}

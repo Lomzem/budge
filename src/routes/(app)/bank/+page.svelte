@@ -9,22 +9,42 @@
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import {
+		feedNeedsYou,
 		getBankConnections,
 		type BankConnection,
 		type HeldAccount
 	} from '$lib/bankConnections.svelte';
+	import StartingBalanceDialog from '$lib/components/accounts/starting-balance-dialog.svelte';
 	import ConnectionCard from '$lib/components/bank/connection-card.svelte';
 	import HeldAccountDialog from '$lib/components/bank/held-account-dialog.svelte';
+	import CutoverDate from '$lib/components/settings/cutover-date.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { mainRegion, type FocusReturn } from '$lib/focusReturn';
 
+	const accounts = getAccounts();
 	const bank = getBankConnections();
 	const settings = useQuery(api.settings.get, {});
 	const outcomes = new SvelteMap<Id<'connectionAccounts'>, string>();
 	let heldDialog: { open: (account: HeldAccount) => void } | undefined = $state();
+	let startingBalance: { open: (account: Account) => void } | undefined = $state();
 	let result = $state('');
+	let next: { to: 'categorize' | 'history'; accountId: Id<'accounts'>; name: string } | null =
+		$state(null);
 	let connectButton: HTMLButtonElement | null = $state(null);
+	let nextLink: HTMLAnchorElement | null = $state(null);
+	let settingUp: {
+		connectionId: Id<'bankConnections'>;
+		connectionAccountId: Id<'connectionAccounts'>;
+	} | null = null;
+	let landed = false;
 	let order: Id<'bankConnections'>[] = $state([]);
+	let cutoverUnsetOnArrival = $state(false);
+
+	$effect(() => {
+		if (settings.data?.cutoverDate === null) cutoverUnsetOnArrival = true;
+	});
 
 	const ready = $derived(bank.loaded && settings.data !== undefined);
 	const blocker = $derived.by(() => {
@@ -39,6 +59,7 @@
 		if (connection.status === 'needsAttention' || connection.lastError !== null) return 0;
 		if (connection.consentEndsAt !== null || connection.overdue) return 1;
 		if (bank.heldFrom(connection._id).length > 0) return 2;
+		if (connection.feeds.some(feedNeedsYou)) return 2;
 		if (!connection.bankLogin) return 3;
 		return 4;
 	}
@@ -72,13 +93,14 @@
 
 	async function removed(connectionId: Id<'bankConnections'>, report: string) {
 		const at = connections.findIndex((connection) => connection._id === connectionId);
-		const next = connections[at + 1] ?? connections[at - 1];
+		const following = connections[at + 1] ?? connections[at - 1];
+		next = null;
 		result = report;
 		await tick();
 		const card =
-			next === undefined
+			following === undefined
 				? null
-				: document.getElementById(`connection-${next._id}`)?.closest('article');
+				: document.getElementById(`connection-${following._id}`)?.closest('article');
 		if (card) card.focus();
 		else connectButton?.focus();
 	}
@@ -86,7 +108,51 @@
 	async function connect() {
 		if (!ready || blocker !== null || connectBlocked) return;
 		result = '';
+		next = null;
 		result = (await bank.connect()) ?? '';
+	}
+
+	function setUp(account: HeldAccount) {
+		settingUp = { connectionId: account.connectionId, connectionAccountId: account._id };
+		landed = false;
+		heldDialog?.open(account);
+	}
+
+	function check(accountId: Id<'accounts'>) {
+		const account = accounts.find(accountId);
+		if (account === undefined) return;
+		settingUp = null;
+		landed = false;
+		startingBalance?.open(account);
+	}
+
+	const afterSetup: FocusReturn = {
+		opener: (opened) => (landed || settingUp !== null ? null : opened),
+		continuation: () => {
+			if (landed) return nextLink;
+			if (settingUp === null) return undefined;
+			const { connectionId, connectionAccountId } = settingUp;
+			const card = document.getElementById(`connection-${connectionId}`)?.closest('article');
+			if (!card) return connectButton;
+			const setup = card.querySelector<HTMLElement>(`[data-setup="${connectionAccountId}"]`);
+			const check = card.querySelector<HTMLElement>(`[data-check="${connectionAccountId}"]`);
+			return setup ?? check ?? card;
+		},
+		fallback: mainRegion
+	};
+
+	function confirmed(account: { _id: Id<'accounts'>; name: string }) {
+		const history = bank.all
+			.flatMap((connection) => connection.feeds)
+			.find((feed) => feed.accountId === account._id && feed.historyIn !== null)?.historyIn;
+		if (history) {
+			result = `${account.name}'s starting balance is confirmed. Its bank Account's earlier Transactions are still in ${history.name}.`;
+			next = { to: 'history', accountId: history.accountId, name: history.name };
+		} else {
+			result = `${account.name}'s starting balance is confirmed.`;
+			next = { to: 'categorize', accountId: account._id, name: account.name };
+		}
+		landed = true;
 	}
 </script>
 
@@ -130,10 +196,8 @@
 			</p>
 		{:else if blocker === 'cutover'}
 			<p id="bank-blocker" class="rounded-lg bg-warning-tint p-4">
-				Set the cutover date in <a
-					href={resolve('/settings')}
-					class="font-bold underline underline-offset-4 hover:no-underline">Settings</a
-				> before connecting a bank, so Budge knows which transactions to bring in.
+				Set the cutover date below before connecting a bank, so Budge knows which transactions to
+				bring in.
 			</p>
 		{:else if bank.service?.environment === 'sandbox'}
 			<p class="rounded-lg bg-muted p-4">
@@ -141,6 +205,12 @@
 				and sign in as <kbd class="font-bold">user_good</kbd> with password
 				<kbd class="font-bold">pass_good</kbd>.
 			</p>
+		{/if}
+
+		{#if cutoverUnsetOnArrival}
+			<div class="max-w-2xl rounded-lg border bg-card p-5 sm:p-6">
+				<CutoverDate />
+			</div>
 		{/if}
 
 		<section aria-labelledby="connections-heading" class="flex flex-col gap-3">
@@ -163,9 +233,8 @@
 							<ConnectionCard
 								{connection}
 								{outcomes}
-								onsetup={(account: HeldAccount) => {
-									heldDialog?.open(account);
-								}}
+								onsetup={setUp}
+								oncheck={check}
 								onremoved={(connectionId: Id<'bankConnections'>, report: string) => {
 									void removed(connectionId, report);
 								}}
@@ -183,13 +252,30 @@
 		? 'sr-only'
 		: 'fixed inset-x-4 bottom-20 z-50 mx-auto flex max-w-md items-center gap-3 rounded-md border bg-popover py-2 pr-2 pl-4 text-sm shadow-lg lg:bottom-6'}
 >
-	<p role="status" class="min-w-0 flex-1">{result}</p>
+	<p role="status" class="min-w-0 flex-1">
+		{result}
+		{#if result !== '' && next?.to === 'categorize'}
+			<a
+				bind:this={nextLink}
+				href="{resolve('/accounts')}?account={next.accountId}&category=uncategorized"
+				class="font-medium underline underline-offset-4 hover:no-underline"
+				>Categorize its Transactions</a
+			>
+		{:else if result !== '' && next?.to === 'history'}
+			<a
+				bind:this={nextLink}
+				href={resolve('/(app)/accounts/[accountId]', { accountId: next.accountId })}
+				class="font-medium underline underline-offset-4 hover:no-underline">Open {next.name}</a
+			>
+		{/if}
+	</p>
 	{#if result !== ''}
 		<Button
 			variant="ghost"
 			size="sm"
 			onclick={() => {
 				result = '';
+				next = null;
 				connectButton?.focus();
 			}}
 		>
@@ -203,4 +289,12 @@
 	onsettled={(connectionAccountId: Id<'connectionAccounts'>, outcome: string) => {
 		outcomes.set(connectionAccountId, outcome);
 	}}
+	onconfirmed={confirmed}
+	returnFocus={afterSetup}
+/>
+
+<StartingBalanceDialog
+	bind:this={startingBalance}
+	onconfirmed={confirmed}
+	returnFocus={afterSetup}
 />

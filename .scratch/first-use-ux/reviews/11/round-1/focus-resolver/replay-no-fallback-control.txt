@@ -1,0 +1,2 @@
+Control run focus-resolver-replay-no-fallback: on top of replay-remove-destinations.diff and replay-probe-main.diff, both bank-page dialogs were given returnFocus={{ fallback: () => null }} (a resolver with no usable fallback, as before it existed).
+Result in journey-runs.txt: every probe received "body", the round-1 failure; with fallback: mainRegion the same steps received "main#main".

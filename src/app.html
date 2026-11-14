@@ -11,6 +11,16 @@
 		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
 		<link rel="icon" href="%sveltekit.assets%/icons/icon.svg" type="image/svg+xml" />
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
+		<link
+			rel="preload"
+			href="%budge.bodyFont%"
+			as="font"
+			type="font/woff2"
+			crossorigin="anonymous"
+		/>
+		<style>
+			%budge.fontFaces%
+		</style>
 		<script>
 			%budge.themeScript%
 		</script>

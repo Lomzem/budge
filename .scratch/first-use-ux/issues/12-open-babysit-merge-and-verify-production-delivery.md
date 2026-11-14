@@ -20,6 +20,19 @@ Acceptance:
 
 Proof: reuse deterministic CI and the focused judge evidence rather than authoring another duplicate test suite for the release ticket. Deployment evidence must be tied to the merged commit and observed production result. Use the deployment provider's event-driven monitoring when supported; do not infer success from a successful local build.
 
+## Comments
+
+### Delivery preparation, 2026-11-14
+
+- Read the delivery ticket, PR workflow, repository/authentication/deployment instructions and the five requested principles in full. No subagents started. The owner's explicit exception governs external review; automatic reviews remain disabled and no opt-in is used.
+- Confirmed `191c424..HEAD` before delivery preparation changes only `.scratch/`. Reused the recorded full check (924 tests and capacity), 56/56 local E2E and three 9/10 UI approvals; no application code changed during delivery preparation.
+- Pushed the six docs/task-record commits on `main` to `origin/main` at `3b68c84`, after a fully redacted outgoing-range secret scan and passing pre-push checks (856 tests, codegen and typecheck). The push ran the hooks again without bypass.
+- Merged `main` into `feat/first-use-ux` at `5728a2b`; the merge adds only two task records. Reviewed the delivery preparation against repository standards and ticket scope inline, honoring the owner's prohibition on subagents. No production/UI edits or new tests; test-authoring audit and new UI judging are inapplicable to this delivery-only work. Analysis-only correction disposition: no new implementation to correct.
+- Schema review: existing Transaction field validators are extracted unchanged, the confirmation field is optional, tables/indexes are additive, and `convex/migrations.ts` is unchanged. No backfill identified. Do not execute any production data repair.
+- The all-local-refs historical secret scan failed at `scripts/local/redacted-log.test.ts:31`, rule `stripe-access-token`. Its commit is outside both delivery branches. Fully redacted scans of each outgoing range passed; no exclusions or hook bypasses added.
+- Monitoring blocker: the required event-driven `watch_pull_request` tool is absent from the exposed tool catalog and a direct invocation is not callable. Do not replace it with polling. PR creation and remaining checks can proceed; merge and production verification remain pending until their evidence is obtained.
+- Principles affecting choices: Prove It Works requires latest-head CI and terminal production evidence; Sequence Verifiable Units keeps main push, integration, CI and deployment separate; Make Operations Idempotent prompted checking for an existing PR before creation; Fix Root Causes separated unrelated historical scan findings from outgoing commits; Guard the Context Window keeps command logs in temporary artifacts and records concise resumption evidence here.
+
 ## Testing gate (shared by every ticket)
 
 - Before authoring a test, name the protected observable contract, credible regression, primary owner, why existing proof misses it, and whether a test-only production seam would be needed. Choose a real boundary instead of adding such a seam.

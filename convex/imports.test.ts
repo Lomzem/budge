@@ -606,7 +606,8 @@ describe('the budget month after a Bank Row write', () => {
 				amount,
 				payee,
 				categoryId: groceries,
-				memo: ''
+				memo: '',
+				rememberCategory: true
 			});
 		const august = () => owner.query(api.budget.month, { month: '2026-08', today: '2026-08-20' });
 		const augustKeptAndRebuilt = async () => {

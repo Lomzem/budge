@@ -1,0 +1,3 @@
+# Green: latency-journeys.ts, 800 ms server->client delay, final layoutShift.ts
+bank-changes/take-the-banks PASS with 800ms response latency
+transfers/import-link PASS with 800ms response latency

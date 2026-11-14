@@ -1,5 +1,7 @@
 <script lang="ts">
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { useConvexClient, useQuery } from 'convex-svelte';
+	import type { FunctionReturnType } from 'convex/server';
 	import { onMount } from 'svelte';
 
 	import { api } from '$convex/_generated/api';
@@ -8,8 +10,14 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { getBankConnections } from '$lib/bankConnections.svelte';
+	import { labelOf } from '$lib/components/bank/held';
 	import { DialogSession } from '$lib/dialogSession.svelte';
+	import { formatDate } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
+
+	type Evidence = FunctionReturnType<typeof api.heldAccounts.startingBalanceEvidence>;
+	type Imported = Evidence['imported'];
 
 	let {
 		account,
@@ -18,20 +26,56 @@
 	}: {
 		account: { _id: Id<'accounts'>; kind: 'cash' | 'creditCard'; name: string };
 		skippable?: boolean;
-		onDone: () => void;
+		onDone: (confirmed: boolean) => void;
 	} = $props();
 
 	const client = useConvexClient();
+	const bank = getBankConnections();
 	const current = useQuery(api.accounts.startingBalance, () => ({ accountId: account._id }));
+	const evidence = useQuery(api.heldAccounts.startingBalanceEvidence, () => ({
+		accountId: account._id
+	}));
+	const settings = useQuery(api.settings.get, {});
 	const owed = $derived(account.kind === 'creditCard');
+	const cutoverDate = $derived(settings.data?.cutoverDate ?? evidence.data?.since ?? null);
+	const since = $derived(cutoverDate === null ? null : formatDate(cutoverDate));
+	const feeds = $derived(
+		bank.all.flatMap((connection) =>
+			connection.feeds.filter((one) => one.accountId === account._id)
+		)
+	);
+	const fed = $derived(feeds.length > 0);
+	const confirmed = $derived(
+		bank.loaded && current.data != null && feeds.every((one) => one.startingBalanceConfirmed)
+	);
+	const asks = $derived(
+		`Enter ${owed ? 'what you owed' : 'the balance your bank showed'} on ${since ?? 'the cutover date'}.`
+	);
 
 	const step = new DialogSession<object, 'suggest' | 'confirm'>();
 	const suggesting = $derived(step.pending('suggest'));
 	const saving = $derived(step.pending('confirm'));
 	let balance = $state('');
+	let field = $state<HTMLInputElement | null>(null);
+	let kept: string | null = null;
 	let synced = $state(true);
 	let suggestion = $state('');
 	let error = $state('');
+	let invalid = $state('');
+	let asked = $state<{
+		bankBalance: number;
+		imported: Imported;
+		source: NonNullable<Evidence['source']>;
+	} | null>(null);
+	let unasked = $state('Asking the bank…');
+	const imported = $derived(asked?.imported ?? evidence.data?.imported);
+	const source = $derived(asked?.source ?? evidence.data?.source);
+
+	$effect(() => {
+		if (kept !== null || !confirmed || current.data == null || balance !== '') return;
+		kept = typed(shown(current.data));
+		balance = kept;
+	});
 
 	onMount(() => {
 		step.open({});
@@ -49,34 +93,56 @@
 		return owed ? -startingBalance : startingBalance;
 	}
 
+	function transactions(count: number) {
+		return count === 1 ? '1 Transaction' : `${count.toLocaleString()} Transactions`;
+	}
+
+	function dated({ first, last }: Imported) {
+		if (first === null || last === null) return '';
+		return first === last
+			? `, dated ${formatDate(first)}`
+			: `, dated ${formatDate(first)} to ${formatDate(last)}`;
+	}
+
 	async function suggest() {
 		const accountId = account._id;
 		const typedBefore = balance;
 		suggestion = '';
-		const asked = await step.run('suggest', () =>
+		asked = null;
+		unasked = 'Asking the bank…';
+		const answer = await step.run('suggest', () =>
 			client.action(api.heldAccounts.suggestStartingBalance, { accountId })
 		);
-		if (!asked.ok) {
-			suggestion =
-				asked.error?.message ??
-				"Budge couldn't ask the bank for a balance. Enter the starting balance.";
+		if (!answer.ok) {
+			const reason = answer.error?.message ?? "Budge couldn't ask the bank for a balance.";
+			unasked = `Unknown. ${reason}`;
+			suggestion = `${reason} Enter the starting balance.`;
 			return;
 		}
-		const outcome = asked.value;
+		const outcome = answer.value;
 		if (outcome.kind === 'suggested') {
+			asked = {
+				bankBalance: outcome.bankBalance,
+				imported: outcome.imported,
+				source: outcome.source
+			};
 			const amount = typed(shown(outcome.startingBalance));
 			const basis =
-				"from the bank's current balance, less the Transactions imported since the cutover date.";
-			if (balance === typedBefore) {
+				'This is an estimate: open What it’s based on, and check it before you confirm.';
+			if (kept !== null && balance === kept) {
+				suggestion = `Budge estimates ${amount}. The confirmed balance stays. ${basis}`;
+			} else if (balance === typedBefore) {
 				balance = amount;
-				suggestion = `Budge suggests this ${basis}`;
+				suggestion = `Budge filled in an estimate. ${basis}`;
 			} else {
-				suggestion = `Budge suggests ${amount} ${basis} Your entry stays.`;
+				suggestion = `Budge estimates ${amount}. Your entry stays. ${basis}`;
 			}
 		} else if (outcome.kind === 'importing') {
+			unasked = 'Not asked yet: Budge is still bringing in rows.';
 			suggestion =
 				"Budge is still bringing in this Account's rows. Suggest again in a moment, or enter the starting balance.";
 		} else if (outcome.kind === 'noBalance') {
+			unasked = "Unknown. The bank didn't report one.";
 			suggestion = "The bank didn't report a balance for this Account. Enter the starting balance.";
 		} else {
 			synced = false;
@@ -87,12 +153,15 @@
 		event.preventDefault();
 		const cents = parseCents(balance);
 		if (cents === undefined) {
-			error = 'Enter the balance as an amount, such as 1,250.00.';
+			error = '';
+			invalid = balance.trim() === '' ? asks : 'Enter the balance as an amount, such as 1,250.00.';
+			field?.focus();
 			return;
 		}
 		const accountId = account._id;
 		const startingBalance = owed ? -cents : cents;
 		error = '';
+		invalid = '';
 		const saved = await step.run('confirm', () =>
 			client.mutation(api.accounts.setStartingBalance, { accountId, startingBalance })
 		);
@@ -100,14 +169,15 @@
 			error = saved.error?.message ?? "Budge couldn't save the starting balance. Try again.";
 			return;
 		}
-		onDone();
+		onDone(true);
 	}
 </script>
 
 <Dialog.Header>
 	<Dialog.Title>Starting balance for {account.name}</Dialog.Title>
 	<Dialog.Description>
-		The starting balance is recorded on the cutover date. Confirm or correct it.
+		Budge records it on {since ?? 'the cutover date'}{since === null ? '' : ', the cutover date'}.
+		Confirm or correct it.
 		{#if skippable}
 			You can change it later from the Account's actions.
 		{/if}
@@ -116,16 +186,21 @@
 <form class="flex flex-col gap-4" onsubmit={confirm}>
 	<div class="flex flex-col gap-2">
 		<Label for="starting-balance">
-			{owed ? 'Amount owed on the cutover date' : 'Starting balance'}
+			{owed ? `Amount owed on ${since ?? 'the cutover date'}` : 'Starting balance'}
 		</Label>
 		<Input
 			id="starting-balance"
+			bind:ref={field}
 			bind:value={balance}
 			inputmode="decimal"
-			placeholder={suggesting && synced ? 'Asking the bank…' : '0.00'}
+			placeholder={suggesting && synced ? 'Asking the bank…' : undefined}
 			autocomplete="off"
-			required
+			aria-invalid={invalid === '' ? undefined : true}
+			aria-describedby={invalid === '' ? undefined : 'starting-balance-error'}
 		/>
+		<p id="starting-balance-error" role="alert" class="text-sm text-destructive empty:hidden">
+			{invalid}
+		</p>
 		{#if current.data != null}
 			<p class="text-sm text-muted-foreground tabular-nums" data-testid="current-starting-balance">
 				Now {formatCents(shown(current.data))}{owed ? ' owed' : ''}
@@ -133,13 +208,92 @@
 		{/if}
 	</div>
 	<p role="status" class="text-sm text-muted-foreground">{suggestion}</p>
+	{#if fed}
+		<details class="group rounded-md bg-muted text-sm">
+			<summary
+				class="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md px-3 font-bold [&::-webkit-details-marker]:hidden"
+			>
+				<ChevronRightIcon
+					aria-hidden="true"
+					class="size-4 text-muted-foreground transition-transform group-open:rotate-90 motion-reduce:transition-none"
+				/>
+				What it’s based on
+			</summary>
+			<div class="flex flex-col gap-3 px-3 pb-3">
+				<dl class="flex flex-col gap-2">
+					<div>
+						<dt class="text-muted-foreground">Bank Account</dt>
+						<dd data-testid="bank-account">
+							{#if source === undefined}
+								Loading…
+							{:else if source === null}
+								Unknown.
+							{:else}
+								{labelOf({ name: source.bankName, mask: source.mask })} at {source.connectionName}
+							{/if}
+						</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">
+							{owed ? 'Owed now, says the bank' : 'Balance now, says the bank'}
+						</dt>
+						<dd class="tabular-nums" data-testid="bank-balance">
+							{asked === null ? unasked : formatCents(shown(asked.bankBalance))}
+						</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">When the bank measured it</dt>
+						<dd>Unknown. Not available to Budge.</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">Imported since {since ?? 'the cutover date'}</dt>
+						<dd data-testid="imported-since">
+							{#if imported === undefined}
+								Counting…
+							{:else}
+								{imported.count === 0
+									? 'None'
+									: `${transactions(imported.count)}${dated(imported)}`}
+							{/if}
+						</dd>
+					</div>
+					{#if imported !== undefined && imported.count > 0}
+						<div>
+							<dt class="text-muted-foreground">
+								{owed ? 'Their net change in what you owe' : 'Their net amount'}
+							</dt>
+							<dd class="tabular-nums">{formatCents(shown(imported.total))}</dd>
+						</div>
+					{/if}
+					<div>
+						<dt class="text-muted-foreground">
+							Every Transaction since {since ?? 'the cutover date'} arrived?
+						</dt>
+						<dd>Unknown. The bank doesn't say whether its history is complete.</dd>
+					</div>
+				</dl>
+				<p>
+					Budge's estimate is the bank's balance less the imported Transactions, so a missing
+					Transaction or an out-of-date balance makes it wrong. A working connection doesn't prove
+					it either. Compare it with your bank statement balance for the start of {since ??
+						'the cutover date'}.
+				</p>
+			</div>
+		</details>
+	{/if}
 	<Dialog.Footer {error}>
 		{#if synced}
 			<Button variant="outline" type="button" disabled={suggesting} onclick={suggest}>
 				Suggest again
 			</Button>
 		{/if}
-		<Button variant="outline" type="button" onclick={onDone}>
+		<Button
+			variant="outline"
+			type="button"
+			onclick={() => {
+				onDone(false);
+			}}
+		>
 			{skippable ? 'Skip' : 'Cancel'}
 		</Button>
 		<Button type="submit" disabled={saving}>Confirm</Button>

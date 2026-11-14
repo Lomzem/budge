@@ -1,0 +1,210 @@
+{
+	"result": "passed",
+	"checkout": "/home/lomzem/proj/budge-wt-t11fix",
+	"commit": "2212e039bd6bfbe380b42081229e2f8950adf9f3",
+	"uncommittedChanges": true,
+	"appUrl": "http://127.0.0.1:5173",
+	"journeys": [
+		{
+			"name": "accounts/setup-correct",
+			"title": "a bank Account set up in the wrong Account is moved through Stop syncing and Bring back, confirmed in its new one, and its earlier Transactions are shown still in the old one",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "at 390 px, set Sample Savings Plus up into Savings and skip its starting balance: its Check balance takes focus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/01-at-390-px-set-sample-savings-plus-up-into-savings-and-skip-i.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/01-at-390-px-set-sample-savings-plus-up-into-savings-and-skip-i.aria.yml"
+				},
+				{
+					"name": "the card says it goes into Savings, starting balance not confirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/02-the-card-says-it-goes-into-savings-starting-balance-not-conf.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/02-the-card-says-it-goes-into-savings-starting-balance-not-conf.aria.yml"
+				},
+				{
+					"name": "stop syncing it into Savings, and bring it back for setup",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/03-stop-syncing-it-into-savings-and-bring-it-back-for-setup.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/03-stop-syncing-it-into-savings-and-bring-it-back-for-setup.aria.yml"
+				},
+				{
+					"name": "set it up as a new Account and confirm its starting balance: the card and the status say its earlier Transactions are still in Savings, and its link takes focus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/04-set-it-up-as-a-new-account-and-confirm-its-starting-balance-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/04-set-it-up-as-a-new-account-and-confirm-its-starting-balance-.aria.yml"
+				},
+				{
+					"name": "once confirmed, the notice reads as information and counts in no \"need you\" count",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/05-once-confirmed-the-notice-reads-as-information-and-counts-in.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/05-once-confirmed-the-notice-reads-as-information-and-counts-in.aria.yml"
+				},
+				{
+					"name": "its earlier Transactions are in Savings, and not in Savings Plus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/06-its-earlier-transactions-are-in-savings-and-not-in-savings-p.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/06-its-earlier-transactions-are-in-savings-and-not-in-savings-p.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-correct/trace.zip"
+		},
+		{
+			"name": "accounts/setup-check",
+			"title": "a mapped bank Account's starting balance stays unconfirmed until the owner confirms it, and its basis says what is unknown",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "the Bank card says Savings comes from Sample Statement Savings, its starting balance not confirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-check/01-the-bank-card-says-savings-comes-from-sample-statement-savin.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-check/01-the-bank-card-says-savings-comes-from-sample-statement-savin.aria.yml"
+				},
+				{
+					"name": "its basis names the bank Account and calls what Budge cannot know unknown",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-check/02-its-basis-names-the-bank-account-and-calls-what-budge-cannot.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-check/02-its-basis-names-the-bank-account-and-calls-what-budge-cannot.aria.yml"
+				},
+				{
+					"name": "Cancel leaves it unconfirmed",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-check/03-cancel-leaves-it-unconfirmed.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-check/03-cancel-leaves-it-unconfirmed.aria.yml"
+				},
+				{
+					"name": "confirming it clears the problem, after a reload too, and points to categorizing",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-check/04-confirming-it-clears-the-problem-after-a-reload-too-and-poin.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-check/04-confirming-it-clears-the-problem-after-a-reload-too-and-poin.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/setup-check/trace.zip"
+		},
+		{
+			"name": "accounts/held-legacy-name",
+			"title": "a held bank Account recorded with a name but no kind is never preselected into the same-named Account",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "it opens on a new Account, not Savings",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-legacy-name/01-it-opens-on-a-new-account-not-savings.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-legacy-name/01-it-opens-on-a-new-account-not-savings.aria.yml"
+				},
+				{
+					"name": "choosing Savings asks the owner to check its kind, and Escape from its starting balance lands on its Check balance",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-legacy-name/02-choosing-savings-asks-the-owner-to-check-its-kind-and-escape.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-legacy-name/02-choosing-savings-asks-the-owner-to-check-its-kind-and-escape.aria.yml"
+				},
+				{
+					"name": "Savings lists its row",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-legacy-name/03-savings-lists-its-row.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-legacy-name/03-savings-lists-its-row.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-legacy-name/trace.zip"
+		},
+		{
+			"name": "accounts/held-ignore",
+			"title": "an ignored held bank Account leaves the list and stays gone",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "ignore Sample Holiday Club: its card takes focus",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-ignore/01-ignore-sample-holiday-club-its-card-takes-focus.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-ignore/01-ignore-sample-holiday-club-its-card-takes-focus.aria.yml"
+				},
+				{
+					"name": "brought back on the same page, it offers Set up again, and ignoring it again hides it",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-ignore/02-brought-back-on-the-same-page-it-offers-set-up-again-and-ign.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-ignore/02-brought-back-on-the-same-page-it-offers-set-up-again-and-ign.aria.yml"
+				},
+				{
+					"name": "after a reload, the other held Accounts remain and it stays gone",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-ignore/03-after-a-reload-the-other-held-accounts-remain-and-it-stays-g.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-ignore/03-after-a-reload-the-other-held-accounts-remain-and-it-stays-g.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-ignore/trace.zip"
+		},
+		{
+			"name": "accounts/held-map",
+			"title": "a held bank Account brought into an existing Account adds its rows and resets its Starting Balance",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "bring Sample Savings Plus into Savings with a $1,000.00 Starting Balance",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-map/01-bring-sample-savings-plus-into-savings-with-a-1-000-00-start.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-map/01-bring-sample-savings-plus-into-savings-with-a-1-000-00-start.aria.yml"
+				},
+				{
+					"name": "Savings lists its rows and the new Starting Balance",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-map/02-savings-lists-its-rows-and-the-new-starting-balance.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-map/02-savings-lists-its-rows-and-the-new-starting-balance.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-map/trace.zip"
+		},
+		{
+			"name": "accounts/held-new-card",
+			"title": "a held card becomes a new credit-card Account whose Starting Balance is the amount owed",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "Sample Rewards Card refuses a cash Account, then comes in as a new credit card owing $100.00",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-new-card/01-sample-rewards-card-refuses-a-cash-account-then-comes-in-as-.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-new-card/01-sample-rewards-card-refuses-a-cash-account-then-comes-in-as-.aria.yml"
+				},
+				{
+					"name": "Rewards Card lists its rows and owes the amount plus their charges",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-new-card/02-rewards-card-lists-its-rows-and-owes-the-amount-plus-their-c.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-new-card/02-rewards-card-lists-its-rows-and-owes-the-amount-plus-their-c.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-new-card/trace.zip"
+		},
+		{
+			"name": "accounts/held-unknown-kind",
+			"title": "a held bank Account the bank never described asks for its type instead of assuming cash",
+			"fixture": "bank-sync",
+			"result": "passed",
+			"steps": [
+				{
+					"name": "a new Account for it has no type until the owner picks one",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-unknown-kind/01-a-new-account-for-it-has-no-type-until-the-owner-picks-one.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-unknown-kind/01-a-new-account-for-it-has-no-type-until-the-owner-picks-one.aria.yml"
+				},
+				{
+					"name": "choosing Checking says the bank gave no kind to check against",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-unknown-kind/02-choosing-checking-says-the-bank-gave-no-kind-to-check-agains.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-unknown-kind/02-choosing-checking-says-the-bank-gave-no-kind-to-check-agains.aria.yml"
+				},
+				{
+					"name": "as a new credit card, its row lands there",
+					"result": "passed",
+					"screenshot": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-unknown-kind/03-as-a-new-credit-card-its-row-lands-there.png",
+					"aria": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-unknown-kind/03-as-a-new-credit-card-its-row-lands-there.aria.yml"
+				}
+			],
+			"trace": "/home/lomzem/proj/budge-wt-t11fix/test-results/verify-budge/t11fix-focus-notice-green/accounts/held-unknown-kind/trace.zip"
+		}
+	]
+}
