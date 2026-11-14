@@ -1,12 +1,12 @@
 # 07: Select Transactions and categorize or approve them together
 
-**Status:** landed — review pending
+**Status:** done
 
 **Spec:** [First-use budgeting UX](../spec.md)
 
 **Blocked by:** 05, 06 — reuse the picker and deliberate memory behavior.
 
-Deliver: select individual Transactions across Payees and subsets within a Payee. Clearly show the selection/count and affected rows. Apply a Category, approve, or categorize-and-approve; saving a Category alone does not approve. Provide undo that restores the affected Category/approval state without overwriting subsequent unrelated changes. A bulk Category action must not silently change remembered defaults. Do not treat all selected Transactions as one Transfer; exclude or explain unsupported/locked rows before changing anything. Search/filter changes must never silently expand a selection to unseen rows.
+Deliver: select individual Transactions across Payees and subsets within a Payee. Clearly show the selection/count and affected rows. Apply a Category, approve, or categorize-and-approve; saving a Category alone does not approve. Provide undo that restores the Category/approval state of rows still as the action left them; a row changed since keeps its change, and the Undo offer ends once the person changes a row the action touched. A bulk Category action must not silently change remembered defaults. Do not treat all selected Transactions as one Transfer; exclude or explain unsupported/locked rows before changing anything. Search/filter changes must never silently expand a selection to unseen rows.
 
 Proof: the bulk-write owner is primary for exact persisted selection scope, approval choices, restrictions, memory side effects, and undo. Browser proof covers selecting a noncontiguous subset, filter/selection behavior, using the shared picker, and invoking undo, including a phone path. Extend existing approval/undo proof instead of cloning it. Do not create a production export solely to reach selection internals from tests.
 
@@ -26,7 +26,7 @@ Proof: the bulk-write owner is primary for exact persisted selection scope, appr
 
 - **One owner, two mutations.** `transactions.categorizeMany({ transactionIds, categoryId | null, approve })` runs in one atomic mutation through the existing write owners: `categorizeTransaction` with no `remember` (so a Payee's remembered Category never changes), then `markApproved` only when `approve` is true. A Category alone leaves approval as it was.
   - It returns `{ categoryId, changes: [{ transactionId, previousCategoryId, approvedNow }] }`, listing only rows it changed.
-  - `transactions.undoCategorizeMany` takes that record back. It restores a row's Category only while the row still has the bulk Category and is neither a Split nor a Transfer, and unapproves only rows the bulk approved that are still approved and not reconciled. So a later change to a row wins, and the count of rows put back is returned.
+  - `transactions.undoCategorizeMany` takes that record back. It restores a row's Category only while the row still has the bulk Category and is neither a Split nor a Transfer, and unapproves only rows the bulk approved that are still approved and not reconciled. So a row changed since keeps its change (value-based best effort; see the fix-stage Comments below), and the count of rows put back is returned.
   - It refuses the whole call (`INVALID_INPUT`, nothing written) when a Split or Transfer is chosen, and `NOT_FOUND` for a missing Transaction. The UI never sends them: they are left out and named in a note (`1 Split keeps its Category.`).
 - **Bound.** `BULK_CATEGORIZE_LIMIT = 250` (`src/lib/domain/bulkCategorize.ts`), enforced at the server on both mutations and shown in the UI (`Categorize at most 250 at once.`). Each Transaction costs about 5 index ranges, 16 documents read and 5 written. At 250 the largest use is 1,456 of 4,096 index ranges (36%) in 0.46 s. At 500 it reaches 66% and 0.9 to 1 s per call. `capacity:check` now runs the bulk contract (categorize-and-approve, then undo) at the limit and fails at 900 on the 4,096 index-range limit.
 - **Selection state** lives in `src/lib/components/transactions/selection.svelte.ts` (`SelectionPerScope`), keyed by Transaction ID and cleared whenever the scope (Account plus filters and search) changes. So a search or filter never expands or carries a selection to rows not shown. Ticket 08's groups can call `selection.set(ids, picked)` for a Payee's rows.
@@ -86,3 +86,54 @@ Evidence is under `test-results/ticket-07/`.
 - The select column narrows the phone Payee column, so long Payees wrap more (`SAMPLE STREAMI NG`).
 - Transfers are excluded and proven at the owner. No browser step checks a Transfer row, because the fixture's Transfers are not in a waiting subset worth selecting. The Split note covers the UI path.
 - The bulk opt-in has an empty hint. 08 may want a hint naming what approval does.
+
+### Fixed after review 2026-11-13 (commits 9edaa25..8b632af, docs in the next commit, on `feat/first-use-ux`)
+
+Review: `.scratch/first-use-ux/reviews/07/review.md`. Evidence is under `test-results/ticket-07-fix/`.
+
+**Dispositions**
+
+- **P2, a late bulk completion clears a newer selection: fixed.**
+  - `SelectionPerScope` counts a generation on every `set` and `clear`, and its scope effect now goes through `clear`. `mark()` captures the generation and scope; `owns(mark)` says whether nothing was checked, cleared or rescoped since.
+  - Bulk categorize, categorize-and-approve and selected approval capture the mark before the call. After it they reset only their busy state. They clear the selection, set Undo, the result or the error, and take focus only while they still own it. The server write still lands.
+  - No general workflow framework was added.
+- **P2, a deleted earlier Category blocks the whole Undo: fixed.**
+  - `undoCategorizeMany` restores every eligible part in one mutation. A row whose earlier Category is gone keeps the bulk Category, and its approval is still put back. It returns `{ restored, kept }`.
+  - The count line names the conflict, for example `3 Transactions put back. 1 kept Dining Out because its earlier Category was deleted.` That text sits in the same aria-live slot as Undo and has no button.
+  - After Undo the count line shows `N Transactions put back.` / `N back to Unapproved.` visibly, replacing the hidden announcement.
+- **P2, value matching: fixed as decided.**
+  - Undo stays value-based best effort, with no revision state. The promise is narrowed: Undo restores rows still as the action left them, and a row changed since keeps its change.
+  - The Undo offer ends as soon as the person picks a row's Category, approves, unapproves, edits in the dialog, or resolves a bank change on any row the action touched. Changing an untouched row keeps it.
+  - The ticket's Deliver text, the earlier Comment ("a later change wins") and the feature map are corrected.
+- **(a) Search clears the selection:** accepted, no change.
+- **(b) Phone Payee wrapping:** accepted for 07; revisit in 08.
+- **(c) Transfer UI proof:** a mixed Transfer + ordinary selection step added. The Transfer keeps its Category, and the ordinary row takes Groceries.
+- **(d) Bulk Remember:** deferred.
+- **(e) Opt-in hint:** `Marks these Transactions reviewed. Balances already include them.`, asserted as the checkbox's accessible description.
+- **Review probes.**
+  - The deleted-Category probe failed after the fix (`probes-red.txt`, `probes-after.txt`) and is folded into the owner Undo test.
+  - The monthly-totals probe is not kept. Bulk writes go only through the owned writers (`local/owned-writes`), and the seeded sequences in `convex/monthlyTotals.test.ts` own that invariant.
+  - The same-state probe is not kept: it pins the accepted value-based limit. `convex/ticket07review.test.ts` was deleted.
+
+**Tests (red, then green)**
+
+- **Owner test.** "Undo puts back each Category and approval it changed, but keeps a row changed since and a Category whose earlier one was deleted". Red: `NOT_FOUND` on the old owner (`owner-red.txt`). Green: `owner-green.txt`.
+- **Journey `transactions/select-categorize`.** New steps: the hint, the Transfer + ordinary selection, Undo retirement (an untouched row keeps Undo, a touched row ends it), and a held `transactions:categorizeMany` released after `Clear` and checking another row.
+  - Red on the pre-fix UI, one new step at a time (`red/t07fix-red` at the hint, `red/t07fix-red-2` at retirement with Undo count 1, `red/t07fix-red-3` at the held step with the newer selection cleared and Undo shown). The Transfer step passed pre-fix, as expected for coverage.
+  - Green on the final code: `green/t07fix-green-final`, with select-categorize, approve-all-undo, categorize and approve-phone all passing. The after-Undo and late-save screenshots were inspected.
+- **Gap:** the deleted-Category sentence is proven at the owner and by type; no journey deletes a Category mid-Undo.
+
+**Checks**
+
+- The main checkout passed `codegen:check`, `format:check`, `lint`, `lint:ui`, `typecheck` and `test` (908 passed) (`check.txt`).
+- `capacity:check` passed in the temporary worktree `budge-t07fix` on the final code: bulk is 250 and below half (`capacity-check.txt`).
+- Full `bun run test:e2e:local`: 53 passed in 7.5 min (`e2e-local.txt`). The Clerk FAPI lines are teardown noise.
+- The commit 9edaa25 was typechecked and owner-tested on its own.
+- The app was stopped and the worktree removed.
+
+**Principles that changed a choice**
+
+- **Encode Lessons in Structure / Model the Domain:** ownership is a selection mark checked at one boundary, not a flag per handler.
+- **Laziness Protocol:** no revision state; the earlier Category's existence is cached per Undo; the redundant probes were not kept.
+- **Test Behavior:** real held traffic, plus a paired retirement case.
+- **Minimize Reader Load:** the after-Undo note reuses the Undo slot rather than adding a second live region.
