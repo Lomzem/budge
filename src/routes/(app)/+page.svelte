@@ -288,6 +288,11 @@
 			?.focus({ preventScroll: true });
 	}
 
+	function leaveEscapeInsideTheInspectorToIt(event: KeyboardEvent) {
+		if (document.getElementById('category-inspector')?.contains(document.activeElement))
+			event.preventDefault();
+	}
+
 	async function closeInspector() {
 		const id = selectedId;
 		selectedId = null;
@@ -668,6 +673,7 @@
 				event.preventDefault();
 				document.getElementById('category-inspector')?.focus({ preventScroll: true });
 			}}
+			onEscapeKeydown={leaveEscapeInsideTheInspectorToIt}
 			returnFocus={{ fallback: mainRegion }}
 		>
 			{@render inspector()}

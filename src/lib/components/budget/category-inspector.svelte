@@ -117,6 +117,7 @@
 		amount = '';
 		moveError = '';
 		moveInvalid = null;
+		document.getElementById('move-category')?.focus();
 	}
 
 	function refuseMove(control: 'move-category' | 'move-amount', message: string) {
@@ -515,14 +516,7 @@
 				/>
 				<Button type="submit" variant="outline" disabled={moving}>Move</Button>
 				{#if moveDirty}
-					<Button
-						type="button"
-						variant="ghost"
-						onclick={() => {
-							clearMove();
-							document.getElementById('move-category')?.focus();
-						}}>Clear</Button
-					>
+					<Button type="button" variant="ghost" onclick={clearMove}>Clear</Button>
 				{/if}
 			</div>
 		</div>

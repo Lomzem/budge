@@ -124,6 +124,7 @@ export const inspector = {
 					await expect(region).toBeVisible();
 					await expect(region.getByLabel('Amount')).toHaveValue('');
 					await expect(from).toContainText('Pick a Category');
+					await expect(from).toBeFocused();
 					await expect(region.getByRole('alert')).toHaveCount(0);
 					await choose(from, /^Coffee \(/);
 					await region.getByLabel('Amount').fill('5.00');
@@ -170,6 +171,33 @@ export const inspector = {
 				await expect(region).toBeHidden();
 				await expect(groceries).toBeFocused();
 			});
+
+			await step(
+				'on a phone, Escape clears a started move and keeps the inspector open; a second Escape closes it',
+				async () => {
+					const dialog = page.getByRole('dialog', { name: 'Groceries' });
+					const from = dialog.getByRole('button', { name: 'From', exact: true });
+					const amount = dialog.getByLabel('Amount');
+					await groceries.click();
+					await choose(from, /^Coffee \(/);
+					await amount.press('Enter');
+					await expect(dialog.getByRole('alert')).toHaveText(
+						'Enter an amount above zero, such as 25.00.'
+					);
+					await amount.fill('5.00');
+					await amount.press('Escape');
+					await expect(dialog).toBeVisible();
+					await expect(amount).toHaveValue('');
+					await expect(from).toContainText('Pick a Category');
+					await expect(dialog.getByRole('alert')).toHaveCount(0);
+					await expect(from).toBeFocused();
+					await expect(dialog.getByRole('region', { name: 'Groceries' })).toBeVisible();
+					await page.keyboard.press('Escape');
+					await expect(dialog).toBeHidden();
+					await expect(groceries).toBeFocused();
+					expect(await assigned('Coffee')).toBe(before.coffee);
+				}
+			);
 
 			await step(
 				'the phone inspector steps to the next Category and focuses its Assigned field',
