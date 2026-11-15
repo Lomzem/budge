@@ -8,7 +8,7 @@ Parent checkout: `/home/lomzem/proj/budge`, branch `feat/ux-efficiency`. Baselin
 
 ## Current phase and running work
 
-All26items and phoneEscape correction integrated; lastcodece0dad7(cherry-pick5bf5ae6). Round2ate4c4634 scoresSolA8.5,SolB9,Opus9,so gateincomplete. Allround2reportsdelivered;onephoneEscape defectfixed, freshfocusedsource rechecks runningbefore affectedthreejudgeconfirmations. Nativephone_escape_standards/specpinnedce0dad7; noOpusimplementationrunning.
+All26items and phoneEscape correction integrated; lastcodece0dad7(cherry-pick5bf5ae6). Round2ate4c4634 scores8.5,9,9,sogateincomplete. FreshphoneEscapeStandards/Spec/testaudit rechecks PASSED0findings; reports retained reviews/phone-escape-{standards,spec}.md. Parentreadreports/artifacts;confirmedonly2productionfiles+inspectorjourneychangedsincee4c4634 andcapacitysourcesunchanged. Noactiveworker/native reviewer now; next3freshaffectedUIjudges afterpreparationcommit.
 
 The ORIGINAL Opus implementor completed its own final finding in the existing isolated checkout:
 
@@ -26,7 +26,7 @@ Implementationcontinuationrun6 completed5bf5ae6 atop93a959f;parentcherry-pickedc
 
 Opusround2completed9approveate4c4634,all6dimensions9;25cleanSHAjourneysplusmanualpass. Parentinspectedreport/actualsummary;retainedreviews/ui-round-2/opus.md. Originalcheckout t3-ef438f28-ba215859556c701b/appdowncleanreleased. Sevenminor/nitsdeferredwithspecificreasonsinissues/09-ui-polish-followups.md(needs-triage),pluslargerphoneamountenvelopelimit. Do not silentlyclaimthese fixed.
 
-Freshsourcephone_escape_standards and phone_escape_spec runningpinnedce0dad7,diffcf4a0cf...ce0dad7,5filesonly. Reports test-results/ux-efficiency/reviews/phone-escape-{standards,spec}.md. AfterpassprepareNEWfreshaffectedUIrechecks for2SolHigh+Opus5.5 atsamefinalcleanSHA. EachcanreadONLYitsownround2report aspriorfullscopeevidence,explicitlyconfirmunchangedevidencecarry-forward aftersourcediff and re-exerciseU2phone/desktopEscapeClear/heldmove plusnestedTarget/Delete/touchpickerfocus and relevantBudgetdependencies. Sourcechangeseventonly(noCSS/sharedwidget),so don'trepeatall25journeyswithoutneed;completeanyactualcoveragegaps(namelyensureU3touchorganizeifretainedjourneyswerenotactualtouch). Noothers'UIreports/scores/score-bearingstate/tickets tonewjudges. Everynewreview/recheck NEWdelegate_task,notthread-send.
+Neutralaffectedbrief ui-final-recheck-brief.md and coordinatorissues/08-ui-review-round-3.md prepared. PinexactcleanHEADaftercommit,thenNEWdelegate_task2SolHigh+Opus5.5 isolatedsameSHA. EachreadsONLYownround2report: SolAoriginal t3-b07d3136-6a31e973738cafaf; SolB t3-d0be7586-9726ad01307dea57; Opus t3-ef438f28-ba215859556c701b, each path test-results/ux-efficiency/ui-review-round-2/<judge>.md. Explicitownunchangedevidencecarry-forwardaftersourcediff + freshU2phone/desktopEscapeClear/heldmove/nestedTarget/Delete/Picker layers+Budgetdependencies+touchU3organizing+briefU4history/390readability. Evidencegap:targets/monthlydoesNOTtestnestedphoneEscape,so freshmanualmandatory. Noothers'UIreports/scores/score-bearingstate/tickets tonewjudges. Newhandleswillbestored judge3_sol-a/sol-b/opus. NoPRyet.
 
 ## Implementation and verification achieved
 
