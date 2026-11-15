@@ -11,6 +11,7 @@ Base: `eb1d3f9` on `feat/ux-efficiency`. Scope: the three production/UI findings
 | Inline 4577048660 | `Swap From and To` was icon-only, against the rule that only "more actions" and the narrow search/filter/clear/add controls may show just an icon (`.scratch/bank-sync-ux/spec.md`, `.coderabbit.yaml`) | **Fixed.** The button now shows `Swap From and To` beside its icon at `size="sm"` (32 px, 44 px under a coarse pointer). The visible text is the accessible name, so `aria-label` is gone and the journeys' selectors still match. |
 | Inline 4577048665 | `reordered = $state({ from: list.data, … })` deep-proxies the query result, so `reordered.from === list.data` was never true and the optimistic order never showed | **Confirmed and fixed at the root.** In convex-svelte 0.15.1, `useQuery().data` is the raw `localQueryResult` object (`$derived`, not proxied). Svelte 5.57.3's `$state` hands back a proxy of it, so the equality always failed. Two quick ArrowUp presses on Coffee therefore computed the second move from the unmoved list: both saves sent index 1, and Coffee moved only once. Rather than switch to `$state.raw`, which keeps the hand-held snapshot and its flicker (the first response replaces the order before the second lands), both reorders now use Convex's optimistic update on `categories.list`. The Convex client stacks pending updates, re-applies them over each server result, and rolls one back if its mutation fails. The `reordered` state and its failure cleanup are gone. Category and Group reorders share this path. |
 | Review 5909130525 (outside diff), `src/routes/(app)/+page.svelte` ~47 | An entry with no `?month`, such as the first `/`, fell back to the shared Budget month, so `/` → Categories → Budget → Next month → Back → Back showed next month and `keepInUrl` rewrote the first entry | **Confirmed and fixed.** The feature map already says the month is "dropped for the current month", so an entry without `?month` means the current month: Back or Forward to one shows the current month. A link or goto into the Budget with no month keeps the month viewed last. That is the existing in-session behavior (the sidebar and tab bar link to plain `/`), and it is preserved. The rule is one function, `monthAt`, which reads `navigating.type === 'popstate'` (from `$app/state`) both when the page mounts and on same-page URL changes. Entries with a month and the month/transaction context fixes are unchanged. |
+| Incremental 4578219535 (review 5910493518), `src/routes/(app)/+page.svelte` ~46 | `monthAt` relies on `navigating.type === 'popstate'`, which a same-page Back that only changes the hash never sets, so Skip to content → Next month → Back kept next month on a `/` with no month | **Confirmed and fixed.** See the follow-up below. |
 
 ## Follow-up: refused reorder recovery (sol-a-CR-A1)
 
@@ -21,7 +22,48 @@ Base `3dc077b`. A refused `categories:move` or `categories:moveGroup` rolled the
 - **Reason in context (`src/routes/(app)/categories/+page.svelte`).** A move failure belongs to the item that moved. It shows as a `role="alert"` line inside that row or group header, so it is in view next to the handle. Only the latest move of an item decides its message. A new move clears it, and an older move refused after a newer one was sent stays silent, because the newer, absolute index decides the order. That resolves the stale-message report as part of the same ownership change. Other page actions keep the page-level alert, whose placement predates this branch and is unchanged.
 - **Harness gap found and fixed (`e2e/journeys/layoutShift.ts`).** Once a journey calls `routeWebSocket`, Playwright replaces the page's `WebSocket` with an in-page mock. The guard had already patched the native class, so it watched only the mock's inner socket and missed held requests and forged answers. It reported the rollback-plus-reason shift as unprompted. The guard now follows the class the page uses and ignores the mock's inner socket. Probes on the scratch page confirmed that the refusal shift is now credited and that an injected shift with no input still fails, with and without a route.
 
-### Red → green
+### Follow-up: Back after Skip to content kept the next month (CodeRabbit 4578219535)
+
+- **Checked against the installed code first.** SvelteKit 2.70.3, `node_modules/@sveltejs/kit/src/runtime/client/client.js`, popstate handler: when the popped entry has the same navigation index and the change is a hash change (or the page already navigated shallowly), it calls `update_url(url)` and returns without `navigate()`. `page.url` changes, but `navigating.type` stays unset.
+- **Reproduced** (`skip.ts` in the agent scratchpad, `test-results/verify-budge/skip-base-e1394e8.json`). Desktop keyboard and 320 px touch gave the same results:
+  1. First `/` shows November 2026, with Groceries at 380.00.
+  2. Tab, then Enter on Skip to content, gives `/#main`, with focus on `main`.
+  3. Next month gives `/?month=2026-12#main`, December, 0.00. `keepInUrl` replaces the `#main` entry.
+  4. Back gives `/`, but it still shows December and 0.00.
+  5. Reload shows November and 380.00.
+- **Cause.** The month rule asked the router how the URL changed. A Back that SvelteKit treats as shallow is a traversal the router never reports. The finding is right: the rule has to classify the traversal itself.
+- **Fix** (`src/routes/(app)/+page.svelte`). The Budget listens for `popstate` on `window` through `on` from `svelte/events`, inside an `$effect` that removes the listener on unmount.
+  - The listener runs after SvelteKit's, which was registered first. Chromium runs listeners on `window` in registration order, even capture ones (probe `order.ts`).
+  - When `page.url` already equals `location.href`, SvelteKit has applied a shallow traversal, so the month is taken from that entry: its `?month`, else the current month.
+  - When they differ, SvelteKit is still running a real navigation. That navigation reports `navigating.type === 'popstate'` to the existing `page.url` effect, which is unchanged, as is the check at mount.
+  - **Rejected alternatives:**
+    - A capture listener, because it still runs after SvelteKit's.
+    - `hashchange`, because it covers only hashes.
+    - Wrapping `history`, or SvelteKit internals.
+  - Selection, inspector drafts and late operations are untouched: the listener only sets `budget.month`, as Back always did.
+- **Journey.** `budget/month-jump` gains "after Skip to content, Back from the next month returns to the current month with its own Assigned, on a desktop keyboard and a 320 px touch screen". Each pass:
+  1. Opens `/`, then uses Tab and Enter on the real skip link, requiring `/#main` and focus on `#main`.
+  2. Presses Next month (Enter at 1280 px, a CDP tap at 320 px under `useATouchScreen`) and saves a Groceries Assigned that differs from the current month's.
+  3. Back requires `/`, the current month's name on the picker, and its own amount.
+  4. Forward requires the `?month…#main` entry, next month and the saved amount.
+  5. Back, then a reload, again show the current month.
+- **Red → green.**
+  - `skip-red` (the `e1394e8` page source with the new step): fails at the first Back, where the picker reads `December 2026` but `November 2026` is expected.
+  - `skip-green3`: passes.
+  - Probe `skip-fixed.json`: Back shows `/`, November and 380.00 at both widths, and so does a reload.
+- **Checks.**
+  - `skip-scoped2` passes 12 journeys:
+    - `budget/assign`, `budget/assign-back`, `budget/needs-you`, `budget/month-jump`, `budget/large-amounts` and `budget/phone-groups`;
+    - `inspector/move-money` and `inspector/cover-and-manage`;
+    - `search/filters` and `search/phone`;
+    - `shell/navigate` and `shell/phone-pages`.
+  - The existing month-jump steps still cover: an explicit month after a reload, Back from another Section, the month-less first entry with two Backs, the year grid, the boundary, and the arrows.
+  - `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests (59 files), including the feature-map test.
+- **Limits.**
+  - Proved in Chromium only. The listener order it relies on is the DOM rule for listeners on one target (registration order).
+  - Firefox stays deferred, as above.
+
+## Red → green
 
 Evidence is under `test-results/verify-budge/`:
 

@@ -10,6 +10,7 @@ import {
 	expectNothingPastTheRightEdge,
 	expectTapTargetHeight,
 	openBudget,
+	tap,
 	typed,
 	useATouchScreen,
 	type Journey
@@ -400,6 +401,65 @@ export const budget = {
 					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
 					await page.goForward();
 					await showing(1, next);
+				}
+			);
+
+			await step(
+				'after Skip to content, Back from the next month returns to the current month with its own Assigned, on a desktop keyboard and a 320 px touch screen',
+				async () => {
+					const groceries = page.getByRole('textbox', {
+						name: 'Assigned for Groceries',
+						exact: true
+					});
+					const showing = async (monthsFromNow: number, amount: number) => {
+						await expect(picker).toHaveAccessibleName(
+							`${monthName(monthsFromNow)}, choose a month`
+						);
+						await expect(groceries).toHaveValue(typed(amount));
+					};
+					const skipThenNextThenBack = async (pressNext: (next: Locator) => Promise<void>) => {
+						await openBudget(page);
+						const current = cents(await groceries.inputValue());
+						await page.keyboard.press('Tab');
+						const skip = page.getByRole('link', { name: 'Skip to content', exact: true });
+						await expect(skip).toBeFocused();
+						await page.keyboard.press('Enter');
+						await expect(page).toHaveURL(/\/#main$/);
+						await expect(page.locator('#main')).toBeFocused();
+
+						await pressNext(page.getByRole('button', { name: 'Next month', exact: true }));
+						await expect(picker).toHaveAccessibleName(`${monthName(1)}, choose a month`);
+						const next = cents(await groceries.inputValue()) + 2_468;
+						expect(next).not.toBe(current);
+						await groceries.fill(typed(next));
+						await groceries.press('Enter');
+						await expect(page).toHaveURL(/[?&]month=.*#main$/);
+
+						await page.goBack();
+						await expect(page).toHaveURL(/\/$/);
+						await showing(0, current);
+						await page.goForward();
+						await expect(page).toHaveURL(/[?&]month=.*#main$/);
+						await showing(1, next);
+						await page.goBack();
+						await showing(0, current);
+						await page.reload();
+						await showing(0, current);
+					};
+
+					await page.goto('about:blank');
+					await page.setViewportSize({ width: 1280, height: 800 });
+					await skipThenNextThenBack(async (next) => {
+						await next.focus();
+						await page.keyboard.press('Enter');
+					});
+
+					await page.goto('about:blank');
+					await page.setViewportSize({ width: 320, height: 640 });
+					const stopTouching = await useATouchScreen(page);
+					await skipThenNextThenBack((next) => tap(page, next));
+					await page.goto('about:blank');
+					await stopTouching();
 				}
 			);
 		}

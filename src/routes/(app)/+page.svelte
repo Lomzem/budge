@@ -8,6 +8,7 @@
 	import { useQuery } from 'convex-svelte';
 	import { Result } from 'effect';
 	import { tick, untrack } from 'svelte';
+	import { on } from 'svelte/events';
 	import { MediaQuery, SvelteSet } from 'svelte/reactivity';
 
 	import { goto } from '$app/navigation';
@@ -40,20 +41,25 @@
 	const bank = getBankConnections();
 	const budget = getBudgetMonth();
 
-	const monthAt = (url: URL) => {
+	const monthAt = (url: URL, returnedToAnEntry: boolean) => {
 		const linked = url.searchParams.get('month');
 		if (linked !== null && isIsoMonth(linked)) return linked;
-		const returningToAnEntryWithoutAMonth = navigating.type === 'popstate';
-		return returningToAnEntryWithoutAMonth ? monthOf(budget.today) : budget.month;
+		return returnedToAnEntry ? monthOf(budget.today) : budget.month;
 	};
-	budget.month = monthAt(page.url);
+	budget.month = monthAt(page.url, navigating.type === 'popstate');
 	let arrivedAt = page.url;
 	$effect(() => {
 		const url = page.url;
 		if (url === arrivedAt) return;
 		arrivedAt = url;
-		budget.month = untrack(() => monthAt(url));
+		budget.month = untrack(() => monthAt(url, navigating.type === 'popstate'));
 	});
+	$effect(() =>
+		on(window, 'popstate', () => {
+			const shownWithoutNavigating = page.url.href === location.href;
+			if (shownWithoutNavigating) budget.month = monthAt(page.url, true);
+		})
+	);
 	$effect(() => {
 		const kept = new URL(location.href);
 		if (budget.month === monthOf(budget.today)) kept.searchParams.delete('month');
