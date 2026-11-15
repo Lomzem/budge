@@ -6,7 +6,7 @@ The owner authorized all 26 simplifications, fresh Opus implementors and judge, 
 
 Parent checkout `/home/lomzem/proj/budge`, branch `feat/ux-efficiency`. Baseline `6bdc864175d0abdb100ce41343a38c2e8c4287f6`. Parent app is stopped; its owner-configured backend is non-anonymous and the app CLI correctly refuses there. Use orchestrator-isolated worktrees for local verification, never edit owner configuration to bypass this guard.
 
-## Current phase — final shared-editor affected UI judging
+## Current phase — active phone editor visibility repair
 
 [PR32](https://github.com/Lomzem/budge/pull/32) remains linked/watched, publishedhead eb1d3f901056034263687a21affa5e1e17c29e65. That head passed deterministic CI/Vercel but CodeRabbit5909130525 requestedchanges. Only ONE manual external review requested so far. All external findings have localfixes/dispositions(ticket10); replies,batchedpush,newCI,ONEincrementalreview,approval,merge/deployment remain. Do notpoll/re-watchexistingPR. No repairbatch pushed.
 
@@ -17,6 +17,8 @@ EarlierfixesvisibleSwap/nativeoptimisticreorder/monthhistory/in-rowfailurefeedba
 OriginalOpusimplementationchildd6353fcf-b464-4545-81ec-da08c10529a3 finishedrun8,owncheckout /home/lomzem/.t3/worktrees/budge/t3-85cb338f-512f3e2cb4e9425e clean9c2755e,appdown,browsersclosed,evidenceretained. Noimplementation/providerretry/timerpending. Own evidence test-results/verify-budge/{editor-rollback-*,blur-switch-*}; sourcehandoff/ticket10recordschecks/limits. Firefoxfocusminor explicitlydeferredafterfixedsourceprobe(no unintendedrename) to maintainedcross-browserfollowup; C2guardpositive/negativeharnessdeferredwithreason(ticket09). No majorwaiver.
 
 NextcommissionNEWaffectedSolAHigh/SolBHigh/Opus5.5 atcleanHEADofthisdocbatch(lastsource30b8c9c). Neutralbrief /home/lomzem/proj/budge/test-results/ux-efficiency/rollback-ui-recheck-brief.md. OWNpreceding75ce reportpaths: SolA /home/lomzem/.t3/worktrees/budge/t3-63133b60-e1f61fc5ba3befe7;SolB /home/lomzem/.t3/worktrees/budge/t3-806be64e-8e36e61d5c719ee2;Opus /home/lomzem/.t3/worktrees/budge/t3-eebde408-ed04655136276ff1,each test-results/ux-efficiency/ui-review-rollback-final/<judge>.md. Noothers'reports/aggregate/state/issue11tojudges. Isolatedcheckouts,realsharededitorrollback+intentionalmouse/touch/Tab/Enter/Escape,newerdraftfocus,errorrecovery+Budgetinspectorcaller,all26ownapplicability,exactfinalSHA andcleanup. Each>=9/no majors/blockers/requiredgaps. Storehandles editor_judge_<judge>;completionwakesparent,nopoll. RetainfinalreportslocallyandPRdescriptionwithoutgratuitouspostapprovalcommit.
+
+Latest8ad8c72round: SolAHigh changesrequired8 withmajor sol-a-EF-A1; semantics/draft/ordinaryswitchrepairpassesbut320phoneasyncrollbackorlateerrorgrowthpushesfocusededitorbehindtabbar. Parentverifiedactualfieldy565h44bottom609/bar575–640 andfeedback613–641; secondnewerBeditory580h44afterolderAerror. Seeissue11latestsection. SolB6fffe71f-1872-4d3e-8faf-8e78f03bea0f andOpus53887e79-875f-4d3e-9556-3edc8d53c33e remainpendingindependently; donotshareSolAjudgment. OriginalOpusimplementationchild nowrun9taskca3fe3a6-370c-4095-9edf-31c77a09e348 fromownpreserved9c2755e source(appwasdown/clean). Samecheckout, testvisibilitypremiseandreproducegeometrybeforerootownerfix;preserveallsemantic/no-write/focus/intentional-switchproof. Completionwakesparent,nopoll. Previousphaseparagraphspreparealready-launchedjudges, notanadditionalrequest. No8adgatepass; no repairpushorCRincrementalrequest.
 
 ## Completed UI gate and evidence
 
