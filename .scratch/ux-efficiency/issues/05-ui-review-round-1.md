@@ -13,7 +13,8 @@ Use [protocol](../../../docs/quality/ui-review/README.md), [rubric](../../../doc
 ## Independent judge reports
 
 - SolAHigh completed at `7aa0bbe5b5b1e8b8eaaf047b0c4f57643679adbf`: **8/10, changes required**, one major `sol-a-1`. [Report](../reviews/ui-round-1/sol-a.md).25 maintained journeys passed; allU1–U8 exercised, U4 fails month context on Back. Browser/app cleaned up and checkout released.
-- SolBHigh and Opus5.5 remain independently running at the same pinned revision. Do not share SolA findings, score or verdict with them before their own reports.
+- Opus5.5 completed at the sameSHA: **9/10, approve**, no major/blocker and no required coverage gaps;24 maintained journeys passed plus manual tasks at desktop/phone/keyboard. [Report](../reviews/ui-round-1/opus.md). Five minor/nit findings require disposition. Cleanup complete and ownership released. Opus's simpler month-return sample passed; it did not exercise SolA's reload→second month→leave→Back sequence. Its approval does not answer that demonstrated failure.
+- SolBHigh remains independently running at the pinned revision. Do not share other judges' findings/scores/verdicts before its report.
 
 ## Coordinator disposition and final gate
 
@@ -22,5 +23,10 @@ Pending. Each finding will have a fixed/answered/deferred disposition and eviden
 | Finding | Severity | Disposition and evidence |
 | --- | --- | --- |
 | sol-a-1: June2027 reload → July2027 → Categories → Back restores June rather than July | major | Open; source and touch/pointer/keyboard evidence inspected by parent. Raw reproduction: original SolA checkout test-results/verify-budge/sol-a-manual/history/observations.json and final keyboard captures. Batch repair after other independent judges finish. |
+| opus-1: table Target funding action24px tall on phone | minor | Pending Opus implementor disposition; minimum met,44px aim missed. |
+| opus-2: Group Add Category+24x24 on phone | minor | Pending disposition; full-size alternative exists. |
+| opus-3: removing split line sends focus to Account picker | minor, also on main | Pending disposition; existing flow now touched by optional memo changes. |
+| opus-4: Cover/Move success lacks polite announcement | nit | Pending disposition. |
+| opus-5: Move form lacks Cancel/Clear | nit | Pending disposition; Escape closes inspector. |
 
-Gate: incomplete; SolA requests changes, remaining2 reports pending.
+Gate: incomplete; SolA requests changes, Opus approves auditedSHA, SolB pending. Any repairs need fresh affected reinspection and final sameSHA approval from all3.
