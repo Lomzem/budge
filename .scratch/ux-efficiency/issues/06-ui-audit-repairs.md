@@ -24,6 +24,7 @@ Status stays `ready-for-agent` until the parent gates (full source review, fresh
 | opus-3 | round-1 minor/nit | fixed | Pre-existing. Removing a split line focuses the Category of the line now in its place, else the line before it (`removeSplitLine` in `transaction-dialog.svelte`); `splits/lines` asserts it. |
 | opus-4 | round-1 minor/nit | fixed | The inspector has a polite `role="status"` that names each done move (`Moved $10.00 from Groceries to Coffee.`) and cover (`Covered $X for <name> from Ready to Assign.`). Asserted in `inspector/move-money` and `inspector/cover-and-manage`, which now also journeys Cover from Ready to Assign. |
 | opus-5 | round-1 minor/nit | fixed | Once the Move form has a choice, an amount or a refusal, a `Clear` button empties it and focuses the picker, and Escape inside the form clears it instead of closing the inspector. A clean form's Escape still closes the inspector. Asserted in `inspector/move-money`. |
+| standards-S1 (P2, local Standards review of `0b01f27`) | P2 | fixed | The Move success announcement read the mutable `direction` after awaiting, while `Swap From and To` stayed enabled, so a swap during a pending Groceries → Coffee move announced `Moved $10.00 from Coffee to Groceries.` The money moved was right. `move()` now snapshots the submitted From/To (ids and names) and the amount, and uses them for both the mutation and the announcement. On success it clears the Amount only if it still holds the submitted text, so an amount typed meanwhile is kept. `cover()` likewise snapshots the Category name before awaiting. |
 | sol-b coverage gaps (provisional 8: extra keyboard/touch coverage) | n/a | deferred to re-judge | These are gaps in judging coverage, not production defects; the parent's fresh affected UI judging owns them. Nothing was masked for them. |
 
 Known envelope, answered: at phone width the design fits a Category Assigned up to $999,999.99 and Group totals up to 13 characters (`$1,000,229.99`, which uses about 8 px of its cell's right padding at 390 px and stays fully readable). The server allows up to $10B, and larger values would wrap or cut at 320 px. Wider amounts are outside the phone design envelope; record a follow-up if real budgets reach eight figures.
@@ -34,17 +35,20 @@ Known envelope, answered: at phone width the design fits a Category Assigned up 
 
 ### Red before fix, green after (evidence under `test-results/verify-budge/`)
 
-- sol-a-1 Budget: red `red-month-history-2` (Back showed August, not the September chosen after the reload); green `green-month-history`, `green-container`. Manual at 1280 keyboard and 320 touch: `manual-sol-a-1/` (Back returns `?month=2027-01` with its saved Groceries amount).
+- sol-a-1 Budget: red `red-month-history-2` (Back showed August, not the September chosen after the reload); green `green-month-history`, and `budget/month-jump` in `green-container` (that run's `budget/large-amounts` failed on an interim harness parser bug, fixed and green in `green-container-2`; the run as a whole is not green). Manual at 1280 keyboard and 320 touch: `manual-sol-a-1/` (Back returns `?month=2027-01` with its saved Groceries amount).
 - sol-a-1 Transactions filters: red `red-filter-history` (Back showed Sample Landlord, not Sample Coffee Shop); green `green-filter-history`.
 - Lint rule: `keep-in-url-config.test.js` 3 fail against the `HEAD` config, pass with the new one.
 - sol-b-1: red `red-large-amounts` at 390 with the judge's exact values; green `green-large-amounts`, `green-container-2`. Manual 390 dark with a long Category name at 320/390/430/640/768/1024/1280, before the container change `manual-sol-b-1-before-container/` (1024 Category at 0 px), after `manual-sol-b-1/` (nothing cut at any width).
 - opus-2: red `red-opus-2`, green `green-opus-2` (`plaid/sync-waiting` also passes with the moved helpers).
 - opus-3/4/5: red `red-opus-345` (move status missing, cover status missing, `Line 2 Category` not focused); green `green-opus-345`. The Escape/Clear and Cover-from-Ready-to-Assign steps weren't reached in the red run because an earlier assertion failed first. The old code had no Clear, and its Escape closed the inspector.
 - opus-1: measured only (`manual-opus-1-2/`).
+- standards-S1: `inspector/move-money` holds the move response with `pausableSync` (the production sync WebSocket), swaps and retypes the Amount while it is pending, then releases it. Red `red-move-snapshot` against `420daed`'s inspector: `Expected "Moved $10.00 from Groceries to Coffee." Received "Moved $10.00 from Coffee to Groceries."` Green `green-move-snapshot` and `green-move-snapshot-2` (with `inspector/cover-and-manage`): the exact message, Amount `7.00` kept, Groceries −$10.00 and Coffee +$10.00 after resume and after a reload, then the reverse move restores both.
 
 ### Checks (app stopped)
 
 `bun run typecheck` 0 errors/0 warnings; `bun run lint`, `bun run lint:ui`, `bun run format:check`, `bun run codegen:check` pass; `bun run test` 59 files, 933 tests pass. Full isolated E2E (`bun run test:e2e:local`): first run 62 passed, 1 failed (the new `budget/phone-groups` touch step turned touch emulation on mid-page and the layout-shift guard flagged the coarse-pointer resize). The step now loads the Budget after touch is on, like `plaid/sync-waiting`; red against the old button is re-proven and the rerun is 63 passed (9.5m). Capacity check not rerun (no capacity change; brief).
+
+S1 follow-up checks (app stopped): `bun run typecheck` 0 errors/0 warnings; eslint and the UI eslint config pass on the changed files; `bun run test scripts/app/featureMap.test.ts` FEATUREMAP; `bun run format:check` pass. The full E2E suite was not rerun, as the brief allowed: the change is local to `move()`/`cover()`, and both inspector journeys pass.
 
 ### Principles that changed a choice
 

@@ -70,6 +70,41 @@ export const inspector = {
 				await expect.poll(() => assigned('Coffee')).toBe(before.coffee);
 			});
 
+			await step(
+				'a move still on its way keeps the From, To and amount it was sent with through a swap, and a newer amount typed meanwhile',
+				async () => {
+					const send = region.getByRole('button', { name: 'Move', exact: true });
+					await region.getByRole('button', { name: 'Swap From and To' }).click();
+					await choose(region.getByRole('button', { name: 'To', exact: true }), /^Coffee \(/);
+					await region.getByLabel('Amount').fill(typed(1_000));
+					sync.pause();
+					await region.getByLabel('Amount').press('Enter');
+					await expect(send).toBeDisabled();
+					await region.getByRole('button', { name: 'Swap From and To' }).click();
+					await expect(region.getByLabel('To', { exact: true })).toHaveText('Groceries');
+					await region.getByLabel('Amount').fill('7.00');
+					sync.resume();
+					await expect(region.getByRole('status')).toHaveText(
+						'Moved $10.00 from Groceries to Coffee.'
+					);
+					await expect(send).toBeEnabled();
+					await expect(region.getByLabel('Amount')).toHaveValue('7.00');
+					await expect.poll(() => assigned('Groceries')).toBe(before.groceries - 1_000);
+					await expect.poll(() => assigned('Coffee')).toBe(before.coffee + 1_000);
+					await page.reload();
+					await expect.poll(() => assigned('Groceries')).toBe(before.groceries - 1_000);
+					await expect.poll(() => assigned('Coffee')).toBe(before.coffee + 1_000);
+					await groceries.click();
+					await expect(region).toBeFocused();
+					await move();
+					await expect(region.getByRole('status')).toHaveText(
+						'Moved $10.00 from Coffee to Groceries.'
+					);
+					await expect.poll(() => assigned('Groceries')).toBe(before.groceries);
+					await expect.poll(() => assigned('Coffee')).toBe(before.coffee);
+				}
+			);
+
 			await step('a Category with no amount is refused and nothing moves', async () => {
 				await region.getByLabel('Amount').fill('');
 				await region.getByLabel('Amount').press('Enter');

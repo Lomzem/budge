@@ -140,19 +140,19 @@
 			refuseMove('move-amount', 'Enter an amount above zero, such as 25.00.');
 			return;
 		}
+		const self = { id: category.id, name: category.name };
+		const sent = {
+			from: direction === 'outOfThis' ? self : other,
+			to: direction === 'outOfThis' ? other : self,
+			cents,
+			amount
+		};
 		moving = true;
-		const moved = await attempt(() =>
-			direction === 'outOfThis'
-				? budget.moveMoney(category.id, other.id, cents)
-				: budget.moveMoney(other.id, category.id, cents)
-		);
+		const moved = await attempt(() => budget.moveMoney(sent.from.id, sent.to.id, sent.cents));
 		moving = false;
 		if (moved.ok) {
-			amount = '';
-			done =
-				direction === 'outOfThis'
-					? `Moved ${formatCents(cents)} from ${category.name} to ${other.name}.`
-					: `Moved ${formatCents(cents)} from ${other.name} to ${category.name}.`;
+			if (amount === sent.amount) amount = '';
+			done = `Moved ${formatCents(sent.cents)} from ${sent.from.name} to ${sent.to.name}.`;
 		} else moveError = moved.error?.message ?? "Budge couldn't move the money. Try again.";
 	}
 
@@ -160,6 +160,7 @@
 		coverError = '';
 		done = '';
 		const shortfall = formatCents(-category.available);
+		const name = category.name;
 		covering = true;
 		const covered = await attempt(() => budget.cover(category.id));
 		covering = false;
@@ -167,7 +168,7 @@
 			coverError = covered.error?.message ?? "Budge couldn't cover the Category. Try again.";
 			return;
 		}
-		done = `Covered ${shortfall} for ${category.name} from Ready to Assign.`;
+		done = `Covered ${shortfall} for ${name} from Ready to Assign.`;
 		section?.focus({ preventScroll: true });
 	}
 
