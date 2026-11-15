@@ -5,7 +5,7 @@ This is a neutral shared brief for fresh Sol A High, Sol B High and Opus 5.5 jud
 ## Scope and evidence
 
 - All26 accepted outcomes: [spec](spec.md). Required desktop1280x800 pointer, phone320x640 browser touch and keyboard completion of applicable tasks; targeted390px,1024px with panels,dark,longnames/largeamounts,empty/loading/error/held states. Do not require an unnecessary full cross-product, but complete the specific combinations below.
-- Last code `0b01f27` (integrated `420daed`). Coordinator will pin the exact clean record commit after local source review. Backend/schema/admission source unchanged from independent32-call capacity pass atd824517. Repair implementor reports codegen/format/bothlinters/typecheck pass,933unit tests,fullisolatedE2E63pass. New local Standards/Spec/testaudit reviews must finish before commissioning.
+- Last code `2ff1448` (integrated `93a959f` atop repair `420daed`/`0b01f27`). Coordinator will pin the exact clean record commit after local source review. Backend/schema/admission source unchanged from independent32-call capacity pass atd824517. Repair implementor reports codegen/format/bothlinters/typecheck pass,933unit tests,fullisolatedE2E63pass; latest focused announcement repair passed typecheck,changed-filelinters/format,7config/maptests and both inspectorjourneys. New local Standards/Spec/testaudit reviews must finish before commissioning.
 - Fresh worktree perjudge, exclusive anonymousbackend/browser/session/evidence; verify-budge required lifecycle and cleanup. No source edits, commits, production access, further delegates or cross-judge communication.
 
 ## Tasks and expected observable outcomes
@@ -30,6 +30,7 @@ No prior score is a target or evidence. Observe all scoped tasks independently; 
 3. Clean keyboard traversal of Targetsetup/funding and combineddatepreset/filter task, usingcorrect rovingradio/Select/Command input paths. Programmaticlocator.focus as the only accessproof is insufficient to replace this traversal.
 4. At320touch: Change to a genuinely differentAccount;heldduplicate/lateentrysave;customFrom/To;fullsplitadd/remove/restart. Also fullkeyboard splitline lifecycle. Other-mode constituentproofdoesnotfillthese explicitcombinations. If your harnessrecipefails, distinguishit fromobservedproductfailureandcorrectrecipebeforeverdict;requiredgapsremainprovisional/blockapproval.
 5. Verifychangedpolish: GroupAddtouch44px;tableTargettoucharea;splitremoveadjacentfocus;Cover/Move politeannouncements;MoveClear/Escapefocusandcancelbehavior.
+6. Hold a submitted Groceries-to-Coffee move, swap From/To and type a new Amount before response lands. Exact announcement must describe the submitted move; new Amount draft stays; donor/recipient balances reflect the submitted command after reload. Cover announcement also uses its submitted Category name.
 
 ## Fixtures, journeys and limits
 

@@ -8,15 +8,15 @@ Parent checkout: `/home/lomzem/proj/budge`, branch `feat/ux-efficiency`. Baselin
 
 ## Current phase and running work
 
-All 26 items and UI-round-1 repairs are integrated. Fresh source Spec review passed. Fresh Standards review found ONE P2: Move success announcement reads mutable direction after await, so Swap during pending makes the announcement reverse the actual saved move. The monetary request remains correct. Parent inspected source; reviewer independently reproduced through actual-handler execution. This is the only current source-review blocker before fresh UI judging.
+All26items, UI-round1 repairs and the final Move announcement snapshot repair are integrated. Current last code `2ff1448` (cherry-pick93a959f atop0b01f27). Fresh focused Standards/Spec rechecks running before fresh UI judging; no known unassigned source finding.
 
-The ORIGINAL Opus implementor is repairing its own finding in its existing isolated checkout (implementation continuation, not a new review):
+The ORIGINAL Opus implementor completed its own final finding in the existing isolated checkout:
 
 - Checkout `/home/lomzem/.t3/worktrees/budge/t3-0957aeec-d0baf4154befc730`, branch `t3/budget-history-ui-repairs`, current committed repair base `420daed`.
 - Child thread: `thread:delegated-task:command%3Amcp%3A07edffa5-346f-4f35-a8b7-bb6acf6ba886%3Adelegate-task%3A82cc3a8e-18df-47a5-a86e-4716996b73bb`.
-- Current implementation continuation task: `node:delegated-task:command%3Amcp%3A07edffa5-346f-4f35-a8b7-bb6acf6ba886%3Athread-send%3A54a682a2-7861-464f-8f4e-b92777f1e9f1`, run ordinal 5.
-- Brief: immutable submitted From/To/amount for mutation and announcement, preserve newer draft/focus, extend inspector/move-money with held-response regression (red old code, green fix), focused checks/typecheck/normal hooks/gitleaks, separate commit, own app cleanup. No push/PR/production/further agents. Parent does not edit UI.
-- Await completion event; do not poll/wait/sleep on child. No native reviewers remain running. Latest source reports retained in `reviews/ui-repair-{standards,spec}.md`.
+- Completed implementation continuation54a682a2/run5, commit93a959f, clean owncheckout/appdown. Submitted From/To/names/cents/amount drives mutation+status; success clears Amount only if unchanged; Cover snapshots name.
+- Parent inspected actual red-move-snapshot failure and green-move-snapshot/-2 pass summaries; both inspector journeys pass, typecheck0errors,changed-filelinters/format and7config/maptests pass. Parent independentlyreran7tests and confirmed backend/capacity/packageequivalencevsd824517.
+- Freshnative move_snapshot_standards and move_snapshot_spec running read-only pinned2ff1448,diffd41e5eb...2ff1448,4filesonly. Reports test-results/ux-efficiency/reviews/move-snapshot-{standards,spec}.md. No app or sourcewrites. Awaitreports; no Opus taskrunning now. Latest precedingreports retained reviews/ui-repair-{standards,spec}.md.
 
 ## Implementation and verification achieved
 
