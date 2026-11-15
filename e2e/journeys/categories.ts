@@ -329,6 +329,51 @@ export const categories = {
 			);
 
 			await step(
+				'a name typed while a mouse press on its field is held is not saved by Escape after Tab and Shift+Tab, but is saved when left by Tab and the press ends',
+				async () => {
+					const field = page.getByRole('textbox', { name: 'Category name' });
+					const holdOn = async (target: Locator) => {
+						const { x, y } = await centerOf(target);
+						await page.mouse.move(x, y);
+						await page.mouse.down();
+					};
+
+					const groceries = page.getByRole('button', { name: 'Groceries', exact: true });
+					await groceries.click();
+					await field.fill('Groceries Cancelled');
+					await holdOn(field);
+					await page.keyboard.press('Tab');
+					await expect(
+						page.getByRole('button', { name: 'Groceries actions', exact: true })
+					).toBeFocused();
+					await page.keyboard.press('Shift+Tab');
+					await expect(field).toBeFocused();
+					await page.keyboard.press('Escape');
+					await expect(field).toBeHidden();
+					await page.mouse.up();
+					await settled(page);
+					await expect(groceries).toBeVisible();
+
+					const transit = page.getByRole('button', { name: 'Transit', exact: true });
+					await transit.click();
+					await field.fill('Transit Held');
+					await holdOn(field);
+					await page.keyboard.press('Tab');
+					await page.mouse.up();
+					await expect(
+						page.getByRole('button', { name: 'Transit Held', exact: true })
+					).toBeVisible();
+
+					await page.reload();
+					await expect(
+						page.getByRole('button', { name: 'Transit Held', exact: true })
+					).toBeVisible();
+					await expect(groceries).toBeVisible();
+					await expect(page.getByRole('button', { name: /^Groceries Cancelled/ })).toHaveCount(0);
+				}
+			);
+
+			await step(
 				'on a touch screen, a name scrolled to just above the tab bar and emptied keeps its field and reason clear of the bar, on Enter for a Category and on a tap beside it for a group, and Escape keeps the old names',
 				async () => {
 					await page.goto('about:blank');

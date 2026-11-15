@@ -34,12 +34,13 @@
 	const errorId = $props.id();
 
 	let draftOpened = false;
-	let openings = 0;
+	let thisOpening = new AbortController();
 	$effect.pre(() => {
 		const opening = editing && !draftOpened;
 		draftOpened = editing;
 		if (!opening) return;
-		openings++;
+		thisOpening.abort();
+		thisOpening = new AbortController();
 		untrack(() => {
 			draft = pending ?? failed?.name ?? name;
 			error = failed?.error ?? '';
@@ -62,7 +63,7 @@
 		};
 	});
 
-	function decideWhenThePressEnds(decide: () => void) {
+	function decideWhenThePressEnds(opening: AbortSignal, decide: () => void) {
 		if (!pressing) {
 			decide();
 			return;
@@ -76,7 +77,7 @@
 					ended.abort();
 					decide();
 				},
-				{ signal: ended.signal }
+				{ signal: AbortSignal.any([ended.signal, opening]) }
 			);
 		}
 	}
@@ -121,6 +122,7 @@
 		if (event.key === 'Escape') {
 			event.preventDefault();
 			event.stopPropagation();
+			thisOpening.abort();
 			editing = false;
 			void leave();
 		}
@@ -138,10 +140,10 @@
 			onblur={(event: FocusEvent & { currentTarget: HTMLInputElement }) => {
 				if (!editing) return;
 				const input = event.currentTarget;
-				const left = openings;
-				decideWhenThePressEnds(() =>
+				const left = thisOpening.signal;
+				decideWhenThePressEnds(left, () =>
 					setTimeout(() => {
-						if (left !== openings) return;
+						if (left.aborted) return;
 						if (document.hasFocus() && document.activeElement === input) return;
 						commit();
 					})
