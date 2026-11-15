@@ -88,7 +88,7 @@ export class BudgetMonth {
 	}
 
 	async cover(categoryId: Id<'categories'>) {
-		await this.#cover({ month: this.month, categoryId });
+		return await this.#cover({ month: this.month, categoryId });
 	}
 
 	async assignTarget(categoryId: Id<'categories'>) {

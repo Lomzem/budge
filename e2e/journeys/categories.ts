@@ -217,18 +217,42 @@ export const categories = {
 			});
 
 			await step(
-				'Rename edits the name in place; an empty name is refused, Escape keeps the old one, and a click on another name saves the one typed',
+				'Rename edits the name in place; an empty name is refused on Enter and on leaving the field, Escape keeps the old one, an empty name left for another name stays unsaved, and a click on another name saves the one typed',
 				async () => {
 					await act(page, 'Smoke Test Category', 'Rename');
 					const field = page.getByRole('textbox', { name: 'Category name' });
+					const emptyName = page.getByRole('alert').filter({ hasText: 'Enter a name.' });
 					await expect(field).toBeFocused();
 					await expect(field).toHaveValue('Smoke Test Category');
 					await field.fill('  ');
 					await field.press('Enter');
-					await expect(page.getByRole('alert').filter({ hasText: 'Enter a name.' })).toBeVisible();
+					await expect(emptyName).toBeVisible();
 					await field.press('Escape');
 					const name = page.getByRole('button', { name: 'Smoke Test Category', exact: true });
 					await expect(name).toBeFocused();
+
+					await name.click();
+					await field.fill('  ');
+					await field.press('Tab');
+					await expect(
+						page.getByRole('button', { name: 'Smoke Test Category actions', exact: true })
+					).toBeFocused();
+					await expect(field).toHaveValue('  ');
+					await expect(emptyName).toBeVisible();
+					await field.click();
+					await field.press('Escape');
+					await expect(name).toBeFocused();
+					await expect(emptyName).toHaveCount(0);
+
+					await name.click();
+					await field.fill('  ');
+					await page.getByRole('button', { name: 'Smoke Test Group', exact: true }).click();
+					const openedNext = page.getByRole('textbox', { name: 'Category Group name' });
+					await expect(openedNext).toBeFocused();
+					await expect(openedNext).toHaveValue('Smoke Test Group');
+					await expect(emptyName).toHaveCount(0);
+					await openedNext.press('Escape');
+					await expect(name).toBeVisible();
 
 					await name.click();
 					await field.fill('Smoke Test Renamed');
@@ -247,6 +271,37 @@ export const categories = {
 					await expect(
 						page.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
 					).toBeVisible();
+				}
+			);
+
+			await step(
+				'on a touch screen, an empty group name left by a tap on the empty margin beside it is refused in view of the tab bar, and Escape keeps the old name',
+				async () => {
+					await page.goto('about:blank');
+					const stopTouching = await useATouchScreen(page);
+					await openCategories(page);
+					await tap(page, page.getByRole('button', { name: 'Smoke Test Group', exact: true }));
+					const field = page.getByRole('textbox', { name: 'Category Group name' });
+					await field.fill(' ');
+					const { y } = await centerOf(field);
+					const screen = await touchscreen(page);
+					await screen.touch('touchStart', [{ id: 1, x: 6, y }]);
+					await screen.touch('touchEnd', []);
+					await screen.detach();
+					const emptyName = page.getByRole('alert').filter({ hasText: 'Enter a name.' });
+					await expect(emptyName).toBeVisible();
+					await expect(field).not.toBeFocused();
+					await expect(field).toHaveValue(' ');
+					await expectClearOf(field, tabBarOf(page));
+					await expectClearOf(emptyName, tabBarOf(page));
+					await tap(page, field);
+					await field.press('Escape');
+					await expect(field).toBeHidden();
+					await page.reload();
+					await expect(groupOf(page, 'Smoke Test Group')).toBeVisible();
+					await page.goto('about:blank');
+					await stopTouching();
+					await openCategories(page);
 				}
 			);
 

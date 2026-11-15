@@ -163,7 +163,6 @@
 	async function cover() {
 		coverError = '';
 		done = '';
-		const shortfall = formatCents(-category.available);
 		const name = category.name;
 		covering = true;
 		const covered = await attempt(() => budget.cover(openedForId));
@@ -172,7 +171,7 @@
 			coverError = covered.error?.message ?? "Budge couldn't cover the Category. Try again.";
 			return;
 		}
-		done = `Covered ${shortfall} for ${name} from Ready to Assign.`;
+		done = `Covered ${formatCents(covered.value)} for ${name} from Ready to Assign.`;
 		section?.focus({ preventScroll: true });
 	}
 

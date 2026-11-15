@@ -12,6 +12,8 @@ Base: `eb1d3f9` on `feat/ux-efficiency`. Scope: the three production/UI findings
 | Inline 4577048665 | `reordered = $state({ from: list.data, … })` deep-proxies the query result, so `reordered.from === list.data` was never true and the optimistic order never showed | **Confirmed and fixed at the root.** In convex-svelte 0.15.1, `useQuery().data` is the raw `localQueryResult` object (`$derived`, not proxied). Svelte 5.57.3's `$state` hands back a proxy of it, so the equality always failed. Two quick ArrowUp presses on Coffee therefore computed the second move from the unmoved list: both saves sent index 1, and Coffee moved only once. Rather than switch to `$state.raw`, which keeps the hand-held snapshot and its flicker (the first response replaces the order before the second lands), both reorders now use Convex's optimistic update on `categories.list`. The Convex client stacks pending updates, re-applies them over each server result, and rolls one back if its mutation fails. The `reordered` state and its failure cleanup are gone. Category and Group reorders share this path. |
 | Review 5909130525 (outside diff), `src/routes/(app)/+page.svelte` ~47 | An entry with no `?month`, such as the first `/`, fell back to the shared Budget month, so `/` → Categories → Budget → Next month → Back → Back showed next month and `keepInUrl` rewrote the first entry | **Confirmed and fixed.** The feature map already says the month is "dropped for the current month", so an entry without `?month` means the current month: Back or Forward to one shows the current month. A link or goto into the Budget with no month keeps the month viewed last. That is the existing in-session behavior (the sidebar and tab bar link to plain `/`), and it is preserved. The rule is one function, `monthAt`, which reads `navigating.type === 'popstate'` (from `$app/state`) both when the page mounts and on same-page URL changes. Entries with a month and the month/transaction context fixes are unchanged. |
 | Incremental 4578219535 (review 5910493518), `src/routes/(app)/+page.svelte` ~46 | `monthAt` relies on `navigating.type === 'popstate'`, which a same-page Back that only changes the hash never sets, so Skip to content → Next month → Back kept next month on a `/` with no month | **Confirmed and fixed.** See the follow-up below. |
+| Inline 4578472859 (review 5910828315), `src/lib/components/categories/inline-name.svelte` ~110 | The contract says Enter or blur saves and an empty name shows `Enter a name.`, but a blank or spaces-only name left by blur silently closed the editor | **Confirmed and fixed.** See the follow-up below. |
+| Review 5910828315 (outside diff), `src/lib/components/budget/category-inspector.svelte` ~175 | Cover from Ready to Assign announced `-category.available` read before the request, while `budget.cover()` dropped the shortfall the mutation actually covered | **Confirmed and fixed.** See the follow-up below. |
 
 ## Follow-up: refused reorder recovery (sol-a-CR-A1)
 
@@ -62,6 +64,35 @@ Base `3dc077b`. A refused `categories:move` or `categories:moveGroup` rolled the
 - **Limits.**
   - Proved in Chromium only. The listener order it relies on is the DOM rule for listeners on one target (registration order).
   - Firefox stays deferred, as above.
+
+### Follow-up: a blank name left by blur, and Cover's announced amount (CodeRabbit 5910828315)
+
+- **Blank name left by blur (inline 4578472859).**
+  - **Reproduced** with a manual probe (`blank.ts` in the agent scratchpad, not a maintained assertion; `test-results/verify-budge/blank-base-b17b8e8.json`). On `b17b8e8`, a Category name filled with spaces and left by Tab, by a click on the page heading, or by a 320 px tap on the heading closed the field with no `Enter a name.` and kept the old name. The inspector name left by Tab did the same.
+  - **Cause.** The deferred blur handler special-cased a blank draft as `editing = false` instead of calling `commit()`, which is the one place that refuses an empty name.
+  - **Ownership.** On the Categories page one `renaming` id owns the open editor. A click on another name sets it to that name directly, and A's `editing = false` only clears it while it is still A's. On a blank draft `commit()` sets only A's local `error` and returns: it writes neither `editing` nor `save`. So a blank A left for B cannot close B's editor, take its focus or change its draft. The inspector binds its own local `renaming` the same way.
+  - **Fix** (`inline-name.svelte`). The deferred blur now always calls `commit()`. The openings counter, the focus-came-back check (the rollback false blur), the fast A→B commit of a non-blank name, Escape as cancel and the save path are unchanged.
+  - **Probe after the fix** (`blank-fixed.json`, manual). Tab, click and tap leave the field open with its spaces and `Enter a name.`, with focus where the user moved it. The inspector behaves the same. A blank A left by a click on Coffee or on a group opens B focused with its own name and no error, and both names are unchanged after a reload.
+  - **Journey** (`categories/manage`, 320 px):
+    - The rename step now also covers spaces left by Tab: the actions button takes focus, the field keeps its spaces and shows `Enter a name.`, and Escape in the field keeps the old name. Spaces left by a click on `Smoke Test Group` give focus to the Category Group name field with its own name and no error, and Escape keeps it.
+    - A new touch step taps the group name, types a space, and taps the empty margin beside the field (a CDP touch). It requires `Enter a name.`, the field unfocused with its space, and both clear of the tab bar (`expectClearOf`). Escape then keeps the old name after a reload.
+- **Cover's announced amount (review 5910828315, outside the diff).**
+  - **Cause.** `cover()` formatted `-category.available` before the request. The `budget.cover` mutation reads the Category's Available at the server, covers that shortfall and returns it, but `budget.cover()` in `budget.svelte.ts` dropped the return value.
+  - **Fix.** `budget.cover()` returns the mutation's result, and the inspector announces `formatCents(covered.value)`. The Category name is still captured before the request, and the call still uses `openedForId`. The amounts shown come from the live query as before. `assign-target-button.svelte` announces no amount, so it doesn't share the fault.
+  - **Journey** (`inspector/cover-and-manage`). The step now holds the stale tab's server frames with the existing `pausableSync` helper (`e2e/heldResponse.ts`), registered before the socket opens. A real second tab lowers the Category's Assigned by $5.00 and waits for its Available to read the shortfall plus $5.00. Then the stale tab, still showing the old shortfall, clicks `Cover $X from Ready to Assign`, and the frames are released. The step requires `Covered $(X + 5.00) for <name> from Ready to Assign.`, Available $0.00, Assigned equal to the stale tab's Assigned plus X, and Ready to Assign lowered by X, both at once and after a reload. No receipt is mocked or seeded.
+- **Red → green.**
+  - `cr2-red` (the `b17b8e8` versions of the three source files, with the new journeys):
+    - `inspector/cover-and-manage` fails with `Expected: Covered $51.73 for Coffee from Ready to Assign.`, `Received: Covered $46.73 for Coffee from Ready to Assign.`
+    - `categories/manage` fails at the extended rename step, because after Tab the field is gone. The touch step was not reached; the manual probe shows its red.
+  - `cr2-green` passes `inspector/cover-and-manage`. `cr2-green-manage` passes `categories/manage` after its tap moved from the heading to the margin: a tap on the heading scrolled the field out of view.
+- **Test-audit gate.** Each step protects a stated contract the existing steps missed (blank refused on leaving the field, blank A not disturbing B, a cover amount from the server). Each failed on old code for the reported reason, reuses existing helpers (`pausableSync`, `useATouchScreen`, `touchscreen`, `expectClearOf`), and adds no production seam.
+- **Checks.**
+  - `cr2-affected` passes 10 journeys: `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename`, `inspector/move-money`, `inspector/cover-and-manage`, `budget/needs-you`, `budget/assign`, `budget/phone-groups` and `shell/navigate`.
+  - With the app stopped, `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests (59 files).
+- **Limits.**
+  - Proved in Chromium only.
+  - A blank name left by blur keeps its field open after focus has moved on. To cancel it, the user returns to the field and presses Escape.
+  - When the server finds no shortfall, the announcement reads `Covered $0.00 …`. That is truthful but terse.
 
 ## Red → green
 

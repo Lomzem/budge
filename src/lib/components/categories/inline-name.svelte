@@ -107,8 +107,7 @@
 				setTimeout(() => {
 					if (left !== openings) return;
 					if (document.hasFocus() && document.activeElement === input) return;
-					if (draft.trim() === '') editing = false;
-					else commit();
+					commit();
 				});
 			}}
 			onkeydown={keydown}

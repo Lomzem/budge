@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 import { formatCents } from '../../src/lib/domain/money';
 import { failFirstCallTo, holdResponseTo, pausableSync } from '../heldResponse';
@@ -247,6 +247,7 @@ export const inspector = {
 					.getByRole('cell');
 			const activity = (name: string) => centsIn(cellsOf(name).nth(2));
 			const available = (name: string) => centsIn(cellsOf(name).nth(3));
+			const sync = await pausableSync(page);
 			const expectEveryday = async (names: string[], gone: string[]) => {
 				const everyday = page.url().endsWith('/categories')
 					? page
@@ -314,7 +315,7 @@ export const inspector = {
 			);
 
 			await step(
-				'Cover from Ready to Assign takes the shortfall from Ready to Assign and says so',
+				'Cover from Ready to Assign takes the shortfall the server finds, after another tab spent $5 more, and says how much',
 				async () => {
 					await page
 						.getByRole('region', { name: 'Needs you', exact: true })
@@ -325,14 +326,42 @@ export const inspector = {
 					const shortfall = -(await available(name));
 					expect(shortfall).toBeGreaterThan(0);
 					const ready = await readyToAssign();
+					const assignedField = (shown: Page) =>
+						shown.getByRole('textbox', { name: `Assigned for ${name}`, exact: true });
+					const assigned = cents(await assignedField(page).inputValue());
+
+					sync.pause();
+					const otherTab = await page.context().newPage();
+					await openBudget(otherTab);
+					await assignedField(otherTab).fill(typed(assigned - 500));
+					await assignedField(otherTab).press('Enter');
+					await expect
+						.poll(() =>
+							centsIn(
+								otherTab
+									.getByRole('row')
+									.filter({ has: otherTab.getByRole('button', { name, exact: true }) })
+									.getByRole('cell')
+									.nth(3)
+							)
+						)
+						.toBe(-(shortfall + 500));
+					await otherTab.close();
+
 					await inspector
 						.getByRole('button', { name: `Cover ${formatCents(shortfall)} from Ready to Assign` })
 						.click();
+					sync.resume();
 					await expect(inspector.getByRole('status')).toHaveText(
-						`Covered ${formatCents(shortfall)} for ${name} from Ready to Assign.`
+						`Covered ${formatCents(shortfall + 500)} for ${name} from Ready to Assign.`
 					);
 					await expect.poll(() => available(name)).toBe(0);
+					await expect(assignedField(page)).toHaveValue(typed(assigned + shortfall));
 					await expect.poll(() => readyToAssign()).toBe(ready - shortfall);
+					await page.reload();
+					await expect(assignedField(page)).toHaveValue(typed(assigned + shortfall));
+					await expect.poll(() => available(name)).toBe(0);
+					expect(await readyToAssign()).toBe(ready - shortfall);
 				}
 			);
 
