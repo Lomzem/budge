@@ -12,6 +12,39 @@ Base: `eb1d3f9` on `feat/ux-efficiency`. Scope: the three production/UI findings
 | Inline 4577048665 | `reordered = $state({ from: list.data, … })` deep-proxies the query result, so `reordered.from === list.data` was never true and the optimistic order never showed | **Confirmed and fixed at the root.** In convex-svelte 0.15.1, `useQuery().data` is the raw `localQueryResult` object (`$derived`, not proxied). Svelte 5.57.3's `$state` hands back a proxy of it, so the equality always failed. Two quick ArrowUp presses on Coffee therefore computed the second move from the unmoved list: both saves sent index 1, and Coffee moved only once. Rather than switch to `$state.raw`, which keeps the hand-held snapshot and its flicker (the first response replaces the order before the second lands), both reorders now use Convex's optimistic update on `categories.list`. The Convex client stacks pending updates, re-applies them over each server result, and rolls one back if its mutation fails. The `reordered` state and its failure cleanup are gone. Category and Group reorders share this path. |
 | Review 5909130525 (outside diff), `src/routes/(app)/+page.svelte` ~47 | An entry with no `?month`, such as the first `/`, fell back to the shared Budget month, so `/` → Categories → Budget → Next month → Back → Back showed next month and `keepInUrl` rewrote the first entry | **Confirmed and fixed.** The feature map already says the month is "dropped for the current month", so an entry without `?month` means the current month: Back or Forward to one shows the current month. A link or goto into the Budget with no month keeps the month viewed last. That is the existing in-session behavior (the sidebar and tab bar link to plain `/`), and it is preserved. The rule is one function, `monthAt`, which reads `navigating.type === 'popstate'` (from `$app/state`) both when the page mounts and on same-page URL changes. Entries with a month and the month/transaction context fixes are unchanged. |
 
+## Follow-up: refused reorder recovery (sol-a-CR-A1)
+
+Base `3dc077b`. A refused `categories:move` or `categories:moveGroup` rolled the order back but left focus on `<body>`: 4 Tabs to return to Move Coffee, 17 to Move Everyday. At 320 px the reason showed only in the page-top alert, above the visible list, so the snap-back looked unexplained. A second observer also reported the reason staying after the first of two quick presses was refused and the second landed.
+
+- **Cause.** When the keyed `{#each}` moves a row, Chromium blurs whatever inside it has focus (`focusout` with `relatedTarget` null, the node still connected), and focus falls to `<body>`. The handle's key handler refocused it only after its own optimistic move, so the Convex rollback, a second move, lost focus. Any server-driven move of the focused row did the same.
+- **Focus repair (`src/lib/reorder.ts`).** Each reorder item restores focus to the element inside it that was focused when it moved: the handle, the name button or the rename field. It acts only if that `focusout` had no `relatedTarget`, the item's place among its siblings changed, and focus is now on the document. Tab, a dialog, any other focused control, or a click on blank space (which moves no item) is never taken back. The key handler's `tick` refocus is gone, since the optimistic move takes the same path.
+- **Reason in context (`src/routes/(app)/categories/+page.svelte`).** A move failure belongs to the item that moved. It shows as a `role="alert"` line inside that row or group header, so it is in view next to the handle. Only the latest move of an item decides its message. A new move clears it, and an older move refused after a newer one was sent stays silent, because the newer, absolute index decides the order. That resolves the stale-message report as part of the same ownership change. Other page actions keep the page-level alert, whose placement predates this branch and is unchanged.
+- **Harness gap found and fixed (`e2e/journeys/layoutShift.ts`).** Once a journey calls `routeWebSocket`, Playwright replaces the page's `WebSocket` with an in-page mock. The guard had already patched the native class, so it watched only the mock's inner socket and missed held requests and forged answers. It reported the rollback-plus-reason shift as unprompted. The guard now follows the class the page uses and ignores the mock's inner socket. Probes on the scratch page confirmed that the refusal shift is now credited and that an injected shift with no input still fails, with and without a route.
+
+### Red → green
+
+Evidence is under `test-results/verify-budge/`:
+
+- `cr-focus-red` (base source plus the new steps) failed at step 11: no alert in Coffee's row (the reason was only the page-top alert), after a rollback through the real routed socket.
+- `cr-focus-red-focus` (the page fix only, base `reorder.ts`) failed at step 11: `Move Coffee` was `inactive`, not focused, after the rollback.
+- `cr-focus-green` failed on the journey's own wrong assumption that Everyday had a group above it. The step now picks ArrowUp or ArrowDown from Everyday's place.
+- `cr-focus-green2` failed on the guard gap above.
+- `cr-focus-green3`: all 12 `categories/reorder` steps pass on the finished source, including rapid held moves, Home/End, touch cancel, the second finger, touch autoscroll, the desktop drag and both new steps.
+- `cr-focus-affected`, under the changed guard: 21 of 22 pass. These are every journey that routes the socket (except `categories/reorder`, covered above), plus `budget/phone-groups`, `budget/assign`, `shell/navigate` and `inspector/cover-and-manage`. `categories/manage` failed once, in the Add Category dialog: "Enter a name." did not appear in the step where the group is made but the Category is refused. This diff does not touch that dialog. It passed in reruns `cr-focus-manage-rerun` and `cr-focus-manage-rerun2`, so it is intermittent (1 of 3) and left open.
+- `cr-focus-final`: `categories/reorder` (all 12 steps) and `categories/manage` pass on the committed tree. The tracker map became a `SvelteMap` for `svelte/prefer-svelte-reactivity`.
+
+Test-audit gate: both new steps check what a user observes: order, the visible reason beside the row, focus, retry and persistence. They fail at the real transport boundary on the base source, add no production seam, and reuse `failFirstCallTo`. The focus-away step guards the ownership requirement, so a "refocus the handle on failure" fix would fail it. The guard change has no unit test. Its behavior was shown by the two scratch probes above and by the journeys rerun under it.
+
+### Manual probes (not in the journey)
+
+- `cr-focus-manual2` (`notes.txt`, screenshots, ARIA):
+  - 320 px keyboard: the reason box is at y=306, right under the handle at y=268, focus stays on `Move Coffee`, nothing is past the right edge, and a retry clears it.
+  - First of two quick presses refused at 1280 px: no reason stays, Coffee stays first after a reload, and focus stays on the handle.
+  - Focus moved into the Add Category dialog before the refusal stays on the dialog's input.
+  - A click on blank space before the refusal leaves focus on `<main>`.
+- `cr-focus-manual2-touch-d`: a refused 320 px touch drag puts Coffee back with the reason in view (y=306) and nothing past the right edge.
+- The partial `cr-focus-manual` run, the touch step at the end of `cr-focus-manual2` (timed out after 90 s with no move sent), and `cr-focus-manual2-touch`/`-b`/`-c` record probe-script mistakes (a page-rooted `has` locator, a BODY expectation where `<main>` takes focus, a drag started before the list loaded). They are not product failures.
+
 ## Red → green
 
 Both new journey steps failed on unchanged `eb1d3f9` source, for the reported reason, and pass after the repair:

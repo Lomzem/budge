@@ -1,4 +1,3 @@
-import { tick } from 'svelte';
 import type { Attachment } from 'svelte/attachments';
 
 export function moveInList<T>(items: readonly T[], from: number, to: number): T[] {
@@ -38,6 +37,24 @@ function edgeSpeed(clientY: number, startClientY: number) {
 	const intoBottom = clientY > startClientY ? Math.max(0, clientY - bottom) : 0;
 	const into = intoTop + intoBottom;
 	return Math.max(-MAX_SCROLL_PER_FRAME, Math.min(MAX_SCROLL_PER_FRAME, into / 4));
+}
+
+function keepFocusWhenMoved(event: FocusEvent) {
+	const item = event.currentTarget;
+	const focused = event.target;
+	if (
+		event.relatedTarget !== null ||
+		!(item instanceof Element) ||
+		!(focused instanceof HTMLElement)
+	)
+		return;
+	const after = item.previousElementSibling;
+	queueMicrotask(() => {
+		const lostToTheDocument =
+			document.activeElement === null || document.activeElement === document.body;
+		const moved = item.previousElementSibling !== after;
+		if (lostToTheDocument && moved && focused.isConnected) focused.focus({ preventScroll: true });
+	});
 }
 
 export function reorderHandle(
@@ -152,10 +169,9 @@ export function reorderHandle(
 			event.preventDefault();
 			if (target < 0 || target >= count || target === index) return;
 			onmove(target);
-			void tick().then(() => {
-				handle.focus();
-			});
 		}
+
+		const item = handle.closest<HTMLElement>('[data-reorder-item]');
 
 		handle.addEventListener('pointerdown', down);
 		handle.addEventListener('pointermove', move);
@@ -163,6 +179,7 @@ export function reorderHandle(
 		handle.addEventListener('pointercancel', interrupt);
 		handle.addEventListener('lostpointercapture', interrupt);
 		handle.addEventListener('keydown', key);
+		item?.addEventListener('focusout', keepFocusWhenMoved);
 		return () => {
 			end();
 			handle.removeEventListener('pointerdown', down);
@@ -171,6 +188,7 @@ export function reorderHandle(
 			handle.removeEventListener('pointercancel', interrupt);
 			handle.removeEventListener('lostpointercapture', interrupt);
 			handle.removeEventListener('keydown', key);
+			item?.removeEventListener('focusout', keepFocusWhenMoved);
 		};
 	};
 }

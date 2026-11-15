@@ -4,6 +4,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { useMutation, useQuery } from 'convex-svelte';
 	import { tick } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -28,6 +29,18 @@
 	const setGroupHidden = useMutation(api.categories.setGroupHidden);
 
 	let actionError = $state('');
+
+	const latestMoveOf = new SvelteMap<string, number>();
+	let moveFailure: { id: string; message: string } | null = $state(null);
+
+	async function saveMove(id: string, save: () => Promise<unknown>) {
+		const ticket = (latestMoveOf.get(id) ?? 0) + 1;
+		latestMoveOf.set(id, ticket);
+		moveFailure = null;
+		const moved = await attempt(save);
+		if (moved.ok || latestMoveOf.get(id) !== ticket) return;
+		moveFailure = { id, message: moved.error?.message ?? "Budge couldn't save that. Try again." };
+	}
 
 	let adding: 'group' | 'category' = $state('group');
 	let addingOpen = $state(false);
@@ -71,7 +84,7 @@
 	function reorderGroup(from: number, to: number) {
 		const group = groups[from];
 		if (group === undefined) return;
-		void run(() =>
+		void saveMove(group._id, () =>
 			moveGroup(
 				{ groupId: group._id, index: to },
 				{
@@ -97,7 +110,7 @@
 		const group = groups[groupIndex];
 		const category = group?.categories[from];
 		if (group === undefined || category === undefined) return;
-		void run(() =>
+		void saveMove(category._id, () =>
 			moveCategory(
 				{ categoryId: category._id, groupId: group._id, index: to },
 				{
@@ -194,6 +207,12 @@
 	</button>
 {/snippet}
 
+{#snippet failedMove(id: string)}
+	{#if moveFailure?.id === id}
+		<p role="alert" class="basis-full px-2 pb-1 text-sm text-destructive">{moveFailure.message}</p>
+	{/if}
+{/snippet}
+
 {#snippet hiddenTag()}
 	<span class="shrink-0 rounded-full bg-muted px-2 text-xs text-muted-foreground">Hidden</span>
 {/snippet}
@@ -250,7 +269,7 @@
 					data-reorder-item
 					class="relative rounded-lg border bg-card transition-transform data-dragging:z-10 data-dragging:shadow-lg data-dragging:transition-none motion-reduce:transition-none"
 				>
-					<div class="flex min-h-12 items-center gap-1 border-b py-1 pr-2 pl-1">
+					<div class="flex min-h-12 flex-wrap items-center gap-1 border-b py-1 pr-2 pl-1">
 						{@render handle(group.name, groupIndex, groups.length, (to: number) => {
 							reorderGroup(groupIndex, to);
 						})}
@@ -313,6 +332,7 @@
 								</DropdownMenu.Item>
 							</DropdownMenu.Content>
 						</DropdownMenu.Root>
+						{@render failedMove(group._id)}
 					</div>
 					{#if group.categories.length === 0}
 						<p class="px-4 py-3 text-muted-foreground">No Categories yet.</p>
@@ -322,7 +342,7 @@
 								{@const categoryEditing = editing(category._id)}
 								<li
 									data-reorder-item
-									class="relative flex min-h-11 min-w-0 items-center gap-1 bg-card py-1 pr-2 pl-1 transition-transform data-dragging:z-10 data-dragging:shadow-lg data-dragging:transition-none motion-reduce:transition-none"
+									class="relative flex min-h-11 min-w-0 flex-wrap items-center gap-1 bg-card py-1 pr-2 pl-1 transition-transform data-dragging:z-10 data-dragging:shadow-lg data-dragging:transition-none motion-reduce:transition-none"
 								>
 									{@render handle(category.name, index, group.categories.length, (to: number) => {
 										reorderCategory(groupIndex, index, to);
@@ -400,6 +420,7 @@
 											</DropdownMenu.Item>
 										</DropdownMenu.Content>
 									</DropdownMenu.Root>
+									{@render failedMove(category._id)}
 								</li>
 							{/each}
 						</ul>

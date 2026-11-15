@@ -510,6 +510,86 @@ export const categories = {
 					.locator('[data-category-id]');
 				await expect(rows).toHaveText(['Transit', 'Groceries', 'Dining Out', 'Coffee']);
 			});
+
+			const refused = "Budge couldn't save that. Try again.";
+			const lasts = async (order: () => Promise<string[]>, expected: string[]) => {
+				await expect(async () => {
+					await page.reload();
+					await expect(everyday.getByRole('button', { name: /^Move / })).toHaveCount(5);
+					expect(await order()).toEqual(expected);
+				}).toPass();
+			};
+
+			await step(
+				'a refused Coffee or Everyday move puts it back with its reason beside it and keeps its handle, so the same key tries again and lasts',
+				async () => {
+					const server = await failFirstCallTo(page, 'categories:move', 'categories:moveGroup');
+					await openCategories(page);
+					await coffeeHandle.focus();
+					await page.keyboard.press('ArrowUp');
+					await expect
+						.poll(() => orderIn(everyday))
+						.toEqual(['Everyday', 'Transit', 'Groceries', 'Coffee', 'Dining Out']);
+					await server.called('categories:move');
+					server.failWithServerError('categories:move');
+					await expect
+						.poll(() => orderIn(everyday))
+						.toEqual(['Everyday', 'Transit', 'Groceries', 'Dining Out', 'Coffee']);
+					await expect(coffeeRow.getByRole('alert')).toHaveText(refused);
+					await expect(coffeeRow.getByRole('alert')).toBeInViewport();
+					await expect(coffeeHandle).toBeFocused();
+					await page.keyboard.press('ArrowUp');
+					await expect
+						.poll(() => orderIn(everyday))
+						.toEqual(['Everyday', 'Transit', 'Groceries', 'Coffee', 'Dining Out']);
+					await expect(page.getByRole('alert').filter({ hasText: refused })).toHaveCount(0);
+					await expect(coffeeHandle).toBeFocused();
+
+					const everydayHandle = page.getByRole('button', { name: 'Move Everyday' });
+					const before = await groupOrder(page);
+					const at = before.indexOf('Everyday');
+					const [key, to] = at === 0 ? (['ArrowDown', 1] as const) : (['ArrowUp', at - 1] as const);
+					const moved = before.toSpliced(at, 1).toSpliced(to, 0, 'Everyday');
+					await everydayHandle.focus();
+					await page.keyboard.press(key);
+					await expect.poll(() => groupOrder(page)).toEqual(moved);
+					await server.called('categories:moveGroup');
+					server.failWithServerError('categories:moveGroup');
+					await expect.poll(() => groupOrder(page)).toEqual(before);
+					await expect(everyday.getByRole('alert')).toHaveText(refused);
+					await expect(everyday.getByRole('alert')).toBeInViewport();
+					await expect(everydayHandle).toBeFocused();
+					await page.keyboard.press(key);
+					await expect.poll(() => groupOrder(page)).toEqual(moved);
+					await expect(page.getByRole('alert').filter({ hasText: refused })).toHaveCount(0);
+					await expect(everydayHandle).toBeFocused();
+
+					await lasts(
+						async () => [...(await groupOrder(page)), ...(await orderIn(everyday))],
+						[...moved, 'Everyday', 'Transit', 'Groceries', 'Coffee', 'Dining Out']
+					);
+				}
+			);
+
+			await step(
+				'a move refused after focus went on to the name leaves focus on the name',
+				async () => {
+					const server = await failFirstCallTo(page, 'categories:move');
+					await openCategories(page);
+					const coffeeName = coffeeRow.getByRole('button', { name: 'Coffee', exact: true });
+					await coffeeHandle.focus();
+					await page.keyboard.press('ArrowUp');
+					await server.called('categories:move');
+					await page.keyboard.press('Tab');
+					await expect(coffeeName).toBeFocused();
+					server.failWithServerError('categories:move');
+					await expect
+						.poll(() => orderIn(everyday))
+						.toEqual(['Everyday', 'Transit', 'Groceries', 'Coffee', 'Dining Out']);
+					await expect(coffeeRow.getByRole('alert')).toHaveText(refused);
+					await expect(coffeeName).toBeFocused();
+				}
+			);
 		}
 	},
 	'late-rename': {
