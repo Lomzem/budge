@@ -4,11 +4,11 @@
 
 The owner authorized all 26 audit proposals, fresh Opus implementors/reviewer, local reviews/corrections, three-judge UI audit, one integration PR, CI and CodeRabbit babysitting, merge to main, deploy, and deployment verification. Earlier Sol-only applied to the audit and is superseded. Do not ask again for authorized shipping. Sol coordinates; Opus 5.5 owns production/library/UI implementation. No production seeding or configuration changes. Identify and announce actual production target before merge/deploy. Keep secrets out of output; gitleaks with full redaction before commits/pushes.
 
-Parent checkout: `/home/lomzem/proj/budge`, branch `feat/ux-efficiency`. Baseline main/origin-main: `6bdc864175d0abdb100ce41343a38c2e8c4287f6`. Last integrated code: `0b01f27128641020e4091cfe1fa3b8885d0a93db` (cherry-pick of Opus `420daed`). Parent app is stopped. Owner-configured parent backend is non-anonymous: app CLI correctly refuses there; use orchestrator-isolated worktrees for local app, never edit owner env to bypass it.
+Parent checkout: `/home/lomzem/proj/budge`, branch `feat/ux-efficiency`. Baseline main/origin-main: `6bdc864175d0abdb100ce41343a38c2e8c4287f6`. Last integrated code: `2ff144820f1bb0ddc3301c5d4f377383d16c337a` (cherry-pick of Opus `93a959f`, atop `420daed`/`0b01f27`). Parent app is stopped. Owner-configured parent backend is non-anonymous: app CLI correctly refuses there; use orchestrator-isolated worktrees for local app, never edit owner env to bypass it.
 
 ## Current phase and running work
 
-All26items, UI-round1 repairs and the final Move announcement snapshot repair are integrated. Current last code `2ff1448` (cherry-pick93a959f atop0b01f27). Fresh focused Standards/Spec rechecks running before fresh UI judging; no known unassigned source finding.
+All26items, UI-round1 repairs and final Move snapshot repair integrated. Fresh focused Standards/Spec rechecks both PASSED0findings at2ff1448; parent read/retained reports reviews/move-snapshot-{standards,spec}.md and inspected actual red/green summaries. No source-review blocker remains. Ready to launch3fresh isolated UI judges on exactcleanHEAD after this preparationcommit. Neutralbrief ui-recheck-brief.md and coordinatorrecord issues/07-ui-review-round-2.md ready. No other active delegates/native reviewers.
 
 The ORIGINAL Opus implementor completed its own final finding in the existing isolated checkout:
 
@@ -16,7 +16,7 @@ The ORIGINAL Opus implementor completed its own final finding in the existing is
 - Child thread: `thread:delegated-task:command%3Amcp%3A07edffa5-346f-4f35-a8b7-bb6acf6ba886%3Adelegate-task%3A82cc3a8e-18df-47a5-a86e-4716996b73bb`.
 - Completed implementation continuation54a682a2/run5, commit93a959f, clean owncheckout/appdown. Submitted From/To/names/cents/amount drives mutation+status; success clears Amount only if unchanged; Cover snapshots name.
 - Parent inspected actual red-move-snapshot failure and green-move-snapshot/-2 pass summaries; both inspector journeys pass, typecheck0errors,changed-filelinters/format and7config/maptests pass. Parent independentlyreran7tests and confirmed backend/capacity/packageequivalencevsd824517.
-- Freshnative move_snapshot_standards and move_snapshot_spec running read-only pinned2ff1448,diffd41e5eb...2ff1448,4filesonly. Reports test-results/ux-efficiency/reviews/move-snapshot-{standards,spec}.md. No app or sourcewrites. Awaitreports; no Opus taskrunning now. Latest precedingreports retained reviews/ui-repair-{standards,spec}.md.
+- Freshnative move_snapshot_standards and move_snapshot_spec completed read-only pinned2ff1448,diffd41e5eb...2ff1448,4filesonly. Both0findings; no app/sourcewrites. Latest precedingreports retained reviews/ui-repair-{standards,spec}.md. No Opus taskrunning now; new round2judge task handles will be held in functions store judge2_sol-a,judge2_sol-b,judge2_opus and toolhistory after launch. Follow completion events, no polling.
 
 ## Implementation and verification achieved
 
