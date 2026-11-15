@@ -12,10 +12,15 @@ Use [protocol](../../../docs/quality/ui-review/README.md), [rubric](../../../doc
 
 ## Independent judge reports
 
-Pending. No inferred scores or approvals. Judges must submit before reading any other judge's report or the implementer's preferred score.
+- SolAHigh completed at `7aa0bbe5b5b1e8b8eaaf047b0c4f57643679adbf`: **8/10, changes required**, one major `sol-a-1`. [Report](../reviews/ui-round-1/sol-a.md).25 maintained journeys passed; allU1–U8 exercised, U4 fails month context on Back. Browser/app cleaned up and checkout released.
+- SolBHigh and Opus5.5 remain independently running at the same pinned revision. Do not share SolA findings, score or verdict with them before their own reports.
 
 ## Coordinator disposition and final gate
 
 Pending. Each finding will have a fixed/answered/deferred disposition and evidence. All3 judges must independently approve the same final SHA at>=9/10 with required coverage complete and no open major/blocker. A change after judging requires affected reinspection; documentation-only changes require each judge's explicit carry-forward confirmation for the final SHA.
 
-Gate: incomplete; judges not yet commissioned.
+| Finding | Severity | Disposition and evidence |
+| --- | --- | --- |
+| sol-a-1: June2027 reload → July2027 → Categories → Back restores June rather than July | major | Open; source and touch/pointer/keyboard evidence inspected by parent. Raw reproduction: original SolA checkout test-results/verify-budge/sol-a-manual/history/observations.json and final keyboard captures. Batch repair after other independent judges finish. |
+
+Gate: incomplete; SolA requests changes, remaining2 reports pending.
