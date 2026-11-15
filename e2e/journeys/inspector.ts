@@ -1,8 +1,18 @@
 import { expect } from '@playwright/test';
 
 import { formatCents } from '../../src/lib/domain/money';
-import { pausableSync } from '../heldResponse';
-import { cents, centsIn, choicesOf, choose, openBudget, typed, type Journey } from './journey';
+import { failFirstCallTo, pausableSync } from '../heldResponse';
+import {
+	cents,
+	centsIn,
+	choicesOf,
+	choose,
+	openBudget,
+	tap,
+	typed,
+	useATouchScreen,
+	type Journey
+} from './journey';
 
 export const inspector = {
 	'move-money': {
@@ -237,6 +247,19 @@ export const inspector = {
 					.getByRole('cell');
 			const activity = (name: string) => centsIn(cellsOf(name).nth(2));
 			const available = (name: string) => centsIn(cellsOf(name).nth(3));
+			const expectEveryday = async (names: string[], gone: string[]) => {
+				const everyday = page.url().endsWith('/categories')
+					? page
+							.getByRole('region')
+							.filter({ has: page.getByRole('button', { name: 'Move Everyday', exact: true }) })
+					: rowgroup('Everyday');
+				for (const name of names) {
+					await expect(everyday.getByRole('button', { name, exact: true })).toBeVisible();
+				}
+				for (const name of gone) {
+					await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0);
+				}
+			};
 
 			const overspent = await step('open the first overspent Category', async () => {
 				await openBudget(page);
@@ -313,9 +336,62 @@ export const inspector = {
 				}
 			);
 
+			await step(
+				'a name left by clicking another Category goes to the Category it was typed for, also after a refusal, and the clicked one opens untouched',
+				async () => {
+					const server = await failFirstCallTo(page, 'categories:rename');
+					await openBudget(page);
+					await page.getByRole('button', { name: 'Groceries', exact: true }).click();
+					await inspector.getByRole('button', { name: 'Groceries actions' }).click();
+					await page.getByRole('menuitem', { name: 'Rename' }).click();
+					const field = inspector.getByRole('textbox', { name: 'Category name' });
+					await field.fill('Sample Groceries');
+					await field.press('Enter');
+					await server.called('categories:rename');
+					server.failWithServerError('categories:rename');
+					await expect(inspector.getByRole('alert')).toBeVisible();
+					await expect(field).toHaveValue('Sample Groceries');
+					await field.click();
+					await page.getByRole('button', { name: 'Coffee', exact: true }).click();
+					await expect(inspector.getByRole('heading', { name: 'Coffee' })).toBeVisible();
+					await expect(inspector).toBeFocused();
+					await expect(inspector.getByRole('textbox', { name: 'Category name' })).toHaveCount(0);
+					await expectEveryday(['Sample Groceries', 'Coffee'], ['Groceries']);
+					await page.reload();
+					await expectEveryday(['Sample Groceries', 'Coffee'], ['Groceries']);
+				}
+			);
+
+			await step(
+				'on a phone, a name left by tapping Next Category goes to the Category it was typed for, and the next one opens untouched',
+				async () => {
+					await page.setViewportSize({ width: 320, height: 640 });
+					const stopTouching = await useATouchScreen(page);
+					await tap(page, page.getByRole('button', { name: 'Sample Groceries', exact: true }));
+					const dialog = page.getByRole('dialog');
+					await expect(dialog).toHaveAccessibleName('Sample Groceries');
+					await tap(page, dialog.getByRole('button', { name: 'Sample Groceries actions' }));
+					await tap(page, page.getByRole('menuitem', { name: 'Rename' }));
+					const field = dialog.getByRole('textbox', { name: 'Category name' });
+					await expect(field).toBeFocused();
+					await field.fill('Sample Grocer');
+					await tap(page, dialog.getByRole('button', { name: 'Next Category: Dining Out' }));
+					const stepped = page.getByRole('dialog', { name: 'Dining Out' });
+					await expect(stepped.getByLabel('Assigned this month')).toBeFocused();
+					await expect(stepped.getByRole('textbox', { name: 'Category name' })).toHaveCount(0);
+					await stopTouching();
+					await page.setViewportSize({ width: 1280, height: 800 });
+					await page.reload();
+					await expectEveryday(['Sample Grocer', 'Coffee', 'Dining Out'], ['Sample Groceries']);
+					await page.goto('/categories');
+					await expectEveryday(['Sample Grocer', 'Coffee', 'Dining Out'], ['Sample Groceries']);
+					await openBudget(page);
+				}
+			);
+
 			await step('Rename in the inspector edits its heading in place', async () => {
-				await page.getByRole('button', { name: 'Groceries', exact: true }).click();
-				await inspector.getByRole('button', { name: 'Groceries actions' }).click();
+				await page.getByRole('button', { name: 'Sample Grocer', exact: true }).click();
+				await inspector.getByRole('button', { name: 'Sample Grocer actions' }).click();
 				await page.getByRole('menuitem', { name: 'Rename' }).click();
 				const field = inspector.getByRole('textbox', { name: 'Category name' });
 				await expect(field).toBeFocused();

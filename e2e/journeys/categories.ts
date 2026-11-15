@@ -2,12 +2,16 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 import { failFirstCallTo, holdResponseTo } from '../heldResponse';
 import {
+	centerOf,
 	choicesOf,
 	choose,
 	expectClearOf,
 	expectNothingPastTheRightEdge,
 	openBudget,
+	tap,
+	touchscreen,
 	useATouchScreen,
+	type Finger,
 	type Journey
 } from './journey';
 
@@ -85,39 +89,6 @@ async function touchDragToTheBottomEdge(page: Page, handle: Locator, until: Loca
 	await expect(until).toBeInViewport();
 	await touch('touchEnd', nearTheBottomEdge);
 	await finger.detach();
-}
-
-interface Finger {
-	id: number;
-	x: number;
-	y: number;
-}
-
-async function touchscreen(page: Page) {
-	const cdp = await page.context().newCDPSession(page);
-	return {
-		async touch(type: 'touchStart' | 'touchMove' | 'touchEnd' | 'touchCancel', fingers: Finger[]) {
-			await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: fingers });
-		},
-		async detach() {
-			await cdp.detach();
-		}
-	};
-}
-
-async function centerOf(locator: Locator) {
-	const box = await locator.boundingBox();
-	if (box === null) throw new Error('The element is not on screen.');
-	return { x: box.x + box.width / 2, y: box.y + box.height / 2, top: box.y };
-}
-
-async function tap(page: Page, locator: Locator) {
-	await locator.scrollIntoViewIfNeeded();
-	const { x, y } = await centerOf(locator);
-	const screen = await touchscreen(page);
-	await screen.touch('touchStart', [{ id: 1, x, y }]);
-	await screen.touch('touchEnd', []);
-	await screen.detach();
 }
 
 const tabBarOf = (page: Page) => page.getByRole('navigation', { name: 'Sections', exact: true });

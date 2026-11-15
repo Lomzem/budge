@@ -150,6 +150,39 @@ export async function useATouchScreen(page: Page) {
 	};
 }
 
+export interface Finger {
+	id: number;
+	x: number;
+	y: number;
+}
+
+export async function touchscreen(page: Page) {
+	const cdp = await page.context().newCDPSession(page);
+	return {
+		async touch(type: 'touchStart' | 'touchMove' | 'touchEnd' | 'touchCancel', fingers: Finger[]) {
+			await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: fingers });
+		},
+		async detach() {
+			await cdp.detach();
+		}
+	};
+}
+
+export async function centerOf(locator: Locator) {
+	const box = await locator.boundingBox();
+	if (box === null) throw new Error('The element is not on screen.');
+	return { x: box.x + box.width / 2, y: box.y + box.height / 2, top: box.y };
+}
+
+export async function tap(page: Page, locator: Locator) {
+	await locator.scrollIntoViewIfNeeded();
+	const { x, y } = await centerOf(locator);
+	const screen = await touchscreen(page);
+	await screen.touch('touchStart', [{ id: 1, x, y }]);
+	await screen.touch('touchEnd', []);
+	await screen.detach();
+}
+
 export async function expectTapTargetHeight(target: Locator, height: number) {
 	await target.scrollIntoViewIfNeeded();
 	const missedAt = await target.evaluate(

@@ -53,6 +53,9 @@
 
 	const budget = getBudgetMonth();
 
+	// svelte-ignore state_referenced_locally
+	const openedForId = category.id;
+
 	const list = useQuery(api.categories.list, {});
 	const rename = useMutation(api.categories.rename);
 	const moveToGroup = useMutation(api.categories.move);
@@ -87,7 +90,7 @@
 		]
 			.map((option) => ({
 				...option,
-				categories: option.categories.filter((c) => c.id !== category.id)
+				categories: option.categories.filter((c) => c.id !== openedForId)
 			}))
 			.filter((option) => option.categories.length > 0)
 	);
@@ -96,7 +99,7 @@
 
 	const managedGroups = $derived(list.data?.groups ?? []);
 	const ownGroup = $derived(
-		managedGroups.find((group) => group.categories.some((c) => c._id === category.id))
+		managedGroups.find((group) => group.categories.some((c) => c._id === openedForId))
 	);
 	const otherLabel = $derived(direction === 'intoThis' ? 'From' : 'To');
 
@@ -141,7 +144,7 @@
 			refuseMove('move-amount', 'Enter an amount above zero, such as 25.00.');
 			return;
 		}
-		const self = { id: category.id, name: category.name };
+		const self = { id: openedForId, name: category.name };
 		const sent = {
 			from: direction === 'outOfThis' ? self : other,
 			to: direction === 'outOfThis' ? other : self,
@@ -163,7 +166,7 @@
 		const shortfall = formatCents(-category.available);
 		const name = category.name;
 		covering = true;
-		const covered = await attempt(() => budget.cover(category.id));
+		const covered = await attempt(() => budget.cover(openedForId));
 		covering = false;
 		if (!covered.ok) {
 			coverError = covered.error?.message ?? "Budge couldn't cover the Category. Try again.";
@@ -196,7 +199,7 @@
 	}
 
 	async function hide() {
-		if (await act(() => setHidden({ categoryId: category.id, hidden: true }))) onclose();
+		if (await act(() => setHidden({ categoryId: openedForId, hidden: true }))) onclose();
 	}
 
 	function editTarget() {
@@ -229,7 +232,7 @@
 			name={category.name}
 			label="Category name"
 			bind:editing={renaming}
-			onsave={(name: string) => rename({ categoryId: category.id, name })}
+			onsave={(name: string) => rename({ categoryId: openedForId, name })}
 			onleave={() => {
 				actionsTrigger?.focus();
 			}}
@@ -276,7 +279,7 @@
 											onSelect={() =>
 												void act(() =>
 													moveToGroup({
-														categoryId: category.id,
+														categoryId: openedForId,
 														groupId: other._id,
 														index: other.categories.length
 													})
@@ -335,7 +338,7 @@
 						<AssignedInput
 							amount={row.cents}
 							label={row.label}
-							onsave={(cents: number) => budget.setAssigned(category.id, cents)}
+							onsave={(cents: number) => budget.setAssigned(openedForId, cents)}
 						/>
 					</dd>
 				</div>
@@ -417,7 +420,7 @@
 				{/if}
 				{#if category.target.needed > 0}
 					<AssignTargetButton
-						categoryId={category.id}
+						categoryId={openedForId}
 						needed={category.target.needed}
 						onassigned={() => {
 							section?.focus({ preventScroll: true });
@@ -530,12 +533,12 @@
 <DeleteCategoryDialog
 	bind:this={deleteDialog}
 	bind:open={deleteOpen}
-	category={{ id: category.id, name: category.name }}
+	category={{ id: openedForId, name: category.name }}
 	groups={managedGroups}
 />
 
 <TargetDialog
 	bind:this={targetDialog}
 	bind:open={targetOpen}
-	category={{ id: category.id, name: category.name, target: category.target?.definition ?? null }}
+	category={{ id: openedForId, name: category.name, target: category.target?.definition ?? null }}
 />

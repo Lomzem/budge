@@ -215,6 +215,48 @@ An observer found two phone recovery cases at 320 px with touch where focus, dra
   - Firefox stays deferred as above. When Firefox loses focus to BODY on a moved row, the reveal should still show the row, because focus is on nothing. That follows from the code and was not probed.
 
 
+## Follow-up: a name left in the Budget inspector renamed the Category opened next (blocker)
+
+An observer found that on Budget a name typed in the inspector went to the wrong Category. The steps: open Groceries, choose Rename from its actions, type `Groceries Typed`, then quickly click or tap the Coffee row, or at 320 px tap the dialog's `Next Category`. One rename reached the server, for Coffee (or Dining Out), and Groceries kept its name. A held mouse press and Tab then Enter renamed Groceries.
+
+- **Reproduced first** (`insp.ts` in the agent scratchpad, real transport, rename sends recorded with their `categoryId` and mapped to names, names compared after a reload). In `test-results/verify-budge/insp-base-c671bda.json`:
+  - Mouse click at 1280 px: the one send carried Coffee's id, and Coffee became `Groceries Typed`.
+  - Tap on `Next Category` at 320 px: the one send carried Dining Out's id, and Dining Out became `Groceries Typed`.
+  - Held press and Tab then Enter: one send with Groceries' id. Groceries was renamed.
+- **Cause.** The premise about callback and data identity was tested and holds.
+  - The Budget keys the inspector by Category id (`{#key inspected.id}` in `+page.svelte`), so each Category gets its own inspector.
+  - A click leaves the name field on mousedown, and `InlineName` commits a blur on a timer, so that the move rollback from `ddefe31` can keep a field it puts back.
+  - By the time the timer runs, the click has switched the selection, and the Groceries inspector has been destroyed. Its `onsave` closure read `category.id` through the `category` prop. In Svelte 5 a destroyed component's prop getter still reads the parent's current value, which is the new selection.
+  - A held press commits before the click switches, and Enter commits synchronously, which is why those two ways were right.
+- **Identity decision.** An inspector belongs to the Category it opened for. It takes that id once, when it is created (`const openedForId = category.id`, under `svelte-ignore state_referenced_locally`, since taking the first value is the point), and every write it starts goes to that id:
+  - the rename, the Assigned save, cover, move money, move to group, hide;
+  - the Category passed to the delete and target dialogs, and to the target section.
+  - Display still reads the live `category`. `InlineName` is unchanged: it never knew whose name it held, so a snapshot of its `onsave` would have captured the same live read.
+- **Audit of the other `InlineName` callers and deferred saves.**
+  - The Categories page renders each group and Category name in a keyed `each`, and its `onsave` reads that item's `_id`, which a removed item keeps. The fast A→B switch from `9c2755e` already proves it in `categories/late-rename`.
+  - `AssignedInput` saves synchronously on blur, before the click switches the selection.
+  - The inspector's other writes run at the user's action, inside the inspector that started them.
+- **Journeys** (`inspector/cover-and-manage`, real transport). Two new steps run before "Rename in the inspector edits its heading in place", which now starts from their result:
+  - At 1280 px, a Groceries rename is refused by `failFirstCallTo`, and the field reopens with its reason and draft. The draft, left by a fast click on Coffee, renames Groceries. Coffee opens unedited, with focus on its inspector and no name field. The names hold after a reload.
+  - At 320 px with `useATouchScreen`, a name typed for that Category (`Sample Grocer`) and left by a CDP `tap` on `Next Category: Dining Out` renames it. Dining Out opens unedited, with Assigned focused and no name field. After a reload, Budget and Categories both show `Sample Grocer`, `Coffee` and `Dining Out`, and not the old name.
+  - Each Category's identity is proven by both names: the edited one changes and the one opened next keeps its own.
+  - `tap`, `touchscreen` and `centerOf` moved from `categories.ts` to `journey.ts` so both journeys share them.
+- **Red → green.**
+  - `insp-red`: `c671bda` inspector with the final journey. The desktop step fails because the fast click renamed Coffee, so no `Coffee` heading opens.
+  - `insp-red-phone`: the same source, with the desktop step committing by Enter in a temporary journey copy so the phone step runs. It fails because Dining Out is gone from Everyday, renamed to `Sample Grocer`.
+  - `insp-green-2`: the fix, with every step passing.
+  - Probe `insp-fixed.json`: mouse, held press, Tab then Enter, and the 320 px tap each send one rename, with Groceries' id. Only Groceries changes.
+- **A late failure after the switch.** Probe `insp-stale-failure.json`: a Groceries rename held by `failFirstCallTo` is failed while Coffee's own name is being typed. Coffee keeps `Coffee Draft`, its focus and no alert, and nothing is renamed after a reload.
+- **Checks.**
+  - `insp-green-affected` passes 11 journeys: `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename`, `inspector/cover-and-manage`, `inspector/move-money`, `budget/phone-groups`, `budget/assign`, `budget/needs-you`, `shell/navigate` and `shell/phone-pages`.
+  - `insp-final` reruns the same 11 on the finished tree, and they pass. `insp-fixed.json` was re-probed on it with the same result.
+  - `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests, including the feature-map test.
+  - The parent runs the code review and the UI judges, so none was run here.
+- **Limits.**
+  - A rename refused after its inspector was replaced is dropped without a message. The old name stays in the table, and no other Category or field is touched. Before this fix the same failure was dropped silently too. Surfacing it would need a place outside the inspector, which this blocker does not decide.
+  - With a held press on Coffee, the inspector stays on the renamed Groceries and focus ends on the body, before and after the fix. The rename is right; where the press lands is not part of this blocker.
+  - Chromium only. Firefox stays deferred as above.
+
 ## Red → green
 
 Both new journey steps failed on unchanged `eb1d3f9` source, for the reported reason, and pass after the repair:
