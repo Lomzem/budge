@@ -14,6 +14,8 @@ Every picker is a shadcn-svelte Select: a `combobox` button labeled like the old
 
 ## Proof and skip reporting
 
+A journey description lists only what that journey asserts; label one-off or manual checks separately as `Not in the journey:` or `Manual drive:`.
+
 `bun run app verify` captures this for each journey step. For manual recipes, capture action and result screenshots plus `await page.locator('body').ariaSnapshot()`. Save under a unique `test-results/verify-budge/<run>/` directory. Require persistence and side effects through another user-facing view for mutations. Record each sub-feature ID and entry point as passed, failed, or blocked with the exact unmet precondition. Verifying one entry point leaves other entry points unverified. Cleanup runs after failures too and preserves evidence; the skill owns the lifecycle and proof rules.
 
 ## Features
