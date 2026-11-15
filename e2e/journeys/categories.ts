@@ -307,23 +307,52 @@ export const categories = {
 		run: async (page, { step }) => {
 			const everyday = groupOf(page, 'Everyday');
 
-			await step('open the Categories page at phone width', async () => {
+			const moved = await step('open the Categories page at phone width', async () => {
+				const held = await holdResponseTo(page, 'categories:move');
 				await page.setViewportSize({ width: 320, height: 640 });
 				await openCategories(page);
 				await expect
 					.poll(() => orderIn(everyday))
 					.toEqual(['Everyday', 'Groceries', 'Dining Out', 'Coffee', 'Transit']);
+				return held;
 			});
 
 			await step(
-				'ArrowUp and Home move Coffee, and its handle keeps focus at the group edge',
+				'two ArrowUp presses on Coffee while its first save is unanswered move it twice at once, and both saves last',
 				async () => {
 					const handle = everyday.getByRole('button', { name: 'Move Coffee' });
 					await handle.focus();
 					await page.keyboard.press('ArrowUp');
+					await moved.held;
+					await page.keyboard.press('ArrowUp');
 					await expect
 						.poll(() => orderIn(everyday))
-						.toEqual(['Everyday', 'Groceries', 'Coffee', 'Dining Out', 'Transit']);
+						.toEqual(['Everyday', 'Coffee', 'Groceries', 'Dining Out', 'Transit']);
+					await expect(handle).toBeFocused();
+					moved.release();
+					await expect(async () => {
+						await page.reload();
+						await expect(everyday.getByRole('button', { name: /^Move / })).toHaveCount(5);
+						expect(await orderIn(everyday)).toEqual([
+							'Everyday',
+							'Coffee',
+							'Groceries',
+							'Dining Out',
+							'Transit'
+						]);
+					}).toPass();
+				}
+			);
+
+			await step(
+				'End and Home move Coffee, and its handle keeps focus at the group edge',
+				async () => {
+					const handle = everyday.getByRole('button', { name: 'Move Coffee' });
+					await handle.focus();
+					await page.keyboard.press('End');
+					await expect
+						.poll(() => orderIn(everyday))
+						.toEqual(['Everyday', 'Groceries', 'Dining Out', 'Transit', 'Coffee']);
 					await expect(handle).toBeFocused();
 					await page.keyboard.press('Home');
 					await expect

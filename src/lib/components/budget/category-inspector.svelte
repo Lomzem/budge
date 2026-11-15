@@ -491,8 +491,9 @@
 				{@render self('From')}
 			{/if}
 			<div class="flex justify-center">
-				<Button variant="ghost" size="icon-sm" aria-label="Swap From and To" onclick={swap}>
+				<Button variant="ghost" size="sm" onclick={swap}>
 					<ArrowDownUpIcon aria-hidden="true" />
+					Swap From and To
 				</Button>
 			</div>
 			{#if direction === 'intoThis'}

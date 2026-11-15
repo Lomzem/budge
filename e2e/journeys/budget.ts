@@ -362,6 +362,46 @@ export const budget = {
 					await expect(groceries).toHaveValue(typed(august));
 				}
 			);
+
+			await step(
+				'a Budget entry without a month stays the current month after the next one is viewed from a later entry',
+				async () => {
+					const groceries = page.getByRole('textbox', {
+						name: 'Assigned for Groceries',
+						exact: true
+					});
+					const sections = page.getByRole('navigation', { name: 'Sections', exact: true });
+					const showing = async (monthsFromNow: number, amount: number) => {
+						await expect(picker).toHaveAccessibleName(
+							`${monthName(monthsFromNow)}, choose a month`
+						);
+						await expect(groceries).toHaveValue(typed(amount));
+					};
+					await openBudget(page);
+					const current = cents(await groceries.inputValue());
+					await sections.getByRole('link', { name: /^Categories/ }).click();
+					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await sections.getByRole('link', { name: /^Budget/ }).click();
+					await showing(0, current);
+					await page.getByRole('button', { name: 'Next month', exact: true }).click();
+					const next = current + 12_345;
+					await groceries.fill(typed(next));
+					await groceries.press('Enter');
+					await expect(page).toHaveURL(/[?&]month=/);
+
+					await page.goBack();
+					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await page.goBack();
+					await showing(0, current);
+					await expect(page).not.toHaveURL(/[?&]month=/);
+					await page.reload();
+					await showing(0, current);
+					await page.goForward();
+					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await page.goForward();
+					await showing(1, next);
+				}
+			);
 		}
 	},
 	'large-amounts': {

@@ -12,7 +12,7 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
+	import { navigating, page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
@@ -40,18 +40,19 @@
 	const bank = getBankConnections();
 	const budget = getBudgetMonth();
 
-	const monthIn = (url: URL) => {
+	const monthAt = (url: URL) => {
 		const linked = url.searchParams.get('month');
-		return linked !== null && isIsoMonth(linked) ? linked : undefined;
+		if (linked !== null && isIsoMonth(linked)) return linked;
+		const returningToAnEntryWithoutAMonth = navigating.type === 'popstate';
+		return returningToAnEntryWithoutAMonth ? monthOf(budget.today) : budget.month;
 	};
-	budget.month = monthIn(page.url) ?? budget.month;
+	budget.month = monthAt(page.url);
 	let arrivedAt = page.url;
 	$effect(() => {
 		const url = page.url;
 		if (url === arrivedAt) return;
 		arrivedAt = url;
-		const linked = monthIn(url);
-		if (linked !== undefined) budget.month = linked;
+		budget.month = untrack(() => monthAt(url));
 	});
 	$effect(() => {
 		const kept = new URL(location.href);

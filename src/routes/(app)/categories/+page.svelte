@@ -17,15 +17,8 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { moveInList, reorderHandle } from '$lib/reorder';
 
-	type Listed = NonNullable<typeof list.data>;
-
 	const list = useQuery(api.categories.list, {});
-	let reordered = $state<{ from: Listed; groups: ManagedGroup[] } | null>(null);
-	const groups: ManagedGroup[] = $derived(
-		reordered !== null && reordered.from === list.data
-			? reordered.groups
-			: (list.data?.groups ?? [])
-	);
+	const groups: ManagedGroup[] = $derived(list.data?.groups ?? []);
 
 	const renameCategory = useMutation(api.categories.rename);
 	const renameGroup = useMutation(api.categories.renameGroup);
@@ -75,29 +68,58 @@
 		document.querySelector<HTMLElement>(`[data-rename-id="${id}"]`)?.focus();
 	}
 
-	function reorder(next: ManagedGroup[], change: () => Promise<unknown>) {
-		if (list.data === undefined) return;
-		reordered = { from: list.data, groups: next };
-		void run(change).then(() => {
-			if (actionError !== '') reordered = null;
-		});
-	}
-
 	function reorderGroup(from: number, to: number) {
 		const group = groups[from];
 		if (group === undefined) return;
-		reorder(moveInList(groups, from, to), () => moveGroup({ groupId: group._id, index: to }));
+		void run(() =>
+			moveGroup(
+				{ groupId: group._id, index: to },
+				{
+					optimisticUpdate: (store) => {
+						const listed = store.getQuery(api.categories.list, {});
+						const at = listed?.groups.findIndex((g) => g._id === group._id) ?? -1;
+						if (listed === undefined || at === -1) return;
+						store.setQuery(
+							api.categories.list,
+							{},
+							{
+								...listed,
+								groups: moveInList(listed.groups, at, to)
+							}
+						);
+					}
+				}
+			)
+		);
 	}
 
 	function reorderCategory(groupIndex: number, from: number, to: number) {
 		const group = groups[groupIndex];
 		const category = group?.categories[from];
 		if (group === undefined || category === undefined) return;
-		reorder(
-			groups.map((g, at) =>
-				at === groupIndex ? { ...g, categories: moveInList(g.categories, from, to) } : g
-			),
-			() => moveCategory({ categoryId: category._id, groupId: group._id, index: to })
+		void run(() =>
+			moveCategory(
+				{ categoryId: category._id, groupId: group._id, index: to },
+				{
+					optimisticUpdate: (store) => {
+						const listed = store.getQuery(api.categories.list, {});
+						if (listed === undefined) return;
+						store.setQuery(
+							api.categories.list,
+							{},
+							{
+								...listed,
+								groups: listed.groups.map((g) => {
+									if (g._id !== group._id) return g;
+									const at = g.categories.findIndex((c) => c._id === category._id);
+									if (at === -1) return g;
+									return { ...g, categories: moveInList(g.categories, at, to) };
+								})
+							}
+						);
+					}
+				}
+			)
 		);
 	}
 
