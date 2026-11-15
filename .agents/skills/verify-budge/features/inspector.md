@@ -34,7 +34,7 @@ Preconditions:
 ## Gotchas
 
 - **Manual drive:** check the Target surface on ordinary Categories (Add/Edit Target, progress and Assign when needed) and `Card payment` on Credit Card Payment Categories.
-- Hiding, moving to a collapsed group, or deleting the open Category from its inspector closes the inspector and puts focus on the main region.
+- Hiding or deleting the open Category from its inspector closes the inspector and puts focus on the main region. Moving it to a collapsed group opens that group, keeps the inspector open, and retains focus on the actions button.
 - **Manual drive:** the From/To picker includes Hidden Categories and exclude the current Category. Zero, negative or invalid Amount shows `Enter an amount above zero, such as 25.00.`; a positive move may make the source Assigned negative while preserving Ready to Assign.
 
 - Cover requires actual negative Available; if fixture has no negative Category create Overspending via UI or report blocked, not passed by opening an inspector.

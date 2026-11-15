@@ -1,6 +1,8 @@
 # UI review — UX efficiency, round 1
 
-Protocol: [README](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/docs/quality/ui-review/README.md), [rubric](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/docs/quality/ui-review/rubric.md). This independent report follows the maintained report template.
+Archive note: protocol links were made repository-relative and private artifact links became local path references; observations and verdict are unchanged.
+
+Protocol: [README](../../../../docs/quality/ui-review/README.md), [rubric](../../../../docs/quality/ui-review/rubric.md). This independent report follows the maintained report template.
 
 ## Coordinator brief
 
@@ -22,14 +24,14 @@ Protocol: [README](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519
 
 All paths below are inside this checkout, retained after shutdown:
 
-- **J**: [23 maintained journeys and summary](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-round1/summary.json). Each journey directory includes step PNG/ARIA and trace.zip.
-- **M**: [custom control-driven initial results](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-manual/manual-results.json). Scripts/logs and original failed harness attempts are retained here too; do not interpret each recorded failure as an app defect.
-- **R**: [corrected locator/select recipes](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-recheck/manual-results.json).
-- **F**: [final Cover/month navigation recipes](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-final/manual-results.json).
-- **K**: [stricter Tab/arrow attempts](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-keyboard2/manual-results.json). Successful U3/U4/U6/U7; failures and limits discussed below.
-- **X**: [390/320/desktop edge results](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-extras/results.json), plus signed-out desktop/320 screenshots and ARIA in the same directory.
-- **S**: [split Category/account effects](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-split-effects/manual-results.json).
-- **C**: [focused keyboard Cover reproduction](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-key-cover-probe/reload.aria.yml), with selected/reloaded PNG/ARIA. Completion output in M/keyboard-cover-probe.log.
+- **J**: 23 maintained journeys and summary (local artifact: `/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-round1/summary.json`). Each journey directory includes step PNG/ARIA and trace.zip.
+- **M**: custom control-driven initial results (local artifact: `/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-manual/manual-results.json`). Scripts/logs and original failed harness attempts are retained here too; do not interpret each recorded failure as an app defect.
+- **R**: corrected locator/select recipes (local artifact: `/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-recheck/manual-results.json`).
+- **F**: final Cover/month navigation recipes (local artifact: `/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-final/manual-results.json`).
+- **K**: stricter Tab/arrow attempts (local artifact: `/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-keyboard2/manual-results.json`). Successful U3/U4/U6/U7; failures and limits discussed below.
+- **X**: 390/320/desktop edge results (local artifact: `/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-extras/results.json`), plus signed-out desktop/320 screenshots and ARIA in the same directory.
+- **S**: split Category/account effects (local artifact: `/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-split-effects/manual-results.json`).
+- **C**: focused keyboard Cover reproduction (local artifact: `/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-key-cover-probe/reload.aria.yml`), with selected/reloaded PNG/ARIA. Completion output in M/keyboard-cover-probe.log.
 
 ### Task / viewport / input / persistence matrix
 
@@ -66,7 +68,7 @@ All rows use budget-with-accounts unless stated. “Partial” leaves the specif
 
 | ID | Severity | Task / reproduction | Expected / observed and impact | Evidence |
 | --- | --- | --- | --- | --- |
-| sol-b-1 | **Major** | U1/U3 visual clarity. Seed budget-with-accounts. Set Dark in Settings. At 390×640 browser touch, rename Groceries through inspector to “Sample Groceries With A Very Long Name For Narrow Screens”, close, edit table Assigned to 999999.99, Enter, reload and scroll the row into view. | The persisted amount and corresponding Available/Group totals should remain readable in full. Assigned displays only its leading portion, Available loses trailing cents, and Group totals run together/clamp at the right. Field `scrollWidth=110` exceeds `clientWidth=94`; page itself does not overflow. This demonstrates why a zero-overflow assertion is insufficient: the money is unreadable within its box. At 320 the stacked version does fit (`102/102`, page/viewport 320). No incorrect stored amount observed. | [390 post-reload viewport](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-extras/390-failed.png), [ARIA](/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-extras/390-failed.aria.yml), X/results.json; 320-long-large-dark.png comparator |
+| sol-b-1 | **Major** | U1/U3 visual clarity. Seed budget-with-accounts. Set Dark in Settings. At 390×640 browser touch, rename Groceries through inspector to “Sample Groceries With A Very Long Name For Narrow Screens”, close, edit table Assigned to 999999.99, Enter, reload and scroll the row into view. | The persisted amount and corresponding Available/Group totals should remain readable in full. Assigned displays only its leading portion, Available loses trailing cents, and Group totals run together/clamp at the right. Field `scrollWidth=110` exceeds `clientWidth=94`; page itself does not overflow. This demonstrates why a zero-overflow assertion is insufficient: the money is unreadable within its box. At 320 the stacked version does fit (`102/102`, page/viewport 320). No incorrect stored amount observed. | 390 post-reload viewport (local artifact: `/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-extras/390-failed.png`), ARIA (local artifact: `/home/lomzem/.t3/worktrees/budge/t3-2e620823-82895439599c6519/test-results/verify-budge/sol-b-extras/390-failed.aria.yml`), X/results.json; 320-long-large-dark.png comparator |
 
 No other confirmed major/blocker. Generalized keyboard helper failures are not promoted to findings: they mishandled roving controls, focus handoff or options; the focused Tab/typing Cover reproduction succeeds. Likewise, initial exact-dollar formatting, nonexistent desktop filter toggle, wrong Move button name, native summary locator, and navigation-before-settlement failures were harness errors. They remain visible in raw logs, with corrected evidence explicitly linked above.
 

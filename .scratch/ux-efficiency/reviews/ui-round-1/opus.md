@@ -1,6 +1,8 @@
 # UI review — feat/ux-efficiency, round 1
 
-Use [the protocol](../../../docs/quality/ui-review/README.md) and [rubric](../../../docs/quality/ui-review/rubric.md).
+Archive note: protocol links were corrected after archival; observations and verdict are unchanged.
+
+Use [the protocol](../../../../docs/quality/ui-review/README.md) and [rubric](../../../../docs/quality/ui-review/rubric.md).
 
 ## Independent judge report — Opus
 
