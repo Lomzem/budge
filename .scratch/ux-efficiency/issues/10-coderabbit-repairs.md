@@ -16,6 +16,7 @@ Base: `eb1d3f9` on `feat/ux-efficiency`. Scope: the three production/UI findings
 | Review 5910828315 (outside diff), `src/lib/components/budget/category-inspector.svelte` ~175 | Cover from Ready to Assign announced `-category.available` read before the request, while `budget.cover()` dropped the shortfall the mutation actually covered | **Confirmed and fixed.** See the follow-up below. |
 | Phone validation SB-CR2-1 (not CodeRabbit) | At 320 px with real touch, a blank name in a field near the tab bar (Groceries on the first screen; Transit, Car Repairs or the Savings Goals group after a finger scroll) left by Enter, Tab or a tap beside it showed `Enter a name.` at 572–596 under the Sections bar from 575 | **Confirmed and fixed.** See the SB-CR2-1 follow-up below. |
 | Source review P2 (`blank-visibility-spec.md`, not CodeRabbit), `inline-name.svelte` ~65–148 | A blur decided after a held mouse press survived Escape: type a name, hold the button on the field, Tab away and Shift+Tab back, press Escape, release, and the cancelled name was saved | **Confirmed in the browser and fixed.** See the follow-up after SB-CR2-1. |
+| CI run 43728415686 (job 132855298047), `budget/month-jump`, not CodeRabbit | After a reload on August, September picked from the grid, `123.45` typed in Groceries, Enter, Categories, Back: the September heading showed but Groceries read `0.00` | **Test-only; journey fixed.** The journey typed into the table while it was inert waiting for September. No save was ever sent. See the CI follow-up after the Escape follow-up. |
 | Phone validation, minor | No touch-visible cancel for a refused blank name | **Answered, deferred.** No InlineName edit has a visible cancel, refused or not; adding one is new UI beyond this repair. On touch the user can retype the old name, open another name, or leave the page, and nothing blank is ever saved. Escape cancels on a keyboard. |
 | Phone validation, nit | A real zero cover announces `Covered $0.00 for Coffee …` | **Answered, no change.** The amount is what the server covered (no shortfall left, no double cover), which is the truthful receipt 5910828315 asked for. Money semantics stay unchanged. |
 
@@ -162,6 +163,49 @@ Base `3dc077b`. A refused `categories:move` or `categories:moveGroup` rolled the
   - Minimize-reader-load: one signal answers "is this opening's decision still live" and also removes the release listeners, replacing the counter rather than adding a second piece of state.
   - Test-behavior: the proof is the persisted name, with a positive control that the held route still saves, rather than a call-count of `commit`.
   - Prove-it-works: the inspector failure in the first probe was traced to `pointer-events: none` before any conclusion was drawn.
+
+### Follow-up: CI `budget/month-jump` read `0.00` after Back (run 43728415686)
+
+CI failed 1 of 63 at `fbe43fa` (source-equal to `dab8fff`), in the step "after a reload, the month chosen last…": September's heading showed after Back, but Groceries read `0.00` where `123.45` was expected. CI kept no trace. It showed 36 Assignment rows, which matches the seed: nothing was written.
+
+- **Classification: test-only.** The owner is the journey's readiness boundary. The product is correct.
+- **Cause.**
+  - Picking a month while its query is pending keeps the previous month's table on screen: `BudgetMonth.stale` sets the table `aria-busy` and `inert`.
+  - The step called `fill` and `press('Enter')` straight after the September heading appeared.
+  - Playwright's `fill` and `press` on an input inside an inert subtree return without error, but no input event fires, the value and focus are unchanged, and Enter lands on the unedited `0.00`. So `setAssigned` was never sent.
+  - `click` waits for the field to accept a pointer, which an inert field doesn't. That is the readiness a user has.
+- **Leads tested, in rank order** (manual probe `mj.ts` in the agent scratchpad, not a maintained assertion). It routes the real socket and records only month query adds and results, `budget:setAssigned` month and amount with its ack's success flag, and the Groceries field's focus, input, keydown, value, inert and `aria-busy`. A second view of September and August in a fresh context checks what persisted.
+  1. Pending query and inert table versus fill/press readiness: **confirmed.**
+     - `mj-control`, ungated: the CI symptom occurred naturally. At the September heading the table was `inert` and `aria-busy`, and `fill` produced no input event. Enter's keydown fired on `0.00`, no `setAssigned` was sent, and the second view showed September `0.00` and August `0.00`.
+     - `mj-gated-1` and `-2`, with September's query result withheld and the ack held: the same, deterministically. There were 0 mutations for the held ack to catch.
+     - `mj-gated-click` and `mj-gated-click-ack`: while September was withheld, `click` did not complete. After the release, click, fill and Enter sent exactly one `setAssigned` (month `2027-09`, amount `12345`). Back showed `123.45`, even with the ack still held, through the query update. The second view showed September `123.45` and August `0.00`.
+  2. A wrong-month write or query context: **excluded for this failure.** No write was sent. When one was sent, it carried `2027-09`, and August stayed unchanged.
+  3. Auth or sync errors: **excluded for this failure.** No request was sent or refused, and every query result arrived.
+- **Fix** (`e2e/journeys/budget.ts`, `budget/month-jump` only). The step now holds sync (`pausableSync`, as in the inspector's "while the next month loads, the inspector takes no input") from the September pick. It requires:
+  - the September heading;
+  - that focusing Groceries fails while the month loads;
+  - that a click on Groceries completes only after sync resumes.
+  It then fills `august + 12345`, checks the field shows it, and presses Enter. The money expectations are unchanged.
+  The step's two siblings typed straight after `Next month` in the same way. They now click Groceries first, and the Skip-to-content step reads next month's amount only after that click.
+- **Red → green.**
+  - `mj-journey-red` (the fixed journey edited back to pause, fill, Enter, resume; restored and diffed afterwards): `FAIL budget/month-jump: expect(locator).toHaveValue(expected) failed`. The ARIA snapshot shows September 2027 with Groceries `0.00`, the CI symptom.
+  - `mj-journey-green`: `budget/month-jump`, `budget/assign`, `budget/needs-you`, `inspector/move-money`, `search/filters` and `shell/navigate` pass.
+  - Final tree, original journey repeated: `mj-journey-final` and `mj-journey-final-2` pass `budget/month-jump`.
+  - Probe `mj-final-click`, ungated: the inert, `aria-busy` table at the heading, then one `setAssigned` for `2027-09`/`12345` with a successful ack. Back shows `123.45`, and the second view shows September `123.45` and August `0.00`.
+  - Traces are sanitized (0 matches left on rescan).
+- **Test-audit gate.**
+  - The step protects what a user sees and keeps: the loading table takes no input, and an amount typed once the month has loaded is saved to that month and survives Back.
+  - It went red for the CI reason under the controlled pause.
+  - It reuses the existing transport helper and adds no production seam, sleep or retry.
+- **Checks.** With the app stopped, `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests (59 files), including the feature-map test.
+- **Limits.**
+  - Chromium only.
+  - CI kept no trace, so the link to this cause rests on the matching symptom plus the 36 unchanged Assignment rows.
+  - `budget/assign` types after `Previous month` too, but its next assertion is a month-distinct `toHaveValue`, so it waits on data rather than on readiness. It is left unchanged.
+- **Principles that changed a choice.**
+  - Attack-the-premise: "the save was lost or misdirected" was tested before it was believed. The event log showed no save was sent, which moved the owner from production to the journey.
+  - Test-behavior: the readiness wait is a user action (`click`) plus the observable unfocusable field, not a check of `inert` or `aria-busy` attributes.
+  - Fix-root-causes: all three typing points in this journey got the boundary, not only the one CI caught.
 
 ## Red → green
 

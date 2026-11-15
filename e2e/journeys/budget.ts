@@ -1,7 +1,7 @@
 import { expect, type Locator } from '@playwright/test';
 
 import { formatCents } from '../../src/lib/domain/money';
-import { holdResponseTo } from '../heldResponse';
+import { holdResponseTo, pausableSync } from '../heldResponse';
 import {
 	cents,
 	centsIn,
@@ -321,7 +321,7 @@ export const budget = {
 			});
 
 			await step(
-				'after a reload, the month chosen last is the one Back returns to from another Section, with its own Assigned',
+				'after a reload, the month chosen last is the one Back returns to from another Section, with its own Assigned, typed once that month has loaded',
 				async () => {
 					const nextYear = new Date().getFullYear() + 1;
 					const groceries = page.getByRole('textbox', {
@@ -332,6 +332,7 @@ export const budget = {
 						page.getByText(`${month} ${String(nextYear)}`, {
 							exact: true
 						});
+					const sync = await pausableSync(page);
 					await page.reload();
 					await expect(heading('August')).toBeVisible();
 					const august = cents(await groceries.inputValue());
@@ -339,11 +340,18 @@ export const budget = {
 					await expect(
 						months.getByRole('button', { name: `August ${String(nextYear)}`, exact: true })
 					).toBeFocused();
+					sync.pause();
 					await page.keyboard.press('ArrowRight');
 					await page.keyboard.press('Enter');
 					await expect(heading('September')).toBeVisible();
+					await groceries.focus();
+					await expect(groceries).not.toBeFocused();
+					const clicked = groceries.click();
+					sync.resume();
+					await clicked;
 					const september = august + 12_345;
 					await groceries.fill(typed(september));
+					await expect(groceries).toHaveValue(typed(september));
 					await groceries.press('Enter');
 					await expect(page).toHaveURL(new RegExp(`[?&]month=${String(nextYear)}-09(&|$)`));
 
@@ -385,6 +393,7 @@ export const budget = {
 					await sections.getByRole('link', { name: /^Budget/ }).click();
 					await showing(0, current);
 					await page.getByRole('button', { name: 'Next month', exact: true }).click();
+					await groceries.click();
 					const next = current + 12_345;
 					await groceries.fill(typed(next));
 					await groceries.press('Enter');
@@ -429,6 +438,7 @@ export const budget = {
 
 						await pressNext(page.getByRole('button', { name: 'Next month', exact: true }));
 						await expect(picker).toHaveAccessibleName(`${monthName(1)}, choose a month`);
+						await groceries.click();
 						const next = cents(await groceries.inputValue()) + 2_468;
 						expect(next).not.toBe(current);
 						await groceries.fill(typed(next));
