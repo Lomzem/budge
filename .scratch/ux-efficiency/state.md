@@ -6,7 +6,7 @@ Owner authorized all26 simplifications, Opus5.5 implementation and judge, source
 
 Parent `/home/lomzem/proj/budge`, branch feat/ux-efficiency, owner app stopped. Parent backend is non-anonymous and app CLI correctly refuses: never edit owner env to bypass it; use isolated worktrees. Main baseline6bdc864175d0abdb100ce41343a38c2e8c4287f6 (refresh before merge).
 
-## Current phase — blocker: inspector rename operation identity
+## Current phase — inspector identity source review and completion probe
 
 PR https://github.com/Lomzem/budge/pull/32 remains linked/watched, publishedhead eb1d3f901056034263687a21affa5e1e17c29e65. That head passed CI/Vercel; ONE manual CodeRabbit review5909130525 requested changes. All external findings have localrepairs/dispositions(ticket10), but no repairbatch pushed, no incrementalrequest/merge/deploy. Existing event-drivenwatch persists; no polls/sleeps/re-watch/scheduler for PR waits.
 
@@ -17,6 +17,8 @@ OriginalOpusimplementationchildd6353fcf-b464-4545-81ec-da08c10529a3 nowrun10task
 Previoussource/verificationmilestonesremainvalidonlyfortheirownpaths: 27400a4focusvisibility/rootrefusalhook, sourceStandards/Spec/testauditpassed; 30b8c9c(9c2755e) fixesintentionalfastnameswitchcommits+opening-owneddeferredblur, d8f634b(ddefe31) preservesunsentrollbackdraft; a47f0c7(848edfc)scopesTailwindsrcscanandcontrolleddocreloadcause;0afbc8c(f7538f4)nativefocus/rowerrorownership. Unit933/staticandaffectedjourneys pass atthosehandoffs; cleanfull63at75ce129 precedeslatesteditorchanges. FinalCIwillrerunfullsuite/capacity;backend/schema/admission/dependenciesunchanged. Sourcefixescheckedbutnewinspectorblockerinvalidatessharededitorapproval.
 
 Currenttrackedchangesupdateonlytaskrecordwiththisrealblocker. Finishcommitnormalhooks; preserveoriginalsource/evidence. AllUIreportsarelocal, notrawpublicartifacts. Source/review/pr-body/shipping-log local test-results/ux-efficiency. Newreviewmeansfreshcontext/task, never reuseoldreviewthread; implementationcontinuationonlymayreuseownchild. Don't passcoordinators/state/otherjudgescores tojudges; explicitallowedruntime/test/config/featuremapdiffpaths, planningnames/statusonly. Nextneutralbrief mustinclude sharedinspector ORIGINALtargetscope, notjustcorrectvisiblefield. No silentcarryforward orgratuitouspostapprovalmetadatacommit.
+
+Latest: originalOpus302f160 integratedbb6bbbc0e02aa509b549b264765c84b6531f8bd0; openedForIdcaptureskeyedinstanceidentityforallwrites. Parentactualdesktop/phone redwrongnames+green11journeysverified; owncheckoutclean302/appdown/browsersclosed. FreshStandards/testauditpasses(nointroducedfindings),currentbinding+journeyisproportionatecorrection;Specf03acd99pending. Reports test-results/ux-efficiency/reviews/inspector-identity-{standards,spec}.md. Pre-existing/unprobedhide-successonclosemaycloseanewerinspector: targetedownerprobe/dispositionnowrun11task4db5aa20-6573-4aac-8780-99f022e0ab74 samepreservedcheckout302source; no claimofintroducedfailureyet. Previousrun10complete; noUIjudgesactive. Followcompletion,nopoll. FinishSpec+probe,thenfreshsourceifchangesandNEWall3affectedfinalSHAUIgate;donotuseoldadfapprovals. No repairpush/CRincremental/merge/deploy.
 
 ## Records and explicit limits
 
