@@ -6,7 +6,7 @@ Owner authorized all26 simplifications, Opus5.5 implementation and judge, source
 
 Parent `/home/lomzem/proj/budge`, branch feat/ux-efficiency, owner app stopped. Parent backend is non-anonymous and app CLI correctly refuses: never edit owner env to bypass it; use isolated worktrees. Main baseline6bdc864175d0abdb100ce41343a38c2e8c4287f6 (refresh before merge).
 
-## Current phase — CodeRabbit hash-history repair
+## Current phase — hash-history source review
 
 PR https://github.com/Lomzem/budge/pull/32 linked/watched; PUBLISHEDhead aba16107c2b2b866f1fa8af2c513578dd8903009 (sourcef310971). ALL3freshindependentjudgesapprove9/10 atthathead, each12journeys+manualoriginal-ID/money/lifecycle/geometry/persistence; parentactualreports/summaries/cleanupverified. Latestreportpaths ticket11/localshippingledger. UIgatePASSataba, notanynewsource. Normalpushhooksunit933/codegen/typecheck/secrets58commitspassed. CIrun43708406020green: all63E2E7.3m,capacity,static/unit/secrets,Vercelpreview. Mainlastverified6bdc864 unchanged. No merge/deploy.
 
@@ -17,6 +17,8 @@ OriginalOpusimplementationchildd6353fcf-b464-4545-81ec-da08c10529a3 nowrun12task
 Nextafterhandoff: verifydecisiveactualartifacts,integrate;freshStandards/Spec/test-audit+Solanalysis-onlycorrections,Opusdispositions. PinfinalmetadataandNEWall3affectedmonth/historyUIatsamecleanSHA. UseONLYowncompletedabareports(SolA t3-6a9417ab-be60e866b4ce1c23,SolB t3-8d741395-7d5d1a50e8f421da,Opus t3-454ac9e7-d3a2f41863a6f66b;eachtest-results/ux-efficiency/ui-review-inspector-final/<judge>.md). All26explicitownunchangedevidence+freshchangedhistory/Budget/selectiondependencies;nostaleapproval. Explicitruntime/test/config/featuremapdiffs;planningnames/statusonly,nootherjudges/coordinator/state. Onebatchpushafternine/no-majorall3+localgates;NEXTtoolcalllinkPR. FinalCIgreen thenONEnextincrementalreview whenallowanceavailable (previousrequest~11:32UTCNov15;oneincludedreview/hour). Rate-limit/skippednotapproval; watch event-driven, no polls/sleeps/PRschedulers. ParenthandlesCI/CodeRabbit/merge/deploy withrecordedauthorization.
 
 All sourcefixhistory/limits/actualproof ticket10/11. Currenttrackedmetadataupdateexplainsnewminor; publishonlywithnextcompletebatch, notalone. Liveupdates local test-results/ux-efficiency/shipping-log.md andPRbody. No originalimplementationorUIworkpendingbesidethisrun12. Allolderproviderrecovery/obsoleteOpus538 cancellationdone/evidencekept;notpendingretry.
+
+Latest: Opusb17b8e8 integrated177d032c631c1d552c6fbc482240963b739eac74. Actualbaselineboth1280keys/320touchSkip→Next→Back '/',December/0 vsNovember/380; fixedBack/reloadcurrentmonth380, actualskip-redfails/skip-green3pass/skip-scoped2all12passverified. Windowpopstateon()effectcleanupclassifiesalreadyappliedshallowentryby page.url.href===location.href;fullnavigationskeepexistingpath. No privateSDK/historywrapper. Workerowncleanb17/appdown/browsersclosed,run12finished,noimplementationactive. FreshhashhistoryStandards/testaudit/correctionandSpectaskswillbecommissionedatcleanHEAD(source177d032),functionsstorehash_history_<axis>. PublishedabaCI/UIhistorydoesnotapprovenewcode. Sourcepasses/dispositions→pinmetadata→NEWall3affectedmonth/hash/historyUIexactfinalSHA. NoactiveUIjudges; no additionalexternalreviewrequest. No merge/deploy. Completionwakesparent,nopolling.
 
 ## Records and explicit limits
 
