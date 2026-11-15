@@ -97,10 +97,13 @@
 				draft = event.currentTarget.value;
 				error = '';
 			}}
-			onblur={() => {
-				if (!editing) return;
-				if (draft.trim() === '') editing = false;
-				else commit();
+			onblur={(event: FocusEvent & { currentTarget: HTMLInputElement }) => {
+				const input = event.currentTarget;
+				setTimeout(() => {
+					if (!editing || (document.hasFocus() && document.activeElement === input)) return;
+					if (draft.trim() === '') editing = false;
+					else commit();
+				});
 			}}
 			onkeydown={keydown}
 			aria-label={label}

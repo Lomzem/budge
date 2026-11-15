@@ -81,6 +81,56 @@ Test-audit gate: no journey changes. The failing step already asserts the observ
   Native crediting stays covered by every journey's real-socket mutations. Until then, the probes recorded under "Harness gap found and fixed" above are the evidence.
 - **Cheap signal for next time** (fix-root-causes): `bun run app verify` could report any document load a journey did not ask for, which would have pointed to this cause at first look. It is not done here because it is harness work outside this repair.
 
+## Follow-up: a name being typed when its row's move is refused (sol-a-RF-A1)
+
+Base `848edfc`. The finding: at 320 px, the user focuses Move Coffee or a group's handle, presses ArrowUp while the first save is held, then clicks the moved item's name and types a new name without submitting. When the move is refused, the rollback closes the field, saves the draft as the name, and drops focus to `<body>`. A reload and the Budget then show a rename nobody asked for. Both independent observers reproduced it for a Category. Only one of them saw it for a group.
+
+- **Event order** (instrumented probe, wrapping the keyed `{#each}` DOM moves and logging focus events and Mutation sends):
+  - When a keyed row moves, Svelte calls `before()` on it. Chromium fires `blur`/`focusout` on the focused input synchronously inside that call, with `relatedTarget` null and `activeElement` BODY, while the input is still connected.
+  - `InlineName`'s blur handler treated that blur as the user leaving. It committed at once: the field closed and `categories:rename` / `categories:renameGroup` was sent.
+  - `keepFocusWhenMoved` (`src/lib/reorder.ts`) runs one microtask later and only restores a focused element that is still connected. By then the input had been removed, so focus stayed on BODY.
+- **Why the group case varied.** Only the node Svelte moves loses focus.
+  - Coffee ArrowUp, then rollback, moves Coffee, so it blurs.
+  - The last group (Bills, after `reorder`'s earlier steps) ArrowUp, then rollback, moves that group, so it blurs.
+  - Everyday ArrowDown, then rollback, moves the neighbor instead, so Everyday never blurs.
+  - The two observers moved different groups, so this is a real group fault, not a Category-only one.
+- **Premise attacked.** The `f7538f4` repair assumed focus lost to a move can be put back afterwards. That holds only if nothing acts on the spurious blur first. The commit-on-blur editor acted on it.
+- **Owner and fix** (`src/lib/components/categories/inline-name.svelte`). The editor owns the question "has the user left this field?", so it now answers it only after focus has settled. The blur handler waits one task. Then it commits only if the field is still open and focus is not back on the input, or the window itself lost focus (`document.hasFocus()` false).
+  - A move-caused blur is now repaired by the existing `keepFocusWhenMoved`, because the input is still connected, and the editor sees it focused again and does nothing.
+  - Enter (commit) and Escape (abort) stay synchronous. Tab, a click elsewhere and a window switch still commit, one task later.
+  - The `latest` ticket still owns rename errors, and the `failed` reopen is unchanged.
+  - `reorder.ts` is unchanged and still needed for the handle and name-button repairs. No workaround became obsolete. No shared focus layer was added, and the C1 answer above still holds, with this owner now named.
+- **Journey** (`categories/reorder`, new last step, real Convex transport through `failFirstCallTo`):
+  - Category: type "Morning Coffee" in Coffee's field while its held move is refused. Coffee goes back, the reason shows in its row, the field keeps focus and the draft, and Escape leaves the name as Coffee.
+  - Group: the same for the last group with "Rainy Day Fund". The order goes back, the reason shows in that group, and the field keeps focus and the draft. Tab out of the field then renames it, which proves the deferred commit still runs on a real leave (no journey asserted a blur commit before).
+  - The reload and the Budget show the group rename and Coffee unrenamed in place.
+
+### Red → green
+
+Evidence is under `test-results/verify-budge/`:
+
+- `editor-rollback-red` (base source with the new step): steps 1–12 pass. Step 13 fails in its Category half. The snapshot shows `Move Morning Coffee` with no field.
+- `editor-rollback-red-group` (base source, with the Category half temporarily removed from the step; both files restored right after): fails in the Group half. The snapshot shows `Move Rainy Day Fund` and the reason, but no field. Bills was renamed without Enter.
+- `editor-rollback-green` (fixed): the Category half passes. The Group half failed only on the step's own locator, which matched the page's empty live-region alert too. The locator was scoped to the edited group.
+- `editor-rollback-green-2` (fixed, Enter in the Group half): all 13 `categories/reorder` steps pass.
+- `editor-rollback-green-3` (fixed, the Group half committed by Tab): all 13 steps pass.
+- Probe on the fixed source:
+  - Coffee ArrowUp: blur inside `before()`, then focus is back on the INPUT, with no rename sent.
+  - Savings Goals ArrowUp: the same.
+  - Everyday ArrowDown: no blur at all.
+  - In all three, focus ends on the INPUT with the draft kept.
+
+Test-audit gate: the step asserts only what a user sees (order, reason, focused field and its value, the name after reload and on Budget). It uses the existing `failFirstCallTo` real-socket hold, with no production flag and no source grep. It does not duplicate step 12, which covers focus on the name button, not an open field.
+
+### Checks
+
+- `editor-rollback-affected` (fixed): these journeys pass: `categories/manage` (create and its refusal, Enter renames), `categories/reorder` (stacked presses, held replay, first refused then retried, touch cancel, second finger, autoscroll), `categories/late-rename`, `categories/failed-rename`, `inspector/cover-and-manage` and `inspector/move-money` (the Budget inspector also uses `InlineName`), `budget/phone-groups`, `budget/assign` and `shell/navigate`.
+- `bun run format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes 933 tests (59 files).
+- The feature map's `categories/reorder` entry names the new step and the window-switch commit as not in the journey.
+- **Limits.**
+  - Not in a journey: a blank-click commit and the window-switch commit (same deferred rule as the Tab commit the step asserts), and a refusal that moves a row while its field is open and the first of two quick presses is refused. Both follow from the same rule and were not separately probed.
+  - The fix relies on the browser's own focus order (blur, then the microtask repair, then the task), which was observed in Chromium only.
+
 ## Red → green
 
 Both new journey steps failed on unchanged `eb1d3f9` source, for the reported reason, and pass after the repair:

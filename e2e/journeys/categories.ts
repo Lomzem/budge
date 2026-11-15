@@ -590,6 +590,75 @@ export const categories = {
 					await expect(coffeeName).toBeFocused();
 				}
 			);
+
+			await step(
+				'a name being typed when its own Category or group move is refused keeps its field, draft and focus, and nothing is renamed until the field is left',
+				async () => {
+					const server = await failFirstCallTo(page, 'categories:move', 'categories:moveGroup');
+					await openCategories(page);
+					await coffeeHandle.focus();
+					await page.keyboard.press('ArrowUp');
+					await server.called('categories:move');
+					await coffeeRow.getByRole('button', { name: 'Coffee', exact: true }).click();
+					const categoryField = page.getByRole('textbox', { name: 'Category name' });
+					await categoryField.fill('Morning Coffee');
+					server.failWithServerError('categories:move');
+					await expect
+						.poll(() => orderIn(everyday))
+						.toEqual(['Everyday', 'Transit', 'Groceries', 'Coffee', 'Dining Out']);
+					await expect(coffeeRow.getByRole('alert')).toHaveText(refused);
+					await expect(categoryField).toBeFocused();
+					await expect(categoryField).toHaveValue('Morning Coffee');
+					await categoryField.press('Escape');
+					await expect(
+						coffeeRow.getByRole('button', { name: 'Coffee', exact: true })
+					).toBeVisible();
+
+					const groups = await groupOrder(page);
+					const last = groups.at(-1) ?? '';
+					await page.getByRole('button', { name: `Move ${last}`, exact: true }).focus();
+					await page.keyboard.press('ArrowUp');
+					await server.called('categories:moveGroup');
+					await page.getByRole('button', { name: last, exact: true }).click();
+					const groupField = page.getByRole('textbox', { name: 'Category Group name' });
+					await groupField.fill('Rainy Day Fund');
+					server.failWithServerError('categories:moveGroup');
+					await expect(
+						page.getByRole('region').filter({ has: groupField }).getByRole('alert')
+					).toHaveText(refused);
+					await expect(
+						page
+							.getByRole('main')
+							.getByRole('region')
+							.last()
+							.getByRole('button', { name: `Move ${last}`, exact: true })
+					).toBeVisible();
+					await expect(groupField).toBeFocused();
+					await expect(groupField).toHaveValue('Rainy Day Fund');
+					await groupField.press('Tab');
+					await expect(groupField).toBeHidden();
+					const renamed = groups.with(-1, 'Rainy Day Fund');
+					await expect.poll(() => groupOrder(page)).toEqual(renamed);
+
+					await page.reload();
+					await expect.poll(() => groupOrder(page)).toEqual(renamed);
+					expect(await orderIn(everyday)).toEqual([
+						'Everyday',
+						'Transit',
+						'Groceries',
+						'Coffee',
+						'Dining Out'
+					]);
+					await openBudget(page);
+					await expect(page.getByRole('rowheader', { name: /^Rainy Day Fund/ })).toBeVisible();
+					await expect(
+						page
+							.getByRole('rowgroup')
+							.filter({ has: page.getByRole('rowheader', { name: /^Everyday/ }) })
+							.locator('[data-category-id]')
+					).toHaveText(['Transit', 'Groceries', 'Coffee', 'Dining Out']);
+				}
+			);
 		}
 	},
 	'late-rename': {
