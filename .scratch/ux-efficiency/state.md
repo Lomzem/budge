@@ -8,7 +8,7 @@ Parent checkout: `/home/lomzem/proj/budge`, branch `feat/ux-efficiency`. Baselin
 
 ## Current phase and running work
 
-All26items, UI-round1 repairs and final Move snapshot repair integrated; source reviews passed0findings. UIround2 atclean e4c46349ef17488a3ff89af71f0a12136e7cabbc has SolB9approve,SolA8.5changesrequired(onephoneminor),Opus5.5stillindependent/pending. Gateincomplete. OriginalOpusimplementorrepairingphoneEscape inowncheckout(run6); no native reviewers running. Reports/round2coordinatorupdated below.
+All26items and phoneEscape correction integrated; lastcodece0dad7(cherry-pick5bf5ae6). Round2ate4c4634 scoresSolA8.5,SolB9,Opus9,so gateincomplete. Allround2reportsdelivered;onephoneEscape defectfixed, freshfocusedsource rechecks runningbefore affectedthreejudgeconfirmations. Nativephone_escape_standards/specpinnedce0dad7; noOpusimplementationrunning.
 
 The ORIGINAL Opus implementor completed its own final finding in the existing isolated checkout:
 
@@ -22,7 +22,11 @@ Round2 tasks (fullprefix node:delegated-task:command%3Amcp%3A07edffa5-346f-4f35-
 
 Newminor sol-a-A1:320touchcontext,Groceriesinspector,dirtyMoveAmount5.00,Escapeclearsbutcloseswholeinspector(returnfocusGroceries). Clearkeepsopen;desktopEscape works. No moneywrite. ParentinspectedsourceformpreventDefault vs phoneDialogEscape; routingtoOpuswithoutprescribingframeworkhack.
 
-Implementationcontinuation to ORIGINALOpuschild82cc3a8e startedrun6, task node:delegated-task:command%3Amcp%3A07edffa5-346f-4f35-a8b7-bb6acf6ba886%3Athread-send%3Aa3d0ef91-1008-43c6-8087-94e43fb96537. Sameowncheckout t3-0957aeec-d0baf4154befc730(branchhas93a959f). Brief: reproduce/fixdirtyphoneEscapekeepinginspector+usefulfocus,cleanfollowupEscapecloses,desktop/nestedDialogfocusintact;extendexistinginspectorjourneyphoneredgreen,focusedchecks/separatecommit/hooks/gitleaks/cleanup. No parentUIedits or furtheragents. Additionalpendingjudgefindingscanjointaskvi asteerafterindependentreport. Awaitcompletion,nopoll.
+Implementationcontinuationrun6 completed5bf5ae6 atop93a959f;parentcherry-pickedce0dad7. PhoneDialogonEscapeKeydownleavesinsideevents toinspector;dirtyMoveclearsandfocusespicker,secondcleanEscapecloses/returnsfocus,nestedTopLayerunchanged. Parentinspectedsourceandactualred-phone-escape-2(failedreportedphoneclose),green-phone-escape(4journeys),green-phone-escape-targets andgreen-phone-escape-2passsummaries. Ownappdown/clean. Focusedtypecheck0errors,linters/format,7config/maptests pass;nofull63rerunneededforlocalizedfix. Ticket06recordsdispositionandcorrectedpriorcheckclaims.
+
+Opusround2completed9approveate4c4634,all6dimensions9;25cleanSHAjourneysplusmanualpass. Parentinspectedreport/actualsummary;retainedreviews/ui-round-2/opus.md. Originalcheckout t3-ef438f28-ba215859556c701b/appdowncleanreleased. Sevenminor/nitsdeferredwithspecificreasonsinissues/09-ui-polish-followups.md(needs-triage),pluslargerphoneamountenvelopelimit. Do not silentlyclaimthese fixed.
+
+Freshsourcephone_escape_standards and phone_escape_spec runningpinnedce0dad7,diffcf4a0cf...ce0dad7,5filesonly. Reports test-results/ux-efficiency/reviews/phone-escape-{standards,spec}.md. AfterpassprepareNEWfreshaffectedUIrechecks for2SolHigh+Opus5.5 atsamefinalcleanSHA. EachcanreadONLYitsownround2report aspriorfullscopeevidence,explicitlyconfirmunchangedevidencecarry-forward aftersourcediff and re-exerciseU2phone/desktopEscapeClear/heldmove plusnestedTarget/Delete/touchpickerfocus and relevantBudgetdependencies. Sourcechangeseventonly(noCSS/sharedwidget),so don'trepeatall25journeyswithoutneed;completeanyactualcoveragegaps(namelyensureU3touchorganizeifretainedjourneyswerenotactualtouch). Noothers'UIreports/scores/score-bearingstate/tickets tonewjudges. Everynewreview/recheck NEWdelegate_task,notthread-send.
 
 ## Implementation and verification achieved
 
