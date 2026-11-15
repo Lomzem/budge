@@ -45,6 +45,42 @@ Test-audit gate: both new steps check what a user observes: order, the visible r
 - `cr-focus-manual2-touch-d`: a refused 320 px touch drag puts Coffee back with the reason in view (y=306) and nothing past the right edge.
 - The partial `cr-focus-manual` run, the touch step at the end of `cr-focus-manual2` (timed out after 90 s with no move sent), and `cr-focus-manual2-touch`/`-b`/`-c` record probe-script mistakes (a page-rooted `has` locator, a BODY expectation where `<main>` takes focus, a drag started before the list loaded). They are not product failures.
 
+## Follow-up: the `categories/manage` failure in `cr-focus-affected`
+
+Base `0afbc8c` (the parent's integration of `f7538f4`). The Add Category dialog does not lose its refusal. A full page reload removed it, and an edit to a Markdown file triggered that reload.
+
+- **Evidence in the preserved trace** (`cr-focus-affected/categories/manage/trace.zip`). The `categories:create` refusal arrives at 42284 ms. `[vite] connecting…` follows at 42361 ms and Clerk loads again at 42685 ms, which only happens on a fresh document load. The screencast still shows the dialog at wall time 22:33:19.291 and only "Loading…" at 22:33:19.378. The session transcript shows this agent rewriting this issue file at 22:33:19.27, while that run was going. The empty group Sol saw is the `createGroup` that had already landed before the reload.
+- **Cause.** Tailwind v4 scans the whole repository for class names, including `.scratch/`, `docs/` and `.agents/`, and watches what it scans. A change to a scanned file of a kind Vite has no module for, such as `.md`, makes `@tailwindcss/vite` send `full-reload` to every open page. So an agent's doc edit during a `bun run app verify` run reloads the journey's page. The dialog, its draft and its error go with it. Pointer and keyboard submits are equally exposed, because only the timing of the edit decides.
+- **Fix (`src/app.css`).** `@import 'tailwindcss' source('.')` limits the scan to `src/`, where every class lives. The production CSS loses only 16 utilities that came from doc text alone (such as `overflow-auto`, `container` and `visible`), none of them used in `src/`. No component or dialog code changed. The dialog's recovery (the reason, the made group kept as the choice, the hidden group field, retry into the same single group) was already right and already asserted by that step.
+
+### Red → green
+
+Evidence is under `test-results/verify-budge/`:
+
+- `dialog-reload-probe`: 5 of 5 pointer submits at 320 px show "Enter a name." when nothing is edited. That is why the reruns passed.
+- `dialog-reload-doc-touch` (base): a doc `touch` 30 ms after the submit loses the dialog 2 of 2 times. Vite sends `{"type":"full-reload"}`, and `beforeunload` fires from `@vite/client`.
+- `dialog-reload-kbd-red` (base, Enter in the Name field): the same reload in both tries. The dialog was lost in 1 of 2, because the other refusal landed first.
+- `dialog-reload-doc-touch-fixed2` and `dialog-reload-kbd-fixed` (fixed, after a clean `app up`): no reload, and the alert is shown in 3 of 3 pointer and 2 of 2 keyboard tries. `dialog-reload-doc-touch-fixed` stayed red only because the running Vite kept the old watch list until it restarted.
+- At journey level, with a doc touched every 100 ms throughout: `dialog-doc-edits-red` (base) fails at step 1 because the page keeps reloading. `dialog-doc-edits-green` (fixed) passes all 10 `categories/manage` steps.
+
+Test-audit gate: no journey changes. The failing step already asserts the observable recovery, and it went red for an environment reason, not a product one. A test that pins `source('.')` would be a source grep. The scripted probe is kept at the evidence path above as the re-runnable check.
+
+### Checks
+
+- `dialog-reload-affected` (fixed, clean `app up`): these journeys pass: `categories/manage`, `categories/reorder` (which keeps the `f7538f4` refused-reorder focus proof), `categories/failed-rename`, `categories/late-rename`, `budget/phone-groups`, `budget/assign`, `shell/navigate`, `search/phone`, `settings/later-start` and `transactions/approve-phone`.
+- `bun run format:check`, `lint`, `lint:ui` and `typecheck` pass, `bun run test` passes 933 tests (59 files), and `bun run build` succeeds.
+- The feature map is unchanged, because no behavior changed.
+
+### Corrections (analysis-only `/correct`, decided by the Opus implementor)
+
+- **C1, focus ownership recurs** (`cec8434` failed rename, `f7538f4` rollback): **answered.** Each fix gives focus to the thing that owns it: the moved item restores its own focused descendant, and only when its move dropped focus to the document. The journey's focus-away step already proves that a newer control keeps focus. These are two owners with different triggers, so a shared focus framework would add indirection without removing a fault.
+- **C2, layout-shift guard causality recurs** (`fe03b0a`, `f060acb`, and the routed `WebSocket` class in `f7538f4`): **deferred**, with a concrete proposal. A maintained positive/negative check needs a browser, and this repository has no place to run one outside a journey. The Vitest CI job installs no browser, and every Playwright test seeds a fixture and signs in with the owner's Clerk credentials. Giving it a place means adding a Playwright-browser step to the Vitest job or a credential-free Playwright project. That is a CI and dev-environment change, which AGENTS.md sends straight to `main`, not to this integration branch. Once that exists, the check is about 40 lines, using `routeWebSocket` on a `setContent` page:
+  - an unprompted shift fails, natively and routed;
+  - a refusal shift answered after a held routed request is credited.
+
+  Native crediting stays covered by every journey's real-socket mutations. Until then, the probes recorded under "Harness gap found and fixed" above are the evidence.
+- **Cheap signal for next time** (fix-root-causes): `bun run app verify` could report any document load a journey did not ask for, which would have pointed to this cause at first look. It is not done here because it is harness work outside this repair.
+
 ## Red → green
 
 Both new journey steps failed on unchanged `eb1d3f9` source, for the reported reason, and pass after the repair:
