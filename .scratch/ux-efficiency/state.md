@@ -8,7 +8,7 @@ Parent checkout: `/home/lomzem/proj/budge`, branch `feat/ux-efficiency`. Baselin
 
 ## Current phase and running work
 
-All26items, UI-round1 repairs and final Move snapshot repair integrated. Fresh focused Standards/Spec rechecks both PASSED0findings at2ff1448; parent read/retained reports reviews/move-snapshot-{standards,spec}.md and inspected actual red/green summaries. No source-review blocker remains. Ready to launch3fresh isolated UI judges on exactcleanHEAD after this preparationcommit. Neutralbrief ui-recheck-brief.md and coordinatorrecord issues/07-ui-review-round-2.md ready. No other active delegates/native reviewers.
+All26items, UI-round1 repairs and final Move snapshot repair integrated; source reviews passed0findings. UIround2 atclean e4c46349ef17488a3ff89af71f0a12136e7cabbc has SolB9approve,SolA8.5changesrequired(onephoneminor),Opus5.5stillindependent/pending. Gateincomplete. OriginalOpusimplementorrepairingphoneEscape inowncheckout(run6); no native reviewers running. Reports/round2coordinatorupdated below.
 
 The ORIGINAL Opus implementor completed its own final finding in the existing isolated checkout:
 
@@ -16,7 +16,13 @@ The ORIGINAL Opus implementor completed its own final finding in the existing is
 - Child thread: `thread:delegated-task:command%3Amcp%3A07edffa5-346f-4f35-a8b7-bb6acf6ba886%3Adelegate-task%3A82cc3a8e-18df-47a5-a86e-4716996b73bb`.
 - Completed implementation continuation54a682a2/run5, commit93a959f, clean owncheckout/appdown. Submitted From/To/names/cents/amount drives mutation+status; success clears Amount only if unchanged; Cover snapshots name.
 - Parent inspected actual red-move-snapshot failure and green-move-snapshot/-2 pass summaries; both inspector journeys pass, typecheck0errors,changed-filelinters/format and7config/maptests pass. Parent independentlyreran7tests and confirmed backend/capacity/packageequivalencevsd824517.
-- Freshnative move_snapshot_standards and move_snapshot_spec completed read-only pinned2ff1448,diffd41e5eb...2ff1448,4filesonly. Both0findings; no app/sourcewrites. Latest precedingreports retained reviews/ui-repair-{standards,spec}.md. No Opus taskrunning now; new round2judge task handles will be held in functions store judge2_sol-a,judge2_sol-b,judge2_opus and toolhistory after launch. Follow completion events, no polling.
+- Freshnative move_snapshot_standards and move_snapshot_spec completed read-only pinned2ff1448,diffd41e5eb...2ff1448,4filesonly. Both0findings; no app/sourcewrites. Latest precedingreports retained reviews/ui-repair-{standards,spec}.md. Round2judgehandles in functionsstore judge2_sol-a,judge2_sol-b,judge2_opus and toolhistory. Followcompletionevents,nopolling.
+
+Round2 tasks (fullprefix node:delegated-task:command%3Amcp%3A07edffa5-346f-4f35-a8b7-bb6acf6ba886%3Adelegate-task%3A): SolA861d1fe2-316d-4c9b-8c08-3fa1a02b1681 completed8.5; SolB32169a30-5fcc-48fe-9133-d43c6b2941d0 completed9; Opus9ef8d1f7-9b2c-4c80-bb7d-1a97be4261d4 remainsrunning. Allat e4c4634. SolAreport retained reviews/ui-round-2/sol-a.md, originalcheckout t3-b07d3136-6a31e973738cafaf; SolBreportretained similarly, originalcheckout t3-d0be7586-9726ad01307dea57. Parentreadreports/evidence,SolB24journeyscleanSHA pass. Donotshareotherjudges'resultswithpendingOpus.
+
+Newminor sol-a-A1:320touchcontext,Groceriesinspector,dirtyMoveAmount5.00,Escapeclearsbutcloseswholeinspector(returnfocusGroceries). Clearkeepsopen;desktopEscape works. No moneywrite. ParentinspectedsourceformpreventDefault vs phoneDialogEscape; routingtoOpuswithoutprescribingframeworkhack.
+
+Implementationcontinuation to ORIGINALOpuschild82cc3a8e startedrun6, task node:delegated-task:command%3Amcp%3A07edffa5-346f-4f35-a8b7-bb6acf6ba886%3Athread-send%3Aa3d0ef91-1008-43c6-8087-94e43fb96537. Sameowncheckout t3-0957aeec-d0baf4154befc730(branchhas93a959f). Brief: reproduce/fixdirtyphoneEscapekeepinginspector+usefulfocus,cleanfollowupEscapecloses,desktop/nestedDialogfocusintact;extendexistinginspectorjourneyphoneredgreen,focusedchecks/separatecommit/hooks/gitleaks/cleanup. No parentUIedits or furtheragents. Additionalpendingjudgefindingscanjointaskvi asteerafterindependentreport. Awaitcompletion,nopoll.
 
 ## Implementation and verification achieved
 
