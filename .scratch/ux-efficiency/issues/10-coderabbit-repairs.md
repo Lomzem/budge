@@ -14,6 +14,9 @@ Base: `eb1d3f9` on `feat/ux-efficiency`. Scope: the three production/UI findings
 | Incremental 4578219535 (review 5910493518), `src/routes/(app)/+page.svelte` ~46 | `monthAt` relies on `navigating.type === 'popstate'`, which a same-page Back that only changes the hash never sets, so Skip to content → Next month → Back kept next month on a `/` with no month | **Confirmed and fixed.** See the follow-up below. |
 | Inline 4578472859 (review 5910828315), `src/lib/components/categories/inline-name.svelte` ~110 | The contract says Enter or blur saves and an empty name shows `Enter a name.`, but a blank or spaces-only name left by blur silently closed the editor | **Confirmed and fixed.** See the follow-up below. |
 | Review 5910828315 (outside diff), `src/lib/components/budget/category-inspector.svelte` ~175 | Cover from Ready to Assign announced `-category.available` read before the request, while `budget.cover()` dropped the shortfall the mutation actually covered | **Confirmed and fixed.** See the follow-up below. |
+| Phone validation SB-CR2-1 (not CodeRabbit) | At 320 px with real touch, a blank name in a field near the tab bar (Groceries on the first screen; Transit, Car Repairs or the Savings Goals group after a finger scroll) left by Enter, Tab or a tap beside it showed `Enter a name.` at 572–596 under the Sections bar from 575 | **Confirmed and fixed.** See the SB-CR2-1 follow-up below. |
+| Phone validation, minor | No touch-visible cancel for a refused blank name | **Answered, deferred.** No InlineName edit has a visible cancel, refused or not; adding one is new UI beyond this repair. On touch the user can retype the old name, open another name, or leave the page, and nothing blank is ever saved. Escape cancels on a keyboard. |
+| Phone validation, nit | A real zero cover announces `Covered $0.00 for Coffee …` | **Answered, no change.** The amount is what the server covered (no shortfall left, no double cover), which is the truthful receipt 5910828315 asked for. Money semantics stay unchanged. |
 
 ## Follow-up: refused reorder recovery (sol-a-CR-A1)
 
@@ -93,6 +96,45 @@ Base `3dc077b`. A refused `categories:move` or `categories:moveGroup` rolled the
   - Proved in Chromium only.
   - A blank name left by blur keeps its field open after focus has moved on. To cancel it, the user returns to the field and presses Escape.
   - When the server finds no shortfall, the announcement reads `Covered $0.00 …`. That is truthful but terse.
+
+### Follow-up: a refused blank name under the tab bar (SB-CR2-1)
+
+- **Premise attacked.** EF-A1 left the open editor's `Enter a name.` without a reveal because `ef-edit.ts` measured it clear (field 495–539, reason 543–567). That only held for a field opened with room below it. Opening a field focuses its input, and the focus scroll stops the field at the `max-lg` `scroll-padding-bottom` (4.5rem), so a field opened near the bar ends at 640 − 72 = 568. The 28 px reason (`mt-1` plus a 24 px line) that appears later has no room.
+- **Reproduced** with a manual probe (`geo.ts` in the agent scratchpad, not a maintained assertion; `test-results/verify-budge/geo-base-4e3b8ac/results.json`), real CDP touch on `4e3b8ac`:
+
+  | Width | Name, how it got near the bar | Field | Reason | Bar from |
+  | --- | --- | --- | --- | --- |
+  | 320 | Groceries on the first screen; Enter, Tab or a tap beside it | 524–568 | 572–596 | 575 |
+  | 320 | Transit, Car Repairs, the Savings Goals group after a finger scroll | 524–568 | 572–596 | 575 |
+  | 390 dark | Car Repairs, the Savings Goals group after a finger scroll | 728–772 | 776–800 | 779 |
+
+- **Second cause, found while proving the fix.** A real mouse press holds the button long enough for the deferred blur to decide mid-press. A blank A then shows its reason, its row grows 28 px, B moves out from under the pointer, and mouseup misses B. So a held press on B left A refused and B unopened (`insp-held-base`, manual), which a reason that scrolls anything would make worse. A touch tap is unaffected, because its pointerup comes before the compatibility mousedown that blurs A.
+- **Fix** (`inline-name.svelte`, `refusalInView.ts`), for every InlineName caller (Categories rows and groups, the Budget inspector):
+  - `keepReasonInView` reveals the field with its reason (`block: 'nearest'`), then, if focus sits on another element (Tab to the actions button), scrolls that element back into view the same way. Focus on `<main>` or `<body>` after a tap beside the field is left alone. It moves nothing when the reason already fits.
+  - While the field is open it tracks the pointer press on `window`; a blur during a press is decided after `pointerup` or `pointercancel`. The openings counter, the false-blur rollback, Escape, `commit()` and the closed `failed` refusal with `keepRefusalInView` are unchanged.
+- **Ownership.** The reason renders only while its own editor is open, and one `renaming` id owns the open editor. A blank A left for B writes only A's `error` and closes nothing, so A's reason never renders after B opens and cannot scroll B away or take its focus. The probes' A→B rows match the base: B focused, its own name, the same scroll.
+- **Manual probes after the fix** (`geo-fixed`, `insp-fixed`, `insp-held-fixed`, `insp-held-nonblank-fixed`):
+  - 320: field 496–540, reason 544–568 (28 px up); 390 dark: reason 748–772. Focus stays on the field, `Groceries actions` or `<main>`, and the typed spaces stay.
+  - The inspector at 320 (dialog) and 1280 shows field and reason in view with the page scroll unchanged; Tab keeps `Groceries actions` focused.
+  - Held press: no reason mid-press; after release Groceries opens focused with its name and A closes. A non-blank held press saves A (`Everyday Held` after a reload) and opens B.
+  - Names after a reload are unchanged throughout.
+- **Journey** (`categories/manage`). The margin-only touch step is replaced by two steps:
+  - A held mouse press (`mouse.down`, settle, `mouse.up`) on Groceries after emptying Everyday opens Groceries focused with its name, closes the group field, and Escape plus a reload keep both names.
+  - At 320 px under `useATouchScreen`, real finger swipes bring Car Repairs, then the Savings Goals group, to just above the tab bar (asserted: gap 0–12 px, fully in view). Car Repairs emptied and left by Enter, and the group emptied and left by a tap beside it, show `Enter a name.` with field and reason both clear of the Sections bar (`expectClearOf`), the spaces kept, and focus on the field or not, as left. Escape and a reload keep the old names.
+- **Red → green** (`test-results/verify-budge/`):
+  - `sb-red` (the `4e3b8ac` source): `categories/manage` fails at the held-press step, `expect(locator).toBeFocused() failed`, with `textbox "Category Group name" [invalid]` and the alert `Enter a name.` in the snapshot.
+  - `sb-red-reveal` (the press fix without `keepReasonInView`): fails at the touch step, `getByRole('navigation', { name: 'Sections', exact: true }) overlaps getByRole('alert').filter({ hasText: 'Enter a name.' })`, on Car Repairs' Enter. The group half was not reached; the manual probe shows its red.
+  - `sb-green`: 10 pass: `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename`, `inspector/move-money`, `inspector/cover-and-manage`, `budget/needs-you`, `budget/assign`, `budget/phone-groups`, `shell/navigate`. `sb-green-repeat` passes `categories/manage` again.
+  - `sb-green-final` (the committed source, after the lint renames): `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename` and `inspector/cover-and-manage` pass.
+  - Traces are sanitized (`sb-sanitation.json`): network logs removed, 0 matches left on rescan.
+- **Test-audit gate.** Both steps check what a user sees and does at the real boundary: a finger scroll, a tap, a held press, focus, the visible reason and the bar, and names after a reload. Each failed on old code for the reported reason. They reuse `expectClearOf`, `useATouchScreen`, `tap` and `settled`, and add no production seam; the swipe helper is test-side touch input. They replace the margin step, whose field sat high enough never to fail.
+- **Checks.** With the app stopped, `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests (59 files), including the feature-map test.
+- **Limits.**
+  - Proved in Chromium only. In Safari a clicked button doesn't take focus; that case is unprobed.
+  - A held press on another name now commits A after release rather than mid-press.
+  - The swipe helper adds 16 px for Chromium's touch slop.
+  - A refused blank on touch has no visible cancel (see Dispositions).
+- **Principles that changed a choice.** Attack-the-premise and fix-root-causes: the EF-A1 "already clear" note was a measurement at one position, and the held-press miss was the leave decided mid-press, not a scroll to undo. Separate-before-serializing: the single `renaming` owner is why A's reason needs no guard against B. Test-behavior: the journey reaches the position by a real swipe rather than a scroll setter. Laziness and minimize-reader-load: one attachment and a press tracker local to InlineName, no focus framework. Prove-it-works: the journeys were rerun after the lint renames.
 
 ## Red → green
 

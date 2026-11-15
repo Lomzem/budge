@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { tick, untrack, type Snippet } from 'svelte';
+	import { on } from 'svelte/events';
 
 	import { attempt } from '$lib/attempt';
 	import { Input } from '$lib/components/ui/input';
-	import { keepRefusalInView } from '$lib/refusalInView';
+	import { keepReasonInView, keepRefusalInView } from '$lib/refusalInView';
 
 	let {
 		name,
@@ -45,6 +46,40 @@
 			failed = null;
 		});
 	});
+
+	let pressing = false;
+	$effect(() => {
+		if (!editing) return;
+		pressing = false;
+		const press = (event: PointerEvent) => {
+			pressing = event.type === 'pointerdown';
+		};
+		const stops = (['pointerdown', 'pointerup', 'pointercancel'] as const).map((type) =>
+			on(window, type, press, { capture: true })
+		);
+		return () => {
+			for (const stop of stops) stop();
+		};
+	});
+
+	function decideWhenThePressEnds(decide: () => void) {
+		if (!pressing) {
+			decide();
+			return;
+		}
+		const ended = new AbortController();
+		for (const type of ['pointerup', 'pointercancel'] as const) {
+			on(
+				window,
+				type,
+				() => {
+					ended.abort();
+					decide();
+				},
+				{ signal: ended.signal }
+			);
+		}
+	}
 
 	async function save(next: string) {
 		pending = next;
@@ -104,11 +139,13 @@
 				if (!editing) return;
 				const input = event.currentTarget;
 				const left = openings;
-				setTimeout(() => {
-					if (left !== openings) return;
-					if (document.hasFocus() && document.activeElement === input) return;
-					commit();
-				});
+				decideWhenThePressEnds(() =>
+					setTimeout(() => {
+						if (left !== openings) return;
+						if (document.hasFocus() && document.activeElement === input) return;
+						commit();
+					})
+				);
 			}}
 			onkeydown={keydown}
 			aria-label={label}
@@ -120,7 +157,14 @@
 				node.select();
 			}}
 		/>
-		{#if error}<p id={errorId} role="alert" class="mt-1 text-sm text-destructive">{error}</p>{/if}
+		{#if error}<p
+				id={errorId}
+				role="alert"
+				class="mt-1 text-sm text-destructive"
+				{@attach keepReasonInView}
+			>
+				{error}
+			</p>{/if}
 	</div>
 {:else if failed}
 	<div class={['flex min-w-0 flex-1 flex-col', className]}>

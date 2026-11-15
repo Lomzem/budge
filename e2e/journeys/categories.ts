@@ -93,6 +93,36 @@ async function touchDragToTheBottomEdge(page: Page, handle: Locator, until: Loca
 
 const tabBarOf = (page: Page) => page.getByRole('navigation', { name: 'Sections', exact: true });
 
+const touchSlop = 16;
+
+async function swipeJustAboveTheTabBar(page: Page, target: Locator) {
+	const barTop = (await tabBarOf(page).boundingBox())?.y;
+	if (barTop === undefined) throw new Error('The tab bar is not on screen.');
+	const finger = await touchscreen(page);
+	for (let swipe = 0; swipe < 8; swipe++) {
+		const box = await target.boundingBox();
+		if (box === null) throw new Error('The name is not on the page.');
+		const gap = barTop - (box.y + box.height);
+		if (gap >= 0 && gap < 12) break;
+		const travel = Math.max(-300, Math.min(300, gap - 4));
+		const from = travel > 0 ? 150 : 450;
+		await finger.touch('touchStart', [{ id: 1, x: 6, y: from }]);
+		for (let move = 1; move <= 10; move++) {
+			const y = from + ((travel + Math.sign(travel) * touchSlop) * move) / 10;
+			await finger.touch('touchMove', [{ id: 1, x: 6, y }]);
+		}
+		await finger.touch('touchEnd', []);
+		await settled(page);
+	}
+	await finger.detach();
+	const placed = await target.boundingBox();
+	if (placed === null) throw new Error('The name is not on the page.');
+	const gap = barTop - (placed.y + placed.height);
+	expect(gap, 'the name sits just above the tab bar').toBeGreaterThanOrEqual(0);
+	expect(gap, 'the name sits just above the tab bar').toBeLessThan(12);
+	await expect(target).toBeInViewport({ ratio: 1 });
+}
+
 export const categories = {
 	manage: {
 		title:
@@ -275,30 +305,75 @@ export const categories = {
 			);
 
 			await step(
-				'on a touch screen, an empty group name left by a tap on the empty margin beside it is refused in view of the tab bar, and Escape keeps the old name',
+				'an empty group name left by a held mouse press on the Category below it opens that Category, unchanged',
+				async () => {
+					await page.getByRole('button', { name: 'Everyday', exact: true }).click();
+					const groupField = page.getByRole('textbox', { name: 'Category Group name' });
+					await groupField.fill(' ');
+					const below = page.getByRole('button', { name: 'Groceries', exact: true });
+					await below.scrollIntoViewIfNeeded();
+					const { x, y } = await centerOf(below);
+					await page.mouse.move(x, y);
+					await page.mouse.down();
+					await settled(page);
+					await page.mouse.up();
+					const field = page.getByRole('textbox', { name: 'Category name' });
+					await expect(field).toBeFocused();
+					await expect(field).toHaveValue('Groceries');
+					await expect(groupField).toBeHidden();
+					await field.press('Escape');
+					await page.reload();
+					await expect(groupOf(page, 'Everyday')).toBeVisible();
+					await expect(page.getByRole('button', { name: 'Groceries', exact: true })).toBeVisible();
+				}
+			);
+
+			await step(
+				'on a touch screen, a name scrolled to just above the tab bar and emptied keeps its field and reason clear of the bar, on Enter for a Category and on a tap beside it for a group, and Escape keeps the old names',
 				async () => {
 					await page.goto('about:blank');
 					const stopTouching = await useATouchScreen(page);
 					await openCategories(page);
-					await tap(page, page.getByRole('button', { name: 'Smoke Test Group', exact: true }));
-					const field = page.getByRole('textbox', { name: 'Category Group name' });
-					await field.fill(' ');
-					const { y } = await centerOf(field);
+					const emptyName = page.getByRole('alert').filter({ hasText: 'Enter a name.' });
+
+					const carRepairs = page.getByRole('button', { name: 'Car Repairs', exact: true });
+					await swipeJustAboveTheTabBar(page, carRepairs);
+					await tap(page, carRepairs);
+					const field = page.getByRole('textbox', { name: 'Category name' });
+					await expect(field).toBeFocused();
+					await field.fill('  ');
+					await field.press('Enter');
+					await expect(emptyName).toBeVisible();
+					await expect(field).toBeFocused();
+					await expect(field).toHaveValue('  ');
+					await expectClearOf(field, tabBarOf(page));
+					await expectClearOf(emptyName, tabBarOf(page));
+					await field.press('Escape');
+					await expect(carRepairs).toBeVisible();
+
+					const savingsGoals = page.getByRole('button', { name: 'Savings Goals', exact: true });
+					await swipeJustAboveTheTabBar(page, savingsGoals);
+					await tap(page, savingsGoals);
+					const groupField = page.getByRole('textbox', { name: 'Category Group name' });
+					await expect(groupField).toBeFocused();
+					await groupField.fill(' ');
+					const { y } = await centerOf(groupField);
 					const screen = await touchscreen(page);
 					await screen.touch('touchStart', [{ id: 1, x: 6, y }]);
 					await screen.touch('touchEnd', []);
 					await screen.detach();
-					const emptyName = page.getByRole('alert').filter({ hasText: 'Enter a name.' });
 					await expect(emptyName).toBeVisible();
-					await expect(field).not.toBeFocused();
-					await expect(field).toHaveValue(' ');
-					await expectClearOf(field, tabBarOf(page));
+					await expect(groupField).not.toBeFocused();
+					await expect(groupField).toHaveValue(' ');
+					await expectClearOf(groupField, tabBarOf(page));
 					await expectClearOf(emptyName, tabBarOf(page));
-					await tap(page, field);
-					await field.press('Escape');
-					await expect(field).toBeHidden();
+					await tap(page, groupField);
+					await groupField.press('Escape');
+					await expect(groupField).toBeHidden();
+
 					await page.reload();
-					await expect(groupOf(page, 'Smoke Test Group')).toBeVisible();
+					await expect(groupOf(page, 'Savings Goals')).toBeVisible();
+					await expect(carRepairs).toBeAttached();
 					await page.goto('about:blank');
 					await stopTouching();
 					await openCategories(page);

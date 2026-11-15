@@ -6,3 +6,9 @@ export const keepRefusalInView: Attachment<HTMLElement> = (message) => {
 	const elsewhere = focused !== null && focused !== document.body && !row.contains(focused);
 	(elsewhere ? focused : row).scrollIntoView({ block: 'nearest' });
 };
+
+export const keepReasonInView: Attachment<HTMLElement> = (message) => {
+	const focused = document.activeElement;
+	(message.parentElement ?? message).scrollIntoView({ block: 'nearest' });
+	if (focused !== null && !focused.contains(message)) focused.scrollIntoView({ block: 'nearest' });
+};
