@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 
+import { formatCents } from '../../src/lib/domain/money';
 import { pausableSync } from '../heldResponse';
 import { cents, centsIn, choicesOf, choose, openBudget, typed, type Journey } from './journey';
 
@@ -56,6 +57,9 @@ export const inspector = {
 					await expect.poll(() => assigned('Groceries')).toBe(before.groceries - 1_000);
 					await expect.poll(() => assigned('Coffee')).toBe(before.coffee + 1_000);
 					expect(await readyToAssign()).toBe(before.readyToAssign);
+					await expect(region.getByRole('status')).toHaveText(
+						'Moved $10.00 from Groceries to Coffee.'
+					);
 				}
 			);
 
@@ -75,6 +79,27 @@ export const inspector = {
 				await expect(region.getByLabel('Amount')).toBeFocused();
 				expect(await assigned('Coffee')).toBe(before.coffee);
 			});
+
+			await step(
+				'Escape clears a started move and leaves the inspector open; Clear does the same by pointer',
+				async () => {
+					const from = region.getByRole('button', { name: 'From', exact: true });
+					await region.getByLabel('Amount').fill('5.00');
+					await region.getByLabel('Amount').press('Escape');
+					await expect(region).toBeVisible();
+					await expect(region.getByLabel('Amount')).toHaveValue('');
+					await expect(from).toContainText('Pick a Category');
+					await expect(region.getByRole('alert')).toHaveCount(0);
+					await choose(from, /^Coffee \(/);
+					await region.getByLabel('Amount').fill('5.00');
+					await region.getByRole('button', { name: 'Clear', exact: true }).click();
+					await expect(region.getByLabel('Amount')).toHaveValue('');
+					await expect(from).toContainText('Pick a Category');
+					await expect(from).toBeFocused();
+					await expect(region.getByRole('button', { name: 'Clear', exact: true })).toHaveCount(0);
+					expect(await assigned('Coffee')).toBe(before.coffee);
+				}
+			);
 
 			await step(
 				'while the next month loads, the inspector takes no input, then takes it again',
@@ -189,6 +214,9 @@ export const inspector = {
 					await expect(inspector).not.toContainText('Overspent by');
 					await expect.poll(() => available(overspent)).toBe(0);
 					await expect.poll(() => available(donor)).toBe(donorBefore - shortfall);
+					await expect(inspector.getByRole('status')).toHaveText(
+						`Moved ${formatCents(shortfall)} from ${donor} to ${overspent}.`
+					);
 					await expect(
 						inspector.getByRole('button', { name: 'Cover from another Category' })
 					).toHaveCount(0);
@@ -196,6 +224,29 @@ export const inspector = {
 					await page.reload();
 					await page.getByRole('button', { name: overspent, exact: true }).click();
 					await expect(inspector).not.toContainText('Overspent by');
+				}
+			);
+
+			await step(
+				'Cover from Ready to Assign takes the shortfall from Ready to Assign and says so',
+				async () => {
+					await page
+						.getByRole('region', { name: 'Needs you', exact: true })
+						.getByRole('button', { name: /overspent$/ })
+						.first()
+						.click();
+					const name = (await opened.textContent())?.trim() ?? '';
+					const shortfall = -(await available(name));
+					expect(shortfall).toBeGreaterThan(0);
+					const ready = await readyToAssign();
+					await inspector
+						.getByRole('button', { name: `Cover ${formatCents(shortfall)} from Ready to Assign` })
+						.click();
+					await expect(inspector.getByRole('status')).toHaveText(
+						`Covered ${formatCents(shortfall)} for ${name} from Ready to Assign.`
+					);
+					await expect.poll(() => available(name)).toBe(0);
+					await expect.poll(() => readyToAssign()).toBe(ready - shortfall);
 				}
 			);
 

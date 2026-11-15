@@ -102,6 +102,7 @@ export const splits = {
 					await row.getByRole('button', { name: /^Smoke Test Warehouse/ }).click();
 					await expect(dialog.getByLabel('Line 3 amount')).toHaveValue('8.00');
 					await dialog.getByRole('button', { name: 'Remove line 3' }).click();
+					await expect(dialog.getByLabel('Line 2 Category')).toBeFocused();
 					await expect(remainder).toHaveText('$8.00 left to split');
 					await dialog.getByLabel('Line 2 amount').fill('20.00');
 					await dialog.getByRole('button', { name: 'Save', exact: true }).click();

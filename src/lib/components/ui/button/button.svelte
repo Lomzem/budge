@@ -29,7 +29,7 @@
 				wrap: 'min-h-9 gap-2 px-3.5 py-1.5 whitespace-normal pointer-coarse:min-h-11',
 				icon: 'size-9 pointer-coarse:size-11',
 				'icon-xs':
-					"size-6 rounded-button-xs in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3.5",
+					"size-6 rounded-button-xs pointer-coarse:size-11 in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3.5",
 				'icon-sm':
 					'size-8 rounded-button-sm pointer-coarse:size-11 in-data-[slot=button-group]:rounded-md',
 				'icon-lg': 'size-11'

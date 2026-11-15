@@ -1,13 +1,17 @@
-import { expect } from '@playwright/test';
+import { expect, type Locator } from '@playwright/test';
 
+import { formatCents } from '../../src/lib/domain/money';
 import { holdResponseTo } from '../heldResponse';
 import {
 	cents,
 	centsIn,
 	expectClearOf,
+	expectEveryAmountShownInFull,
 	expectNothingPastTheRightEdge,
+	expectTapTargetHeight,
 	openBudget,
 	typed,
+	useATouchScreen,
 	type Journey
 } from './journey';
 
@@ -314,6 +318,109 @@ export const budget = {
 				await page.keyboard.press('Enter');
 				await expect(page.getByText(`August ${nextYear}`, { exact: true })).toBeVisible();
 			});
+
+			await step(
+				'after a reload, the month chosen last is the one Back returns to from another Section, with its own Assigned',
+				async () => {
+					const nextYear = new Date().getFullYear() + 1;
+					const groceries = page.getByRole('textbox', {
+						name: 'Assigned for Groceries',
+						exact: true
+					});
+					const heading = (month: string) =>
+						page.getByText(`${month} ${String(nextYear)}`, {
+							exact: true
+						});
+					await page.reload();
+					await expect(heading('August')).toBeVisible();
+					const august = cents(await groceries.inputValue());
+					await picker.click();
+					await expect(
+						months.getByRole('button', { name: `August ${String(nextYear)}`, exact: true })
+					).toBeFocused();
+					await page.keyboard.press('ArrowRight');
+					await page.keyboard.press('Enter');
+					await expect(heading('September')).toBeVisible();
+					const september = august + 12_345;
+					await groceries.fill(typed(september));
+					await groceries.press('Enter');
+					await expect(page).toHaveURL(new RegExp(`[?&]month=${String(nextYear)}-09(&|$)`));
+
+					const sections = page.getByRole('navigation', { name: 'Sections', exact: true });
+					await sections.getByRole('link', { name: /^Categories/ }).click();
+					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await page.goBack();
+					await expect(heading('September')).toBeVisible();
+					await expect(groceries).toHaveValue(typed(september));
+
+					await page.goForward();
+					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await page.goBack();
+					await expect(heading('September')).toBeVisible();
+					await page.getByRole('button', { name: 'Previous month', exact: true }).click();
+					await expect(heading('August')).toBeVisible();
+					await expect(groceries).toHaveValue(typed(august));
+				}
+			);
+		}
+	},
+	'large-amounts': {
+		title:
+			'a six-figure Assigned, its Available and its seven-figure Group totals read in full on 320 and 390 px phones, and beside the side panel at 1024 and 1280 px',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			const groceries = page.getByRole('textbox', { name: 'Assigned for Groceries', exact: true });
+			const groceriesRow = page.getByRole('row').filter({ has: groceries });
+			const everyday = page
+				.getByRole('rowgroup')
+				.filter({ has: page.getByRole('rowheader', { name: /^Everyday/ }) })
+				.getByRole('row')
+				.first();
+			const amountsIn = async (row: Locator) =>
+				(
+					await row
+						.getByRole('cell')
+						.evaluateAll((cells) => cells.map((cell) => (cell as HTMLElement).innerText))
+				).map((text) => cents(text));
+			const sixFigures = 99_999_999;
+			const shows = (row: Locator, amount: number) =>
+				expect(row.getByText(formatCents(amount)).filter({ visible: true })).toHaveCount(1);
+
+			const before = await step('read the desktop Budget columns', async () => {
+				await page.setViewportSize({ width: 1280, height: 800 });
+				await openBudget(page);
+				const [groupAssigned = 0, , groupAvailable = 0] = await amountsIn(everyday);
+				const available = await centsIn(groceriesRow.getByRole('cell').last());
+				return {
+					assigned: cents(await groceries.inputValue()),
+					available,
+					groupAssigned,
+					groupAvailable
+				};
+			});
+			const raise = sixFigures - before.assigned;
+
+			await step('on a 390 px phone, a six-figure Assigned saves from the table', async () => {
+				await page.setViewportSize({ width: 390, height: 640 });
+				await groceries.fill(typed(sixFigures));
+				await groceries.press('Enter');
+				await shows(groceriesRow, before.available + raise);
+				await page.reload();
+				await expect(groceries).toHaveValue(typed(sixFigures));
+			});
+
+			for (const width of [390, 320, 1024, 1280]) {
+				await step(`at ${String(width)} px every amount reads in full`, async () => {
+					await page.setViewportSize({ width, height: width < 640 ? 640 : 800 });
+					await groceries.scrollIntoViewIfNeeded();
+					await expect(groceries).toHaveValue(typed(sixFigures));
+					await shows(groceriesRow, before.available + raise);
+					await shows(everyday, before.groupAssigned + raise);
+					await shows(everyday, before.groupAvailable + raise);
+					await expectEveryAmountShownInFull(page.getByRole('table'));
+					await expectNothingPastTheRightEdge(page);
+				});
+			}
 		}
 	},
 	'phone-groups': {
@@ -328,8 +435,24 @@ export const budget = {
 			const toggle = (group: string) =>
 				header(group).getByRole('button', { name: new RegExp(`^${group}( \\d+ overspent)?$`) });
 
+			await step(
+				"on a 320 px touch screen a Group's Add Category button takes taps across 44 px",
+				async () => {
+					await page.goto('about:blank');
+					await page.setViewportSize({ width: 320, height: 640 });
+					const stopTouching = await useATouchScreen(page);
+					await openBudget(page);
+					await expectTapTargetHeight(
+						page.getByRole('button', { name: 'Add Category to Everyday', exact: true }),
+						44
+					);
+					await expectNothingPastTheRightEdge(page);
+					await page.goto('about:blank');
+					await stopTouching();
+				}
+			);
+
 			const before = await step('open the Budget on a 320 px phone', async () => {
-				await page.setViewportSize({ width: 320, height: 640 });
 				await openBudget(page);
 				await expect(assigned).toBeVisible();
 				await expectNothingPastTheRightEdge(page);

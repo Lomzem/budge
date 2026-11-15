@@ -231,6 +231,13 @@
 		if (added) document.getElementById(`split-category-${String(added.key)}`)?.focus();
 	}
 
+	async function removeSplitLine(key: number, index: number) {
+		draft = removeLine(draft, key);
+		await tick();
+		const next = draft.lines[Math.min(index, draft.lines.length - 1)];
+		if (next) document.getElementById(`split-category-${String(next.key)}`)?.focus();
+	}
+
 	function selectionChoices(): Choices {
 		const { transferAccounts } = shown;
 		return [
@@ -448,9 +455,7 @@
 							variant="outline"
 							size="sm"
 							disabled={draft.lines.length <= 2}
-							onclick={() => {
-								draft = removeLine(draft, line.key);
-							}}
+							onclick={() => removeSplitLine(line.key, index)}
 						>
 							Remove<span class="sr-only"> line {number}</span>
 						</Button>

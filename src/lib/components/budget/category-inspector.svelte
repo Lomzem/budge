@@ -66,6 +66,7 @@
 	let moveInvalid: 'move-category' | 'move-amount' | null = $state(null);
 	let covering = $state(false);
 	let coverError = $state('');
+	let done = $state('');
 	let renaming = $state(false);
 	let actionError = $state('');
 	let actionsTrigger: HTMLElement | null = $state(null);
@@ -105,8 +106,17 @@
 		{ label: 'Activity', cents: category.activity, assigned: false }
 	]);
 
-	function findOther(id: string): Id<'categories'> | undefined {
-		return others.flatMap((group) => group.categories).find((c) => c.id === id)?.id;
+	function findOther(id: string) {
+		return others.flatMap((group) => group.categories).find((c) => c.id === id);
+	}
+
+	const moveDirty = $derived(otherId !== '' || amount !== '' || moveError !== '');
+
+	function clearMove() {
+		otherId = '';
+		amount = '';
+		moveError = '';
+		moveInvalid = null;
 	}
 
 	function refuseMove(control: 'move-category' | 'move-amount', message: string) {
@@ -119,6 +129,7 @@
 		event.preventDefault();
 		moveError = '';
 		moveInvalid = null;
+		done = '';
 		const other = findOther(otherId);
 		const cents = parseCents(amount);
 		if (other === undefined) {
@@ -132,16 +143,23 @@
 		moving = true;
 		const moved = await attempt(() =>
 			direction === 'outOfThis'
-				? budget.moveMoney(category.id, other, cents)
-				: budget.moveMoney(other, category.id, cents)
+				? budget.moveMoney(category.id, other.id, cents)
+				: budget.moveMoney(other.id, category.id, cents)
 		);
 		moving = false;
-		if (moved.ok) amount = '';
-		else moveError = moved.error?.message ?? "Budge couldn't move the money. Try again.";
+		if (moved.ok) {
+			amount = '';
+			done =
+				direction === 'outOfThis'
+					? `Moved ${formatCents(cents)} from ${category.name} to ${other.name}.`
+					: `Moved ${formatCents(cents)} from ${other.name} to ${category.name}.`;
+		} else moveError = moved.error?.message ?? "Budge couldn't move the money. Try again.";
 	}
 
 	async function cover() {
 		coverError = '';
+		done = '';
+		const shortfall = formatCents(-category.available);
 		covering = true;
 		const covered = await attempt(() => budget.cover(category.id));
 		covering = false;
@@ -149,6 +167,7 @@
 			coverError = covered.error?.message ?? "Budge couldn't cover the Category. Try again.";
 			return;
 		}
+		done = `Covered ${shortfall} for ${category.name} from Ready to Assign.`;
 		section?.focus({ preventScroll: true });
 	}
 
@@ -410,7 +429,20 @@
 		</section>
 	{/if}
 
-	<form class="flex flex-col gap-3" aria-labelledby="move-heading" novalidate onsubmit={move}>
+	<p role="status" class="sr-only">{done}</p>
+
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<form
+		class="flex flex-col gap-3"
+		aria-labelledby="move-heading"
+		novalidate
+		onsubmit={move}
+		onkeydown={(event) => {
+			if (event.key !== 'Escape' || event.defaultPrevented || !moveDirty) return;
+			event.preventDefault();
+			clearMove();
+		}}
+	>
 		<h3 id="move-heading" class="text-sm font-medium">Move money</h3>
 		{#snippet self(side: string)}
 			<div class="flex min-w-0 flex-col gap-2">
@@ -481,6 +513,16 @@
 					required
 				/>
 				<Button type="submit" variant="outline" disabled={moving}>Move</Button>
+				{#if moveDirty}
+					<Button
+						type="button"
+						variant="ghost"
+						onclick={() => {
+							clearMove();
+							document.getElementById('move-category')?.focus();
+						}}>Clear</Button
+					>
+				{/if}
 			</div>
 		</div>
 		<p id="move-error" class="-mt-1 min-h-5 text-sm text-destructive">

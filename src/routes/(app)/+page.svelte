@@ -10,10 +10,9 @@
 	import { tick, untrack } from 'svelte';
 	import { MediaQuery, SvelteSet } from 'svelte/reactivity';
 
-	import { goto, replaceState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import type { ResolvedPathname } from '$app/types';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
@@ -34,6 +33,7 @@
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
 	import { formatBankChangeCount } from '$lib/domain/bankChanges';
 	import { mainRegion } from '$lib/focusReturn';
+	import { keepInUrl } from '$lib/keepInUrl';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 
 	const accounts = getAccounts();
@@ -57,8 +57,7 @@
 		const kept = new URL(location.href);
 		if (budget.month === monthOf(budget.today)) kept.searchParams.delete('month');
 		else kept.searchParams.set('month', budget.month);
-		if (kept.href === location.href) return;
-		replaceState(`${kept.pathname}${kept.search}${kept.hash}` as ResolvedPathname, page.state);
+		keepInUrl(kept);
 	});
 	const settings = useQuery(api.settings.get, {});
 	const unapproved = useQuery(api.transactions.unapprovedCount, {});

@@ -162,6 +162,33 @@ export const search = {
 					await expect(page.getByText("Budge couldn't load Transactions")).toHaveCount(0);
 				}
 			);
+
+			await step(
+				'after a reload, the filter chosen last is the one Back returns to from another Section',
+				async () => {
+					const payee = page.getByLabel('Payee', { exact: true });
+					await choose(payee, 'Sample Landlord');
+					await page.reload();
+					await expect(payee).toHaveText('Sample Landlord');
+					await choose(payee, 'Sample Coffee Shop');
+					await expect
+						.poll(async () => new Set(await listedPayees(page)))
+						.toEqual(new Set(['Sample Coffee Shop']));
+
+					await page
+						.getByRole('navigation', { name: 'Sections and Accounts' })
+						.getByRole('link', { name: /^Budget/ })
+						.click();
+					await expect(
+						page.getByRole('heading', { level: 1, name: 'Budget', exact: true })
+					).toBeVisible();
+					await page.goBack();
+					await expect(payee).toHaveText('Sample Coffee Shop');
+					await expect
+						.poll(async () => new Set(await listedPayees(page)))
+						.toEqual(new Set(['Sample Coffee Shop']));
+				}
+			);
 		}
 	},
 	phone: {
