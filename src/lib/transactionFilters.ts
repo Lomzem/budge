@@ -1,4 +1,4 @@
-import { isIsoDate } from '$lib/domain/dates';
+import { addDays, addMonths, dayOfMonth, isIsoDate, monthOf } from '$lib/domain/dates';
 
 export interface TransactionFilterValues {
 	search: string;
@@ -115,4 +115,58 @@ export function countedTransactions(count: number, values: TransactionFilterValu
 		noun
 	];
 	return `${String(count)} ${words.join(' ')}`;
+}
+
+const DATE_RANGES = {
+	'this-month': {
+		label: 'This month',
+		of: (today: string) => wholeMonth(monthOf(today))
+	},
+	'last-month': {
+		label: 'Last month',
+		of: (today: string) => wholeMonth(addMonths(monthOf(today), -1))
+	},
+	'last-30-days': {
+		label: 'Last 30 days',
+		of: (today: string) => ({ from: addDays(today, -29), to: today })
+	},
+	'this-year': {
+		label: 'This year',
+		of: (today: string) => ({
+			from: `${today.slice(0, 4)}-01-01`,
+			to: `${today.slice(0, 4)}-12-31`
+		})
+	}
+} satisfies Record<string, { label: string; of: (today: string) => { from: string; to: string } }>;
+
+function wholeMonth(month: string) {
+	return { from: dayOfMonth(month, 1), to: dayOfMonth(month, 31) };
+}
+
+export type DateRange = keyof typeof DATE_RANGES;
+
+export const dateRanges = (Object.keys(DATE_RANGES) as DateRange[]).map((range) => ({
+	value: range,
+	label: DATE_RANGES[range].label
+}));
+
+export function dateRangeOf(
+	values: TransactionFilterValues,
+	today: string
+): DateRange | 'custom' | '' {
+	if (values.from === '' && values.to === '') return '';
+	const preset = dateRanges.find(({ value }) => {
+		const { from, to } = DATE_RANGES[value].of(today);
+		return values.from === from && values.to === to;
+	});
+	return preset?.value ?? 'custom';
+}
+
+export function withDateRange(
+	values: TransactionFilterValues,
+	range: DateRange | '',
+	today: string
+): TransactionFilterValues {
+	const dates = range === '' ? { from: '', to: '' } : DATE_RANGES[range].of(today);
+	return { ...values, ...dates };
 }

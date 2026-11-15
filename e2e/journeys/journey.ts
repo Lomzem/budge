@@ -126,3 +126,75 @@ export async function expectNothingPastTheRightEdge(page: Page) {
 		`content past the right edge of a ${String(page.viewportSize()?.width)} px viewport`
 	).toEqual([]);
 }
+
+export async function expectEveryAmountShownInFull(table: Locator) {
+	const cut = await table.evaluate((root) =>
+		[...root.querySelectorAll('td, th, input')]
+			.filter((element) => element.checkVisibility({ visibilityProperty: true }))
+			.filter((element) => element.scrollWidth > element.clientWidth + 1)
+			.map((element) => {
+				const text = element instanceof HTMLInputElement ? element.value : element.textContent;
+				return `<${element.localName}> "${text.trim().slice(0, 40)}" needs ${String(element.scrollWidth)} px in ${String(element.clientWidth)} px`;
+			})
+	);
+	expect(cut, `cut-off amounts at ${String(table.page().viewportSize()?.width)} px`).toEqual([]);
+}
+
+export async function useATouchScreen(page: Page) {
+	const emulation = await page.context().newCDPSession(page);
+	await emulation.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+	await expect.poll(() => page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+	return async () => {
+		await emulation.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+		await emulation.detach();
+	};
+}
+
+export interface Finger {
+	id: number;
+	x: number;
+	y: number;
+}
+
+export async function touchscreen(page: Page) {
+	const cdp = await page.context().newCDPSession(page);
+	return {
+		async touch(type: 'touchStart' | 'touchMove' | 'touchEnd' | 'touchCancel', fingers: Finger[]) {
+			await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: fingers });
+		},
+		async detach() {
+			await cdp.detach();
+		}
+	};
+}
+
+export async function centerOf(locator: Locator) {
+	const box = await locator.boundingBox();
+	if (box === null) throw new Error('The element is not on screen.');
+	return { x: box.x + box.width / 2, y: box.y + box.height / 2, top: box.y };
+}
+
+export async function tap(page: Page, locator: Locator) {
+	await locator.scrollIntoViewIfNeeded();
+	const { x, y } = await centerOf(locator);
+	const screen = await touchscreen(page);
+	await screen.touch('touchStart', [{ id: 1, x, y }]);
+	await screen.touch('touchEnd', []);
+	await screen.detach();
+}
+
+export async function expectTapTargetHeight(target: Locator, height: number) {
+	await target.scrollIntoViewIfNeeded();
+	const missedAt = await target.evaluate(
+		(element, reach) => {
+			const box = element.getBoundingClientRect();
+			const x = box.left + box.width / 2;
+			const middle = box.top + box.height / 2;
+			return [middle - reach, middle + reach].filter(
+				(y) => document.elementFromPoint(x, y)?.closest('button') !== element
+			);
+		},
+		height / 2 - 1
+	);
+	expect(missedAt, `${String(target)} misses taps within ${String(height)} px`).toEqual([]);
+}

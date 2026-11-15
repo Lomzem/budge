@@ -5,7 +5,8 @@ import { cents, choose, openBudget, typed, type Journey } from './journey';
 
 export const targets = {
 	monthly: {
-		title: 'a Target shows its progress, "Assign $X" funds it, and it is listed as Upcoming',
+		title:
+			'a Target shows its progress, "Assign $X" in the table funds it, and it is listed as Upcoming',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			await page.setViewportSize({ width: 1280, height: 800 });
@@ -52,12 +53,22 @@ export const targets = {
 				}
 			);
 
-			await step('Assign $25.00 funds it', async () => {
-				await region.getByRole('button', { name: 'Assign $25.00' }).click();
+			await step('Assign $25.00 in the table funds it, as the inspector offers too', async () => {
+				await expect(region.getByRole('button', { name: 'Assign $25.00' })).toBeVisible();
+				const fromTable = page.getByRole('button', {
+					name: `Assign $25.00 to ${name}`,
+					exact: true
+				});
+				await fromTable.click();
 				await expect(region.getByText('Funded', { exact: true })).toBeVisible();
 				await expect(bar).toHaveAttribute('aria-valuetext', 'Funded');
+				await expect(fromTable).toHaveCount(0);
+				await expect(region.getByRole('button', { name: 'Assign $25.00' })).toHaveCount(0);
+				await expect(nameButton).toBeFocused();
 				await nameButton.click();
 				await expect(row).toContainText('Yes');
+				await expect.poll(assigned).toBe(twentyFiveDollarsMoreThanAssigned);
+				await page.reload();
 				await expect.poll(assigned).toBe(twentyFiveDollarsMoreThanAssigned);
 			});
 

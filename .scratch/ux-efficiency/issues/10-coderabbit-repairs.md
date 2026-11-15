@@ -1,0 +1,513 @@
+# 10 — CodeRabbit production repairs (PR 32)
+
+Status: ready-for-agent
+
+Base: `eb1d3f9` on `feat/ux-efficiency`. Scope: the three production/UI findings from the completed CodeRabbit review. Docs findings, replies, push and merge stay with the parent. The parent's independent reviews and affected UI judging are still pending, so the status stays `ready-for-agent`.
+
+## Dispositions
+
+| CodeRabbit ID | Finding | Disposition |
+| --- | --- | --- |
+| Inline 4577048660 | `Swap From and To` was icon-only, against the rule that only "more actions" and the narrow search/filter/clear/add controls may show just an icon (`.scratch/bank-sync-ux/spec.md`, `.coderabbit.yaml`) | **Fixed.** The button now shows `Swap From and To` beside its icon at `size="sm"` (32 px, 44 px under a coarse pointer). The visible text is the accessible name, so `aria-label` is gone and the journeys' selectors still match. |
+| Inline 4577048665 | `reordered = $state({ from: list.data, … })` deep-proxies the query result, so `reordered.from === list.data` was never true and the optimistic order never showed | **Confirmed and fixed at the root.** In convex-svelte 0.15.1, `useQuery().data` is the raw `localQueryResult` object (`$derived`, not proxied). Svelte 5.57.3's `$state` hands back a proxy of it, so the equality always failed. Two quick ArrowUp presses on Coffee therefore computed the second move from the unmoved list: both saves sent index 1, and Coffee moved only once. Rather than switch to `$state.raw`, which keeps the hand-held snapshot and its flicker (the first response replaces the order before the second lands), both reorders now use Convex's optimistic update on `categories.list`. The Convex client stacks pending updates, re-applies them over each server result, and rolls one back if its mutation fails. The `reordered` state and its failure cleanup are gone. Category and Group reorders share this path. |
+| Review 5909130525 (outside diff), `src/routes/(app)/+page.svelte` ~47 | An entry with no `?month`, such as the first `/`, fell back to the shared Budget month, so `/` → Categories → Budget → Next month → Back → Back showed next month and `keepInUrl` rewrote the first entry | **Confirmed and fixed.** The feature map already says the month is "dropped for the current month", so an entry without `?month` means the current month: Back or Forward to one shows the current month. A link or goto into the Budget with no month keeps the month viewed last. That is the existing in-session behavior (the sidebar and tab bar link to plain `/`), and it is preserved. The rule is one function, `monthAt`, which reads `navigating.type === 'popstate'` (from `$app/state`) both when the page mounts and on same-page URL changes. Entries with a month and the month/transaction context fixes are unchanged. |
+| Incremental 4578219535 (review 5910493518), `src/routes/(app)/+page.svelte` ~46 | `monthAt` relies on `navigating.type === 'popstate'`, which a same-page Back that only changes the hash never sets, so Skip to content → Next month → Back kept next month on a `/` with no month | **Confirmed and fixed.** See the follow-up below. |
+| Inline 4578472859 (review 5910828315), `src/lib/components/categories/inline-name.svelte` ~110 | The contract says Enter or blur saves and an empty name shows `Enter a name.`, but a blank or spaces-only name left by blur silently closed the editor | **Confirmed and fixed.** See the follow-up below. |
+| Review 5910828315 (outside diff), `src/lib/components/budget/category-inspector.svelte` ~175 | Cover from Ready to Assign announced `-category.available` read before the request, while `budget.cover()` dropped the shortfall the mutation actually covered | **Confirmed and fixed.** See the follow-up below. |
+| Phone validation SB-CR2-1 (not CodeRabbit) | At 320 px with real touch, a blank name in a field near the tab bar (Groceries on the first screen; Transit, Car Repairs or the Savings Goals group after a finger scroll) left by Enter, Tab or a tap beside it showed `Enter a name.` at 572–596 under the Sections bar from 575 | **Confirmed and fixed.** See the SB-CR2-1 follow-up below. |
+| Source review P2 (`blank-visibility-spec.md`, not CodeRabbit), `inline-name.svelte` ~65–148 | A blur decided after a held mouse press survived Escape: type a name, hold the button on the field, Tab away and Shift+Tab back, press Escape, release, and the cancelled name was saved | **Confirmed in the browser and fixed.** See the follow-up after SB-CR2-1. |
+| CI run 43728415686 (job 132855298047), `budget/month-jump`, not CodeRabbit | After a reload on August, September picked from the grid, `123.45` typed in Groceries, Enter, Categories, Back: the September heading showed but Groceries read `0.00` | **Test-only; journey fixed.** The journey typed into the table while it was inert waiting for September. No save was ever sent. See the CI follow-up after the Escape follow-up. |
+| Phone validation, minor | No touch-visible cancel for a refused blank name | **Answered, deferred.** No InlineName edit has a visible cancel, refused or not; adding one is new UI beyond this repair. On touch the user can retype the old name, open another name, or leave the page, and nothing blank is ever saved. Escape cancels on a keyboard. |
+| Phone validation, nit | A real zero cover announces `Covered $0.00 for Coffee …` | **Answered, no change.** The amount is what the server covered (no shortfall left, no double cover), which is the truthful receipt 5910828315 asked for. Money semantics stay unchanged. |
+
+## Follow-up: refused reorder recovery (sol-a-CR-A1)
+
+Base `3dc077b`. A refused `categories:move` or `categories:moveGroup` rolled the order back but left focus on `<body>`: 4 Tabs to return to Move Coffee, 17 to Move Everyday. At 320 px the reason showed only in the page-top alert, above the visible list, so the snap-back looked unexplained. A second observer also reported the reason staying after the first of two quick presses was refused and the second landed.
+
+- **Cause.** When the keyed `{#each}` moves a row, Chromium blurs whatever inside it has focus (`focusout` with `relatedTarget` null, the node still connected), and focus falls to `<body>`. The handle's key handler refocused it only after its own optimistic move, so the Convex rollback, a second move, lost focus. Any server-driven move of the focused row did the same.
+- **Focus repair (`src/lib/reorder.ts`).** Each reorder item restores focus to the element inside it that was focused when it moved: the handle, the name button or the rename field. It acts only if that `focusout` had no `relatedTarget`, the item's place among its siblings changed, and focus is now on the document. Tab, a dialog, any other focused control, or a click on blank space (which moves no item) is never taken back. The key handler's `tick` refocus is gone, since the optimistic move takes the same path.
+- **Reason in context (`src/routes/(app)/categories/+page.svelte`).** A move failure belongs to the item that moved. It shows as a `role="alert"` line inside that row or group header, so it is in view next to the handle. Only the latest move of an item decides its message. A new move clears it, and an older move refused after a newer one was sent stays silent, because the newer, absolute index decides the order. That resolves the stale-message report as part of the same ownership change. Other page actions keep the page-level alert, whose placement predates this branch and is unchanged.
+- **Harness gap found and fixed (`e2e/journeys/layoutShift.ts`).** Once a journey calls `routeWebSocket`, Playwright replaces the page's `WebSocket` with an in-page mock. The guard had already patched the native class, so it watched only the mock's inner socket and missed held requests and forged answers. It reported the rollback-plus-reason shift as unprompted. The guard now follows the class the page uses and ignores the mock's inner socket. Probes on the scratch page confirmed that the refusal shift is now credited and that an injected shift with no input still fails, with and without a route.
+
+### Follow-up: Back after Skip to content kept the next month (CodeRabbit 4578219535)
+
+- **Checked against the installed code first.** SvelteKit 2.70.3, `node_modules/@sveltejs/kit/src/runtime/client/client.js`, popstate handler: when the popped entry has the same navigation index and the change is a hash change (or the page already navigated shallowly), it calls `update_url(url)` and returns without `navigate()`. `page.url` changes, but `navigating.type` stays unset.
+- **Reproduced** (`skip.ts` in the agent scratchpad, `test-results/verify-budge/skip-base-e1394e8.json`). Desktop keyboard and 320 px touch gave the same results:
+  1. First `/` shows November 2026, with Groceries at 380.00.
+  2. Tab, then Enter on Skip to content, gives `/#main`, with focus on `main`.
+  3. Next month gives `/?month=2026-12#main`, December, 0.00. `keepInUrl` replaces the `#main` entry.
+  4. Back gives `/`, but it still shows December and 0.00.
+  5. Reload shows November and 380.00.
+- **Cause.** The month rule asked the router how the URL changed. A Back that SvelteKit treats as shallow is a traversal the router never reports. The finding is right: the rule has to classify the traversal itself.
+- **Fix** (`src/routes/(app)/+page.svelte`). The Budget listens for `popstate` on `window` through `on` from `svelte/events`, inside an `$effect` that removes the listener on unmount.
+  - The listener runs after SvelteKit's, which was registered first. Chromium runs listeners on `window` in registration order, even capture ones (probe `order.ts`).
+  - When `page.url` already equals `location.href`, SvelteKit has applied a shallow traversal, so the month is taken from that entry: its `?month`, else the current month.
+  - When they differ, SvelteKit is still running a real navigation. That navigation reports `navigating.type === 'popstate'` to the existing `page.url` effect, which is unchanged, as is the check at mount.
+  - **Rejected alternatives:**
+    - A capture listener, because it still runs after SvelteKit's.
+    - `hashchange`, because it covers only hashes.
+    - Wrapping `history`, or SvelteKit internals.
+  - Selection, inspector drafts and late operations are untouched: the listener only sets `budget.month`, as Back always did.
+- **Journey.** `budget/month-jump` gains "after Skip to content, Back from the next month returns to the current month with its own Assigned, on a desktop keyboard and a 320 px touch screen". Each pass:
+  1. Opens `/`, then uses Tab and Enter on the real skip link, requiring `/#main` and focus on `#main`.
+  2. Presses Next month (Enter at 1280 px, a CDP tap at 320 px under `useATouchScreen`) and saves a Groceries Assigned that differs from the current month's.
+  3. Back requires `/`, the current month's name on the picker, and its own amount.
+  4. Forward requires the `?month…#main` entry, next month and the saved amount.
+  5. Back, then a reload, again show the current month.
+- **Red → green.**
+  - `skip-red` (the `e1394e8` page source with the new step): fails at the first Back, where the picker reads `December 2026` but `November 2026` is expected.
+  - `skip-green3`: passes.
+  - Probe `skip-fixed.json`: Back shows `/`, November and 380.00 at both widths, and so does a reload.
+- **Checks.**
+  - `skip-scoped2` passes 12 journeys:
+    - `budget/assign`, `budget/assign-back`, `budget/needs-you`, `budget/month-jump`, `budget/large-amounts` and `budget/phone-groups`;
+    - `inspector/move-money` and `inspector/cover-and-manage`;
+    - `search/filters` and `search/phone`;
+    - `shell/navigate` and `shell/phone-pages`.
+  - The existing month-jump steps still cover: an explicit month after a reload, Back from another Section, the month-less first entry with two Backs, the year grid, the boundary, and the arrows.
+  - `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests (59 files), including the feature-map test.
+- **Limits.**
+  - Proved in Chromium only. The listener order it relies on is the DOM rule for listeners on one target (registration order).
+  - Firefox stays deferred, as above.
+
+### Follow-up: a blank name left by blur, and Cover's announced amount (CodeRabbit 5910828315)
+
+- **Blank name left by blur (inline 4578472859).**
+  - **Reproduced** with a manual probe (`blank.ts` in the agent scratchpad, not a maintained assertion; `test-results/verify-budge/blank-base-b17b8e8.json`). On `b17b8e8`, a Category name filled with spaces and left by Tab, by a click on the page heading, or by a 320 px tap on the heading closed the field with no `Enter a name.` and kept the old name. The inspector name left by Tab did the same.
+  - **Cause.** The deferred blur handler special-cased a blank draft as `editing = false` instead of calling `commit()`, which is the one place that refuses an empty name.
+  - **Ownership.** On the Categories page one `renaming` id owns the open editor. A click on another name sets it to that name directly, and A's `editing = false` only clears it while it is still A's. On a blank draft `commit()` sets only A's local `error` and returns: it writes neither `editing` nor `save`. So a blank A left for B cannot close B's editor, take its focus or change its draft. The inspector binds its own local `renaming` the same way.
+  - **Fix** (`inline-name.svelte`). The deferred blur now always calls `commit()`. The openings counter, the focus-came-back check (the rollback false blur), the fast A→B commit of a non-blank name, Escape as cancel and the save path are unchanged.
+  - **Probe after the fix** (`blank-fixed.json`, manual). Tab, click and tap leave the field open with its spaces and `Enter a name.`, with focus where the user moved it. The inspector behaves the same. A blank A left by a click on Coffee or on a group opens B focused with its own name and no error, and both names are unchanged after a reload.
+  - **Journey** (`categories/manage`, 320 px):
+    - The rename step now also covers spaces left by Tab: the actions button takes focus, the field keeps its spaces and shows `Enter a name.`, and Escape in the field keeps the old name. Spaces left by a click on `Smoke Test Group` give focus to the Category Group name field with its own name and no error, and Escape keeps it.
+    - A new touch step taps the group name, types a space, and taps the empty margin beside the field (a CDP touch). It requires `Enter a name.`, the field unfocused with its space, and both clear of the tab bar (`expectClearOf`). Escape then keeps the old name after a reload.
+- **Cover's announced amount (review 5910828315, outside the diff).**
+  - **Cause.** `cover()` formatted `-category.available` before the request. The `budget.cover` mutation reads the Category's Available at the server, covers that shortfall and returns it, but `budget.cover()` in `budget.svelte.ts` dropped the return value.
+  - **Fix.** `budget.cover()` returns the mutation's result, and the inspector announces `formatCents(covered.value)`. The Category name is still captured before the request, and the call still uses `openedForId`. The amounts shown come from the live query as before. `assign-target-button.svelte` announces no amount, so it doesn't share the fault.
+  - **Journey** (`inspector/cover-and-manage`). The step now holds the stale tab's server frames with the existing `pausableSync` helper (`e2e/heldResponse.ts`), registered before the socket opens. A real second tab lowers the Category's Assigned by $5.00 and waits for its Available to read the shortfall plus $5.00. Then the stale tab, still showing the old shortfall, clicks `Cover $X from Ready to Assign`, and the frames are released. The step requires `Covered $(X + 5.00) for <name> from Ready to Assign.`, Available $0.00, Assigned equal to the stale tab's Assigned plus X, and Ready to Assign lowered by X, both at once and after a reload. No receipt is mocked or seeded.
+- **Red → green.**
+  - `cr2-red` (the `b17b8e8` versions of the three source files, with the new journeys):
+    - `inspector/cover-and-manage` fails with `Expected: Covered $51.73 for Coffee from Ready to Assign.`, `Received: Covered $46.73 for Coffee from Ready to Assign.`
+    - `categories/manage` fails at the extended rename step, because after Tab the field is gone. The touch step was not reached; the manual probe shows its red.
+  - `cr2-green` passes `inspector/cover-and-manage`. `cr2-green-manage` passes `categories/manage` after its tap moved from the heading to the margin: a tap on the heading scrolled the field out of view.
+- **Test-audit gate.** Each step protects a stated contract the existing steps missed (blank refused on leaving the field, blank A not disturbing B, a cover amount from the server). Each failed on old code for the reported reason, reuses existing helpers (`pausableSync`, `useATouchScreen`, `touchscreen`, `expectClearOf`), and adds no production seam.
+- **Checks.**
+  - `cr2-affected` passes 10 journeys: `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename`, `inspector/move-money`, `inspector/cover-and-manage`, `budget/needs-you`, `budget/assign`, `budget/phone-groups` and `shell/navigate`.
+  - With the app stopped, `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests (59 files).
+- **Limits.**
+  - Proved in Chromium only.
+  - A blank name left by blur keeps its field open after focus has moved on. To cancel it, the user returns to the field and presses Escape.
+  - When the server finds no shortfall, the announcement reads `Covered $0.00 …`. That is truthful but terse.
+
+### Follow-up: a refused blank name under the tab bar (SB-CR2-1)
+
+- **Premise attacked.** EF-A1 left the open editor's `Enter a name.` without a reveal because `ef-edit.ts` measured it clear (field 495–539, reason 543–567). That only held for a field opened with room below it. Opening a field focuses its input, and the focus scroll stops the field at the `max-lg` `scroll-padding-bottom` (4.5rem), so a field opened near the bar ends at 640 − 72 = 568. The 28 px reason (`mt-1` plus a 24 px line) that appears later has no room.
+- **Reproduced** with a manual probe (`geo.ts` in the agent scratchpad, not a maintained assertion; `test-results/verify-budge/geo-base-4e3b8ac/results.json`), real CDP touch on `4e3b8ac`:
+
+  | Width | Name, how it got near the bar | Field | Reason | Bar from |
+  | --- | --- | --- | --- | --- |
+  | 320 | Groceries on the first screen; Enter, Tab or a tap beside it | 524–568 | 572–596 | 575 |
+  | 320 | Transit, Car Repairs, the Savings Goals group after a finger scroll | 524–568 | 572–596 | 575 |
+  | 390 dark | Car Repairs, the Savings Goals group after a finger scroll | 728–772 | 776–800 | 779 |
+
+- **Second cause, found while proving the fix.** A real mouse press holds the button long enough for the deferred blur to decide mid-press. A blank A then shows its reason, its row grows 28 px, B moves out from under the pointer, and mouseup misses B. So a held press on B left A refused and B unopened (`insp-held-base`, manual), which a reason that scrolls anything would make worse. A touch tap is unaffected, because its pointerup comes before the compatibility mousedown that blurs A.
+- **Fix** (`inline-name.svelte`, `refusalInView.ts`), for every InlineName caller (Categories rows and groups, the Budget inspector):
+  - `keepReasonInView` reveals the field with its reason (`block: 'nearest'`), then, if focus sits on another element (Tab to the actions button), scrolls that element back into view the same way. Focus on `<main>` or `<body>` after a tap beside the field is left alone. It moves nothing when the reason already fits.
+  - While the field is open it tracks the pointer press on `window`; a blur during a press is decided after `pointerup` or `pointercancel`. The openings counter, the false-blur rollback, Escape, `commit()` and the closed `failed` refusal with `keepRefusalInView` are unchanged.
+- **Ownership.** The reason renders only while its own editor is open, and one `renaming` id owns the open editor. A blank A left for B writes only A's `error` and closes nothing, so A's reason never renders after B opens and cannot scroll B away or take its focus. The probes' A→B rows match the base: B focused, its own name, the same scroll.
+- **Manual probes after the fix** (`geo-fixed`, `insp-fixed`, `insp-held-fixed`, `insp-held-nonblank-fixed`):
+  - 320: field 496–540, reason 544–568 (28 px up); 390 dark: reason 748–772. Focus stays on the field, `Groceries actions` or `<main>`, and the typed spaces stay.
+  - The inspector at 320 (dialog) and 1280 shows field and reason in view with the page scroll unchanged; Tab keeps `Groceries actions` focused.
+  - Held press: no reason mid-press; after release Groceries opens focused with its name and A closes. A non-blank held press saves A (`Everyday Held` after a reload) and opens B.
+  - Names after a reload are unchanged throughout.
+- **Journey** (`categories/manage`). The margin-only touch step is replaced by two steps:
+  - A held mouse press (`mouse.down`, settle, `mouse.up`) on Groceries after emptying Everyday opens Groceries focused with its name, closes the group field, and Escape plus a reload keep both names.
+  - At 320 px under `useATouchScreen`, real finger swipes bring Car Repairs, then the Savings Goals group, to just above the tab bar (asserted: gap 0–12 px, fully in view). Car Repairs emptied and left by Enter, and the group emptied and left by a tap beside it, show `Enter a name.` with field and reason both clear of the Sections bar (`expectClearOf`), the spaces kept, and focus on the field or not, as left. Escape and a reload keep the old names.
+- **Red → green** (`test-results/verify-budge/`):
+  - `sb-red` (the `4e3b8ac` source): `categories/manage` fails at the held-press step, `expect(locator).toBeFocused() failed`, with `textbox "Category Group name" [invalid]` and the alert `Enter a name.` in the snapshot.
+  - `sb-red-reveal` (the press fix without `keepReasonInView`): fails at the touch step, `getByRole('navigation', { name: 'Sections', exact: true }) overlaps getByRole('alert').filter({ hasText: 'Enter a name.' })`, on Car Repairs' Enter. The group half was not reached; the manual probe shows its red.
+  - `sb-green`: 10 pass: `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename`, `inspector/move-money`, `inspector/cover-and-manage`, `budget/needs-you`, `budget/assign`, `budget/phone-groups`, `shell/navigate`. `sb-green-repeat` passes `categories/manage` again.
+  - `sb-green-final` (the committed source, after the lint renames): `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename` and `inspector/cover-and-manage` pass.
+  - Traces are sanitized (`sb-sanitation.json`): network logs removed, 0 matches left on rescan.
+- **Test-audit gate.** Both steps check what a user sees and does at the real boundary: a finger scroll, a tap, a held press, focus, the visible reason and the bar, and names after a reload. Each failed on old code for the reported reason. They reuse `expectClearOf`, `useATouchScreen`, `tap` and `settled`, and add no production seam; the swipe helper is test-side touch input. They replace the margin step, whose field sat high enough never to fail.
+- **Checks.** With the app stopped, `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests (59 files), including the feature-map test.
+- **Limits.**
+  - Proved in Chromium only. In Safari a clicked button doesn't take focus; that case is unprobed.
+  - A held press on another name now commits A after release rather than mid-press.
+  - The swipe helper adds 16 px for Chromium's touch slop.
+  - A refused blank on touch has no visible cancel (see Dispositions).
+- **Principles that changed a choice.** Attack-the-premise and fix-root-causes: the EF-A1 "already clear" note was a measurement at one position, and the held-press miss was the leave decided mid-press, not a scroll to undo. Separate-before-serializing: the single `renaming` owner is why A's reason needs no guard against B. Test-behavior: the journey reaches the position by a real swipe rather than a scroll setter. Laziness and minimize-reader-load: one attachment and a press tracker local to InlineName, no focus framework. Prove-it-works: the journeys were rerun after the lint renames.
+
+### Follow-up: Escape after a held press saved the cancelled name (source review P2)
+
+- **Reproduced in the browser** before the fix, on `2f39e04` with real mouse and keyboard input:
+  - Journey `esc-red` (`categories/manage`, new step): Groceries renamed to `Groceries Cancelled` was saved after hold, Tab, Shift+Tab, Escape, release. It failed with `expect(locator).toBeVisible() failed` on the `Groceries` button, and the step's ARIA snapshot lists `button "Groceries Cancelled"`.
+  - Manual probe `esc-probe-base-2f39e04` (`esc.ts` in the agent scratchpad, not a maintained assertion), 1280 px, counting sent `categories:rename`/`renameGroup` socket frames by function name only: the Everyday group and the inspector's Groceries each sent a rename for the cancelled draft, and both showed after a reload and on the other page.
+- **Cause.** Escape closed the editor but left that opening's pending leave decision alive. The decision checked only that no newer opening had begun and that the old input no longer had focus, which is also true after a cancel, so `commit()` saved the discarded draft. Only an explicit cancel ends an opening without a decision. An Enter commit's later decision finds the save already pending or landed, and a close by opening another name must still commit, so neither changes.
+- **Fix** (`inline-name.svelte`). Each opening owns an `AbortController` (`thisOpening`) in place of the openings counter. A new opening or Escape aborts it. A blur captures its signal, and the deferred decision returns once it is aborted. The release listeners also stop on that signal, so a cancelled or replaced opening leaves no listeners on `window`. Closing by a click on another name does not abort, so the non-blank A→B commit is unchanged. A failed save's reopening is a new opening, so a decision from the earlier one is dropped, as before. All three callers (Category rows, group rows, the inspector) share the component.
+- **Journey** (`categories/manage`, 320 px, mouse and keyboard): a new step types `Groceries Cancelled`, holds the mouse button on the field, presses Tab (the actions button takes focus), Shift+Tab (the field is focused again) and Escape (the field closes), then releases. Groceries stays. As the positive control, `Transit Held` with the button held, left by Tab and released, is saved. After a reload `Transit Held` shows, Groceries shows and no `Groceries Cancelled` exists. The save that lands is sent after the cancel on the same client, so the reload shows that nothing was sent for the cancel.
+- **Green.**
+  - `esc-green`: 8 journeys pass: `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename`, `inspector/move-money`, `inspector/cover-and-manage`, `budget/phone-groups` and `budget/assign`.
+  - `esc-green-final` (after the probe swapped the base source in and back): `categories/manage`, `categories/late-rename`, `categories/failed-rename`, `categories/reorder` and `inspector/cover-and-manage` pass. Prettier rewrapped the new step's lines afterwards, with no change in behavior.
+  - Manual probe `esc-probe-fixed`: the group and inspector send 0 renames for the cancel, and the names are unchanged after a reload and on the other page. The held Tab and release control sends 1, so the counter can see a save.
+  - Kept from SB-CR2-1 in the same runs: the swipe-to-bar Enter and tap-beside cases, the held and fast A→B steps, the rollback draft, failed and late renames, and the inspector's Cover receipt.
+  - Traces are sanitized (network logs removed, 0 matches left on rescan).
+- **Test-audit gate.** The step checks what a user sees and what persists: focus, the field closing, names after a reload. It failed on the old code for the reported reason, and its positive control proves the same held route still saves. It drives real mouse and keyboard input with no production seam or source grep, and it is one step at the component's strongest existing journey rather than one per caller. The Group and inspector callers are covered by the manual probe.
+- **Checks.** With the app stopped, `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests (59 files), including the feature-map test.
+- **Limits.**
+  - Chromium only.
+  - A press made during the actions menu's close animation (about 110 ms, while the menu sets `pointer-events: none` on `<body>`) lands on the page, not the field. The probe first hit this and now waits it out; it is menu behavior outside this diff.
+  - Unmounting the editor (for example, closing the inspector) during a held press still commits after release, as a blur does.
+- **Principles that changed a choice.**
+  - Fix-root-causes and attack-the-premise: the premise "an opening is live until another opening begins" was false, because a cancel also ends one. So the cancel ends the opening, rather than adding a check that the editor is still open, which would break the A→B commit.
+  - Minimize-reader-load: one signal answers "is this opening's decision still live" and also removes the release listeners, replacing the counter rather than adding a second piece of state.
+  - Test-behavior: the proof is the persisted name, with a positive control that the held route still saves, rather than a call-count of `commit`.
+  - Prove-it-works: the inspector failure in the first probe was traced to `pointer-events: none` before any conclusion was drawn.
+
+### Follow-up: CI `budget/month-jump` read `0.00` after Back (run 43728415686)
+
+CI failed 1 of 63 at `fbe43fa` (source-equal to `dab8fff`), in the step "after a reload, the month chosen last…": September's heading showed after Back, but Groceries read `0.00` where `123.45` was expected. CI kept no trace. It showed 36 Assignment rows, which matches the seed: nothing was written.
+
+- **Classification: test-only.** The owner is the journey's readiness boundary. The product is correct.
+- **Cause.**
+  - Picking a month while its query is pending keeps the previous month's table on screen: `BudgetMonth.stale` sets the table `aria-busy` and `inert`.
+  - The step called `fill` and `press('Enter')` straight after the September heading appeared.
+  - Playwright's `fill` and `press` on an input inside an inert subtree return without error, but no input event fires, the value and focus are unchanged, and Enter lands on the unedited `0.00`. So `setAssigned` was never sent.
+  - `click` waits for the field to accept a pointer, which an inert field doesn't. That is the readiness a user has.
+- **Leads tested, in rank order** (manual probe `mj.ts` in the agent scratchpad, not a maintained assertion). It routes the real socket and records only month query adds and results, `budget:setAssigned` month and amount with its ack's success flag, and the Groceries field's focus, input, keydown, value, inert and `aria-busy`. A second view of September and August in a fresh context checks what persisted.
+  1. Pending query and inert table versus fill/press readiness: **confirmed.**
+     - `mj-control`, ungated: the CI symptom occurred naturally. At the September heading the table was `inert` and `aria-busy`, and `fill` produced no input event. Enter's keydown fired on `0.00`, no `setAssigned` was sent, and the second view showed September `0.00` and August `0.00`.
+     - `mj-gated-1` and `-2`, with September's query result withheld and the ack held: the same, deterministically. There were 0 mutations for the held ack to catch.
+     - `mj-gated-click` and `mj-gated-click-ack`: while September was withheld, `click` did not complete. After the release, click, fill and Enter sent exactly one `setAssigned` (month `2027-09`, amount `12345`). Back showed `123.45`, even with the ack still held, through the query update. The second view showed September `123.45` and August `0.00`.
+  2. A wrong-month write or query context: **excluded for this failure.** No write was sent. When one was sent, it carried `2027-09`, and August stayed unchanged.
+  3. Auth or sync errors: **excluded for this failure.** No request was sent or refused, and every query result arrived.
+- **Fix** (`e2e/journeys/budget.ts`, `budget/month-jump` only). The step now holds sync (`pausableSync`, as in the inspector's "while the next month loads, the inspector takes no input") from the September pick. It requires:
+  - the September heading;
+  - that focusing Groceries fails while the month loads;
+  - that a click on Groceries completes only after sync resumes.
+  It then fills `august + 12345`, checks the field shows it, and presses Enter. The money expectations are unchanged.
+  The step's two siblings typed straight after `Next month` in the same way. They now click Groceries first, and the Skip-to-content step reads next month's amount only after that click.
+- **Red → green.**
+  - `mj-journey-red` (the fixed journey edited back to pause, fill, Enter, resume; restored and diffed afterwards): `FAIL budget/month-jump: expect(locator).toHaveValue(expected) failed`. The ARIA snapshot shows September 2027 with Groceries `0.00`, the CI symptom.
+  - `mj-journey-green`: `budget/month-jump`, `budget/assign`, `budget/needs-you`, `inspector/move-money`, `search/filters` and `shell/navigate` pass.
+  - Final tree, original journey repeated: `mj-journey-final` and `mj-journey-final-2` pass `budget/month-jump`.
+  - Probe `mj-final-click`, ungated: the inert, `aria-busy` table at the heading, then one `setAssigned` for `2027-09`/`12345` with a successful ack. Back shows `123.45`, and the second view shows September `123.45` and August `0.00`.
+  - Traces are sanitized (0 matches left on rescan).
+- **Test-audit gate.**
+  - The step protects what a user sees and keeps: the loading table takes no input, and an amount typed once the month has loaded is saved to that month and survives Back.
+  - It went red for the CI reason under the controlled pause.
+  - It reuses the existing transport helper and adds no production seam, sleep or retry.
+- **Checks.** With the app stopped, `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests (59 files), including the feature-map test.
+- **Limits.**
+  - Chromium only.
+  - CI kept no trace, so the link to this cause rests on the matching symptom plus the 36 unchanged Assignment rows.
+  - `budget/assign` types after `Previous month` too, but its next assertion is a month-distinct `toHaveValue`, so it waits on data rather than on readiness. It is left unchanged.
+- **Principles that changed a choice.**
+  - Attack-the-premise: "the save was lost or misdirected" was tested before it was believed. The event log showed no save was sent, which moved the owner from production to the journey.
+  - Test-behavior: the readiness wait is a user action (`click`) plus the observable unfocusable field, not a check of `inert` or `aria-busy` attributes.
+  - Fix-root-causes: all three typing points in this journey got the boundary, not only the one CI caught.
+
+## Red → green
+
+Evidence is under `test-results/verify-budge/`:
+
+- `cr-focus-red` (base source plus the new steps) failed at step 11: no alert in Coffee's row (the reason was only the page-top alert), after a rollback through the real routed socket.
+- `cr-focus-red-focus` (the page fix only, base `reorder.ts`) failed at step 11: `Move Coffee` was `inactive`, not focused, after the rollback.
+- `cr-focus-green` failed on the journey's own wrong assumption that Everyday had a group above it. The step now picks ArrowUp or ArrowDown from Everyday's place.
+- `cr-focus-green2` failed on the guard gap above.
+- `cr-focus-green3`: all 12 `categories/reorder` steps pass on the finished source, including rapid held moves, Home/End, touch cancel, the second finger, touch autoscroll, the desktop drag and both new steps.
+- `cr-focus-affected`, under the changed guard: 21 of 22 pass. These are every journey that routes the socket (except `categories/reorder`, covered above), plus `budget/phone-groups`, `budget/assign`, `shell/navigate` and `inspector/cover-and-manage`. `categories/manage` failed once, in the Add Category dialog: "Enter a name." did not appear in the step where the group is made but the Category is refused. This diff does not touch that dialog. It passed in reruns `cr-focus-manage-rerun` and `cr-focus-manage-rerun2`, so it is intermittent (1 of 3) and left open.
+- `cr-focus-final`: `categories/reorder` (all 12 steps) and `categories/manage` pass on the committed tree. The tracker map became a `SvelteMap` for `svelte/prefer-svelte-reactivity`.
+
+Test-audit gate: both new steps check what a user observes: order, the visible reason beside the row, focus, retry and persistence. They fail at the real transport boundary on the base source, add no production seam, and reuse `failFirstCallTo`. The focus-away step guards the ownership requirement, so a "refocus the handle on failure" fix would fail it. The guard change has no unit test. Its behavior was shown by the two scratch probes above and by the journeys rerun under it.
+
+### Manual probes (not in the journey)
+
+- `cr-focus-manual2` (`notes.txt`, screenshots, ARIA):
+  - 320 px keyboard: the reason box is at y=306, right under the handle at y=268, focus stays on `Move Coffee`, nothing is past the right edge, and a retry clears it.
+  - First of two quick presses refused at 1280 px: no reason stays, Coffee stays first after a reload, and focus stays on the handle.
+  - Focus moved into the Add Category dialog before the refusal stays on the dialog's input.
+  - A click on blank space before the refusal leaves focus on `<main>`.
+- `cr-focus-manual2-touch-d`: a refused 320 px touch drag puts Coffee back with the reason in view (y=306) and nothing past the right edge.
+- The partial `cr-focus-manual` run, the touch step at the end of `cr-focus-manual2` (timed out after 90 s with no move sent), and `cr-focus-manual2-touch`/`-b`/`-c` record probe-script mistakes (a page-rooted `has` locator, a BODY expectation where `<main>` takes focus, a drag started before the list loaded). They are not product failures.
+
+## Follow-up: the `categories/manage` failure in `cr-focus-affected`
+
+Base `0afbc8c` (the parent's integration of `f7538f4`). The Add Category dialog does not lose its refusal. A full page reload removed it, and an edit to a Markdown file triggered that reload.
+
+- **Evidence in the preserved trace** (`cr-focus-affected/categories/manage/trace.zip`). The `categories:create` refusal arrives at 42284 ms. `[vite] connecting…` follows at 42361 ms and Clerk loads again at 42685 ms, which only happens on a fresh document load. The screencast still shows the dialog at wall time 22:33:19.291 and only "Loading…" at 22:33:19.378. The session transcript shows this agent rewriting this issue file at 22:33:19.27, while that run was going. The empty group Sol saw is the `createGroup` that had already landed before the reload.
+- **Cause.** Tailwind v4 scans the whole repository for class names, including `.scratch/`, `docs/` and `.agents/`, and watches what it scans. A change to a scanned file of a kind Vite has no module for, such as `.md`, makes `@tailwindcss/vite` send `full-reload` to every open page. So an agent's doc edit during a `bun run app verify` run reloads the journey's page. The dialog, its draft and its error go with it. Pointer and keyboard submits are equally exposed, because only the timing of the edit decides.
+- **Fix (`src/app.css`).** `@import 'tailwindcss' source('.')` limits the scan to `src/`, where every class lives. The production CSS loses only 16 utilities that came from doc text alone (such as `overflow-auto`, `container` and `visible`), none of them used in `src/`. No component or dialog code changed. The dialog's recovery (the reason, the made group kept as the choice, the hidden group field, retry into the same single group) was already right and already asserted by that step.
+
+### Red → green
+
+Evidence is under `test-results/verify-budge/`:
+
+- `dialog-reload-probe`: 5 of 5 pointer submits at 320 px show "Enter a name." when nothing is edited. That is why the reruns passed.
+- `dialog-reload-doc-touch` (base): a doc `touch` 30 ms after the submit loses the dialog 2 of 2 times. Vite sends `{"type":"full-reload"}`, and `beforeunload` fires from `@vite/client`.
+- `dialog-reload-kbd-red` (base, Enter in the Name field): the same reload in both tries. The dialog was lost in 1 of 2, because the other refusal landed first.
+- `dialog-reload-doc-touch-fixed2` and `dialog-reload-kbd-fixed` (fixed, after a clean `app up`): no reload, and the alert is shown in 3 of 3 pointer and 2 of 2 keyboard tries. `dialog-reload-doc-touch-fixed` stayed red only because the running Vite kept the old watch list until it restarted.
+- At journey level, with a doc touched every 100 ms throughout: `dialog-doc-edits-red` (base) fails at step 1 because the page keeps reloading. `dialog-doc-edits-green` (fixed) passes all 10 `categories/manage` steps.
+
+Test-audit gate: no journey changes. The failing step already asserts the observable recovery, and it went red for an environment reason, not a product one. A test that pins `source('.')` would be a source grep. The scripted probe is kept at the evidence path above as the re-runnable check.
+
+### Checks
+
+- `dialog-reload-affected` (fixed, clean `app up`): these journeys pass: `categories/manage`, `categories/reorder` (which keeps the `f7538f4` refused-reorder focus proof), `categories/failed-rename`, `categories/late-rename`, `budget/phone-groups`, `budget/assign`, `shell/navigate`, `search/phone`, `settings/later-start` and `transactions/approve-phone`.
+- `bun run format:check`, `lint`, `lint:ui` and `typecheck` pass, `bun run test` passes 933 tests (59 files), and `bun run build` succeeds.
+- The feature map is unchanged, because no behavior changed.
+
+### Corrections (analysis-only `/correct`, decided by the Opus implementor)
+
+- **C1, focus ownership recurs** (`cec8434` failed rename, `f7538f4` rollback): **answered.** Each fix gives focus to the thing that owns it: the moved item restores its own focused descendant, and only when its move dropped focus to the document. The journey's focus-away step already proves that a newer control keeps focus. These are two owners with different triggers, so a shared focus framework would add indirection without removing a fault.
+- **C2, layout-shift guard causality recurs** (`fe03b0a`, `f060acb`, and the routed `WebSocket` class in `f7538f4`): **deferred**, with a concrete proposal. A maintained positive/negative check needs a browser, and this repository has no place to run one outside a journey. The Vitest CI job installs no browser, and every Playwright test seeds a fixture and signs in with the owner's Clerk credentials. Giving it a place means adding a Playwright-browser step to the Vitest job or a credential-free Playwright project. That is a CI and dev-environment change, which AGENTS.md sends straight to `main`, not to this integration branch. Once that exists, the check is about 40 lines, using `routeWebSocket` on a `setContent` page:
+  - an unprompted shift fails, natively and routed;
+  - a refusal shift answered after a held routed request is credited.
+
+  Native crediting stays covered by every journey's real-socket mutations. Until then, the probes recorded under "Harness gap found and fixed" above are the evidence.
+- **Cheap signal for next time** (fix-root-causes): `bun run app verify` could report any document load a journey did not ask for, which would have pointed to this cause at first look. It is not done here because it is harness work outside this repair.
+
+## Follow-up: a name being typed when its row's move is refused (sol-a-RF-A1)
+
+Base `848edfc`. The finding: at 320 px, the user focuses Move Coffee or a group's handle, presses ArrowUp while the first save is held, then clicks the moved item's name and types a new name without submitting. When the move is refused, the rollback closes the field, saves the draft as the name, and drops focus to `<body>`. A reload and the Budget then show a rename nobody asked for. Both independent observers reproduced it for a Category. Only one of them saw it for a group.
+
+- **Event order** (instrumented probe, wrapping the keyed `{#each}` DOM moves and logging focus events and Mutation sends):
+  - When a keyed row moves, Svelte calls `before()` on it. Chromium fires `blur`/`focusout` on the focused input synchronously inside that call, with `relatedTarget` null and `activeElement` BODY, while the input is still connected.
+  - `InlineName`'s blur handler treated that blur as the user leaving. It committed at once: the field closed and `categories:rename` / `categories:renameGroup` was sent.
+  - `keepFocusWhenMoved` (`src/lib/reorder.ts`) runs one microtask later and only restores a focused element that is still connected. By then the input had been removed, so focus stayed on BODY.
+- **Why the group case varied.** Only the node Svelte moves loses focus.
+  - Coffee ArrowUp, then rollback, moves Coffee, so it blurs.
+  - The last group (Bills, after `reorder`'s earlier steps) ArrowUp, then rollback, moves that group, so it blurs.
+  - Everyday ArrowDown, then rollback, moves the neighbor instead, so Everyday never blurs.
+  - The two observers moved different groups, so this is a real group fault, not a Category-only one.
+- **Premise attacked.** The `f7538f4` repair assumed focus lost to a move can be put back afterwards. That holds only if nothing acts on the spurious blur first. The commit-on-blur editor acted on it.
+- **Owner and fix** (`src/lib/components/categories/inline-name.svelte`). The editor owns the question "has the user left this field?", so it now answers it only after focus has settled. The blur handler waits one task. Then it commits only if the field is still open and focus is not back on the input, or the window itself lost focus (`document.hasFocus()` false).
+  - A move-caused blur is now repaired by the existing `keepFocusWhenMoved`, because the input is still connected, and the editor sees it focused again and does nothing.
+  - Enter (commit) and Escape (abort) stay synchronous. Tab, a click elsewhere and a window switch still commit, one task later.
+  - The `latest` ticket still owns rename errors, and the `failed` reopen is unchanged.
+  - `reorder.ts` is unchanged and still needed for the handle and name-button repairs. No workaround became obsolete. No shared focus layer was added, and the C1 answer above still holds, with this owner now named.
+- **Journey** (`categories/reorder`, new last step, real Convex transport through `failFirstCallTo`):
+  - Category: type "Morning Coffee" in Coffee's field while its held move is refused. Coffee goes back, the reason shows in its row, the field keeps focus and the draft, and Escape leaves the name as Coffee.
+  - Group: the same for the last group with "Rainy Day Fund". The order goes back, the reason shows in that group, and the field keeps focus and the draft. Tab out of the field then renames it, which proves the deferred commit still runs on a real leave (no journey asserted a blur commit before).
+  - The reload and the Budget show the group rename and Coffee unrenamed in place.
+
+### Red → green
+
+Evidence is under `test-results/verify-budge/`:
+
+- `editor-rollback-red` (base source with the new step): steps 1–12 pass. Step 13 fails in its Category half. The snapshot shows `Move Morning Coffee` with no field.
+- `editor-rollback-red-group` (base source, with the Category half temporarily removed from the step; both files restored right after): fails in the Group half. The snapshot shows `Move Rainy Day Fund` and the reason, but no field. Bills was renamed without Enter.
+- `editor-rollback-green` (fixed): the Category half passes. The Group half failed only on the step's own locator, which matched the page's empty live-region alert too. The locator was scoped to the edited group.
+- `editor-rollback-green-2` (fixed, Enter in the Group half): all 13 `categories/reorder` steps pass.
+- `editor-rollback-green-3` (fixed, the Group half committed by Tab): all 13 steps pass.
+- Probe on the fixed source:
+  - Coffee ArrowUp: blur inside `before()`, then focus is back on the INPUT, with no rename sent.
+  - Savings Goals ArrowUp: the same.
+  - Everyday ArrowDown: no blur at all.
+  - In all three, focus ends on the INPUT with the draft kept.
+
+Test-audit gate: the step asserts only what a user sees (order, reason, focused field and its value, the name after reload and on Budget). It uses the existing `failFirstCallTo` real-socket hold, with no production flag and no source grep. It does not duplicate step 12, which covers focus on the name button, not an open field.
+
+### Checks
+
+- `editor-rollback-affected` (fixed): these journeys pass: `categories/manage` (create and its refusal, Enter renames), `categories/reorder` (stacked presses, held replay, first refused then retried, touch cancel, second finger, autoscroll), `categories/late-rename`, `categories/failed-rename`, `inspector/cover-and-manage` and `inspector/move-money` (the Budget inspector also uses `InlineName`), `budget/phone-groups`, `budget/assign` and `shell/navigate`.
+- `bun run format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes 933 tests (59 files).
+- The feature map's `categories/reorder` entry names the new step and the window-switch commit as not in the journey.
+- **Limits.**
+  - Not in a journey: a blank-click commit and the window-switch commit (same deferred rule as the Tab commit the step asserts), and a refusal that moves a row while its field is open and the first of two quick presses is refused. Both follow from the same rule and were not separately probed.
+  - The fix relies on the browser's own focus order (blur, then the microtask repair, then the task), which was observed in Chromium only.
+
+## Follow-up: a typed name dropped by opening another name (after `ddefe31`)
+
+The reviewers raised a conditional risk: `ddefe31`'s deferred blur skipped when `!editing`, while a name button's `onclick` sets `renaming` to its own id at once. A draft in A could then be closed by B's opening before A's timer ran, and dropped instead of saved. I probed it before changing anything.
+
+- **Probe** (`blur-switch.ts` in the agent scratchpad). It seeds `budget-with-accounts`, types "Draft A" into A, moves to B with a real input, then reads the Mutation sends, the open fields, focus and the names after a reload. There are 13 scenarios: fast mouse click, a 90 ms held click, CDP touch tap at 320 px, keyboard focus-and-Enter, Category↔Group in every direction, a click or tap on the Budget nav link, and a click or tap on blank space.
+  - `blur-switch-base-848edfc.json` (the synchronous editor before `ddefe31`): 13 of 13 saved, one rename each.
+  - `ddefe31` (printed lines; the run stopped at the probe's own reload wait before writing its file): fast mouse Category→Category, Category→Group and Group→Category, and tap Category→Category, Group→Category and Category→Group all sent nothing, and the draft was gone after a reload. The 90 ms held click and keyboard Category→Category saved. The regression was real for ordinary fast clicks and every tap. In a fast click and in a tap, the click lands in the same task as the blur or before the timer, so `renaming` moved to B first.
+  - `blur-switch-fixed.json`: 13 of 13 saved, one rename each, with B's field open and focused.
+- **Cause.** Deferring the decision changed what `!editing` meant. Checked during the blur, it means Enter or Escape already closed this field. Checked a task later, it also matches "another name opened", which is an ordinary leave whose draft must be saved.
+- **Fix** (`inline-name.svelte`). The `!editing` check runs during the blur again. The deferred step asks only whether focus came back to the input in a focused window (the move rollback). It acts for the opening that blurred, through an `openings` count, so a stale timer never commits or closes a newer opening of the same field. It commits even if another opener already closed the field. The page's `editing(id)` setter clears `renaming` only when it still names this row, so A's late commit cannot close B. Navigation and unmount: a click or tap on the Budget link saves the draft before the page leaves.
+- **Journey** (`categories/manage`, at 320 px, real transport).
+  - The Category rename now ends with a fast mouse click on the group's name. The group field must open focused with its own name, and Escape must leave "Smoke Test Renamed" saved.
+  - The group rename ends with a CDP touch tap on the Category's name. The Category field must open focused, and "Smoke Test Shelf" must be saved through a reload.
+  - Enter-commit stays covered by the empty-name check, `late-rename` and `failed-rename`. Tab-commit is covered by the `reorder` rollback step.
+  - Red/green:
+    - `blur-switch-red` (`ddefe31` editor): fails at the Category step because the name is not saved.
+    - `blur-switch-red-group` (`ddefe31` editor, with the Category step temporarily committing by Enter; both files restored after): fails at the group step because "Move Smoke Test Shelf" is never attached.
+    - `blur-switch-green`: all 10 steps pass.
+- **Checks.**
+  - `blur-switch-green` also passes `categories/reorder` (the Category and Group rollback-with-open-field step, Tab, Escape), `categories/late-rename`, `categories/failed-rename`, `inspector/cover-and-manage`, `inspector/move-money`, `budget/phone-groups`, `budget/assign` and `shell/navigate`.
+  - `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes 933.
+- **Limits.**
+  - A reopening of the same field inside the blur's task cannot be reached by user input. The `openings` guard covers it by construction, and no probe drives it.
+  - Window-switch commit is still unprobed.
+
+### Firefox: a moved focused node loses focus without `focusout` (deferred)
+
+A judge reported that in Firefox, when End or a refused rollback moves the focused item itself, focus goes to BODY with no `focusout` event, so `keepFocusWhenMoved` never runs. Repeated ArrowUp keeps focus, because the neighbour moves.
+
+- **Probe** (Firefox 1555 from the local Playwright cache, fixed source, the editor-order probe): a refused Coffee move and a refused Savings Goals move with the name field open send no rename and keep the field and its draft, but focus is BODY. So the data-integrity part of RF-A1 holds in Firefox. Only focus is lost, as on the handle.
+- **Disposition: deferred.**
+  - The repo's maintained verification is Chromium only (CI runs `playwright install --with-deps chromium`, and journeys and `verify-budge` use Chromium), so a Firefox repair would have no check to keep it.
+  - In Firefox the loss comes with no event at all. A repair needs a second detection path in `reorder.ts`, such as remembering the focused descendant and watching the list with a `MutationObserver`, alongside the `focusout` path Chromium needs. That is the shared focus machinery this scope rules out.
+  - Restoring focus where the order is set (`saveMove`) would not cover moves that arrive from the server.
+  - If Firefox joins the supported matrix, add a Firefox journey project first, then replace `keepFocusWhenMoved` with one engine-neutral owner and prove it there.
+
+## Follow-up: a phone editor or refusal left under the tab bar (sol-a-EF-A1)
+
+An observer found two phone recovery cases at 320 px with touch where focus, draft and data were right but the user could not see them:
+
+- **A.** Moving the last group up with its name field open and refused, the order came back with the field, draft and focus intact, but the field sat behind the Sections tab bar (field 565–609, bar 575–640), with the refusal under it.
+- **B.** A refused Everyday rename grew its multi-line failure above a Groceries field being typed, which pushed that field behind the bar (field 580–624).
+
+- **Reproduced first** (`ef.ts` in the agent scratchpad, 320×640, touch and coarse pointer, real Convex transport through `failFirstCallTo`, rename sends counted). `ef-base-9c2755e/results.json`:
+  - A, group: field 565–609, refusal 613–641, bar 575–640.
+  - A, Coffee: clear.
+  - B, group fails above the Category being typed: field 524–568 before and 580–624 after.
+  - B, Category above Category and Category above group: clear.
+  - Every case kept focus and the draft, and sent no rename.
+- **Cause.**
+  - A: the rollback moves the focused row itself. `keepFocusWhenMoved` in `reorder.ts` (added in `f7538f4`) restored focus with `preventScroll: true`, so nothing brought the field back into view. Nothing revealed the row's refusal either.
+  - B: a failure appearing above the focused field grows the page, and no scroll keeps the user's field in view. Chromium's scroll anchoring did not hold it here, and iOS Safari has no scroll anchoring at all.
+  - The same `preventScroll` also leaves a keyboard-moved handle off-screen. Measured with `ef-end.ts` at 320 px: Home on the last group put its focused handle at −281 to −237, and End on the first group at 777–821.
+- **Ownership and fix.** Each change sits with the code that changes what the user sees. Nothing generic watches focus.
+  - `reorder.ts`: restoring focus scrolls as an ordinary focus does (`preventScroll` removed). The browser then honours the phone's `scroll-padding-bottom` above the tab bar.
+  - `src/lib/refusalInView.ts` is a single attachment on a refusal message, used where the message appears: the page's move refusal, and `InlineName`'s failure beside a closed name.
+    - If focus is still in the message's row, or on nothing, it reveals the whole row (the field with its reason) with `block: 'nearest'`.
+    - If focus is elsewhere, it reveals only the focused control. B's field stays in view, and the old A failure is never shown at B's expense.
+    - When everything is already in view, `nearest` scrolls nothing.
+  - Not added: the same reveal on the error inside an open editor ("Enter a name."). `ef-edit.ts` measured that error clear of the bar without it (field 495–539, error 543–567, bar from 575), because opening the field already scrolls it above the padding.
+- **Journeys** (real transport, 320 px).
+  - `categories/reorder`:
+    - The no-op "End moves the Savings Goals group last" step (it was already last) became "Home moves the Savings Goals group first and End moves it back last, its focused handle clear of the tab bar each time". This leaves the later group order unchanged.
+    - The rollback-with-open-name step now runs at 320 px under `useATouchScreen`. The group half reopens the page, presses ArrowUp on the last group, and opens the name with a CDP tap (`tap`, now shared with `manage`). It then checks the Category and group fields, both refusals and the moved handle with `expectClearOf` against the Sections bar.
+  - `categories/failed-rename`: a new step fails a second Everyday rename while a CDP-tapped Groceries field is being typed. It requires the group failure, the Groceries draft and focus, and the field clear of the bar.
+- **Red → green.**
+  - `ef-red-final-2` (`9c2755e` source, final journeys):
+    - `reorder` fails at the Home/End step: the focused handle is at viewport ratio 0.
+    - `failed-rename` fails at the new step: the bar overlaps the Category field.
+  - `ef-red-only-focusfix-touch` (the `preventScroll` removal only, run before the Home/End step was rewritten): `reorder` fails at the open-name step, where the bar overlaps the group refusal.
+  - `ef-red-only-reveal-2` (the reveal only, with `preventScroll` kept): `reorder` fails at the Home/End step.
+  - `ef-green-final`: all 9 affected journeys pass.
+  - Geometry after the fix, from `ef-final-{320,390,1024,1280}/results.json`:
+    - A, group at 320: field 487–531, refusal 535–563, bar 575–640.
+    - B, group above Category at 320: field 524–568, unmoved, with the group failure 443–515 also in view.
+    - Every case at 390, 1024 and 1280 keeps the field and its reason in the viewport, with focus and the draft, and sends no rename.
+- **Checks.**
+  - `ef-green-final`: `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename`, `inspector/cover-and-manage`, `inspector/move-money`, `budget/phone-groups`, `budget/assign` and `shell/navigate` pass. That covers stacked presses, held replay, touch cancel, the second finger, autoscroll, Enter, Tab and click commits, Escape, the fast A→B switch, late and failed renames, and the Budget inspector's `InlineName`.
+  - `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes 933.
+- **Limits.**
+  - A refused touch drag, where focus is on nothing, now reveals the dragged row with its reason. That path is by construction and was not probed.
+  - Firefox stays deferred as above. When Firefox loses focus to BODY on a moved row, the reveal should still show the row, because focus is on nothing. That follows from the code and was not probed.
+
+
+## Follow-up: a name left in the Budget inspector renamed the Category opened next (blocker)
+
+An observer found that on Budget a name typed in the inspector went to the wrong Category. The steps: open Groceries, choose Rename from its actions, type `Groceries Typed`, then quickly click or tap the Coffee row, or at 320 px tap the dialog's `Next Category`. One rename reached the server, for Coffee (or Dining Out), and Groceries kept its name. A held mouse press and Tab then Enter renamed Groceries.
+
+- **Reproduced first** (`insp.ts` in the agent scratchpad, real transport, rename sends recorded with their `categoryId` and mapped to names, names compared after a reload). In `test-results/verify-budge/insp-base-c671bda.json`:
+  - Mouse click at 1280 px: the one send carried Coffee's id, and Coffee became `Groceries Typed`.
+  - Tap on `Next Category` at 320 px: the one send carried Dining Out's id, and Dining Out became `Groceries Typed`.
+  - Held press and Tab then Enter: one send with Groceries' id. Groceries was renamed.
+- **Cause.** The premise about callback and data identity was tested and holds.
+  - The Budget keys the inspector by Category id (`{#key inspected.id}` in `+page.svelte`), so each Category gets its own inspector.
+  - A click leaves the name field on mousedown, and `InlineName` commits a blur on a timer, so that the move rollback from `ddefe31` can keep a field it puts back.
+  - By the time the timer runs, the click has switched the selection, and the Groceries inspector has been destroyed. Its `onsave` closure read `category.id` through the `category` prop. In Svelte 5 a destroyed component's prop getter still reads the parent's current value, which is the new selection.
+  - A held press commits before the click switches, and Enter commits synchronously, which is why those two ways were right.
+- **Identity decision.** An inspector belongs to the Category it opened for. It takes that id once, when it is created (`const openedForId = category.id`, under `svelte-ignore state_referenced_locally`, since taking the first value is the point), and every write it starts goes to that id:
+  - the rename, the Assigned save, cover, move money, move to group, hide;
+  - the Category passed to the delete and target dialogs, and to the target section.
+  - Display still reads the live `category`. `InlineName` is unchanged: it never knew whose name it held, so a snapshot of its `onsave` would have captured the same live read.
+- **Audit of the other `InlineName` callers and deferred saves.**
+  - The Categories page renders each group and Category name in a keyed `each`, and its `onsave` reads that item's `_id`, which a removed item keeps. The fast A→B switch from `9c2755e` already proves it in `categories/late-rename`.
+  - `AssignedInput` saves synchronously on blur, before the click switches the selection.
+  - The inspector's other writes run at the user's action, inside the inspector that started them.
+- **Journeys** (`inspector/cover-and-manage`, real transport). Two new steps run before "Rename in the inspector edits its heading in place", which now starts from their result:
+  - At 1280 px, a Groceries rename is refused by `failFirstCallTo`, and the field reopens with its reason and draft. The draft, left by a fast click on Coffee, renames Groceries. Coffee opens unedited, with focus on its inspector and no name field. The names hold after a reload.
+  - At 320 px with `useATouchScreen`, a name typed for that Category (`Sample Grocer`) and left by a CDP `tap` on `Next Category: Dining Out` renames it. Dining Out opens unedited, with Assigned focused and no name field. After a reload, Budget and Categories both show `Sample Grocer`, `Coffee` and `Dining Out`, and not the old name.
+  - Each Category's identity is proven by both names: the edited one changes and the one opened next keeps its own.
+  - `tap`, `touchscreen` and `centerOf` moved from `categories.ts` to `journey.ts` so both journeys share them.
+- **Red → green.**
+  - `insp-red`: `c671bda` inspector with the final journey. The desktop step fails because the fast click renamed Coffee, so no `Coffee` heading opens.
+  - `insp-red-phone`: the same source, with the desktop step committing by Enter in a temporary journey copy so the phone step runs. It fails because Dining Out is gone from Everyday, renamed to `Sample Grocer`.
+  - `insp-green-2`: the fix, with every step passing.
+  - Probe `insp-fixed.json`: mouse, held press, Tab then Enter, and the 320 px tap each send one rename, with Groceries' id. Only Groceries changes.
+- **A late failure after the switch.** Probe `insp-stale-failure.json`: a Groceries rename held by `failFirstCallTo` is failed while Coffee's own name is being typed. Coffee keeps `Coffee Draft`, its focus and no alert, and nothing is renamed after a reload.
+- **Checks.**
+  - `insp-green-affected` passes 11 journeys: `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename`, `inspector/cover-and-manage`, `inspector/move-money`, `budget/phone-groups`, `budget/assign`, `budget/needs-you`, `shell/navigate` and `shell/phone-pages`.
+  - `insp-final` reruns the same 11 on the finished tree, and they pass. `insp-fixed.json` was re-probed on it with the same result.
+  - `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests, including the feature-map test.
+  - The parent runs the code review and the UI judges, so none was run here.
+- **Limits.**
+  - A rename refused after its inspector was replaced is dropped without a message. The old name stays in the table, and no other Category or field is touched. Before this fix the same failure was dropped silently too. Surfacing it would need a place outside the inspector, which this blocker does not decide.
+  - With a held press on Coffee, the inspector stays on the renamed Groceries and focus ends on the body, before and after the fix. The rename is right; where the press lands is not part of this blocker.
+  - Chromium only. Firefox stays deferred as above.
+
+## Follow-up: a held Hide closed the inspector opened after it
+
+The parent's source review asked whether `hide()` could close a newer inspector. It awaited `setHidden`, then on success called the shared `onclose`, which closes whatever is selected. This was pre-existing, not introduced by `302f160`, and was only a source question until probed.
+
+- **Probed first** (`hide.ts` in the agent scratchpad, real transport, `setHidden` answer held by `holdResponseTo`). In `test-results/verify-budge/hide-base-302f160.json`:
+  - At 1280 px: hide Groceries, click Coffee while the answer is held, and open Coffee's name with `Coffee Draft`. On release, Coffee's inspector closed and the draft was lost.
+  - At 320 px, with Next Category to Dining Out: the same.
+  - Groceries was hidden in both.
+- **Disposition: fixed.** The close did not belong to the Hide.
+  - The Budget already closes the inspector when its selected Category leaves the shown Categories. Its `$effect` clears `selectedId` once `selected` is undefined, and focuses the main region if focus fell to the body. That is how Delete closes it.
+  - That close is keyed to the current selection, so a Category hidden after the user moved on cannot close the one now open.
+  - `hide()` now only sends `setHidden` through `act`, which still shows a refusal.
+- **Other completion callbacks audited.** None shares the fault:
+  - `cover` focuses its own `section`, and `bind:this` clears that when its inspector goes.
+  - `move`, `act` errors and `AssignedInput` set only their own instance's state.
+  - The delete and target dialogs are modal and close only themselves through `DialogSession.run`. Delete reaches the Budget through the same selection effect.
+  - Escape and the Close button call `onclose` synchronously, from the inspector being used.
+- **Journey.** In `inspector/cover-and-manage`, after the existing Hide step, a new step holds a Transit Hide with `holdResponseTo('categories:setHidden')`, opens Coffee and types `Coffee Draft`, then releases. It requires:
+  - Transit under Hidden Categories;
+  - typing to reach the same focused field (`Coffee Draft Kept`);
+  - Escape to leave Coffee's inspector open.
+  The unheld Hide step still requires the inspector to close with the main region focused.
+- **Red → green.**
+  - `hide-red` (`302f160` source, new step): fails because Coffee's name field is gone.
+  - `hide-green`: every step passes.
+  - Probe `hide-fixed.json`: both widths keep the new inspector, its draft and focus, and Groceries is hidden.
+  - Probe `hide-phone-fixed.json`: an unheld 320 px Hide closes the dialog and focuses `main`.
+- **Checks.**
+  - `hide-final` passes 8 journeys: `inspector/cover-and-manage`, `inspector/move-money`, `budget/phone-groups`, `budget/assign`, `budget/needs-you`, `categories/manage`, `categories/late-rename` and `shell/navigate`. The `categories/reorder` and `failed-rename` journeys don't reach Hide or the inspector, so they were not rerun.
+  - `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests.
+- **Limit.** A held Hide that the server refuses after the user moved on shows its reason only in the replaced inspector, so it is dropped. Transit stays shown, and nothing else changes. This is the same limit as for a late rename above.
+
+## Red → green
+
+Both new journey steps failed on unchanged `eb1d3f9` source, for the reported reason, and pass after the repair:
+
+- `categories/reorder`, "two ArrowUp presses on Coffee while its first save is unanswered move it twice at once, and both saves last". `holdResponseTo('categories:move')` holds the first answer and every later frame. Red run `cr-red`: the order stayed `Groceries, Dining Out, Coffee, Transit` with no optimistic move. Green run `cr-green`: Coffee was first at once, and still first after the release and a reload. The step replaced "ArrowUp and Home". Home and the no-op ArrowUp at the edge stay in "End and Home move Coffee…", which also covers End on a Category.
+- `budget/month-jump`, "a Budget entry without a month stays the current month after the next one is viewed from a later entry". Red run `cr-red`: after Back twice the picker read `December 2026` where `November 2026` was expected. Green run `cr-green`: Back twice shows the current month with its own Groceries Assigned and no `?month`, the same after a reload, and Forward twice returns to next month with its distinct amount.
+
+Test-audit gate: each step protects an observable contract that existing proof missed. The old reorder step waited for the server after every press, and the old month steps only used entries that had `?month`. Each fails on a credible regression (shown red above), adds no production seam, and reuses existing helpers.
+
+## Checks
+
+Evidence is under `test-results/verify-budge/` in this worktree, from the worktree-local `bun run app` (anonymous local backend, `budget-with-accounts`, synthetic data only):
+
+- `cr-red`: the two new steps fail on the unchanged source.
+- `cr-green`: `categories/reorder` and `budget/month-jump` pass.
+- `cr-affected`: `budget/assign`, `budget/assign-back`, `budget/needs-you`, `budget/phone-groups`, `categories/manage`, `categories/late-rename`, `categories/failed-rename`, `inspector/move-money`, `inspector/cover-and-manage`, `search/filters` and `shell/navigate` pass.
+- `cr-manual`, with screenshots, ARIA snapshots and `notes.txt`:
+  - Swap at 1280 px: Tab reaches it, Enter and Space swap and keep focus. Escape in the open picker closes only the picker and keeps the draft. Escape on a started move clears it and leaves the inspector open.
+  - Swap at 320 px with touch: visible label, 44 px tap target, nothing past the right edge, and a tap swaps. Escape in the picker and on a started move behave as at 1280 px, and the dialog stays open.
+  - Two held `moveGroup` presses move `Savings Goals` up twice at once, and the order lasts after the release and a reload.
+  - A failed `categories:move` rolls the optimistic order back and shows `Budge couldn't save that. Try again.`
+  - The sidebar Budget link keeps next month after a visit to Categories.
+- `cr-final`: the final run on the finished tree, recorded under Comments.
+- `bun run format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests (59 files), including the feature-map test.
+- No Convex, admission or codegen change, so `codegen:check` and `capacity:check` were not rerun.
+
+Feature map: `budget.md` (`budget-month-jump` and the `budget/month-jump` journey) and `categories.md` (`categories/reorder`). `inspector.md` needs no change: the Swap button's name is the same, and that file belongs to the parent.
+
+## Comments
+
+- Parent integrated `37c22be` as `2cdd2e1`. Fresh local code-review at `f93eb14` reports no production Standards violations/smells and no Spec findings; changed-test audit passes and seven focused checks pass. Reports: `test-results/ux-efficiency/reviews/cr-repairs-{standards,spec}.md` in the parent checkout. Parent independently read the actual pre-fix failures and green, affected and final summaries.
+- Standards P3: the Categories map put failed-save rollback inside the `categories/reorder` journey description, although only `cr-manual` exercises refusal/rollback. Removed that parenthetical; the manual proof remains explicitly in this ticket. Feature-map checks and formatting pass.
+- Analysis-only corrections, decided by the Opus implementor: C1 (component copies losing operation/query context) **answered** by existing submitted-command snapshots for async feedback and library-owned optimistic query updates; their owners differ, so no shared state framework. C2 (manual checks drifting into journey coverage) **accepted** as a documentation-only convention in the feature-map README: journey descriptions list retained assertions; manual probes have separately labelled clauses. No runtime or source-grep lint is justified.
+- Parent documentation fixes address CodeRabbit 4577048648 (regrouping keeps inspector open), 4577048651/4577048654 (repository-relative protocol links), 4577048655 (private artifact paths labelled as local), and 4577048658 (current resume phase/remaining steps). Archive notes identify link-only editorial changes; observations/verdicts are preserved. Link targets resolve and redacted secret checks pass. Fresh affected UI judging and final-head CI/CodeRabbit approval remain required; no new shipping claim is made.
+
+- Opus 5.5 implementor: final tree (after the lint rename and Prettier formatting) passed `categories/reorder`, `budget/month-jump`, `inspector/move-money` and `inspector/cover-and-manage` in run `cr-final`; the app was stopped with `bun run app down`. Local `code-review` (sub-agents) was not run here because this task forbade further delegation; the parent schedules the reviews and affected UI judging.

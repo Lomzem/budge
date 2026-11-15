@@ -14,6 +14,8 @@ Every picker is a shadcn-svelte Select: a `combobox` button labeled like the old
 
 ## Proof and skip reporting
 
+A journey description lists only what that journey asserts; label one-off or manual checks separately as `Not in the journey:` or `Manual drive:`.
+
 `bun run app verify` captures this for each journey step. For manual recipes, capture action and result screenshots plus `await page.locator('body').ariaSnapshot()`. Save under a unique `test-results/verify-budge/<run>/` directory. Require persistence and side effects through another user-facing view for mutations. Record each sub-feature ID and entry point as passed, failed, or blocked with the exact unmet precondition. Verifying one entry point leaves other entry points unverified. Cleanup runs after failures too and preserves evidence; the skill owns the lifecycle and proof rules.
 
 ## Features
@@ -21,7 +23,7 @@ Every picker is a shadcn-svelte Select: a `combobox` button labeled like the old
 | Feature map                         | User-facing coverage                                                                         | v1 tickets |
 | ----------------------------------- | -------------------------------------------------------------------------------------------- | ---------- |
 | [Budget](budget.md)                 | Assigned, Ready to Assign, month navigation, desktop/mobile entry                            | 05         |
-| [Inspector](inspector.md)           | Inspect, Move to/Take from, Cover, keyboard and phone                                        | 07         |
+| [Inspector](inspector.md)           | Inspect, From/To move, Cover, manage a Category, keyboard and phone                          | 07         |
 | [Targets](targets.md)               | Monthly, By date, repeat, Assign, Upcoming                                                   | 08         |
 | [Categories](categories.md)         | Groups, create, rename, order, move, hide, delete/history                                    | 06         |
 | [Accounts](accounts.md)             | Cash/Card, starting balances, rename/order, held mapping and suggestions, setup confirmation | 03, 21     |

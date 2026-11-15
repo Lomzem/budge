@@ -111,15 +111,29 @@ function observeLayoutShifts(binding: string) {
 		}
 	};
 	const listening = new WeakSet<WebSocket>();
-	const { send } = WebSocket.prototype as { send: (this: WebSocket, data: unknown) => void };
-	WebSocket.prototype.send = function (data) {
-		if (!listening.has(this)) {
-			listening.add(this);
-			this.addEventListener('message', fromServer);
-		}
-		noteSent(parsed(data), performance.now());
-		send.call(this, data);
+	let pageSocket = WebSocket;
+	const watchSendsOf = (Socket: typeof WebSocket) => {
+		const { send } = Socket.prototype as { send: (this: WebSocket, data: unknown) => void };
+		Socket.prototype.send = function (data) {
+			if (this instanceof pageSocket) {
+				if (!listening.has(this)) {
+					listening.add(this);
+					this.addEventListener('message', fromServer);
+				}
+				noteSent(parsed(data), performance.now());
+			}
+			send.call(this, data);
+		};
 	};
+	watchSendsOf(pageSocket);
+	Object.defineProperty(globalThis, 'WebSocket', {
+		configurable: true,
+		get: () => pageSocket,
+		set: (routedSocket: typeof WebSocket) => {
+			pageSocket = routedSocket;
+			watchSendsOf(routedSocket);
+		}
+	});
 	const answersARequest = (at: number) =>
 		[...requested.values()].some(
 			({ sentAt, settledAt }) =>

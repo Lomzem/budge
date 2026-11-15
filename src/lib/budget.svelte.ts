@@ -29,11 +29,11 @@ export class BudgetMonth {
 	readonly readyToAssign = $derived.by(() => this.#query.data?.readyToAssign);
 	readonly error = $derived.by(() => this.#query.error);
 
-	readonly #firstMonth = $derived.by(() => this.#query.data?.firstMonth);
+	readonly firstMonth = $derived.by(() => this.#query.data?.firstMonth ?? null);
 
 	readonly canGoBack = $derived.by(() => {
-		const first = this.#firstMonth;
-		return first !== null && first !== undefined && this.month > first;
+		const first = this.firstMonth;
+		return first !== null && this.month > first;
 	});
 
 	constructor(enabled: () => boolean) {
@@ -60,6 +60,11 @@ export class BudgetMonth {
 		this.month = addMonths(this.month, 1);
 	}
 
+	goTo(month: string) {
+		const first = this.firstMonth;
+		this.month = first !== null && month < first ? first : month;
+	}
+
 	readonly onThisMonth = $derived.by(() => this.month === monthOf(this.today));
 
 	thisMonth() {
@@ -83,7 +88,7 @@ export class BudgetMonth {
 	}
 
 	async cover(categoryId: Id<'categories'>) {
-		await this.#cover({ month: this.month, categoryId });
+		return await this.#cover({ month: this.month, categoryId });
 	}
 
 	async assignTarget(categoryId: Id<'categories'>) {

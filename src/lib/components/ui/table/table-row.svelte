@@ -4,7 +4,11 @@
 	export const tableRowVariants = tv({
 		base: 'border-b border-border transition-colors hover:bg-muted/60 has-aria-expanded:bg-muted/60 data-[state=selected]:bg-funded-tint',
 		variants: {
-			weight: { normal: '', strong: 'bg-muted/40 font-bold' },
+			weight: {
+				normal: '',
+				strong: 'bg-muted/40 font-bold',
+				group: 'bg-muted/40 hover:bg-muted/40 has-aria-expanded:bg-muted/40'
+			},
 			opens: { true: 'cursor-pointer', false: '' }
 		},
 		defaultVariants: { weight: 'normal', opens: false }

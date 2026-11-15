@@ -22,6 +22,13 @@ const browserOnlyGlobals = new Set([
 	'location'
 ]);
 
+const keepStateThroughNavigation = {
+	name: '$app/navigation',
+	importNames: ['pushState', 'replaceState'],
+	message:
+		'Back restores a shallow history entry to the URL the page loaded with; write view state with keepInUrl from $lib/keepInUrl.'
+};
+
 const journeyRunsOutsidePlaywrightTest =
 	'A journey also runs outside Playwright Test, under `bun run app verify`; report steps through its context instead.';
 
@@ -197,6 +204,12 @@ export default defineConfig(
 		}
 	},
 	{
+		files: ['src/**'],
+		rules: {
+			'no-restricted-imports': ['error', { paths: [keepStateThroughNavigation] }]
+		}
+	},
+	{
 		files: [
 			'src/**/*-dialog.svelte',
 			'src/lib/components/accounts/starting-balance-step.svelte',
@@ -208,6 +221,7 @@ export default defineConfig(
 				'error',
 				{
 					paths: [
+						keepStateThroughNavigation,
 						{
 							name: '$lib/attempt',
 							message:

@@ -15,8 +15,8 @@ Divide one Transaction across Categories and memos while preserving its total an
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/splits.ts`, also run by `bun run test:e2e:local`):
 
-- `splits/lines`: a split shows Split in the list, and lines are added, edited and removed (`split-create`, `split-edit`, `split-remove`). It first holds the `payees:lastCategory` answer (`e2e/heldResponse.ts`) with the pointer over `Split across Categories` in the open Category list; when the answer comes the trigger reads `Uncategorized`, the list holds still, and the click picks Split.
-- `splits/restart`: leaving Split and choosing it again starts from the current amount and Category.
+- `splits/lines`: a split shows Split in the list, and lines are added, edited and removed (`split-create`, `split-edit`, `split-remove`); removing a line moves focus to the Category of the line now in its place, else the line before it. It first holds the `payees:lastCategory` answer (`e2e/heldResponse.ts`) with the pointer over `Split across Categories` in the open Category list; when the answer comes the trigger reads `Uncategorized`, the list holds still, and the click picks Split.
+- `splits/restart`: leaving Split and choosing it again starts from the current amount and Category. A line's empty memo hides behind `Add memo to line N`, which shows and focuses it; a restarted split hides its memos again. Opening the seeded Sample Warehouse Club split shows both saved line memos, hides its empty Transaction memo behind `Add memo`, and a newly added line's memo starts hidden.
 
 The recipes below cover what the journeys leave out.
 
@@ -24,7 +24,7 @@ Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
 
-- **Create:** fill Amount 10.00, select `Split across Categories`. Fill labels `Line 1 Category`, `Line 1 amount`, `Line 1 memo`, and corresponding Line 2 labels with Groceries/6.00/invented food and Gifts/4.00/invented birthday. Save, require Split in list. Reload/reopen and require both lines and correct budget Activity, Account balance −$10.
+- **Create:** fill Amount 10.00, select `Split across Categories`. Fill labels `Line 1 Category`, `Line 1 amount`, and `Line 1 memo` (after `Add memo to line 1`), and corresponding Line 2 labels with Groceries/6.00/invented food and Gifts/4.00/invented birthday. Save, require Split in list. Reload/reopen and require both lines and correct budget Activity, Account balance −$10.
 - **Validation/edit:** enter lines not summing to parent; require remainder/error and no successful save. Restore sum; exercise Add line and `Remove line N` (disabled at two lines, enabled above two), save, reopen. Change parent Date and verify both Categories’ Activity in the new month. Select a single Category to unsplit; require lines gone and total unchanged after reload.
 - **Card:** repeat on Card; require outflow lines to increase Credit Card Payment Category Activity and inflow lines to decrease it, with corresponding ordinary Category Activity. Check both directions manually. Capture dialog at 320 px with all lines reachable by scrolling.
 

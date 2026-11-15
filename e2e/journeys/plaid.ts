@@ -1,7 +1,14 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 import { answerInsteadOfServer, holdResponseTo } from '../heldResponse';
-import { expectClearOf, expectNothingPastTheRightEdge, openAccount, type Journey } from './journey';
+import {
+	expectClearOf,
+	expectNothingPastTheRightEdge,
+	expectTapTargetHeight,
+	openAccount,
+	useATouchScreen,
+	type Journey
+} from './journey';
 
 const notSetUp = "Bank sync isn't set up on this server.";
 const syncThatHeldRowsForSetup = { kind: 'synced', added: 1, matched: 0, held: 2 };
@@ -39,32 +46,6 @@ async function expectUnclipped(text: Locator) {
 		return null;
 	});
 	expect(clippedBy, `${String(text)} is clipped`).toBeNull();
-}
-
-async function useATouchScreen(page: Page) {
-	const emulation = await page.context().newCDPSession(page);
-	await emulation.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
-	await expect.poll(() => page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
-	return async () => {
-		await emulation.send('Emulation.setTouchEmulationEnabled', { enabled: false });
-		await emulation.detach();
-	};
-}
-
-async function expectTapTargetHeight(target: Locator, height: number) {
-	await target.scrollIntoViewIfNeeded();
-	const missedAt = await target.evaluate(
-		(element, reach) => {
-			const box = element.getBoundingClientRect();
-			const x = box.left + box.width / 2;
-			const middle = box.top + box.height / 2;
-			return [middle - reach, middle + reach].filter(
-				(y) => document.elementFromPoint(x, y)?.closest('button') !== element
-			);
-		},
-		height / 2 - 1
-	);
-	expect(missedAt, `${String(target)} misses taps within ${String(height)} px`).toEqual([]);
 }
 
 async function tap(target: Locator) {

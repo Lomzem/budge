@@ -24,6 +24,8 @@ export const splits = {
 					await dialog.getByLabel('Payee').fill('Smoke Test Warehouse');
 					const minusSignTheDirectionOverridesInTheLines = '-50.00';
 					await dialog.getByLabel('Amount').fill(minusSignTheDirectionOverridesInTheLines);
+					await dialog.getByRole('button', { name: 'Add memo', exact: true }).click();
+					await expect(dialog.getByLabel('Memo', { exact: true })).toBeFocused();
 					await dialog.getByLabel('Memo', { exact: true }).fill(memo);
 					const category = dialog.getByLabel('Category or Transfer');
 					await expect(category).toHaveText('Looking up the remembered Category…');
@@ -45,7 +47,7 @@ export const splits = {
 				async () => {
 					await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('');
 					await expect(remainder).toHaveText('$50.00 left to split');
-					await dialog.getByRole('button', { name: 'Save' }).click();
+					await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 					await expect(dialog.getByRole('alert')).toHaveText(
 						'Line 1 is empty. Pick its Category and amount.'
 					);
@@ -79,14 +81,14 @@ export const splits = {
 					await choose(lineThreeCategory, 'Coffee');
 					await dialog.getByLabel('Line 3 amount').fill('9.00');
 					await expect(remainder).toHaveText('$1.00 over the amount');
-					await dialog.getByRole('button', { name: 'Save' }).click();
+					await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 					await expect(dialog.getByRole('alert')).toHaveText(
 						'The lines are $1.00 over the amount.'
 					);
 					await expect(dialog.getByLabel('Line 3 amount')).toBeFocused();
 					await dialog.getByLabel('Line 3 amount').fill('8.00');
 					await expect(remainder).toHaveText('Fully split');
-					await dialog.getByRole('button', { name: 'Save' }).click();
+					await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 					await expect(dialog).toBeHidden();
 					await expect(
 						row.getByText('Split', { exact: true }).filter({ visible: true })
@@ -100,9 +102,10 @@ export const splits = {
 					await row.getByRole('button', { name: /^Smoke Test Warehouse/ }).click();
 					await expect(dialog.getByLabel('Line 3 amount')).toHaveValue('8.00');
 					await dialog.getByRole('button', { name: 'Remove line 3' }).click();
+					await expect(dialog.getByLabel('Line 2 Category')).toBeFocused();
 					await expect(remainder).toHaveText('$8.00 left to split');
 					await dialog.getByLabel('Line 2 amount').fill('20.00');
-					await dialog.getByRole('button', { name: 'Save' }).click();
+					await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 					await expect(dialog).toBeHidden();
 					await row.getByRole('button', { name: /^Smoke Test Warehouse/ }).click();
 					await expect(dialog.getByLabel('Line 2 amount')).toHaveValue('20.00');
@@ -112,7 +115,8 @@ export const splits = {
 		}
 	},
 	restart: {
-		title: 'leaving Split and choosing it again starts fresh from the current amount and Category',
+		title:
+			'leaving Split and choosing it again starts fresh from the current amount and Category, and line memos show only when they have text or are asked for',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
@@ -126,6 +130,9 @@ export const splits = {
 				await choose(category, 'Split across Categories');
 				await choose(dialog.getByLabel('Line 1 Category'), 'Gifts');
 				await dialog.getByLabel('Line 1 amount').fill('30.00');
+				await expect(dialog.getByLabel('Line 1 memo')).toHaveCount(0);
+				await dialog.getByRole('button', { name: 'Add memo to line 1' }).click();
+				await expect(dialog.getByLabel('Line 1 memo')).toBeFocused();
 				await dialog.getByLabel('Line 1 memo').fill('Sample line note');
 				await dialog.getByLabel('Line 2 amount').fill('20.00');
 				await dialog.getByRole('button', { name: 'Add line' }).click();
@@ -140,11 +147,39 @@ export const splits = {
 			await step('the split starts fresh from $80.00 and Groceries', async () => {
 				await expect(dialog.getByLabel('Line 1 amount')).toHaveValue('');
 				await expect(dialog.getByText('$80.00 left to split')).toBeVisible();
-				await expect(dialog.getByLabel('Line 1 memo')).toHaveValue('');
+				await expect(dialog.getByLabel('Line 1 memo')).toHaveCount(0);
+				await expect(dialog.getByRole('button', { name: 'Add memo to line 1' })).toBeVisible();
 				await expect(dialog.getByLabel('Line 1 Category')).toHaveText('Groceries');
 				await expect(dialog.getByLabel('Line 2 amount')).toHaveValue('');
 				await expect(dialog.getByLabel('Line 3 amount')).toHaveCount(0);
 			});
+
+			await step(
+				'a saved split shows the memos its lines have, while an empty memo stays behind Add memo',
+				async () => {
+					await page.keyboard.press('Escape');
+					await page
+						.getByRole('alertdialog', { name: 'Discard your changes?' })
+						.getByRole('button', { name: 'Discard' })
+						.click();
+					await expect(dialog).toBeHidden();
+					await page.getByRole('searchbox', { name: 'Search' }).fill('Warehouse');
+					await page
+						.getByRole('button', { name: /^Sample Warehouse Club/ })
+						.first()
+						.click();
+					const editing = page.getByRole('dialog', { name: 'Edit Transaction' });
+					await expect(editing.getByLabel('Line 1 memo')).toHaveValue('Pantry restock');
+					await expect(editing.getByLabel('Line 2 memo')).toHaveValue('Birthday present');
+					await expect(editing.getByLabel('Memo', { exact: true })).toHaveCount(0);
+					await expect(
+						editing.getByRole('button', { name: 'Add memo', exact: true })
+					).toBeVisible();
+					await editing.getByRole('button', { name: 'Add line' }).click();
+					await expect(editing.getByLabel('Line 3 memo')).toHaveCount(0);
+					await expect(editing.getByRole('button', { name: 'Add memo to line 3' })).toBeVisible();
+				}
+			);
 		}
 	}
 } satisfies Record<string, Journey>;

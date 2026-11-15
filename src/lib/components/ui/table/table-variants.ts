@@ -11,14 +11,16 @@ export const tableColumnVariants = tv({
 			check: 'w-16 sm:w-20',
 			select: 'w-8 pr-0 sm:w-12',
 			amount: 'w-28 sm:w-32',
-			'amount-compact': 'w-24 sm:w-32',
+			assigned: 'w-30 sm:w-32',
 			date: 'w-32',
 			name: 'w-44',
 			note: 'w-48'
 		},
 		showFrom: {
 			always: '',
+			md: 'hidden @md:table-cell',
 			lg: 'hidden @lg:table-cell',
+			xl: 'hidden @xl:table-cell',
 			'2xl': 'hidden @2xl:table-cell',
 			'4xl': 'hidden @4xl:table-cell',
 			'5xl': 'hidden @5xl:table-cell',
@@ -27,7 +29,7 @@ export const tableColumnVariants = tv({
 			'screen-xs': 'hidden xs:table-cell',
 			'screen-sm': 'hidden sm:table-cell'
 		},
-		hideFrom: { never: '', lg: '@lg:hidden' },
+		hideFrom: { never: '', md: '@md:hidden', lg: '@lg:hidden' },
 		numeric: { true: 'tabular-nums', false: '' }
 	},
 	defaultVariants: {

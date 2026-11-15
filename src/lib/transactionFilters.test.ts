@@ -3,11 +3,14 @@ import { describe, expect, test } from 'vitest';
 import {
 	BANK_CHANGES,
 	countedTransactions,
+	dateRangeOf,
+	type DateRange,
 	filtersFromUrl,
 	noFilters,
 	offeredFilters,
 	UNAPPROVED,
-	UNCATEGORIZED
+	UNCATEGORIZED,
+	withDateRange
 } from './transactionFilters';
 
 describe('the register count names the filter that narrowed it', () => {
@@ -70,6 +73,62 @@ describe('offeredFilters', () => {
 			...noFilters,
 			search: 'rent',
 			payeeId: 'payee1'
+		});
+	});
+});
+
+describe('date range presets run on local calendar dates', () => {
+	test.each([
+		{
+			today: '2026-03-15',
+			ranges: {
+				'this-month': ['2026-03-01', '2026-03-31'],
+				'last-month': ['2026-02-01', '2026-02-28'],
+				'last-30-days': ['2026-02-14', '2026-03-15'],
+				'this-year': ['2026-01-01', '2026-12-31']
+			}
+		},
+		{
+			today: '2028-01-05',
+			ranges: {
+				'this-month': ['2028-01-01', '2028-01-31'],
+				'last-month': ['2027-12-01', '2027-12-31'],
+				'last-30-days': ['2027-12-07', '2028-01-05'],
+				'this-year': ['2028-01-01', '2028-12-31']
+			}
+		},
+		{
+			today: '2028-03-31',
+			ranges: {
+				'this-month': ['2028-03-01', '2028-03-31'],
+				'last-month': ['2028-02-01', '2028-02-29'],
+				'last-30-days': ['2028-03-02', '2028-03-31'],
+				'this-year': ['2028-01-01', '2028-12-31']
+			}
+		}
+	])('on $today', ({ today, ranges }) => {
+		for (const [range, [from, to]] of Object.entries(ranges)) {
+			const values = withDateRange(noFilters, range as DateRange, today);
+			expect([values.from, values.to]).toEqual([from, to]);
+			expect(dateRangeOf(values, today)).toBe(range);
+		}
+	});
+
+	test('dates that match no preset read as a custom range, and none as any date', () => {
+		expect(dateRangeOf({ ...noFilters, from: '2026-03-02' }, '2026-03-15')).toBe('custom');
+		expect(dateRangeOf({ ...noFilters, to: '2026-03-31' }, '2026-03-15')).toBe('custom');
+		expect(dateRangeOf(noFilters, '2026-03-15')).toBe('');
+		expect(withDateRange({ ...noFilters, from: '2026-03-02' }, '', '2026-03-15')).toEqual(
+			noFilters
+		);
+	});
+
+	test('a preset keeps the other filters', () => {
+		const values = { ...noFilters, search: 'rent', payeeId: 'payee1' };
+		expect(withDateRange(values, 'this-month', '2026-03-15')).toEqual({
+			...values,
+			from: '2026-03-01',
+			to: '2026-03-31'
 		});
 	});
 });

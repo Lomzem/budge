@@ -10,8 +10,6 @@
 	import { tick, untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
-	import { replaceState } from '$app/navigation';
-	import type { ResolvedPathname } from '$app/types';
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -29,6 +27,7 @@
 	import { formatUnapprovedCount, UNAPPROVED_COUNT_LIMIT } from '$lib/domain/unapproved';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { mainRegion, type FocusReturn } from '$lib/focusReturn';
+	import { keepInUrl } from '$lib/keepInUrl';
 	import { usePaginatedQuery } from '$lib/paginatedQuery.svelte';
 
 	import {
@@ -113,9 +112,7 @@
 	});
 	$effect(() => {
 		const kept = urlGrouped(urlWithFilters(new URL(location.href), filterValues), byPayee);
-		if (kept.href === location.href) return;
-		const samePage = `${kept.pathname}${kept.search}${kept.hash}` as ResolvedPathname;
-		replaceState(samePage, page.state);
+		keepInUrl(kept);
 	});
 
 	const accounts = getAccounts();
