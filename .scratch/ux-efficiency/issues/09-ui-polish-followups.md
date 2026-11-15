@@ -19,3 +19,7 @@ These localized findings are deferred from the 26-item delivery for the reasons 
 The required phone case (999999.99 Assigned and seven-figure Group totals) is readable. Larger server-valid amounts, up to 10B, are not certified and may clip. A follow-up should verify readability across the admitted range; storage validity does not prove display readability.
 
 Original observations and evidence paths are retained in the independent reports. These deferrals waive no major, blocker or missing required task. The separate phone Escape correction is fixed and approved.
+
+## Verification infrastructure follow-up
+
+Correction C2 from the rollback repair: retain credential-free browser checks of the layout-shift guard. Both native and routed unsolicited shifts must fail, while a refusal response to a held request is attributed correctly. Opus deferred this maintained harness: Vitest CI installs no browser and current journey fixtures seed authenticated local data; creating an isolated browser-test home belongs with a separately reviewed tooling/CI change. Scratch positive/negative probes support the current guard but are not maintained regression coverage. See ticket10 for decisions and ticket11 for source-review evidence. No broad suppression or source-grep test is authorized by this deferral.
