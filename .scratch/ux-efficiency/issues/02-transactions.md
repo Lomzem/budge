@@ -1,12 +1,12 @@
 # 02 — Simplify Transaction review and entry
 
-Status: ready-for-agent
+Status: done
 
 Implement spec items 13–20. Fresh Opus implementor. Update this file with decisions, item coverage, changed files, checks, evidence, and remaining work. Avoid Budget/Categories files and items 21–26. Feature verification, local review, corrections, and three-judge gate are required before done; parent coordinates review.
 
 ## Implementation record (Opus implementor, branch `t3/transactions-efficiency-slice`)
 
-Not done: waiting on the parent's local code review, `/correct`, and the three-judge UI gate.
+Completed at source revision `417d273`: local reviews/corrections and all three UI judges passed. Shipping remains ticket04.
 
 Worktree: `/home/lomzem/.t3/worktrees/budge/t3-31b947c5-5d3de6743af1f7ef`. No Convex or backend change.
 
@@ -69,3 +69,7 @@ Ownership cleanup: `bun run app down` → `app: down.`, `running.json` gone, por
 - Other E2E code outside these journeys that matches the Add/Edit Transaction `Save` button without `exact` would now be ambiguous. `grep "name: 'Save' }"` in `e2e/` finds only dialogs without that button: categories, settings, targets, and the Edit Transaction dialog in `accounts.ts` (`accounts/start-edit` passed).
 - Spec items 21–26 (Budget/Category) may touch the shared filter or dialog footer layout. Re-run `search/phone` and `transactions/add-another` after merging them.
 - No full `bun run check` or full E2E suite in this worktree.
+
+## Parent completion record
+
+Implementation, local Standards/Spec review, test-audit, correction dispositions, feature verification and three-judge review completed at `417d273986dc93485e7e762a32ed3efed964b20f`. Each judge independently approved 9/10 with full scoped coverage and no open major or blocker; see issue 08. Earlier sections are historical handoffs. Localized follow-ups are in issue 09; PR, CI, CodeRabbit, merge and deployment verification remain ticket 04. Record individual confirmations for the final documentation-only head in shipping evidence and the PR description before external review.

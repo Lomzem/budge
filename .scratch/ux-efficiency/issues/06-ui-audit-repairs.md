@@ -1,6 +1,6 @@
 # 06 — Repair three-judge UI audit findings
 
-Status: ready-for-agent
+Status: done
 
 Fresh Opus owns production/UI fixes from round1. Primary required repair is sol-a-1: changing viewed Budget month after reload, navigating to Categories, then Back must restore the last-viewed month. Preserve explicit deep links, current-month URL convention, cutover boundary and deliberate history semantics; test the user-visible context and actual monthly assignments.
 
@@ -10,7 +10,7 @@ Use existing public journeys and verify-budge. Preserve evidence at desktop1280x
 
 ## Implementation record (Opus 5.5 repair, worktree `t3-0957aeec-d0baf4154befc730`, branch `t3/budget-history-ui-repairs` from `1c3aa26`)
 
-Status stays `ready-for-agent` until the parent gates (full source review, fresh affected UI judging) pass.
+The original handoff awaited parent review and fresh UI judging; both are now complete at the source revision recorded below.
 
 ### Dispositions
 
@@ -65,3 +65,7 @@ sol-a-A1 checks (app stopped): `bun run typecheck` 0 errors/0 warnings; eslint a
 ### Cleanup
 
 `bun run app down` run by this repair; evidence retained under `test-results/verify-budge/`.
+
+## Parent completion record
+
+Implementation, local Standards/Spec review, test-audit, correction dispositions, feature verification and three-judge review completed at `417d273986dc93485e7e762a32ed3efed964b20f`. Each judge independently approved 9/10 with full scoped coverage and no open major or blocker; see issue 08. Earlier sections are historical handoffs. Localized follow-ups are in issue 09; PR, CI, CodeRabbit, merge and deployment verification remain ticket 04. Record individual confirmations for the final documentation-only head in shipping evidence and the PR description before external review.

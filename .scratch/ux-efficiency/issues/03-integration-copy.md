@@ -1,6 +1,6 @@
 # 03 — Integrate and remove redundant copy
 
-Status: ready-for-agent
+Status: done
 
 Fresh Opus implementor integrates tickets 01/02 and implements spec items 21–26. Resolve production/UI integration issues, run full checks and feature verification, prepare neutral review tasks and known external gaps. Parent coordinates independent local code review, corrections, three judges, and shipping. Record evidence and final revisions here.
 
@@ -127,3 +127,7 @@ Design decision (IS-1): the decision "may this name reopen?" belongs to the owne
 - Not retained in a journey: the owning pointer's own `lostpointercapture`, leaving the page mid-drag, native OS gesture cancel (probe-only, labelled in the map).
 - A failure alert stays beside a name until that name is opened again (by design; a reload clears it).
 - Fresh review rechecks and three judges at the final SHA remain with the parent.
+
+## Parent completion record
+
+Implementation, local Standards/Spec review, test-audit, correction dispositions, feature verification and three-judge review completed at `417d273986dc93485e7e762a32ed3efed964b20f`. Each judge independently approved 9/10 with full scoped coverage and no open major or blocker; see issue 08. Earlier sections are historical handoffs. Localized follow-ups are in issue 09; PR, CI, CodeRabbit, merge and deployment verification remain ticket 04. Record individual confirmations for the final documentation-only head in shipping evidence and the PR description before external review.

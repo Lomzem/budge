@@ -1,12 +1,12 @@
 # 01 — Simplify Budget and Categories
 
-Status: ready-for-agent
+Status: done
 
 Implement spec items 1–12. Fresh Opus implementor. Update this file with decisions, item coverage, changed files, checks, evidence, and remaining work. Do not implement items 13–26. Feature verification, local review, corrections, and three-judge gate are required before done; parent coordinates review.
 
 ## Implementation record (Opus 5.5, worktree `t3/budget-category-efficiency`)
 
-Status stays `ready-for-agent` until the parent runs local code review, `/correct` and the three-judge UI gate. This worktree's brief forbade subagents, so the local `code-review` skill (which fans out to sub-agents) was **not** run here.
+The original handoff awaited parent reviews; those gates are now complete at the source revision recorded below. This worktree's brief forbade subagents, so the local `code-review` skill (which fans out to sub-agents) was **not** run here.
 
 ### Item coverage
 
@@ -88,3 +88,7 @@ Status stays `ready-for-agent` until the parent runs local code review, `/correc
 - Moving a Category into a collapsed group hides its row (the group's totals still change).
 - `DeleteCategoryDialog` opened from the inspector unmounts with it after a successful delete (focus goes to `#main`, which `cover-and-manage` checks).
 - Cross-group drag is not offered; `Move to group` covers it.
+
+## Parent completion record
+
+Implementation, local Standards/Spec review, test-audit, correction dispositions, feature verification and three-judge review completed at `417d273986dc93485e7e762a32ed3efed964b20f`. Each judge independently approved 9/10 with full scoped coverage and no open major or blocker; see issue 08. Earlier sections are historical handoffs. Localized follow-ups are in issue 09; PR, CI, CodeRabbit, merge and deployment verification remain ticket 04. Record individual confirmations for the final documentation-only head in shipping evidence and the PR description before external review.

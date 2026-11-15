@@ -1,19 +1,21 @@
-# 09 — Follow-up UI polish observed in round 2
+# 09 — UI polish follow-ups
 
 Status: needs-triage
 
-These localized findings are deferred from the 26-item delivery with the reasons below. They are recorded, not claimed fixed. Reproduce and design the follow-up before implementation; retain glossary vocabulary and existing budgeting semantics. IDs below mean round2 Opus observations, distinct from similarly numbered round1 findings.
+These localized findings are deferred from the 26-item delivery for the reasons below. They are recorded, not claimed fixed. Reproduce and design each follow-up before implementation. IDs distinguish later observations from similarly numbered round-1 findings.
 
-| Finding | Follow-up | Deferral reason |
+| Finding | Follow-up | Reason for deferral |
 | --- | --- | --- |
-| r2-opus-1, minor:320px native From/To input hides last year digit under icon | Reproduce native-date rendering at320px in Chromium and physicalphone; make fulltypeddate readable | Fullrange remains in accessiblechip/URL and filteringpersistscorrectly. Nativecontrol sizing needs its own cross-browser review; current required date tasks complete. |
-| r2-opus-2, minor:Cover completes after leaving its Category with no announcement | Consider completion-feedback ownership outside keyedinspector | Moneyandpersistencecorrect,newCategorydraft/focuspreserved. Globalcompletion feedback requires deliberateapp-levelowner; extendinglocalstatus could announce unrelatedcontext. |
-| r2-opus-3, nit:all12months are Tabstops | Assess rovinggridtabindex while preservingarrowkeys/yearfocus | Requiredkeyboardtaskcompletes. Navigationergonomicsneedsfocusedgridreview ratherthanchangingtheapprovedhistoryrepair. |
-| r2-opus-4, nit:largeGroupTotalflushright | Refine narrowfinancialalignment | Digitsnowfullyreadable. Paddingchange must preserve the measurednarrowlayout and deserves its own sizecases. |
-| r2-opus-5, nit:inspectorregion temporarilyunnamed duringinlineRename | Keepstableaccessiblename whileheadingisedited | FocusedRenameinputstillnamedandtaskcompletes. Follow-upshouldverifyregion/controlnaming throughallrename anderrorstates. |
-| r2-opus-6, nit:backwardTab toemptySplitamount prefillsremainder andcanoverallocate | Reviewremainderprefillintent andbackwardnavigation | Existingbehavioroutside26items; visibleoverageandvalidationprovide recovery. Changingmoney-entrydefaultsneedsseparatedomaininteractiondecision. |
-| r2-opus-7, nit:some40pxcoarsetargets,dialog32pxboxesunmeasured | Measureactualhitareas;improveconfirmedtargets | Observed40pxexceeds24pxminimum; dialoghitareaisunverified. Previous24pxvisibleTargetalreadyhad44pxtoucharea, so measurebeforechangingcontrols. |
+| Round-2 Opus 1: last year digit clipped in native From/To inputs at 320px | Check native date rendering in Chromium and on a physical phone | The full range remains in the accessible chip and URL, and filtering persists correctly. Native control sizing needs separate browser coverage. |
+| Round-2 Opus 2: held Cover/Move completes silently after leaving its inspector | Decide ownership of completion feedback outside the keyed inspector | Money and persistence are correct, and the new Category's draft/focus are preserved. Global feedback needs an app-level owner. |
+| Round-2 Opus 3: twelve month Tab stops | Assess a roving grid tabindex | Required keyboard tasks complete. Refine keyboard travel without disturbing year/grid focus. |
+| Round-2 Opus 4: large Group total sits flush right | Refine narrow financial alignment | All digits are readable. Padding changes need their own narrow-layout checks. |
+| Round-2 Opus 5: inspector region temporarily unnamed during Rename | Retain a stable accessible region name | The focused Rename input remains named and the task completes. Check all rename/error states. |
+| Round-2 Opus 6: backward Tab prefills a split remainder | Review prefill intent during backward navigation | Existing behavior outside the 26 items; visible overage and validation provide recovery. Changing money-entry defaults needs a separate interaction decision. |
+| Round-2 Opus 7: some 40px touch targets and unmeasured dialog hit areas | Measure actual hit areas before changing controls | Observed targets exceed the 24px minimum; some visible boxes already have larger touch areas. |
+| Round-3 Sol A N1: heavy Group-label wrapping with large phone amounts | Refine Group header density | Names, amounts and controls remain usable. Preserve the measured financial readability when changing layout. |
+| Round-3 Opus 8: Move refusal remains after correcting Amount | Consider clearing validation on the relevant draft edit | Existing validate-on-submit behavior; invalid saves are still refused, and Clear/resubmit recovers. |
 
-Additional known envelope: requiredphone999999.99Assigned andseven-figureGroupTotals are readable; larger server-valid values(up to10B) are not certified and mayclip. Follow-up should define/verify financialreadability for the admittedrange, without confusing storagevalidity and displayedreadability.
+The required phone case (999999.99 Assigned and seven-figure Group totals) is readable. Larger server-valid amounts, up to 10B, are not certified and may clip. A follow-up should verify readability across the admitted range; storage validity does not prove display readability.
 
-Source observations and original private/local evidence paths are retained in the round2Opus report. This follow-up does not waive any major/blocker or missing requiredcoverage; current delivery's phoneEscape defect is separately fixed and still requires fresh approval.
+Original observations and evidence paths are retained in the independent reports. These deferrals waive no major, blocker or missing required task. The separate phone Escape correction is fixed and approved.
