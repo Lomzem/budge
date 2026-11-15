@@ -257,6 +257,38 @@ An observer found that on Budget a name typed in the inspector went to the wrong
   - With a held press on Coffee, the inspector stays on the renamed Groceries and focus ends on the body, before and after the fix. The rename is right; where the press lands is not part of this blocker.
   - Chromium only. Firefox stays deferred as above.
 
+## Follow-up: a held Hide closed the inspector opened after it
+
+The parent's source review asked whether `hide()` could close a newer inspector. It awaited `setHidden`, then on success called the shared `onclose`, which closes whatever is selected. This was pre-existing, not introduced by `302f160`, and was only a source question until probed.
+
+- **Probed first** (`hide.ts` in the agent scratchpad, real transport, `setHidden` answer held by `holdResponseTo`). In `test-results/verify-budge/hide-base-302f160.json`:
+  - At 1280 px: hide Groceries, click Coffee while the answer is held, and open Coffee's name with `Coffee Draft`. On release, Coffee's inspector closed and the draft was lost.
+  - At 320 px, with Next Category to Dining Out: the same.
+  - Groceries was hidden in both.
+- **Disposition: fixed.** The close did not belong to the Hide.
+  - The Budget already closes the inspector when its selected Category leaves the shown Categories. Its `$effect` clears `selectedId` once `selected` is undefined, and focuses the main region if focus fell to the body. That is how Delete closes it.
+  - That close is keyed to the current selection, so a Category hidden after the user moved on cannot close the one now open.
+  - `hide()` now only sends `setHidden` through `act`, which still shows a refusal.
+- **Other completion callbacks audited.** None shares the fault:
+  - `cover` focuses its own `section`, and `bind:this` clears that when its inspector goes.
+  - `move`, `act` errors and `AssignedInput` set only their own instance's state.
+  - The delete and target dialogs are modal and close only themselves through `DialogSession.run`. Delete reaches the Budget through the same selection effect.
+  - Escape and the Close button call `onclose` synchronously, from the inspector being used.
+- **Journey.** In `inspector/cover-and-manage`, after the existing Hide step, a new step holds a Transit Hide with `holdResponseTo('categories:setHidden')`, opens Coffee and types `Coffee Draft`, then releases. It requires:
+  - Transit under Hidden Categories;
+  - typing to reach the same focused field (`Coffee Draft Kept`);
+  - Escape to leave Coffee's inspector open.
+  The unheld Hide step still requires the inspector to close with the main region focused.
+- **Red → green.**
+  - `hide-red` (`302f160` source, new step): fails because Coffee's name field is gone.
+  - `hide-green`: every step passes.
+  - Probe `hide-fixed.json`: both widths keep the new inspector, its draft and focus, and Groceries is hidden.
+  - Probe `hide-phone-fixed.json`: an unheld 320 px Hide closes the dialog and focuses `main`.
+- **Checks.**
+  - `hide-final` passes 8 journeys: `inspector/cover-and-manage`, `inspector/move-money`, `budget/phone-groups`, `budget/assign`, `budget/needs-you`, `categories/manage`, `categories/late-rename` and `shell/navigate`. The `categories/reorder` and `failed-rename` journeys don't reach Hide or the inspector, so they were not rerun.
+  - `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes all 933 tests.
+- **Limit.** A held Hide that the server refuses after the user moved on shows its reason only in the replaced inspector, so it is dropped. Transit stays shown, and nothing else changes. This is the same limit as for a late rename above.
+
 ## Red → green
 
 Both new journey steps failed on unchanged `eb1d3f9` source, for the reported reason, and pass after the repair:

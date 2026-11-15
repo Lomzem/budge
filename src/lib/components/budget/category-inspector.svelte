@@ -198,8 +198,8 @@
 		return changed.ok;
 	}
 
-	async function hide() {
-		if (await act(() => setHidden({ categoryId: openedForId, hidden: true }))) onclose();
+	function hide() {
+		void act(() => setHidden({ categoryId: openedForId, hidden: true }));
 	}
 
 	function editTarget() {
@@ -291,7 +291,7 @@
 								</DropdownMenu.SubContent>
 							</DropdownMenu.Sub>
 						{/if}
-						<DropdownMenu.Item onSelect={() => void hide()}>Hide from budget</DropdownMenu.Item>
+						<DropdownMenu.Item onSelect={hide}>Hide from budget</DropdownMenu.Item>
 						<DropdownMenu.Separator />
 						<DropdownMenu.Item
 							variant="destructive"

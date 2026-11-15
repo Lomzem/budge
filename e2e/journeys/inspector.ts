@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 
 import { formatCents } from '../../src/lib/domain/money';
-import { failFirstCallTo, pausableSync } from '../heldResponse';
+import { failFirstCallTo, holdResponseTo, pausableSync } from '../heldResponse';
 import {
 	cents,
 	centsIn,
@@ -440,6 +440,32 @@ export const inspector = {
 					0
 				);
 			});
+
+			await step(
+				'a Hide answered after another Category opened hides the first and leaves the one opened with its draft and focus',
+				async () => {
+					const server = await holdResponseTo(page, 'categories:setHidden');
+					await openBudget(page);
+					await page.getByRole('button', { name: 'Transit', exact: true }).click();
+					await inspector.getByRole('button', { name: 'Transit actions' }).click();
+					await page.getByRole('menuitem', { name: 'Hide from budget' }).click();
+					await server.held;
+					await page.getByRole('button', { name: 'Coffee', exact: true }).click();
+					await inspector.getByRole('button', { name: 'Coffee actions' }).click();
+					await page.getByRole('menuitem', { name: 'Rename' }).click();
+					const field = inspector.getByRole('textbox', { name: 'Category name' });
+					await field.fill('Coffee Draft');
+					server.release();
+					await expect(page.getByRole('region', { name: 'Hidden Categories' })).toContainText(
+						'Transit'
+					);
+					await page.keyboard.type(' Kept');
+					await expect(field).toBeFocused();
+					await expect(field).toHaveValue('Coffee Draft Kept');
+					await field.press('Escape');
+					await expect(inspector.getByRole('heading', { name: 'Coffee' })).toBeVisible();
+				}
+			);
 
 			await step('Delete… moves its history to the Category picked, then it is gone', async () => {
 				const diningOut = await activity('Dining Out');
