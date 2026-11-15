@@ -233,7 +233,7 @@ export const categories = {
 			});
 
 			await step(
-				'Rename edits the name in place; an empty name is refused and Escape keeps the old one',
+				'Rename edits the name in place; an empty name is refused, Escape keeps the old one, and a click on another name saves the one typed',
 				async () => {
 					await act(page, 'Smoke Test Category', 'Rename');
 					const field = page.getByRole('textbox', { name: 'Category name' });
@@ -248,10 +248,14 @@ export const categories = {
 
 					await name.click();
 					await field.fill('Smoke Test Renamed');
-					await field.press('Enter');
+					await page.getByRole('button', { name: 'Smoke Test Group', exact: true }).click();
+					const groupField = page.getByRole('textbox', { name: 'Category Group name' });
+					await expect(groupField).toBeFocused();
+					await expect(groupField).toHaveValue('Smoke Test Group');
+					await groupField.press('Escape');
 					await expect(
 						page.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
-					).toBeFocused();
+					).toBeVisible();
 					await expect(
 						page.getByRole('button', { name: 'Move Smoke Test Renamed', exact: true })
 					).toBeAttached();
@@ -262,17 +266,30 @@ export const categories = {
 				}
 			);
 
-			await step('a group is renamed in place from its name', async () => {
-				await page.getByRole('button', { name: 'Smoke Test Group', exact: true }).click();
-				const field = page.getByRole('textbox', { name: 'Category Group name' });
-				await field.fill('Smoke Test Shelf');
-				await field.press('Enter');
-				await expect(
-					page.getByRole('button', { name: 'Move Smoke Test Shelf', exact: true })
-				).toBeAttached();
-				await page.reload();
-				await expect(groupOf(page, 'Smoke Test Shelf')).toBeVisible();
-			});
+			await step(
+				'a group is renamed in place from its name, saved by a tap on another name',
+				async () => {
+					await page.getByRole('button', { name: 'Smoke Test Group', exact: true }).click();
+					const field = page.getByRole('textbox', { name: 'Category Group name' });
+					await field.fill('Smoke Test Shelf');
+					const category = await centerOf(
+						page.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
+					);
+					const screen = await touchscreen(page);
+					await screen.touch('touchStart', [{ id: 1, x: category.x, y: category.y }]);
+					await screen.touch('touchEnd', []);
+					await screen.detach();
+					const categoryField = page.getByRole('textbox', { name: 'Category name' });
+					await expect(categoryField).toBeFocused();
+					await expect(categoryField).toHaveValue('Smoke Test Renamed');
+					await categoryField.press('Escape');
+					await expect(
+						page.getByRole('button', { name: 'Move Smoke Test Shelf', exact: true })
+					).toBeAttached();
+					await page.reload();
+					await expect(groupOf(page, 'Smoke Test Shelf')).toBeVisible();
+				}
+			);
 
 			await step('hide it, with nothing scrolling sideways', async () => {
 				await act(page, 'Smoke Test Renamed', 'Hide from budget');

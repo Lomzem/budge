@@ -131,6 +131,42 @@ Test-audit gate: the step asserts only what a user sees (order, reason, focused 
   - Not in a journey: a blank-click commit and the window-switch commit (same deferred rule as the Tab commit the step asserts), and a refusal that moves a row while its field is open and the first of two quick presses is refused. Both follow from the same rule and were not separately probed.
   - The fix relies on the browser's own focus order (blur, then the microtask repair, then the task), which was observed in Chromium only.
 
+## Follow-up: a typed name dropped by opening another name (after `ddefe31`)
+
+The reviewers raised a conditional risk: `ddefe31`'s deferred blur skipped when `!editing`, while a name button's `onclick` sets `renaming` to its own id at once. A draft in A could then be closed by B's opening before A's timer ran, and dropped instead of saved. I probed it before changing anything.
+
+- **Probe** (`blur-switch.ts` in the agent scratchpad). It seeds `budget-with-accounts`, types "Draft A" into A, moves to B with a real input, then reads the Mutation sends, the open fields, focus and the names after a reload. There are 13 scenarios: fast mouse click, a 90 ms held click, CDP touch tap at 320 px, keyboard focus-and-Enter, Category↔Group in every direction, a click or tap on the Budget nav link, and a click or tap on blank space.
+  - `blur-switch-base-848edfc.json` (the synchronous editor before `ddefe31`): 13 of 13 saved, one rename each.
+  - `ddefe31` (printed lines; the run stopped at the probe's own reload wait before writing its file): fast mouse Category→Category, Category→Group and Group→Category, and tap Category→Category, Group→Category and Category→Group all sent nothing, and the draft was gone after a reload. The 90 ms held click and keyboard Category→Category saved. The regression was real for ordinary fast clicks and every tap. In a fast click and in a tap, the click lands in the same task as the blur or before the timer, so `renaming` moved to B first.
+  - `blur-switch-fixed.json`: 13 of 13 saved, one rename each, with B's field open and focused.
+- **Cause.** Deferring the decision changed what `!editing` meant. Checked during the blur, it means Enter or Escape already closed this field. Checked a task later, it also matches "another name opened", which is an ordinary leave whose draft must be saved.
+- **Fix** (`inline-name.svelte`). The `!editing` check runs during the blur again. The deferred step asks only whether focus came back to the input in a focused window (the move rollback). It acts for the opening that blurred, through an `openings` count, so a stale timer never commits or closes a newer opening of the same field. It commits even if another opener already closed the field. The page's `editing(id)` setter clears `renaming` only when it still names this row, so A's late commit cannot close B. Navigation and unmount: a click or tap on the Budget link saves the draft before the page leaves.
+- **Journey** (`categories/manage`, at 320 px, real transport).
+  - The Category rename now ends with a fast mouse click on the group's name. The group field must open focused with its own name, and Escape must leave "Smoke Test Renamed" saved.
+  - The group rename ends with a CDP touch tap on the Category's name. The Category field must open focused, and "Smoke Test Shelf" must be saved through a reload.
+  - Enter-commit stays covered by the empty-name check, `late-rename` and `failed-rename`. Tab-commit is covered by the `reorder` rollback step.
+  - Red/green:
+    - `blur-switch-red` (`ddefe31` editor): fails at the Category step because the name is not saved.
+    - `blur-switch-red-group` (`ddefe31` editor, with the Category step temporarily committing by Enter; both files restored after): fails at the group step because "Move Smoke Test Shelf" is never attached.
+    - `blur-switch-green`: all 10 steps pass.
+- **Checks.**
+  - `blur-switch-green` also passes `categories/reorder` (the Category and Group rollback-with-open-field step, Tab, Escape), `categories/late-rename`, `categories/failed-rename`, `inspector/cover-and-manage`, `inspector/move-money`, `budget/phone-groups`, `budget/assign` and `shell/navigate`.
+  - `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes 933.
+- **Limits.**
+  - A reopening of the same field inside the blur's task cannot be reached by user input. The `openings` guard covers it by construction, and no probe drives it.
+  - Window-switch commit is still unprobed.
+
+### Firefox: a moved focused node loses focus without `focusout` (deferred)
+
+A judge reported that in Firefox, when End or a refused rollback moves the focused item itself, focus goes to BODY with no `focusout` event, so `keepFocusWhenMoved` never runs. Repeated ArrowUp keeps focus, because the neighbour moves.
+
+- **Probe** (Firefox 1555 from the local Playwright cache, fixed source, the editor-order probe): a refused Coffee move and a refused Savings Goals move with the name field open send no rename and keep the field and its draft, but focus is BODY. So the data-integrity part of RF-A1 holds in Firefox. Only focus is lost, as on the handle.
+- **Disposition: deferred.**
+  - The repo's maintained verification is Chromium only (CI runs `playwright install --with-deps chromium`, and journeys and `verify-budge` use Chromium), so a Firefox repair would have no check to keep it.
+  - In Firefox the loss comes with no event at all. A repair needs a second detection path in `reorder.ts`, such as remembering the focused descendant and watching the list with a `MutationObserver`, alongside the `focusout` path Chromium needs. That is the shared focus machinery this scope rules out.
+  - Restoring focus where the order is set (`saveMove`) would not cover moves that arrive from the server.
+  - If Firefox joins the supported matrix, add a Firefox journey project first, then replace `keepFocusWhenMoved` with one engine-neutral owner and prove it there.
+
 ## Red → green
 
 Both new journey steps failed on unchanged `eb1d3f9` source, for the reported reason, and pass after the repair:

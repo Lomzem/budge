@@ -32,10 +32,12 @@
 	const errorId = $props.id();
 
 	let draftOpened = false;
+	let openings = 0;
 	$effect.pre(() => {
 		const opening = editing && !draftOpened;
 		draftOpened = editing;
 		if (!opening) return;
+		openings++;
 		untrack(() => {
 			draft = pending ?? failed?.name ?? name;
 			error = failed?.error ?? '';
@@ -98,9 +100,12 @@
 				error = '';
 			}}
 			onblur={(event: FocusEvent & { currentTarget: HTMLInputElement }) => {
+				if (!editing) return;
 				const input = event.currentTarget;
+				const left = openings;
 				setTimeout(() => {
-					if (!editing || (document.hasFocus() && document.activeElement === input)) return;
+					if (left !== openings) return;
+					if (document.hasFocus() && document.activeElement === input) return;
 					if (draft.trim() === '') editing = false;
 					else commit();
 				});
