@@ -3,6 +3,7 @@
 
 	import { attempt } from '$lib/attempt';
 	import { Input } from '$lib/components/ui/input';
+	import { keepRefusalInView } from '$lib/refusalInView';
 
 	let {
 		name,
@@ -125,7 +126,9 @@
 {:else if failed}
 	<div class={['flex min-w-0 flex-1 flex-col', className]}>
 		{@render children(name)}
-		<p role="alert" class="mt-1 text-sm text-destructive">{failed.error}</p>
+		<p role="alert" class="mt-1 text-sm text-destructive" {@attach keepRefusalInView}>
+			{failed.error}
+		</p>
 	</div>
 {:else}
 	{@render children(pending ?? name)}

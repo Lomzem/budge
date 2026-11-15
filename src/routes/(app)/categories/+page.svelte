@@ -17,6 +17,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { moveInList, reorderHandle } from '$lib/reorder';
+	import { keepRefusalInView } from '$lib/refusalInView';
 
 	const list = useQuery(api.categories.list, {});
 	const groups: ManagedGroup[] = $derived(list.data?.groups ?? []);
@@ -209,7 +210,13 @@
 
 {#snippet failedMove(id: string)}
 	{#if moveFailure?.id === id}
-		<p role="alert" class="basis-full px-2 pb-1 text-sm text-destructive">{moveFailure.message}</p>
+		<p
+			role="alert"
+			class="basis-full px-2 pb-1 text-sm text-destructive"
+			{@attach keepRefusalInView}
+		>
+			{moveFailure.message}
+		</p>
 	{/if}
 {/snippet}
 

@@ -4,8 +4,10 @@ import { failFirstCallTo, holdResponseTo } from '../heldResponse';
 import {
 	choicesOf,
 	choose,
+	expectClearOf,
 	expectNothingPastTheRightEdge,
 	openBudget,
+	useATouchScreen,
 	type Journey
 } from './journey';
 
@@ -108,6 +110,17 @@ async function centerOf(locator: Locator) {
 	if (box === null) throw new Error('The element is not on screen.');
 	return { x: box.x + box.width / 2, y: box.y + box.height / 2, top: box.y };
 }
+
+async function tap(page: Page, locator: Locator) {
+	await locator.scrollIntoViewIfNeeded();
+	const { x, y } = await centerOf(locator);
+	const screen = await touchscreen(page);
+	await screen.touch('touchStart', [{ id: 1, x, y }]);
+	await screen.touch('touchEnd', []);
+	await screen.detach();
+}
+
+const tabBarOf = (page: Page) => page.getByRole('navigation', { name: 'Sections', exact: true });
 
 export const categories = {
 	manage: {
@@ -272,13 +285,7 @@ export const categories = {
 					await page.getByRole('button', { name: 'Smoke Test Group', exact: true }).click();
 					const field = page.getByRole('textbox', { name: 'Category Group name' });
 					await field.fill('Smoke Test Shelf');
-					const category = await centerOf(
-						page.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
-					);
-					const screen = await touchscreen(page);
-					await screen.touch('touchStart', [{ id: 1, x: category.x, y: category.y }]);
-					await screen.touch('touchEnd', []);
-					await screen.detach();
+					await tap(page, page.getByRole('button', { name: 'Smoke Test Renamed', exact: true }));
 					const categoryField = page.getByRole('textbox', { name: 'Category name' });
 					await expect(categoryField).toBeFocused();
 					await expect(categoryField).toHaveValue('Smoke Test Renamed');
@@ -383,14 +390,23 @@ export const categories = {
 				}
 			);
 
-			await step('End moves the Savings Goals group last', async () => {
-				const before = await groupOrder(page);
-				await page.getByRole('button', { name: 'Move Savings Goals' }).focus();
-				await page.keyboard.press('End');
-				await expect
-					.poll(() => groupOrder(page))
-					.toEqual([...before.filter((name) => name !== 'Savings Goals'), 'Savings Goals']);
-			});
+			await step(
+				'Home moves the Savings Goals group first and End moves it back last, its focused handle clear of the tab bar each time',
+				async () => {
+					const before = await groupOrder(page);
+					const others = before.filter((name) => name !== 'Savings Goals');
+					const handle = page.getByRole('button', { name: 'Move Savings Goals' });
+					await handle.focus();
+					await page.keyboard.press('Home');
+					await expect.poll(() => groupOrder(page)).toEqual(['Savings Goals', ...others]);
+					await expect(handle).toBeFocused();
+					await expectClearOf(handle, tabBarOf(page));
+					await page.keyboard.press('End');
+					await expect.poll(() => groupOrder(page)).toEqual([...others, 'Savings Goals']);
+					await expect(handle).toBeFocused();
+					await expectClearOf(handle, tabBarOf(page));
+				}
+			);
 
 			const coffeeRow = everyday
 				.getByRole('listitem')
@@ -609,9 +625,11 @@ export const categories = {
 			);
 
 			await step(
-				'a name being typed when its own Category or group move is refused keeps its field, draft and focus, and nothing is renamed until the field is left',
+				'on a phone, a name being typed when its own Category or group move is refused keeps its field, draft and focus in view with the reason, and nothing is renamed until the field is left',
 				async () => {
 					const server = await failFirstCallTo(page, 'categories:move', 'categories:moveGroup');
+					await page.setViewportSize({ width: 320, height: 640 });
+					const stopTouching = await useATouchScreen(page);
 					await openCategories(page);
 					await coffeeHandle.focus();
 					await page.keyboard.press('ArrowUp');
@@ -626,23 +644,31 @@ export const categories = {
 					await expect(coffeeRow.getByRole('alert')).toHaveText(refused);
 					await expect(categoryField).toBeFocused();
 					await expect(categoryField).toHaveValue('Morning Coffee');
+					await expectClearOf(categoryField, tabBarOf(page));
+					await expectClearOf(coffeeRow.getByRole('alert'), tabBarOf(page));
 					await categoryField.press('Escape');
 					await expect(
 						coffeeRow.getByRole('button', { name: 'Coffee', exact: true })
 					).toBeVisible();
 
+					await openCategories(page);
 					const groups = await groupOrder(page);
 					const last = groups.at(-1) ?? '';
-					await page.getByRole('button', { name: `Move ${last}`, exact: true }).focus();
+					const lastHandle = page.getByRole('button', { name: `Move ${last}`, exact: true });
+					await lastHandle.focus();
 					await page.keyboard.press('ArrowUp');
 					await server.called('categories:moveGroup');
-					await page.getByRole('button', { name: last, exact: true }).click();
+					await expect(lastHandle).toBeFocused();
+					await expectClearOf(lastHandle, tabBarOf(page));
+					await tap(page, page.getByRole('button', { name: last, exact: true }));
 					const groupField = page.getByRole('textbox', { name: 'Category Group name' });
 					await groupField.fill('Rainy Day Fund');
 					server.failWithServerError('categories:moveGroup');
-					await expect(
-						page.getByRole('region').filter({ has: groupField }).getByRole('alert')
-					).toHaveText(refused);
+					const groupRefusal = page
+						.getByRole('region')
+						.filter({ has: groupField })
+						.getByRole('alert');
+					await expect(groupRefusal).toHaveText(refused);
 					await expect(
 						page
 							.getByRole('main')
@@ -652,8 +678,11 @@ export const categories = {
 					).toBeVisible();
 					await expect(groupField).toBeFocused();
 					await expect(groupField).toHaveValue('Rainy Day Fund');
+					await expectClearOf(groupField, tabBarOf(page));
+					await expectClearOf(groupRefusal, tabBarOf(page));
 					await groupField.press('Tab');
 					await expect(groupField).toBeHidden();
+					await stopTouching();
 					const renamed = groups.with(-1, 'Rainy Day Fund');
 					await expect.poll(() => groupOrder(page)).toEqual(renamed);
 
@@ -821,6 +850,32 @@ export const categories = {
 				await expect(named('Sample Typed Coffee')).toBeVisible();
 				await expect(named('Everyday')).toBeVisible();
 			});
+
+			await step(
+				'a group save failing above a Category name being typed shows the failure without pushing that field under the tab bar',
+				async () => {
+					const later = await failFirstCallTo(page, 'categories:renameGroup');
+					await openCategories(page);
+					await tap(page, named('Everyday'));
+					await groupField.fill('Sample Refused Again');
+					await groupField.press('Enter');
+					await later.called('categories:renameGroup');
+					await tap(page, named('Sample Refused Groceries'));
+					await categoryField.fill('Sample Typed Groceries');
+					later.failWithServerError('categories:renameGroup');
+					const groupFailure = page
+						.getByRole('region')
+						.filter({ has: page.getByRole('button', { name: 'Move Everyday', exact: true }) })
+						.getByRole('heading')
+						.getByRole('alert');
+					await expect(groupFailure).toHaveText(failure);
+					await expect(categoryField).toBeFocused();
+					await expect(categoryField).toHaveValue('Sample Typed Groceries');
+					await expectClearOf(categoryField, tabBarOf(page));
+					await categoryField.press('Escape');
+					await expect(named('Sample Refused Groceries')).toBeFocused();
+				}
+			);
 		}
 	}
 } satisfies Record<string, Journey>;

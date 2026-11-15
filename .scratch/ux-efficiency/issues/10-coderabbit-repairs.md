@@ -167,6 +167,54 @@ A judge reported that in Firefox, when End or a refused rollback moves the focus
   - Restoring focus where the order is set (`saveMove`) would not cover moves that arrive from the server.
   - If Firefox joins the supported matrix, add a Firefox journey project first, then replace `keepFocusWhenMoved` with one engine-neutral owner and prove it there.
 
+## Follow-up: a phone editor or refusal left under the tab bar (sol-a-EF-A1)
+
+An observer found two phone recovery cases at 320 px with touch where focus, draft and data were right but the user could not see them:
+
+- **A.** Moving the last group up with its name field open and refused, the order came back with the field, draft and focus intact, but the field sat behind the Sections tab bar (field 565–609, bar 575–640), with the refusal under it.
+- **B.** A refused Everyday rename grew its multi-line failure above a Groceries field being typed, which pushed that field behind the bar (field 580–624).
+
+- **Reproduced first** (`ef.ts` in the agent scratchpad, 320×640, touch and coarse pointer, real Convex transport through `failFirstCallTo`, rename sends counted). `ef-base-9c2755e/results.json`:
+  - A, group: field 565–609, refusal 613–641, bar 575–640.
+  - A, Coffee: clear.
+  - B, group fails above the Category being typed: field 524–568 before and 580–624 after.
+  - B, Category above Category and Category above group: clear.
+  - Every case kept focus and the draft, and sent no rename.
+- **Cause.**
+  - A: the rollback moves the focused row itself. `keepFocusWhenMoved` in `reorder.ts` (added in `f7538f4`) restored focus with `preventScroll: true`, so nothing brought the field back into view. Nothing revealed the row's refusal either.
+  - B: a failure appearing above the focused field grows the page, and no scroll keeps the user's field in view. Chromium's scroll anchoring did not hold it here, and iOS Safari has no scroll anchoring at all.
+  - The same `preventScroll` also leaves a keyboard-moved handle off-screen. Measured with `ef-end.ts` at 320 px: Home on the last group put its focused handle at −281 to −237, and End on the first group at 777–821.
+- **Ownership and fix.** Each change sits with the code that changes what the user sees. Nothing generic watches focus.
+  - `reorder.ts`: restoring focus scrolls as an ordinary focus does (`preventScroll` removed). The browser then honours the phone's `scroll-padding-bottom` above the tab bar.
+  - `src/lib/refusalInView.ts` is a single attachment on a refusal message, used where the message appears: the page's move refusal, and `InlineName`'s failure beside a closed name.
+    - If focus is still in the message's row, or on nothing, it reveals the whole row (the field with its reason) with `block: 'nearest'`.
+    - If focus is elsewhere, it reveals only the focused control. B's field stays in view, and the old A failure is never shown at B's expense.
+    - When everything is already in view, `nearest` scrolls nothing.
+  - Not added: the same reveal on the error inside an open editor ("Enter a name."). `ef-edit.ts` measured that error clear of the bar without it (field 495–539, error 543–567, bar from 575), because opening the field already scrolls it above the padding.
+- **Journeys** (real transport, 320 px).
+  - `categories/reorder`:
+    - The no-op "End moves the Savings Goals group last" step (it was already last) became "Home moves the Savings Goals group first and End moves it back last, its focused handle clear of the tab bar each time". This leaves the later group order unchanged.
+    - The rollback-with-open-name step now runs at 320 px under `useATouchScreen`. The group half reopens the page, presses ArrowUp on the last group, and opens the name with a CDP tap (`tap`, now shared with `manage`). It then checks the Category and group fields, both refusals and the moved handle with `expectClearOf` against the Sections bar.
+  - `categories/failed-rename`: a new step fails a second Everyday rename while a CDP-tapped Groceries field is being typed. It requires the group failure, the Groceries draft and focus, and the field clear of the bar.
+- **Red → green.**
+  - `ef-red-final-2` (`9c2755e` source, final journeys):
+    - `reorder` fails at the Home/End step: the focused handle is at viewport ratio 0.
+    - `failed-rename` fails at the new step: the bar overlaps the Category field.
+  - `ef-red-only-focusfix-touch` (the `preventScroll` removal only, run before the Home/End step was rewritten): `reorder` fails at the open-name step, where the bar overlaps the group refusal.
+  - `ef-red-only-reveal-2` (the reveal only, with `preventScroll` kept): `reorder` fails at the Home/End step.
+  - `ef-green-final`: all 9 affected journeys pass.
+  - Geometry after the fix, from `ef-final-{320,390,1024,1280}/results.json`:
+    - A, group at 320: field 487–531, refusal 535–563, bar 575–640.
+    - B, group above Category at 320: field 524–568, unmoved, with the group failure 443–515 also in view.
+    - Every case at 390, 1024 and 1280 keeps the field and its reason in the viewport, with focus and the draft, and sends no rename.
+- **Checks.**
+  - `ef-green-final`: `categories/manage`, `categories/reorder`, `categories/late-rename`, `categories/failed-rename`, `inspector/cover-and-manage`, `inspector/move-money`, `budget/phone-groups`, `budget/assign` and `shell/navigate` pass. That covers stacked presses, held replay, touch cancel, the second finger, autoscroll, Enter, Tab and click commits, Escape, the fast A→B switch, late and failed renames, and the Budget inspector's `InlineName`.
+  - `format:check`, `lint`, `lint:ui` and `typecheck` pass, and `bun run test` passes 933.
+- **Limits.**
+  - A refused touch drag, where focus is on nothing, now reveals the dragged row with its reason. That path is by construction and was not probed.
+  - Firefox stays deferred as above. When Firefox loses focus to BODY on a moved row, the reveal should still show the row, because focus is on nothing. That follows from the code and was not probed.
+
+
 ## Red → green
 
 Both new journey steps failed on unchanged `eb1d3f9` source, for the reported reason, and pass after the repair:

@@ -53,7 +53,7 @@ function keepFocusWhenMoved(event: FocusEvent) {
 		const lostToTheDocument =
 			document.activeElement === null || document.activeElement === document.body;
 		const moved = item.previousElementSibling !== after;
-		if (lostToTheDocument && moved && focused.isConnected) focused.focus({ preventScroll: true });
+		if (lostToTheDocument && moved && focused.isConnected) focused.focus();
 	});
 }
 
