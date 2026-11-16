@@ -11,7 +11,7 @@ Inspect a Category, move Assigned between jobs, and cover Overspending from Read
 
 ## How to get to it (user POV)
 
-- Budget table → Category-name button. The Overspent list has no buttons; open the Category in the table, then use Cover in its inspector.
+- Budget table → Category-name button, or the `Needs you` chip `N Categories overspent`, which opens the first overspent Category (each further click the next). Hidden Categories have no opening buttons.
 - At 1024 px and up the inspector sits in a sticky side panel that scrolls on its own; opening it focuses the region without scrolling the page. Below that it opens as a dialog whose `Assigned this month` row is an editable amount field (the table keeps its Assigned field too, even at 320 px), with an `Other Categories` nav of `Previous Category: <name>` and `Next Category: <name>` buttons (the visible name truncates on one line) that switch the dialog to the neighboring Category, scrolled to the top, and focus its Assigned field. The dialog opens scrolled to the top, with Ready to Assign in view.
 
 ## Driving it with Playwright
@@ -27,8 +27,8 @@ Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
 
-- **Inspect:** focus `getByRole("button", { name: "Groceries", exact: true })`, press Enter; require `getByRole("region", { name: "Groceries", exact: true })` visible and Left over from last month visible; opening auto-focuses the region only at widths ≥1024 px. Escape from inside the region or Close Groceries must restore focus. Repeat at 320 px: it opens as `getByRole("dialog", { name: "Groceries" })` scrolled to the top, and Close or Escape returns focus to the Category-name button.
-- **Move:** record Assigned for Groceries/Coffee and Ready to Assign; in region click `Swap From and To` so Groceries is From, open the `To` picker, type `Coffee` and choose it (focus moves to Amount), fill Amount 10.00, submit `Move money`. Require Assigned −$10/+ $10 and Ready to Assign unchanged; reload and reopen. Swap back to reverse and verify.
+- **Inspect:** focus `getByRole("button", { name: "Groceries", exact: true })`, press Enter; require `getByRole("region", { name: "Groceries", exact: true })` visible and Left over from last month visible; opening focuses the region (the side panel at ≥1024 px, the dialog below). Escape from inside the region or Close Groceries must restore focus. Repeat at 320 px: it opens as `getByRole("dialog", { name: "Groceries" })` scrolled to the top, and Close or Escape returns focus to the Category-name button.
+- **Move:** record Assigned for Groceries/Coffee and Ready to Assign; in region click `Swap From and To` so Groceries is From, open the `To` picker, type `Coffee` and choose it (focus moves to Amount), fill Amount 10.00, submit `Move` (in the `Move money` section). Require Assigned −$10/+ $10 and Ready to Assign unchanged; reload and reopen. Swap back to reverse and verify.
 - **Cover (journeyed in `inspector/cover-and-manage`; repeat by hand only for a Cash Category):** create an invented outflow large enough to overspend an ordinary Cash Category using Transaction UI; select it on Budget. Click its `Cover $… from Ready to Assign` action (inspect actual amount in ARIA). Require Available exactly zero, Assigned increased by deficit and Ready to Assign decreased by deficit; reload.
 
 ## Gotchas

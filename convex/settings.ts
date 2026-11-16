@@ -7,6 +7,7 @@ import {
 	lastCutoverMove,
 	laterCutoverPreview,
 	previewLaterCutover as preview,
+	supersedeLastCutoverMove,
 	undoLaterCutover as undo
 } from './lib/laterCutover';
 import { readCutoverDate, requireIsoDate } from './lib/settings';
@@ -35,7 +36,10 @@ export const setCutoverDate = mutation({
 		const settings = await ctx.db.query('settings').first();
 		await ensureReadyToAssign(ctx);
 		if (settings === null) await ctx.db.insert('settings', { cutoverDate });
-		else await ctx.db.patch('settings', settings._id, { cutoverDate });
+		else if (settings.cutoverDate !== cutoverDate) {
+			await supersedeLastCutoverMove(ctx);
+			await ctx.db.patch('settings', settings._id, { cutoverDate });
+		}
 		return null;
 	}
 });

@@ -1040,6 +1040,26 @@ describe('applying a confirmed later cutover date', () => {
 		).toMatch(/moved again/);
 		expect(await persisted(t)).toEqual(secondUndone);
 	});
+
+	test('will not undo a move once the date was changed away and back without moving history', async () => {
+		const { t, owner, moveId } = await movedToNovember();
+		await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-10-31' });
+		await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-11-01' });
+		const changedBack = await persisted(t);
+
+		expect(await owner.query(api.settings.lastMove, {})).toBeNull();
+		expect(
+			await publicErrorMessage(owner.mutation(api.settings.undoLaterCutover, { moveId }))
+		).toMatch(/moved again/);
+		expect(await persisted(t)).toEqual(changedBack);
+	});
+
+	test('still offers the undo after the date is saved again unchanged', async () => {
+		const { owner, moveId } = await movedToNovember();
+		await owner.mutation(api.settings.setCutoverDate, { cutoverDate: '2026-11-01' });
+
+		expect(await owner.query(api.settings.lastMove, {})).toMatchObject({ moveId });
+	});
 });
 
 async function ledger(t: Backend) {
