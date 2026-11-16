@@ -32,6 +32,8 @@ export default {
 			ownedTable:
 				'Write `{{table}}` through an operation in convex/lib/transactions.ts, which keeps search text, Cleared state, and monthly totals correct.',
 			unnamedTable: 'Name the table as the first argument of a database write.',
+			databaseArgument:
+				'Pass the helper `ctx`, query results or a read method instead of the database, so the tables it writes stay checked.',
 			detachedWrite:
 				'Call `{{method}}` on the database itself, so the table it writes stays checked.'
 		}
@@ -78,7 +80,17 @@ export default {
 			AssignmentExpression(node) {
 				if (node.operator === '=') checkPattern(node.left, node.right);
 			},
+			MemberExpression(node) {
+				const method = propertyName(node);
+				if (!writes.has(method) || !isDatabase(node.object)) return;
+				if (node.parent.type === 'CallExpression' && node.parent.callee === node) return;
+				context.report({ node, messageId: 'detachedWrite', data: { method } });
+			},
 			CallExpression(node) {
+				for (const argument of node.arguments) {
+					if (isDatabase(argument))
+						context.report({ node: argument, messageId: 'databaseArgument' });
+				}
 				const { callee } = node;
 				if (callee.type !== 'MemberExpression') return;
 				if (!writes.has(propertyName(callee)) || !isDatabase(callee.object)) return;

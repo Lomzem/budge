@@ -9,7 +9,7 @@ Manage the jobs for money, their order and visibility, and the history destinati
 
 ## How to get to it (user POV)
 
-- Sidebar or phone tab bar → Categories, or Budget → `Manage Categories` (`/categories`); Add Category and Add Category Group are also on Budget, and every ordinary group header (Budget and Categories) has an `Add Category to <group>` button that opens Add Category with that group chosen.
+- Sidebar or phone tab bar → Categories, or Budget → `Manage Categories` (`/categories`; below `sm` it is a menuitem of the `Edit Categories` button); Add Category and Add Category Group are also on Budget, and every ordinary group header (Budget and Categories) has an `Add Category to <group>` button that opens Add Category with that group chosen.
 - Add Category's `Category Group` select ends with `New Category Group…`, which reveals a required `Group name` field; Add then creates the group and the Category together.
 - A Category's or group's name on the Categories page is a button: click it (or the actions menu's `Rename`) to edit the name in place (`Category name` / `Category Group name` textbox). Enter or blur saves, Escape keeps the old name (even with a mouse press held since before it), an empty name shows `Enter a name.` on Enter or when focus leaves the field, which stays open with it and scrolls just enough to show the reason with the field; an empty name left by opening another name, even with a held mouse press, leaves that one's field focused and unchanged.
 - Each row starts with a `Move <name>` handle: ArrowUp/ArrowDown/Home/End move it within its group (groups among groups) and keep focus on the handle; dragging it by mouse, pen or touch moves it too. Moving to another group stays in the actions menu's `Move to group`.

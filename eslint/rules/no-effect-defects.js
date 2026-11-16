@@ -32,6 +32,9 @@ export default {
 	},
 	create(context) {
 		const aliases = new Set();
+		const effectPackageNamespaces = new Set();
+		const importedDefectFunctions = new Set();
+		const propertyName = (node) => (node.computed ? node.property.value : node.property.name);
 		const variableOf = (node) => {
 			let scope = context.sourceCode.getScope(node);
 			while (scope) {
@@ -42,15 +45,60 @@ export default {
 			return undefined;
 		};
 		const namespace = (node) => {
+			if (node.type === 'MemberExpression') {
+				return (
+					propertyName(node) === 'Effect' &&
+					node.object.type === 'Identifier' &&
+					effectPackageNamespaces.has(variableOf(node.object))
+				);
+			}
 			if (node.type !== 'Identifier') return false;
 			const variable = variableOf(node);
 			return variable ? aliases.has(variable) : node.name === 'Effect';
 		};
 		const allow = context.options[0]?.allow ?? [];
+		const checkDefect = (node) => {
+			const ancestors = context.sourceCode.getAncestors(node);
+			const method = ancestors.findLast((ancestor) => ancestor.type === 'MethodDefinition');
+			const owner = ancestors.findLast((ancestor) => ancestor.type === 'ClassDeclaration');
+			const approved = allow.some(
+				(entry) =>
+					context.filename.replaceAll('\\', '/').endsWith('/' + entry.file) &&
+					owner?.id?.name === entry.className &&
+					method?.static === true &&
+					method.key.name === entry.method
+			);
+			if (!approved) context.report({ node, messageId: 'defect' });
+		};
 		return {
+			ImportNamespaceSpecifier(node) {
+				const source = node.parent.source.value;
+				const variable = context.sourceCode.getDeclaredVariables(node)[0];
+				if (source === 'effect') effectPackageNamespaces.add(variable);
+				if (source === 'effect/Effect') aliases.add(variable);
+			},
 			ImportSpecifier(node) {
-				if (node.parent.source.value === 'effect' && node.imported.name === 'Effect')
-					aliases.add(context.sourceCode.getDeclaredVariables(node)[0]);
+				const source = node.parent.source.value;
+				const variable = context.sourceCode.getDeclaredVariables(node)[0];
+				const imported = node.imported.name ?? node.imported.value;
+				if (source === 'effect' && imported === 'Effect') aliases.add(variable);
+				const typeOnly = node.importKind === 'type' || node.parent.importKind === 'type';
+				if (source === 'effect/Effect' && defects.has(imported) && !typeOnly)
+					importedDefectFunctions.add(variable);
+			},
+			Identifier(node) {
+				const variable = variableOf(node);
+				if (!importedDefectFunctions.has(variable)) return;
+				const inType = context.sourceCode
+					.getAncestors(node)
+					.some((ancestor) => ancestor.type === 'TSTypeQuery');
+				if (inType) return;
+				if (
+					variable.references.some(
+						(reference) => reference.identifier === node && reference.isRead()
+					)
+				)
+					checkDefect(node);
 			},
 			VariableDeclarator(node) {
 				if (node.id.type === 'Identifier' && node.init && namespace(node.init))
@@ -63,19 +111,7 @@ export default {
 				}
 			},
 			MemberExpression(node) {
-				const property = node.computed ? node.property.value : node.property.name;
-				if (!namespace(node.object) || !defects.has(property)) return;
-				const ancestors = context.sourceCode.getAncestors(node);
-				const method = ancestors.findLast((ancestor) => ancestor.type === 'MethodDefinition');
-				const owner = ancestors.findLast((ancestor) => ancestor.type === 'ClassDeclaration');
-				const approved = allow.some(
-					(entry) =>
-						context.filename.replaceAll('\\', '/').endsWith('/' + entry.file) &&
-						owner?.id?.name === entry.className &&
-						method?.static === true &&
-						method.key.name === entry.method
-				);
-				if (!approved) context.report({ node, messageId: 'defect' });
+				if (namespace(node.object) && defects.has(propertyName(node))) checkDefect(node);
 			}
 		};
 	}

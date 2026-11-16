@@ -11,6 +11,17 @@ const options = [{ tables: ['transactions', 'imports'] }];
 
 new RuleTester().run('owned-writes', rule, {
 	valid: [
+		{
+			name: 'read-only helper receives query results',
+			code: 'read(await ctx.db.query("transactions").collect());',
+			options
+		},
+		{ name: 'read-only helper receives detached get', code: 'read(ctx.db.get);', options },
+		{
+			name: 'helper receives ctx and its writes stay checked where it makes them',
+			code: 'function save(ctx) { return ctx.db.patch("accounts", id, {}); } save(ctx);',
+			options
+		},
 		{ code: 'ctx.db.patch("accounts", id, { name });', options },
 		{ code: 'ctx.db.get("transactions", id);', options },
 		{ code: 'ctx.db.query("imports");', options },
@@ -22,6 +33,36 @@ new RuleTester().run('owned-writes', rule, {
 		}
 	],
 	invalid: [
+		...['insert', 'patch', 'replace', 'delete'].map((method) => ({
+			name: `detached database ${method}`,
+			code: `const write = ctx.db.${method}; write("transactions", id, {});`,
+			options,
+			errors: [{ messageId: 'detachedWrite', data: { method } }]
+		})),
+		{
+			name: 'assigned detached method from a database alias',
+			code: 'const store = ctx.db; let patch; patch = store["patch"]; patch("transactions", id, {});',
+			options,
+			errors: [{ messageId: 'detachedWrite', data: { method: 'patch' } }]
+		},
+		{
+			name: 'database passed to differently named helper parameter',
+			code: 'function write(store) { store.patch("transactions", id, {}) } write(ctx.db);',
+			options,
+			errors: [{ messageId: 'databaseArgument' }]
+		},
+		{
+			name: 'database alias passed to a helper',
+			code: 'const store = ctx.db; helper(store);',
+			options,
+			errors: [{ messageId: 'databaseArgument' }]
+		},
+		{
+			name: 'literal db parameter remains checked',
+			code: 'function write(db) { db.patch("transactions", id, {}); }',
+			options,
+			errors: [{ messageId: 'ownedTable', data: { table: 'transactions' } }]
+		},
 		...['insert', 'patch', 'replace', 'delete'].map((method) => ({
 			code: `ctx.db.${method}("transactions", id, {});`,
 			options,
@@ -48,6 +89,7 @@ new RuleTester().run('owned-writes', rule, {
 			errors: [{ messageId: 'ownedTable', data: { table: 'imports' } }]
 		},
 		{
+			name: 'destructured patch remains checked',
 			code: 'const { patch } = ctx.db; patch("transactions", id, {});',
 			options,
 			errors: [{ messageId: 'detachedWrite', data: { method: 'patch' } }]

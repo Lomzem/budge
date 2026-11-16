@@ -212,7 +212,7 @@ export default defineSchema({
 		from: v.string(),
 		to: v.string(),
 		fingerprint: v.string(),
-		state: v.union(v.literal('applied'), v.literal('undone')),
+		state: v.union(v.literal('applied'), v.literal('undone'), v.literal('superseded')),
 		startingBalances: v.array(
 			v.object({
 				transactionId: v.id('transactions'),

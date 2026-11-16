@@ -5,14 +5,14 @@ Navigate between budgeting views, retain theme choice, and expose iPhone install
 ## Sub-features
 
 - `shell-nav`: five Sections (Budget, Accounts, Bank, Categories, Settings) in the desktop sidebar and the phone tab bar; direct routes.
-- `shell-theme`: System/Light/Dark persistent choice on Settings.
+- `shell-theme`: `Match this device`/Light/Dark persistent choice on Settings (radiogroup `Theme`); without a stored choice it follows the device.
 - `shell-install`: guidance dialog; real standalone iPhone resume/auth.
 - `shell-stable`: no layout shift on any page at desktop or phone width.
 
 ## How to get to it (user POV)
 
 - Desktop (`lg` and up): the `Sections and Accounts` sidebar lists the Sections, then each Account under its Cash/Credit group with balances; `Add Account` sits beside the Accounts heading.
-- Phone: the `Sections` tab bar at the bottom. Accounts lists the Accounts as a `nav` named `Accounts` above All Transactions; an Account page keeps the Accounts tab current (`aria-current="true"`).
+- Phone: the `Sections` tab bar at the bottom. Accounts lists the Accounts as a `nav` named `Accounts` above All Transactions, inside the `Your Accounts` disclosure (collapsed unless opened before; arriving with a query string forces it closed); an Account page keeps the Accounts tab current (`aria-current="true"`).
 - Badges: Accounts shows the Unapproved count, Bank the things that need the owner. Screen readers hear `Accounts, 3 Unapproved`.
 - Settings → Theme radio group; Settings → This device → `Add to Home Screen` (only when not already standalone).
 
@@ -21,7 +21,7 @@ Navigate between budgeting views, retain theme choice, and expose iPhone install
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/shell.ts`, also run by `bun run test:e2e:local`):
 
 - `shell/navigate`: Budget landing, every sidebar Section, a wheel over the Budget table and the sidebar scrolling the page, then the 320 px tab bar to every Section and an Account (`shell-nav`).
-- `shell/phone-pages`: at 390 px, every Section and the Checking register load and scroll to the end (`shell-stable`).
+- `shell/phone-pages`: at 390 px, every Section and the Checking register load and take a large scroll (`shell-stable`); the journey does not assert the end was reached.
 
 Every journey runs under the layout-shift guard (`e2e/journeys/layoutShift.ts`): a shift fails the journey and names the elements that moved unless it comes within 500 ms of input, or while a request sent within 500 ms of input is pending and up to 500 ms after its result arrives (a mutation once the page has synced its commit, a new query once its first result lands). Background updates and page loads with no input still fail. It watches the `WebSocket` the page uses, so a journey's `routeWebSocket` (as in `e2e/heldResponse.ts`) does not hide held requests or forged answers from it.
 
@@ -32,7 +32,7 @@ Preconditions:
 - Authenticated baseline from the index; reseed before independent mutations.
 
 - **Navigate:** require the heading, `aria-current="page"` on the Section, and no horizontal overflow at 320 px. Follow `Manage Categories` from the Budget (manual drive beyond the journey).
-- **Theme:** on `/settings`, choose `getByRole("radio", { name: "Dark" })`, capture; reload, require the choice kept and readable contrast. Repeat Light and System; change the OS color-scheme preference for System and require the app follows it. Check focus visibility.
+- **Theme:** on `/settings`, choose `getByRole("radio", { name: "Dark" })`, capture; reload, require the choice kept and readable contrast. Repeat Light and `Match this device`; change the OS color-scheme preference for `Match this device` and require the app follows it. Check focus visibility.
 - **Guidance:** Settings → Add to Home Screen; the dialog's steps follow the device: on iPhone/iPad Safari (title `Add to Home Screen`, Share/Add/Open as Web App), on Android Chrome (`Add to Home Screen`, menu → Add to home screen → Install), elsewhere (title `Install Budge`, Chrome/Edge install). Require the title and steps for the emulated device, dismiss and restore focus. On a real iPhone separately install, verify standalone launch, GitHub/email auth, live data after background/resume, 7-day session renewal, safe areas and light/dark status bar.
 
 ## Gotchas

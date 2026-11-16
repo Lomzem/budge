@@ -314,6 +314,11 @@ export async function lastCutoverMove(ctx: QueryCtx) {
 	return (await readCutoverDate(ctx)) === last.to ? last : null;
 }
 
+export async function supersedeLastCutoverMove(ctx: MutationCtx) {
+	const last = await lastCutoverMove(ctx);
+	if (last !== null) await ctx.db.patch('cutoverMoves', last._id, { state: 'superseded' });
+}
+
 const cannotUndo = "so the move can't be undone.";
 
 export async function undoLaterCutover(ctx: MutationCtx, moveId: Id<'cutoverMoves'>) {
