@@ -160,6 +160,11 @@
 		} else moveError = moved.error?.message ?? "Budge couldn't move the money. Try again.";
 	}
 
+	function announceAssigned(cents: number) {
+		done = `Assigned ${formatCents(cents)} to ${category.name} from Ready to Assign.`;
+		section?.focus({ preventScroll: true });
+	}
+
 	async function cover() {
 		coverError = '';
 		done = '';
@@ -407,9 +412,7 @@
 				<AssignNeededButton
 					categoryId={openedForId}
 					needed={category.payment.uncovered}
-					onassigned={() => {
-						section?.focus({ preventScroll: true });
-					}}
+					onassigned={announceAssigned}
 				/>
 			{/if}
 		</section>
@@ -430,9 +433,7 @@
 					<AssignNeededButton
 						categoryId={openedForId}
 						needed={category.target.needed}
-						onassigned={() => {
-							section?.focus({ preventScroll: true });
-						}}
+						onassigned={announceAssigned}
 					/>
 				{/if}
 			{/if}

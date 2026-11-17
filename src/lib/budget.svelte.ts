@@ -92,7 +92,7 @@ export class BudgetMonth {
 	}
 
 	async assignNeeded(categoryId: Id<'categories'>) {
-		await this.#assignNeeded({ month: this.month, categoryId });
+		return await this.#assignNeeded({ month: this.month, categoryId });
 	}
 
 	async setTarget(

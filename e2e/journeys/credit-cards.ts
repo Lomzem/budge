@@ -26,21 +26,25 @@ export const creditCards = {
 			);
 
 			await step(
-				'Assign $612.48 in the table covers the debt from Ready to Assign, as the inspector offers too',
+				'Assign $612.48 covers the debt from Ready to Assign, from the table or the inspector',
 				async () => {
-					await nameButton.click();
-					const inspector = page.getByRole('region', { name: 'Card', exact: true });
-					const fromInspector = inspector.getByRole('button', { name: 'Assign $612.48' });
-					await expect(fromInspector).toBeVisible();
 					const fromTable = group.getByRole('button', {
 						name: 'Assign $612.48 to Card',
 						exact: true
 					});
-					await fromTable.click();
-					await expect(fromTable).toHaveCount(0);
+					await expect(fromTable).toBeVisible();
+					await nameButton.click();
+					const inspector = page.getByRole('region', { name: 'Card', exact: true });
+					const fromInspector = inspector.getByRole('button', { name: 'Assign $612.48' });
+					await fromInspector.focus();
+					await page.keyboard.press('Enter');
+					await expect(inspector.getByRole('status')).toHaveText(
+						'Assigned $612.48 to Card from Ready to Assign.'
+					);
 					await expect(fromInspector).toHaveCount(0);
+					await expect(fromTable).toHaveCount(0);
 					await expect(page.getByText('of card debt not yet covered')).toHaveCount(0);
-					await expect(nameButton).toBeFocused();
+					await expect(inspector).toBeFocused();
 					await expect.poll(readyToAssign).toBe(before - seededCardsStartingDebt);
 					await page.reload();
 					await expect.poll(readyToAssign).toBe(before - seededCardsStartingDebt);
