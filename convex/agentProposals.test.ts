@@ -147,11 +147,11 @@ describe('applying a Categorization Proposal', () => {
 
 		expect(result.changes.map((change) => change.outcome)).toEqual(['applied', 'applied']);
 		const after = await rows(t);
-		expect(after.get('Corner Grocer')?.category?.id).toBe(categories.Dining);
-		expect(after.get('SAMPLE COFFEE 0042')).toMatchObject({
-			category: { id: categories.Dining },
-			approved: false
-		});
+		const dining = { id: categories.Dining, name: 'Dining' };
+		for (const payee of ['Corner Grocer', 'SAMPLE COFFEE 0042']) {
+			expect(after.get(payee)).toEqual({ ...read.get(payee), category: dining });
+		}
+		expect(after.get('SAMPLE COFFEE 0042')?.approved).toBe(false);
 		expect(await owner.query(api.payees.lastCategory, { name: 'Corner Grocer' })).toBe(
 			categories.Groceries
 		);
@@ -159,7 +159,7 @@ describe('applying a Categorization Proposal', () => {
 
 	test('leaves alone each change it may not make, and still makes the rest', async () => {
 		const { t, owner, accounts, groups, categories, readyToAssignId, read } = await spending();
-		for (const payee of ['Bakery', 'Deli', 'Kiosk']) {
+		for (const payee of ['Bakery', 'Deli', 'Kiosk', 'Stall']) {
 			await owner.mutation(api.transactions.create, {
 				accountId: accounts.Checking,
 				date: '2026-08-18',
@@ -171,6 +171,14 @@ describe('applying a Categorization Proposal', () => {
 		}
 		await owner.mutation(api.categories.setHidden, { categoryId: categories.Old, hidden: true });
 		await owner.mutation(api.categories.setGroupHidden, { groupId: groups.Archive, hidden: true });
+		const gone = await owner.mutation(api.categories.create, {
+			groupId: groups.Everyday,
+			name: 'Gone'
+		});
+		await owner.mutation(api.categories.remove, {
+			categoryId: gone,
+			destinationId: categories.Groceries
+		});
 		const now = await rows(t);
 		const fromGroceries = (payee: string) => ({
 			transactionId: idOf(now, payee),
@@ -191,6 +199,7 @@ describe('applying a Categorization Proposal', () => {
 				{ ...fromGroceries('Bakery'), toCategoryId: readyToAssignId },
 				{ ...fromGroceries('Deli'), toCategoryId: categories.Old },
 				{ ...fromGroceries('Kiosk'), toCategoryId: categories.Retired },
+				{ ...fromGroceries('Stall'), toCategoryId: gone },
 				{
 					transactionId: idOf(read, 'Corner Grocer'),
 					fromCategoryId: categories.Dining,
@@ -207,6 +216,7 @@ describe('applying a Categorization Proposal', () => {
 			'notAllowed',
 			'notAllowed',
 			'notAllowed',
+			'notAllowed',
 			'changed',
 			'applied'
 		]);
@@ -220,6 +230,7 @@ describe('applying a Categorization Proposal', () => {
 			Bakery: categories.Groceries,
 			Deli: categories.Groceries,
 			Kiosk: categories.Groceries,
+			Stall: categories.Groceries,
 			'Corner Grocer': categories.Groceries,
 			'SAMPLE COFFEE 0042': categories.Dining
 		});
@@ -479,6 +490,80 @@ describe('undoing a Categorization Proposal', () => {
 		]);
 	});
 
+	type Spending = Awaited<ReturnType<typeof spending>>;
+	test.each<[string, (backend: Spending, snacks: Id<'categories'>) => Promise<unknown>]>([
+		[
+			'a split line',
+			({ owner, accounts, categories }, snacks) =>
+				owner.mutation(api.transactions.create, {
+					accountId: accounts.Checking,
+					date: '2026-08-20',
+					amount: -1_000,
+					payee: 'Corner Shop',
+					memo: '',
+					splits: [
+						{ categoryId: snacks, amount: -400, memo: '' },
+						{ categoryId: categories.Groceries, amount: -600, memo: '' }
+					]
+				})
+		],
+		[
+			'an Assignment',
+			({ owner }, snacks) =>
+				owner.mutation(api.budget.setAssigned, {
+					month: '2026-08',
+					categoryId: snacks,
+					amount: 2_000
+				})
+		],
+		[
+			'a Target',
+			({ owner }, snacks) =>
+				owner.mutation(api.categories.setTarget, {
+					categoryId: snacks,
+					target: { kind: 'monthly', amount: 2_000, mode: 'refill' }
+				})
+		],
+		[
+			"a Payee's Remembered Category",
+			async ({ owner, accounts }, snacks) => {
+				const vending = await owner.mutation(api.transactions.create, {
+					accountId: accounts.Checking,
+					date: '2026-08-20',
+					amount: -300,
+					payee: 'Vending',
+					categoryId: snacks,
+					rememberCategory: true,
+					memo: ''
+				});
+				await owner.mutation(api.transactions.remove, { transactionId: vending });
+			}
+		]
+	])('keeps a new Category the owner has since used in %s', async (_use, useIt) => {
+		const backend = await spending();
+		const { t, owner, groups, read } = backend;
+		await apply(t, {
+			id: 'proposal-in-use',
+			newCategories: [{ name: 'Snacks', groupId: groups.Everyday }],
+			changes: [
+				{
+					transactionId: idOf(read, 'SAMPLE COFFEE 0042'),
+					fromCategoryId: null,
+					toNewCategory: 'Snacks'
+				}
+			]
+		});
+		await useIt(backend, await snacksId(owner));
+
+		const response = await agentPost(t, '/agent/proposals/undo', { id: 'proposal-in-use' });
+
+		expect(await response.json()).toMatchObject({ restored: 1, removedCategories: [] });
+		const { groups: after } = await owner.query(api.categories.list, {});
+		expect(after.flatMap((group) => group.categories.map((category) => category.name))).toContain(
+			'Snacks'
+		);
+	});
+
 	test('answers a second undo with the first result and changes nothing more', async () => {
 		const { t, owner, categories } = await appliedThenEdited();
 		const first = await agentPost(t, '/agent/proposals/undo', { id: 'proposal-to-undo' });
@@ -662,13 +747,14 @@ describe('a malformed Categorization Proposal', () => {
 	});
 
 	test.each([
-		['a missing id', {}],
-		['an unknown field', { id: 'p', changes: [] }]
-	])('refuses an undo with %s', async (_, body) => {
+		['a missing id', {}, 'id must be non-empty text'],
+		['an unknown field', { id: 'p', changes: [] }, 'unknown field changes']
+	])('refuses an undo with %s', async (_, body, mention) => {
 		const { t } = await spending();
 
 		const response = await agentPost(t, '/agent/proposals/undo', body);
 
 		expect(response.status).toBe(400);
+		expect(await response.text()).toContain(mention);
 	});
 });

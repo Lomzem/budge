@@ -2,6 +2,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
+import { NEW_NAME_LIMIT, PROPOSAL_CHANGE_LIMIT, PROPOSAL_ID } from '../../convex/lib/agentProposal';
+
 import { readAgentConfig } from './config';
 
 const MONEY_NOTE =
@@ -64,7 +66,7 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const proposalId = z
 	.string()
-	.regex(/^[\w.:-]{1,100}$/)
+	.regex(PROPOSAL_ID)
 	.describe('an ID you choose for this proposal: letters, digits, and . _ : -');
 
 const APPLY_DESCRIPTION = [
@@ -85,7 +87,11 @@ function registerProposalTools(server: McpServer) {
 			description: APPLY_DESCRIPTION,
 			inputSchema: {
 				id: proposalId,
-				newGroups: z.array(z.string()).max(20).optional().describe('new Category Group names'),
+				newGroups: z
+					.array(z.string())
+					.max(NEW_NAME_LIMIT)
+					.optional()
+					.describe('new Category Group names'),
 				newCategories: z
 					.array(
 						z.object({
@@ -94,7 +100,7 @@ function registerProposalTools(server: McpServer) {
 							newGroup: z.string().optional().describe('a name from newGroups')
 						})
 					)
-					.max(20)
+					.max(NEW_NAME_LIMIT)
 					.optional(),
 				changes: z
 					.array(
@@ -107,7 +113,7 @@ function registerProposalTools(server: McpServer) {
 						})
 					)
 					.min(1)
-					.max(100)
+					.max(PROPOSAL_CHANGE_LIMIT)
 			},
 			annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false }
 		},

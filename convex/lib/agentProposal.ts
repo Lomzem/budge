@@ -15,8 +15,8 @@ export const proposalOutcome = v.union(
 export type ProposalOutcome = Infer<typeof proposalOutcome>;
 
 export const PROPOSAL_CHANGE_LIMIT = 100;
-const NEW_NAME_LIMIT = 20;
-const PROPOSAL_ID = /^[\w.:-]{1,100}$/;
+export const NEW_NAME_LIMIT = 20;
+export const PROPOSAL_ID = /^[\w.:-]{1,100}$/;
 
 export type ChangeTarget = { categoryId: string } | { newCategory: string };
 export type GroupChoice = { groupId: string } | { newGroup: string };
