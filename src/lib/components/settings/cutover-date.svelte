@@ -82,10 +82,7 @@
 <section aria-labelledby="cutover-heading" class="flex flex-col gap-3">
 	<div class="flex flex-col gap-1">
 		<h2 id="cutover-heading" class="text-lg font-bold">Cutover date</h2>
-		<p class="text-muted-foreground">
-			Budge tracks money from this date on. Bank transactions dated earlier aren't brought in, and
-			each Account's starting balance is its balance on this date.
-		</p>
+		<p class="text-muted-foreground">Budge tracks money from this date.</p>
 	</div>
 	{#if settings.error}
 		<p role="alert" class="flex h-9 items-center text-destructive">
