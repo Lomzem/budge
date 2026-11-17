@@ -30,7 +30,7 @@ import {
 	transferCandidatesOf
 } from './lib/transactions';
 
-const transactionRow = v.object({
+export const transactionRow = v.object({
 	_id: v.id('transactions'),
 	accountId: v.id('accounts'),
 	accountName: v.string(),
@@ -74,47 +74,66 @@ const transactionRow = v.object({
 	)
 });
 
-const approval = v.union(v.literal('unapproved'), v.literal('approved'));
+export const approval = v.union(v.literal('unapproved'), v.literal('approved'));
+
+const listArgs = {
+	accountId: v.optional(v.id('accounts')),
+	approval: v.optional(approval),
+	search: v.optional(v.string()),
+	categoryId: v.optional(v.id('categories')),
+	uncategorized: v.optional(v.literal(true)),
+	payeeId: v.optional(v.id('payees')),
+	from: v.optional(v.string()),
+	to: v.optional(v.string()),
+	splitLines: v.optional(v.boolean()),
+	bankChanges: v.optional(v.literal(true)),
+	paginationOpts: paginationOptsValidator
+};
+
+export const transactionPage = paginationResultValidator(transactionRow);
 
 export const list = query({
-	args: {
-		accountId: v.optional(v.id('accounts')),
-		approval: v.optional(approval),
-		search: v.optional(v.string()),
-		categoryId: v.optional(v.id('categories')),
-		uncategorized: v.optional(v.literal(true)),
-		payeeId: v.optional(v.id('payees')),
-		from: v.optional(v.string()),
-		to: v.optional(v.string()),
-		splitLines: v.optional(v.boolean()),
-		bankChanges: v.optional(v.literal(true)),
-		paginationOpts: paginationOptsValidator
-	},
-	returns: paginationResultValidator(transactionRow),
-	handler: async (ctx, { approval, bankChanges, paginationOpts, ...args }) => {
+	args: listArgs,
+	returns: transactionPage,
+	handler: async (ctx, args) => {
 		await requireOwner(ctx);
-		if (args.accountId !== undefined && (await ctx.db.get('accounts', args.accountId)) === null) {
-			throw publicError('NOT_FOUND');
-		}
-		const searching = (args.search ?? '').trim() !== '';
-		const filters = requireFilters(args);
-
-		const searchOfOnlyPunctuation = searching && filters.search === '';
-		if (searchOfOnlyPunctuation) return { page: [], isDone: true, continueCursor: '' };
-
-		if (bankChanges === true && filters.splitLines) {
-			throw publicError('INVALID_INPUT', 'Bank changes list whole Transactions, not split lines.');
-		}
-		const result =
-			bankChanges === true
-				? await withBankChanges(ctx, filters, approval, paginationOpts)
-				: await pageOf(ctx, filters, searching, approval, paginationOpts);
-		return {
-			...result,
-			page: await Promise.all(result.page.map((transaction) => toRow(ctx, transaction)))
-		};
+		return await readTransactions(ctx, args);
 	}
 });
+
+export interface TransactionsQuery extends Omit<Filters, 'search' | 'splitLines'> {
+	search?: string | undefined;
+	splitLines?: boolean | undefined;
+	approval?: Approval | undefined;
+	bankChanges?: true | undefined;
+	paginationOpts: PaginationOptions;
+}
+
+export async function readTransactions(
+	ctx: QueryCtx,
+	{ approval, bankChanges, paginationOpts, ...args }: TransactionsQuery
+): Promise<Infer<typeof transactionPage>> {
+	if (args.accountId !== undefined && (await ctx.db.get('accounts', args.accountId)) === null) {
+		throw publicError('NOT_FOUND');
+	}
+	const searching = (args.search ?? '').trim() !== '';
+	const filters = requireFilters(args);
+
+	const searchOfOnlyPunctuation = searching && filters.search === '';
+	if (searchOfOnlyPunctuation) return { page: [], isDone: true, continueCursor: '' };
+
+	if (bankChanges === true && filters.splitLines) {
+		throw publicError('INVALID_INPUT', 'Bank changes list whole Transactions, not split lines.');
+	}
+	const result =
+		bankChanges === true
+			? await withBankChanges(ctx, filters, approval, paginationOpts)
+			: await pageOf(ctx, filters, searching, approval, paginationOpts);
+	return {
+		...result,
+		page: await Promise.all(result.page.map((transaction) => toRow(ctx, transaction)))
+	};
+}
 
 interface Filters {
 	accountId?: Id<'accounts'> | undefined;
@@ -130,7 +149,10 @@ interface Filters {
 type Approval = Infer<typeof approval>;
 
 function requireFilters(
-	args: Omit<Filters, 'search' | 'splitLines'> & { search?: string; splitLines?: boolean }
+	args: Omit<Filters, 'search' | 'splitLines'> & {
+		search?: string | undefined;
+		splitLines?: boolean | undefined;
+	}
 ): Filters {
 	const filters: Filters = {
 		...args,

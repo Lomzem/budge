@@ -46,36 +46,36 @@ const categoryBudget = v.object({
 	)
 });
 
+export const budgetMonth = v.object({
+	month: v.string(),
+	firstMonth: v.union(v.string(), v.null()),
+	readyToAssign: v.object({ amount: v.number(), uncategorized: v.number() }),
+	uncategorizedCount: v.number(),
+	groups: v.array(
+		v.object({
+			id: v.id('categoryGroups'),
+			name: v.string(),
+			kind: v.union(v.literal('normal'), v.literal('creditCardPayments')),
+			...totals,
+			categories: v.array(categoryBudget)
+		})
+	),
+	hidden: v.array(categoryBudget),
+	overspent: v.array(v.object({ id: v.id('categories'), name: v.string(), available: v.number() })),
+	upcoming: v.array(
+		v.object({
+			id: v.id('categories'),
+			name: v.string(),
+			dueDate: v.string(),
+			amount: v.number(),
+			funded: v.boolean()
+		})
+	)
+});
+
 export const month = query({
 	args: { month: v.string(), today: v.string() },
-	returns: v.object({
-		month: v.string(),
-		firstMonth: v.union(v.string(), v.null()),
-		readyToAssign: v.object({ amount: v.number(), uncategorized: v.number() }),
-		uncategorizedCount: v.number(),
-		groups: v.array(
-			v.object({
-				id: v.id('categoryGroups'),
-				name: v.string(),
-				kind: v.union(v.literal('normal'), v.literal('creditCardPayments')),
-				...totals,
-				categories: v.array(categoryBudget)
-			})
-		),
-		hidden: v.array(categoryBudget),
-		overspent: v.array(
-			v.object({ id: v.id('categories'), name: v.string(), available: v.number() })
-		),
-		upcoming: v.array(
-			v.object({
-				id: v.id('categories'),
-				name: v.string(),
-				dueDate: v.string(),
-				amount: v.number(),
-				funded: v.boolean()
-			})
-		)
-	}),
+	returns: budgetMonth,
 	handler: async (ctx, args) => {
 		await requireOwner(ctx);
 		if (!isIsoMonth(args.month) || !isIsoDate(args.today)) throw publicError('INVALID_INPUT');
@@ -83,7 +83,7 @@ export const month = query({
 	}
 });
 
-async function readBudget(ctx: QueryCtx, month: string, today: string) {
+export async function readBudget(ctx: QueryCtx, month: string, today: string) {
 	return computeBudget(await readBudgetInput(ctx, month, today));
 }
 

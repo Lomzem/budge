@@ -36,6 +36,7 @@ type Env = {
   readonly PLAID_CLIENT_ID: string | undefined;
   readonly PLAID_SECRET: string | undefined;
   readonly BUDGE_TOKEN_KEY: string | undefined;
+  readonly BUDGE_AGENT_KEY_SHA256: string | undefined;
 };
 
 /**
