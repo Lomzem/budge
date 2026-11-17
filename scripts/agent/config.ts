@@ -8,6 +8,10 @@ export interface AgentConfig {
 	target: string[];
 }
 
+export function agentCommand(name: string, target: string[]) {
+	return ['`bun run agent', name, ...target].join(' ') + '`';
+}
+
 export function agentConfigPath() {
 	const override = process.env.BUDGE_AGENT_CONFIG;
 	if (override !== undefined && override !== '') return override;

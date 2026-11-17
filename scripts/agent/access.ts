@@ -6,6 +6,7 @@ import { convexCli } from '../local/backend';
 import { findCheckout } from '../local/checkout';
 import { inheritedEnvWithoutDeploymentSettings } from '../local/env-file';
 import {
+	agentCommand,
 	agentConfigPath,
 	readAgentConfig,
 	removeAgentConfig,
@@ -117,10 +118,6 @@ function requireConfig() {
 	return config;
 }
 
-function command(name: string, target: string[]) {
-	return ['`bun run agent', name, ...target].join(' ') + '`';
-}
-
 function admitsLocalKey({ siteUrl, key, target }: AgentConfig) {
 	const found = deploymentOf(target);
 	if (found.siteUrl !== siteUrl) {
@@ -137,7 +134,7 @@ export function rotate() {
 	const { siteUrl, target } = config;
 	if (admitsLocalKey(config) !== 'admitted') {
 		throw new Error(
-			`${describeTarget(target)} (${siteUrl}) does not admit the Agent Key in ${agentConfigPath()}. Run ${command('setup', target)} to replace both.`
+			`${describeTarget(target)} (${siteUrl}) does not admit the Agent Key in ${agentConfigPath()}. Run ${agentCommand('setup', target)} to replace both.`
 		);
 	}
 	admitNewKey(siteUrl, target);
@@ -155,13 +152,13 @@ export function revoke(args: string[]) {
 	const { target } = config;
 	if (asked.length > 0 && asked.join(' ') !== target.join(' ')) {
 		throw new Error(
-			`the Agent Key in ${agentConfigPath()} belongs to ${describeTarget(target)}, not ${describeTarget(asked)}. Run ${command('revoke', [])} first, then ${command('revoke', asked)}.`
+			`the Agent Key in ${agentConfigPath()} belongs to ${describeTarget(target)}, not ${describeTarget(asked)}. Run ${agentCommand('revoke', [])} first, then ${agentCommand('revoke', asked)}.`
 		);
 	}
 	const state = admitsLocalKey(config);
 	if (state === 'another key') {
 		throw new Error(
-			`${describeTarget(target)} admits a different Agent Key than the one in ${agentConfigPath()}, so revoking would cut off another checkout's agent. To turn it off anyway, delete that file and run ${command('revoke', target)}.`
+			`${describeTarget(target)} admits a different Agent Key than the one in ${agentConfigPath()}, so revoking would cut off another checkout's agent. To turn it off anyway, delete that file and run ${agentCommand('revoke', target)}.`
 		);
 	}
 	if (state === 'admitted') convex(['env', 'remove', FINGERPRINT_VARIABLE, ...target]);

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { assert, beforeEach, describe, expect, test, vi } from 'vitest';
+import { assert, beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -565,6 +565,11 @@ describe('undoing a Categorization Proposal', () => {
 	});
 
 	test('keeps a new Category that undoing the latest cutover move would put back', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(new Date('2026-11-17T18:00:00Z'));
+		onTestFinished(() => {
+			vi.useRealTimers();
+		});
 		const { t, owner, groups, read } = await spending();
 		await apply(t, {
 			id: 'proposal-before-cutover',

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { NEW_NAME_LIMIT, PROPOSAL_CHANGE_LIMIT, PROPOSAL_ID } from '../../convex/lib/agentProposal';
 import { TRANSACTIONS_LIMIT } from '../../convex/lib/agentQuery';
 
-import { readAgentConfig } from './config';
+import { agentCommand, readAgentConfig } from './config';
 
 const MONEY_NOTE =
 	'Amounts are dollars; negative amounts are outflows. Every Category, Account, and Transaction carries its ID.';
@@ -46,7 +46,7 @@ async function callBudge(path: string, request: { parameters?: Parameters; body?
 	);
 	if (response.status === 401) {
 		return answer(
-			'Budge refused the Agent Key. Ask the owner to run `bun run agent rotate`.',
+			`Budge refused the Agent Key. Ask the owner to run ${agentCommand('setup', config.target)} to issue a new one.`,
 			true
 		);
 	}

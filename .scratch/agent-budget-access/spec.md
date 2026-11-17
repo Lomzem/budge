@@ -104,6 +104,13 @@ Opus accepted all five findings; the fixes are in the commit after `cc2c4a7`.
 - **MCP write tools lacked hints:** apply and undo carry `destructiveHint: true`, `idempotentHint: true`, `openWorldHint: false`.
 - **Verification:** both new tests failed under their negative controls (cutover: `removedCategories: ["Snacks"]`; size: `expected 200 to be 413`), then the files were restored. Live against a local anonymous backend: setup, rotate, rotate refused under a foreign fingerprint, `revoke --prod` refused with a dev key, revoke refused under a foreign fingerprint, revoke after the fingerprint was removed out of band, and a normal revoke.
 
+### CodeRabbit incremental review on `2f12f8c`
+
+Opus accepted both findings.
+
+- **The cutover test depended on the real date:** `applyLaterCutover` accepts `today` only near the real clock, so the test would fail from 2026-11-18. The test now pins `Date` to 2026-11-17T18:00Z and restores real timers when it finishes, as `convex/bankChanges.test.ts` does. Negative control: pinned to 2026-11-19, it failed at the device-date guard.
+- **The MCP 401 answer said to run `rotate`, which now refuses when the deployment no longer admits the key:** the answer now names `setup` with the key's own target. `agentCommand` moved to `scripts/agent/config.ts` so the CLI and the MCP server build the same command.
+
 ## Opus design review, pending owner decisions
 
 Recommends conversational approval for the personal extension, explicitly trusting the agent to honor the owner's answer. A separate human gate is a different security guarantee; a server cannot infer that a human said yes from an agent apply call. No verified T3 native per-tool approval mechanism is established. Full-access agents that can reach other owner credentials are outside a scoped API's isolation guarantee; the review's hypotheses about ambient credential powers were not verified and must not be treated as proof that independent approval is useless.
