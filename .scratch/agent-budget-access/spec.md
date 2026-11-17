@@ -1,0 +1,87 @@
+# Agent budget access
+
+Design interview in progress (resumed 2026-11-16; owner wants to proceed to implementation once the remaining decisions settle). No implementation is authorized by this record yet.
+
+## Desired experience
+
+Start a T3 Code thread and ask an agent to inspect a month's Transactions and budget and offer recommendations. Also explore categorization: the agent proposes Categories for recent Transactions, shows its decisions, and applies changes after the owner approves them.
+
+## Settled constraints
+
+- Budge is for this owner alone indefinitely; a multi-user integration platform is outside scope.
+- Stay on the free tier as long as practical. Bounded reads, batching where useful, and abuse controls matter; a batch is not itself evidence of lower database usage.
+- First-release writes include recategorizing existing Transactions (including already categorized Transactions) and creating Categories and Category Groups, after review and approval. No changes to amounts, dates, Payees, deletion, or money assignment are requested. Split handling remains open.
+- Connected agents may read the whole budget across Accounts and history, in bounded portions as needed. Bank credentials and authentication secrets are outside this access.
+- Show proposed categorization decisions before writing. Owner accepts conversational approval in T3 Code and trusts the agent to wait for approval; server scope enforcement does not independently prove human approval.
+- Same-machine cache reuse with download-time labeling and deliberate refresh is accepted; no continuous polling initially.
+- Product direction is a decoupled extension with approval in T3 Code, rather than requiring Budge UI. Opus design advice obtained; product trust boundary accepted, implementation enforcement design remains open.
+- Agent reclassification must leave remembered Payee Categories unchanged.
+- Include reviewable undo that preserves later owner changes and retains newly created Categories that have since been used.
+- Leave the existing checkout and the other active thread alone. Documentation lives on `docs/agent-budget-access` in `/home/lomzem/proj/budge-agent-access`, fast-forwarded onto `main` 2a7e56e on 2026-11-16 with these notes preserved. Note: `main` deleted ADRs 0001–0003 (35aa11d), so the ADR 0003 citation below refers to history, not a current record.
+
+## Decisions settled 2026-11-16
+
+- Q12 accepted: at apply, Budge refuses each change whose Transaction no longer has the Category the agent read; other changes in the Categorization Proposal still apply, and the agent asks again about the refused ones.
+- Q16 accepted: no local cache in the first release. Reads are live and bounded; measure real usage before building a cache (supersedes the Q7 cache for now).
+- Q17 accepted: page caps on reads and a cap of about 100 changes per apply; no daily quotas.
+- Q18 accepted: one setup command on this machine registers Budge for both Claude and Codex at user level, so any T3 Code thread in any folder can use named Budge tools.
+- Q19 accepted: one agent key; Budge stores only a fingerprint; the key lives in a private local file; it can read the budget, recategorize, and create Categories and Category Groups only; no expiry; revoke or rotate by command; no new Budge screens.
+- Q20 accepted: every applied Categorization Proposal is recorded; undo runs through an agent in chat, reverts only Transactions still in the agent's Category, and removes new Categories nothing uses yet. No Budge page for agent changes in the first release.
+- Q21 accepted: two tickets on one integration branch and PR: read access first, then proposals, apply, conflict handling, and undo.
+- Q22 accepted: Budge refuses an agent-created Category or Category Group whose name matches an existing one, ignoring case; the agent reuses the existing one.
+- Q23 accepted: agent recategorization leaves Unapproved Transactions Unapproved, and the agent cannot move Transactions into hidden Categories.
+- Q11 accepted: the agent may change the Category of Reconciled Transactions and of existing split lines; it cannot add, remove, or resize split lines, and cannot change Transfers or Starting Balances.
+- Q15 accepted: the agent proposes only changes it is sure of, lists unclear Transactions as questions, and adds a change only after the owner answers.
+
+Scout evidence (verified by parent at `convex/transactions.ts:477-560`): `categorizeMany` rejects splits and Transfers and never changes Remembered Categories; `undoCategorizeMany` restores only Transactions still in the bulk Category, with the change record held by the caller today. Category and Category Group creation does not check duplicate names (`convex/categories.ts:58`). The only HTTP route is the Plaid webhook; no agent credential exists.
+
+## Open decisions
+
+No product decisions remain open. Architecture is Opus-owned and is proposed below, pending owner confirmation of the shared understanding.
+
+## Investigation evidence
+
+Read-only scout inspected the active checkout without modifying it. Parent verified `convex/lib/owner.ts` and ADR 0003: existing owner credentials admit both reads and writes, and each deployment holds one owner's budget. Agent credentials therefore cannot simply reuse the owner's session while claiming read-only access. Other reported findings need verification against the implementation baseline before design is finalized.
+
+Reported existing building blocks: monthly budget read, filtered paginated Transactions, monthly totals cache. No existing agent access or scoped credential facilities were found. Current platform allowances and the cost of agent workflows are not yet measured or verified.
+
+Cache scout findings on this worktree: current export paginates full tables without a revision or common snapshot contract (`convex/export.ts`); schema has no general change feed or deletion tracking (`convex/schema.ts`). Transaction dates and Bank Connection cursors cannot detect all edits and deletions. Existing export is not an approved agent-facing data surface. Efficient incremental refresh and consistent publication of a completed cache require architectural decisions. Existing `.local-app/` state is checkout-local; a machine-wide cache would be new. Filesystem sharing is established for collaboration agents in this runtime, not every independent T3 thread or remote host. Local reads can avoid cloud calls, while refreshes and writes still incur usage per https://docs.convex.dev/production/state/limits. No actual usage measured.
+
+## Pending interview round
+
+- Q7 accepted: reuse same-machine cached data with download-time labeling and deliberate refresh, without continuous polling.
+- Q8 Budge approval rejected: user wants a decoupled extension and asks for approval in T3 Code. Security trade-off and enforcement under review by Opus.
+- Q9 restricted existing-Category/Uncategorized-only scope rejected: allow new Categories and Category Groups, and reorganizing already categorized Transactions. Split behavior and uncertain choices still open.
+- Q10 accepted: chat approval with explicit agent trust and server-enforced allowed changes.
+- Q11 not settled: owner asks about reversibility and why exclude special Transactions. Correct prior overbroad locked-Transaction claim: `saveTransaction` calls `requireLockKept`, which protects a Reconciled Transaction's amount/date/Account; it does not prohibit Category changes. Read verified at `convex/lib/transactions.ts:118` and `:196`.
+- Q12 clarification requested using wait-what skill: explain concurrent edits with one Transaction and ask again.
+- Q13 accepted: historical reclassification does not teach future Payee categorization.
+- Q14 accepted: reviewable safe undo.
+
+## Principles applied
+
+- Experience First: begin with asking questions and reviewing concrete categorization proposals.
+- Laziness Protocol: narrow the first release before choosing transports or extra capabilities.
+- Boundary Discipline: distinguish owner session permissions from agent permissions.
+- Separate Before Serializing Shared State: use an independent documentation worktree.
+- Make Operations Idempotent: proposed writes will need retry and interruption semantics; not yet designed.
+
+## Verification and remaining work
+
+Documentation only so far. No app, tests, deployments, commits, or pushes run. Continue the interview, record settled decisions as they arrive, then obtain architectural decisions from Opus. Add glossary terms only when a project-specific term is resolved; add ADRs only for settled decisions with meaningful trade-offs and reversal costs.
+
+## Opus design review, pending owner decisions
+
+Recommends conversational approval for the personal extension, explicitly trusting the agent to honor the owner's answer. A separate human gate is a different security guarantee; a server cannot infer that a human said yes from an agent apply call. No verified T3 native per-tool approval mechanism is established. Full-access agents that can reach other owner credentials are outside a scoped API's isolation guarantee; the review's hypotheses about ambient credential powers were not verified and must not be treated as proof that independent approval is useless.
+
+Proposed guardrails: frozen exact-change proposals; server-side scope and current-state checks; replay-safe apply with recorded results; expiry/revocation; audited changes and safe undo. These are design recommendations, not accepted product decisions. Multi-batch atomicity, interruption recovery and freshness preconditions need concrete design and verification; expected old Category alone is not proof of complete freshness or safe partial retries.
+
+Wider reclassification may shift historical Activity and later Available. Parent confirmed existing `requireUnlocked` and category memory calls in `convex/lib/transactions.ts`. Later verification corrected the review's overbroad lock claim: Reconciliation does not forbid Category-only changes; `requireLockKept` gates amount/date/Account changes. Open product decisions include special/split Transaction handling and conflict behavior. Chat trust, no Payee-memory side effects, and reviewable undo are accepted.
+
+## Proposed architecture (Opus, pending confirmation)
+
+- **Transport:** Convex HTTP actions under `/agent/*` on the deployment's site URL. Each request carries the Agent Key as `Authorization: Bearer`. The action compares the SHA-256 of the key with the fingerprint in the deployment env var `BUDGE_AGENT_KEY_SHA256` (constant-time), then calls internal queries/mutations. No `requireOwner` session reuse; the agent boundary is the HTTP layer.
+- **Local adapter:** a stdio MCP server in this repo, run with Bun, that reads `{siteUrl, key}` from a 0600 file under `~/.config/budge/` and exposes named tools. One `bun run agent` command (`setup`, `rotate`, `revoke`) generates the key, sets the fingerprint on the chosen deployment (production by default) through the Convex CLI, writes the local file, and registers the server at user scope for Claude Code and Codex.
+- **Reads (ticket 1):** month budget, Categories and Groups (including hidden flags), Accounts, Payees, and paginated Transactions filtered by month/date range, Account, Category, Uncategorized, Payee, and search. Every read has a page cap; Transactions reuse existing indexes and row enrichment.
+- **Writes (ticket 2):** one apply call per Categorization Proposal, at most ~100 changes. Each change names a Transaction (or split line) with the Category the agent read and the Category it wants. A proposal may create Categories and Category Groups first (duplicate names refused, case-insensitive). The mutation applies matching changes through `lib/transactions.ts` operations, refuses changed, hidden-target, Transfer, and Starting Balance changes per item, leaves Remembered Categories and approval unchanged, and records the result in a new table. A client-supplied proposal ID makes retries return the recorded result.
+- **Undo (ticket 2):** undo by recorded proposal; restores only Transactions still in the agent's Category; removes created Categories and Groups nothing uses.
