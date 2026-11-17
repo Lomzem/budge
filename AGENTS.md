@@ -54,3 +54,13 @@ Run these for each ticket, scoped to the ticket's diff. A ticket is not done unt
 1. CodeRabbit does not review automatically. Comment `@coderabbitai review` and wait for the completed review. A rate-limit or "review skipped" message is neither a review nor an approval: wait out the window, then comment `@coderabbitai review` again.
 2. Address every CodeRabbit comment with a fix or a reply. Batch the fixes, push, and request one incremental review.
 3. Merge only when CodeRabbit has approved the latest commit and CI is green.
+
+## CI time budget
+
+The `budget` job fails CI when any job runs longer than `BUDGET_SECONDS` in `.github/workflows/ci.yml`. The budget makes CI growth the owner's decision.
+
+When the `budget` job fails:
+
+1. Rerun every job once with `gh run rerun <run-id>`. A slow runner alone can cross the budget.
+2. If it fails again, bring the job under budget yourself: make it faster, add a Playwright shard, or split the job. These keep every test, so they need no approval.
+3. Raising the budget, changing the `budget` job, or skipping, deleting, or weakening a test to get under the budget needs the owner's approval. Finish the rest of the ticket, then ask once, with the job's time before and after the change. The change lands only after the owner approves it.

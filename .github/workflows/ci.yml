@@ -17,7 +17,7 @@ concurrency:
 jobs:
   checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       # The app reads its Convex URL at build time, so typechecking needs one. Nothing serves it.
       PUBLIC_CONVEX_URL: http://127.0.0.1:3210
@@ -59,7 +59,7 @@ jobs:
   e2e:
     name: e2e (${{ matrix.suite }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     strategy:
       # Report every shard, so one flaky journey doesn't hide the others' results.
       fail-fast: false
@@ -106,7 +106,7 @@ jobs:
           exit 1
       - name: Import capacity contract
         if: matrix.suite == 'capacity'
-        timeout-minutes: 10
+        timeout-minutes: 6
         env:
           PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEV_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_DEV_SECRET_KEY }}
@@ -116,7 +116,7 @@ jobs:
         run: bun run capacity:check
       - name: Playwright
         if: matrix.suite != 'capacity'
-        timeout-minutes: 15
+        timeout-minutes: 6
         # The Clerk development instance and its one hand-made test user. Never production:
         # global setup refuses any other credentials.
         env:
@@ -143,3 +143,41 @@ jobs:
             test-results/capacity/*/table.md
           if-no-files-found: ignore
           retention-days: 7
+
+  # Fails CI when a job runs over budget, after every job has finished, so its results stay.
+  # Raising the budget needs the owner's approval: see "CI time budget" in AGENTS.md.
+  budget:
+    needs: [checks, gitleaks, e2e]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: read
+    env:
+      BUDGET_SECONDS: 300
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check job times
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" \
+            --jq '.jobs[] | select(.name != "budget" and .conclusion != "skipped" and .completed_at != null)
+              | [.name, ((.completed_at | fromdate) - (.started_at | fromdate))] | @tsv' > times.tsv
+          [ -s times.tsv ] || { echo "::error title=CI time budget::Found no job times for this run."; exit 1; }
+          unfinished=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" \
+            --jq '.jobs[] | select(.name != "budget" and .completed_at == null) | .name')
+          [ -z "$unfinished" ] || { echo "::error title=CI time budget::Add these jobs to budget's needs: $unfinished"; exit 1; }
+          {
+            echo "| Job | Seconds |"
+            echo "|---|---:|"
+            sort -t$'\t' -k2,2rn times.tsv | awk -F'\t' '{ print "| " $1 " | " $2 " |" }'
+            echo
+            echo "Budget: ${BUDGET_SECONDS} s per job."
+          } >> "$GITHUB_STEP_SUMMARY"
+          over=0
+          while IFS=$'\t' read -r name seconds; do
+            if [ "$seconds" -gt "$BUDGET_SECONDS" ]; then
+              echo "::error title=CI time budget::$name took ${seconds} s, over the ${BUDGET_SECONDS} s budget. A rerun keeps the old times of jobs it skips, so rerun every job: gh run rerun $GITHUB_RUN_ID. See \"CI time budget\" in AGENTS.md."
+              over=1
+            fi
+          done < times.tsv
+          exit "$over"
