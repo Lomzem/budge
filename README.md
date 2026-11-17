@@ -1,81 +1,41 @@
 # budge
 
-budget
+A personal zero-based budget. Production runs at [budge.lomzem.dev](https://budge.lomzem.dev).
+
+## Agent access
+
+Agent access lets Claude Code and Codex read the production budget and apply Categorization Proposals you approve. Run setup after `bun install` and `bunx convex login`, from a checkout already linked to the Budge Convex project so that `--prod` reaches its production deployment.
+
+```sh
+bun run agent setup --prod
+```
+
+Setup writes a new Agent Key to `~/.config/budge/agent.json` by default and makes production accept only that key. It then registers the `budge` tools with the Claude Code and Codex CLIs you have installed. The registered tools run from this checkout, so keep it in place. Start a new Claude Code or Codex session, such as a new T3 Code thread, to pick them up. Then ask something like "What is my Ready to Assign this month?"
+
+```sh
+bun run agent rotate  # replace the Agent Key
+bun run agent revoke  # turn agent access off and delete the local key
+```
+
+If production refuses the key, run `bun run agent setup --prod` again. Run `bun run agent` to list every option.
 
 ## Development
 
-Needs [Bun](https://bun.com) and [gitleaks](https://github.com/gitleaks/gitleaks) (a system binary; the pre-commit hook runs it).
+Needs [Bun](https://bun.com) and [gitleaks](https://github.com/gitleaks/gitleaks), which the pre-commit hook runs.
 
 ```sh
 bun install          # also installs the git hooks
-bun run dev:backend  # Convex backend; on first run, choose a local deployment (no cloud quota)
+bun run dev:backend  # Convex backend. On first run, choose a local deployment.
 bun run dev          # the app
 ```
 
-Signing in needs the Clerk development instance: put its keys in `.env.local`, then point the local backend at it and make your Clerk user the owner:
+To sign in locally, put the Clerk development keys in `.env.local` and activate that instance's [Convex integration](https://docs.convex.dev/auth/clerk). Then point the local backend at that Clerk instance and make your Clerk user the owner.
 
 ```sh
 bunx convex env set CLERK_JWT_ISSUER_DOMAIN <Frontend API URL>
 bunx convex env set BUDGE_OWNER_SUBJECT <your Clerk user ID>
 ```
 
-Scripts for checks and tests are in `package.json`. Run the Playwright suite with `bun run test:e2e:local`. It uses its own disposable backend, never the one above; see [docs/agents/authentication.md](docs/agents/authentication.md#local-e2e). Variable names and where each one lives are in `.env.example`.
+`bunx convex run seed:run` fills an empty local backend with synthetic Accounts and Transactions.
 
-To fill an empty local backend with synthetic Accounts and about three months of Transactions:
-
-```sh
-bunx convex run seed:run
-```
-
-It refuses once any Account exists, and on a deployment where `BUDGE_PRODUCTION` is set.
-
-## Deployments
-
-Production is [budge.lomzem.dev](https://budge.lomzem.dev). Vercel deploys the
-SvelteKit frontend and Node 24 SSR. Its build command deploys Convex and injects
-the matching backend URL:
-
-```sh
-npx convex deploy --cmd 'bun run build' --cmd-url-env-var-name PUBLIC_CONVEX_URL --preview-run seed:run
-```
-
-Text search reads each Transaction's `searchText`, and the Bank changes list reads
-its `bankChange` marker. On a deployment that already has Transactions from before
-either, run the backfill once after deploying; it schedules its own remaining
-batches, and running it again changes nothing:
-
-```sh
-npx convex run migrations:backfillDerivedFields '{"cursor": null}' --prod
-```
-
-Leave out `--prod` to backfill the development deployment.
-
-The app embeds `PUBLIC_CONVEX_URL` during the build. CI uses an explicit localhost
-value for type generation. Vercel supplies each build with its matching backend
-URL through the deploy command.
-
-Vercel Production uses a production Convex deploy key and Clerk production keys.
-Preview uses a separate preview deploy key and Clerk development keys. New Convex
-previews load synthetic Accounts and Transactions and expire after five days.
-Vercel Authentication protects preview URLs. Keep `BUDGE_PRODUCTION` absent from
-all non-production backends, including Preview defaults.
-
-Activate Clerk's Convex integration separately on Production and Development.
-The app uses the standard session token and requires its `aud: "convex"` claim.
-Cloning an instance does not activate that integration on the new instance.
-
-Check shared backend usage in the [Convex dashboard](https://dashboard.convex.dev/)
-under the team's Usage page. Production, cloud dev, and previews share its limits.
-Check hosting usage in the [Vercel dashboard](https://vercel.com/dashboard) under
-the team's Usage page, filtered to Budge. Review a preview's measured database
-I/O and storage against the current plan limits before completing ticket 04.
-The cloud dev deployment pauses after 1000 function calls per UTC day.
-
-The Vercel Ignored Build Step avoids full builds and Convex preview creation for
-changes limited to `.scratch/**`, `docs/**`, and Markdown files. It builds if the
-previous successful deployment's commit is unavailable. Canceled builds still
-count toward Vercel's deployment quotas and concurrent build slots.
-
-[Ticket 04](.scratch/v1/issues/04-production-and-preview-deployments.md) records
-setup evidence and remaining manual checks. Credentials belong in the provider
-dashboards and the password manager. Do not save them in the repository.
+`bun run check` runs the checks and unit tests. `bun run test:e2e:local` runs the Playwright suite on its own disposable backend, as [docs/agents/authentication.md](docs/agents/authentication.md#local-e2e) describes. `.env.example` lists every environment variable and where it lives.
