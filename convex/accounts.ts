@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 
-import { mutation, query } from './_generated/server';
+import { mutation, query, type QueryCtx } from './_generated/server';
 import { confirmStartingBalance, insertAccount, startingBalanceOf } from './lib/accounts';
 import { requireName } from './lib/input';
 import { readPaymentCategory } from './lib/categories';
@@ -10,33 +10,39 @@ import { publicError } from './lib/publicError';
 
 const accountKind = v.union(v.literal('cash'), v.literal('creditCard'));
 
+export const accountRows = v.array(
+	v.object({
+		_id: v.id('accounts'),
+		name: v.string(),
+		kind: accountKind,
+		balance: v.number(),
+		lastReconciledOn: v.union(v.string(), v.null())
+	})
+);
+
 export const list = query({
 	args: {},
-	returns: v.array(
-		v.object({
-			_id: v.id('accounts'),
-			name: v.string(),
-			kind: accountKind,
-			balance: v.number(),
-			lastReconciledOn: v.union(v.string(), v.null())
-		})
-	),
+	returns: accountRows,
 	handler: async (ctx) => {
 		await requireOwner(ctx);
-		const balances = await accountBalances(ctx);
-		const accounts = [];
-		for await (const account of ctx.db.query('accounts')) accounts.push(account);
-		return accounts
-			.sort((a, b) => a.position - b.position)
-			.map(({ _id, name, kind, lastReconciledOn }) => ({
-				_id,
-				name,
-				kind,
-				balance: balances.get(_id) ?? 0,
-				lastReconciledOn: lastReconciledOn ?? null
-			}));
+		return await readAccounts(ctx);
 	}
 });
+
+export async function readAccounts(ctx: QueryCtx) {
+	const balances = await accountBalances(ctx);
+	const accounts = [];
+	for await (const account of ctx.db.query('accounts')) accounts.push(account);
+	return accounts
+		.sort((a, b) => a.position - b.position)
+		.map(({ _id, name, kind, lastReconciledOn }) => ({
+			_id,
+			name,
+			kind,
+			balance: balances.get(_id) ?? 0,
+			lastReconciledOn: lastReconciledOn ?? null
+		}));
+}
 
 export const create = mutation({
 	args: { name: v.string(), kind: accountKind, startingBalance: v.number() },

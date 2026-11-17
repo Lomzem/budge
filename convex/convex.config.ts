@@ -12,7 +12,9 @@ const app = defineApp({
 		PLAID_CLIENT_ID: v.optional(v.string()),
 		PLAID_SECRET: v.optional(v.string()),
 
-		BUDGE_TOKEN_KEY: v.optional(v.string())
+		BUDGE_TOKEN_KEY: v.optional(v.string()),
+
+		BUDGE_AGENT_KEY_SHA256: v.optional(v.string())
 	}
 });
 

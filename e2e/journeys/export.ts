@@ -6,6 +6,7 @@ import type { Journey } from './journey';
 
 const tablesABackupRestores = [
 	'accounts',
+	'agentProposals',
 	'assignments',
 	'bankConnections',
 	'categories',

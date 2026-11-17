@@ -328,10 +328,7 @@ export async function undoLaterCutover(ctx: MutationCtx, moveId: Id<'cutoverMove
 	if ((await lastCutoverMove(ctx))?._id !== moveId) {
 		throw publicError('INVALID_INPUT', `The cutover date has moved again since, ${cannotUndo}`);
 	}
-	const history = await ctx.db
-		.query('cutoverMoveHistory')
-		.withIndex('by_moveId', (q) => q.eq('moveId', moveId))
-		.take(LATER_CUTOVER_READS.transactions);
+	const history = await historyOf(ctx, moveId);
 	const startingBalances = await startingBalancesToPutBack(ctx, move);
 	await requireStillThere(ctx, move, history);
 
@@ -418,8 +415,7 @@ function listed(words: readonly string[]) {
 	return `${words.slice(0, -1).join(', ')} and ${words.at(-1) ?? ''}`;
 }
 
-async function requireStillThere(
-	ctx: QueryCtx,
+function categoriesUsedBy(
 	move: Doc<'cutoverMoves'>,
 	history: readonly Doc<'cutoverMoveHistory'>[]
 ) {
@@ -432,7 +428,28 @@ async function requireStillThere(
 	for (const { before } of move.startingBalances) {
 		if (before?.categoryId !== undefined) categoryIds.add(before.categoryId);
 	}
-	for (const categoryId of categoryIds) {
+	return categoryIds;
+}
+
+async function historyOf(ctx: QueryCtx, moveId: Id<'cutoverMoves'>) {
+	return await ctx.db
+		.query('cutoverMoveHistory')
+		.withIndex('by_moveId', (q) => q.eq('moveId', moveId))
+		.take(LATER_CUTOVER_READS.transactions);
+}
+
+export async function categoriesCutoverUndoNeeds(ctx: QueryCtx) {
+	const move = await lastCutoverMove(ctx);
+	if (move === null) return new Set<Id<'categories'>>();
+	return categoriesUsedBy(move, await historyOf(ctx, move._id));
+}
+
+async function requireStillThere(
+	ctx: QueryCtx,
+	move: Doc<'cutoverMoves'>,
+	history: readonly Doc<'cutoverMoveHistory'>[]
+) {
+	for (const categoryId of categoriesUsedBy(move, history)) {
 		if ((await ctx.db.get('categories', categoryId)) === null) {
 			throw publicError(
 				'INVALID_INPUT',

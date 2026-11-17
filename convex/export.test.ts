@@ -105,6 +105,14 @@ async function seedEveryTable(ctx: MutationCtx) {
 		lines: [],
 		bankRows: []
 	});
+	await ctx.db.insert('agentProposals', {
+		proposalId: 'proposal-1',
+		changes: [
+			{ transactionId, fromCategoryId: null, toCategoryId: categoryId, outcome: 'applied' }
+		],
+		createdGroups: [],
+		createdCategories: []
+	});
 	await ctx.db.insert('monthlyTotals', {
 		month: '2026-08',
 		accountId,
@@ -128,7 +136,8 @@ const seededTables = [
 	'bankConnections',
 	'connectionAccounts',
 	'cutoverMoves',
-	'cutoverMoveHistory'
+	'cutoverMoveHistory',
+	'agentProposals'
 ];
 
 function keysAnywhere(value: unknown): string[] {

@@ -4,6 +4,8 @@ import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import {
 	ensureReadyToAssign,
+	insertCategory,
+	insertGroup,
 	readReadyToAssign,
 	requireOwnCategory,
 	requireOwnGroup
@@ -62,11 +64,7 @@ export const createGroup = mutation({
 		await requireOwner(ctx);
 		const name = requireName(args.name);
 		await ensureReadyToAssign(ctx);
-		let position = 0;
-		for await (const group of ctx.db.query('categoryGroups')) {
-			position = Math.max(position, group.position + 1);
-		}
-		return await ctx.db.insert('categoryGroups', { name, position, kind: 'normal' });
+		return await insertGroup(ctx, name);
 	}
 });
 
@@ -81,17 +79,7 @@ export const create = mutation({
 		if (group.kind !== 'normal') {
 			throw publicError('INVALID_INPUT', 'Budge manages that group.');
 		}
-		const last = await ctx.db
-			.query('categories')
-			.withIndex('by_group_position', (q) => q.eq('groupId', group._id))
-			.order('desc')
-			.first();
-		return await ctx.db.insert('categories', {
-			groupId: group._id,
-			name,
-			position: last === null ? 0 : last.position + 1,
-			kind: 'normal'
-		});
+		return await insertCategory(ctx, group._id, name);
 	}
 });
 

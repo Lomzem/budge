@@ -251,6 +251,16 @@ export type CategoryChoice =
 	| { kind: 'category'; categoryId: Id<'categories'>; remember?: boolean | undefined }
 	| { kind: 'transfer'; accountId: Id<'accounts'> };
 
+async function keptFields(ctx: MutationCtx, existing: Doc<'transactions'>) {
+	return {
+		accountId: existing.accountId,
+		date: existing.date,
+		amount: existing.amount,
+		payee: (await payeeNameOf(ctx, existing)) ?? '',
+		memo: existing.memo ?? ''
+	};
+}
+
 export async function categorizeTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'>,
@@ -259,20 +269,38 @@ export async function categorizeTransaction(
 	if (existing.split === true) {
 		throw publicError('INVALID_INPUT', 'A split Transaction takes its Categories on its lines.');
 	}
-	const payee = choice.kind === 'transfer' ? '' : ((await payeeNameOf(ctx, existing)) ?? '');
+	const kept = await keptFields(ctx, existing);
 	await saveTransaction(
 		ctx,
 		existing,
 		{
-			accountId: existing.accountId,
-			date: existing.date,
-			amount: existing.amount,
-			payee,
-			memo: existing.memo ?? '',
+			...kept,
 			...(choice.kind === 'category' ? { categoryId: choice.categoryId } : {}),
-			...(choice.kind === 'transfer' ? { transferAccountId: choice.accountId } : {})
+			...(choice.kind === 'transfer' ? { payee: '', transferAccountId: choice.accountId } : {})
 		},
 		{ approve: false, rememberCategory: choice.kind === 'category' && choice.remember === true }
+	);
+}
+
+export async function recategorizeSplitLine(
+	ctx: MutationCtx,
+	existing: Doc<'transactions'>,
+	line: number,
+	categoryId: Id<'categories'>
+) {
+	const lines = await splitLinesOf(ctx, existing._id);
+	await saveTransaction(
+		ctx,
+		existing,
+		{
+			...(await keptFields(ctx, existing)),
+			splits: lines.map((split, index) => ({
+				categoryId: index === line ? categoryId : split.categoryId,
+				amount: split.amount,
+				memo: split.memo ?? ''
+			}))
+		},
+		{ approve: false, rememberCategory: false }
 	);
 }
 

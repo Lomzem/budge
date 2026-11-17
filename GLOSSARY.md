@@ -82,6 +82,14 @@ _Avoid_: Over budget, deficit
 To assign or move money into an overspent Category until its Available is back to zero.
 _Avoid_: Fix, top up
 
+**Categorization Proposal**:
+A set of Transaction Category changes and any new Categories or Category Groups that the owner reviews before an agent applies them.
+_Avoid_: Automatic cleanup, approved changes
+
+**Agent Key**:
+The one credential that lets the owner's agents read the budget and apply approved Categorization Proposals, and nothing else.
+_Avoid_: API key, token, password
+
 **Uncategorized**:
 A Transaction not yet given a Category. It counts against Ready to Assign until it gets one.
 _Avoid_: Unassigned, pending
