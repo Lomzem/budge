@@ -80,10 +80,11 @@ export const payees = {
 					.getAttribute('data-category');
 				landlordRow = page.getByRole('button').and(page.locator(`[data-category="${String(id)}"]`));
 				await landlordRow.click();
-				await expect(remember('Sample Landlord')).not.toBeChecked();
+				await expect(remember('Sample Landlord')).toBeChecked();
 				await expect(remember('Sample Landlord')).toHaveAccessibleDescription(
 					'Remembered now: Rent.'
 				);
+				await remember('Sample Landlord').uncheck();
 				await search.fill('groc');
 				await page.keyboard.press('Enter');
 				await expect(landlordRow).toHaveAccessibleName(/^Groceries, /);
@@ -92,7 +93,7 @@ export const payees = {
 			});
 
 			await step(
-				'by keyboard, Tab through the list reaches Remember, which picks the same Groceries again and makes it the remembered one',
+				'by keyboard, Tab through the list reaches Remember, which is on again; picking the same Groceries makes it the remembered one',
 				async () => {
 					const inTheList = listbox.locator(':focus');
 					await landlordRow.focus();
@@ -102,9 +103,8 @@ export const payees = {
 					await expect(inTheList).toHaveCount(1);
 					await page.keyboard.press('Tab');
 					await expect(remember('Sample Landlord')).toBeFocused();
-					await page.keyboard.press('Space');
 					await expect(remember('Sample Landlord')).toBeChecked();
-					await expect(listbox.getByRole('option', { name: 'Transfer: Savings' })).toBeDisabled();
+					await expect(listbox.getByRole('option', { name: 'Transfer: Savings' })).toBeEnabled();
 					await page.keyboard.press('Shift+Tab');
 					await expect(inTheList).toHaveCount(1);
 					await page.keyboard.press('Shift+Tab');
@@ -116,14 +116,14 @@ export const payees = {
 					await expect(remember('Sample Landlord')).toHaveAccessibleDescription(
 						'Remembered now: Groceries.'
 					);
-					await expect(remember('Sample Landlord')).not.toBeChecked();
+					await expect(remember('Sample Landlord')).toBeChecked();
 					await page.keyboard.press('Escape');
 					expect(await filledInFor(page, 'Sample Landlord')).toBe('Groceries');
 				}
 			);
 
 			await step(
-				'in the dialog a new Payee’s first Category is saved once, and remembered only when asked',
+				'in the dialog a new Payee’s first Category defaults to remembered, with an explicit one-off opt-out',
 				async () => {
 					const dialog = page.getByRole('dialog', { name: 'Add Transaction' });
 					const florist = 'Sample Verification Florist';
@@ -135,8 +135,8 @@ export const payees = {
 						await expect(remember(florist)).toHaveAccessibleDescription(
 							'Nothing is remembered yet.'
 						);
-						await expect(remember(florist)).not.toBeChecked();
-						if (checked) await remember(florist).check();
+						await expect(remember(florist)).toBeChecked();
+						if (!checked) await remember(florist).uncheck();
 						await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 						await expect(dialog).toBeHidden();
 					};

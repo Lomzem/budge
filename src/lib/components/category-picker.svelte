@@ -39,6 +39,7 @@
 					readonly label: string;
 					readonly hint: string;
 					readonly accepts: (value: string) => boolean;
+					readonly defaultChecked?: boolean;
 			  }
 			| undefined;
 		onValueChange?: (value: string, optedIn: boolean) => void;
@@ -63,7 +64,7 @@
 		const tabBar = parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom);
 		clearOfTabBar = 8 + (Number.isFinite(tabBar) ? tabBar : 0);
 		search = seed;
-		optedIn = false;
+		optedIn = optIn?.defaultChecked ?? false;
 		highlighted = seed === '' && chosen ? key(chosen.value) : '';
 		open = true;
 	}
@@ -110,14 +111,14 @@
 	function pick(choice: string) {
 		value = choice;
 		open = false;
-		onValueChange?.(choice, optIn !== undefined && optedIn);
+		onValueChange?.(choice, optedIn && optIn?.accepts(choice) === true);
 	}
 </script>
 
 {#snippet item(choice: Choice)}
 	<Command.Item
 		value={key(choice.value)}
-		disabled={(choice.disabled ?? false) || (optedIn && optIn?.accepts(choice.value) === false)}
+		disabled={choice.disabled ?? false}
 		checked={choice.value === value}
 		onSelect={() => {
 			pick(choice.value);

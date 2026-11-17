@@ -2,7 +2,16 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 import { formatCents } from '../../src/lib/domain/money';
 import { holdResponseTo } from '../heldResponse';
-import { cents, centsIn, choicesOf, openAccount, typed, type Journey } from './journey';
+import {
+	cents,
+	centsIn,
+	choicesOf,
+	choose,
+	openAccount,
+	openBudget,
+	typed,
+	type Journey
+} from './journey';
 
 async function openStartingBalance(page: Page, name: string) {
 	await page.getByRole('button', { name: `${name} actions` }).click();
@@ -56,6 +65,62 @@ async function confirmStartingBalance(page: Page, label: string | RegExp, amount
 }
 
 export const accounts = {
+	'savings-budget': {
+		title:
+			'Savings funds Ready to Assign, while a Transfer to Checking leaves the budget unchanged',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			await page.setViewportSize({ width: 1280, height: 800 });
+			const readyToAssign = () => centsIn(page.getByTestId('ready-to-assign'));
+			const savingsBalance = () => centsIn(page.getByTestId('account-balance'));
+			const before = await step('note Ready to Assign and the Savings balance', async () => {
+				await openBudget(page);
+				await expect(page.getByTestId('ready-to-assign')).toBeVisible();
+				const ready = await readyToAssign();
+				await openAccount(page, 'Savings');
+				return { ready, savings: await savingsBalance() };
+			});
+
+			await step('increase the Savings Starting Balance by $100', async () => {
+				const dialog = await openStartingBalance(page, 'Savings');
+				const field = dialog.getByLabel('Starting balance', { exact: true });
+				await expect(field).not.toHaveValue('');
+				const start = cents(await field.inputValue());
+				await field.fill(typed(start + 10_000));
+				await dialog.getByRole('button', { name: 'Confirm', exact: true }).click();
+				await expect(dialog).toBeHidden();
+				await expect.poll(savingsBalance).toBe(before.savings + 10_000);
+			});
+
+			await step('reload preserves the extra $100 in Savings and Ready to Assign', async () => {
+				await page.reload();
+				await expect.poll(savingsBalance).toBe(before.savings + 10_000);
+				await openBudget(page);
+				await expect.poll(readyToAssign).toBe(before.ready + 10_000);
+				await page.reload();
+				await expect.poll(readyToAssign).toBe(before.ready + 10_000);
+			});
+
+			await step('transfer $25 from Savings to Checking', async () => {
+				await openAccount(page, 'Savings');
+				await page.getByRole('button', { name: 'Add Transaction', exact: true }).click();
+				const dialog = page.getByRole('dialog', { name: 'Add Transaction', exact: true });
+				await choose(dialog.getByLabel('Category or Transfer'), 'Transfer: Checking');
+				await dialog.getByRole('radio', { name: 'Outflow', exact: true }).check();
+				await dialog.getByLabel('Amount', { exact: true }).fill('25.00');
+				await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+				await expect(dialog).toBeHidden();
+				await expect.poll(savingsBalance).toBe(before.savings + 7_500);
+			});
+
+			await step('Ready to Assign stays unchanged by the Transfer after reload', async () => {
+				await openBudget(page);
+				await expect.poll(readyToAssign).toBe(before.ready + 10_000);
+				await page.reload();
+				await expect.poll(readyToAssign).toBe(before.ready + 10_000);
+			});
+		}
+	},
 	'start-late-save': {
 		title:
 			"a starting balance saved from a dismissed dialog lands, and leaves the next Account's dialog alone",
