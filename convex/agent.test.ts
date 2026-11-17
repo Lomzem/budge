@@ -338,8 +338,7 @@ describe('the agent Transactions read', () => {
 		['a Category and uncategorized together', 'categoryId=CATEGORY&uncategorized=true'],
 		['split lines without a Category', 'splitLines=true'],
 		['a malformed Account ID', 'accountId=not-an-id'],
-		['an ID that names no Account', 'accountId=CATEGORY'],
-		['an ID that names no Category', 'categoryId=ACCOUNT'],
+		['an Account ID as the Category', 'categoryId=ACCOUNT'],
 		['an unknown parameter', 'month=2026-08']
 	])('refuses %s with a plain message', async (_, query) => {
 		const { t, accounts, categories } = await startBudget({
@@ -354,5 +353,19 @@ describe('the agent Transactions read', () => {
 
 		expect(response.status).toBe(400);
 		expect(await response.text()).toMatch(/\S/);
+	});
+
+	test('refuses a Category that was removed', async () => {
+		const { t, owner, categories } = await startBudget({
+			groups: { Everyday: ['Groceries', 'Dining'] }
+		});
+		await owner.mutation(api.categories.remove, {
+			categoryId: categories.Dining,
+			destinationId: categories.Groceries
+		});
+
+		const response = await agentGet(t, `/agent/transactions?categoryId=${categories.Dining}`);
+
+		expect(response.status).toBe(400);
 	});
 });
