@@ -115,6 +115,10 @@ export interface Budget<C extends string, G extends string> {
 
 const UPCOMING_DAYS = 30;
 
+export function neededOf(category: Pick<CategoryBudget<string>, 'target' | 'payment'>): number {
+	return category.payment?.uncovered ?? category.target?.needed ?? 0;
+}
+
 const sum = (
 	rows: readonly CategoryBudget<string>[],
 	field: 'assigned' | 'activity' | 'available'

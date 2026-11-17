@@ -18,7 +18,7 @@
 		label?: string | undefined;
 		size?: 'wrap' | 'xs';
 		variant?: 'default' | 'outline';
-		onassigned: () => void;
+		onassigned: (cents: number) => void;
 	} = $props();
 
 	const budget = getBudgetMonth();
@@ -28,9 +28,9 @@
 	async function assign() {
 		error = '';
 		assigning = true;
-		const assigned = await attempt(() => budget.assignTarget(categoryId));
+		const assigned = await attempt(() => budget.assignNeeded(categoryId));
 		assigning = false;
-		if (assigned.ok) onassigned();
+		if (assigned.ok) onassigned(assigned.value);
 		else error = assigned.error?.message ?? "Budge couldn't assign the money. Try again.";
 	}
 </script>

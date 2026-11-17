@@ -35,4 +35,4 @@ Preconditions:
 - **Manual drive:** invalid/nonpositive Amount shows an alert; By date needs a date and Repeat needs a whole interval of 1–120 months. Require failed validation to leave the dialog open and the saved Target unchanged.
 
 - Due day changes scheduling, not amount. Month-end due dates clamp; repeat interval is 1–120 months.
-- Sources: ticket 08; public `categories.setTarget`, `budget.assignTarget/month`.
+- Sources: ticket 08; public `categories.setTarget`, `budget.assignNeeded/month`.

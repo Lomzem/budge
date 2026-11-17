@@ -484,6 +484,7 @@
 		const choices = choicesFor(row);
 		return {
 			...rememberCopy(choices, row.payeeName, row.rememberedCategoryId),
+			defaultChecked: true,
 			accepts: (option: string) => rowChoiceFor(option)?.kind === 'category'
 		};
 	}

@@ -170,7 +170,7 @@ export function openDraft(start: {
 			lines: [],
 			choice: { kind: 'uncategorized' },
 			picked: false,
-			remember: false,
+			remember: true,
 			link: undefined,
 			nextLineKey: 0,
 			filledFrom: null
@@ -193,7 +193,7 @@ export function openDraft(start: {
 		lines,
 		choice: choiceOf(saved),
 		picked: false,
-		remember: false,
+		remember: true,
 		link: undefined,
 		nextLineKey: lines.length,
 		filledFrom: { date: saved.date, amount: saved.amount }

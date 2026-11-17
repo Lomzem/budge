@@ -127,7 +127,7 @@ function sampleArgs(ids: {
 			amount: 500
 		},
 		'budget:cover': { month: '2026-08', categoryId },
-		'budget:assignTarget': { month: '2026-08', categoryId }
+		'budget:assignNeeded': { month: '2026-08', categoryId }
 	};
 	return args;
 }
