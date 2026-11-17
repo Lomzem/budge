@@ -116,7 +116,7 @@ function registerProposalTools(server: McpServer) {
 					.min(1)
 					.max(PROPOSAL_CHANGE_LIMIT)
 			},
-			annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false }
+			annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: false }
 		},
 		async (proposal) => await callBudge('/agent/proposals', { body: proposal })
 	);
@@ -128,7 +128,7 @@ function registerProposalTools(server: McpServer) {
 			description:
 				"Undo an applied Categorization Proposal when the owner asks. Budge moves back only the Transactions that still have the Category the proposal gave them; it keeps the owner's later changes and reports them in keptTransactionIds. It removes the new Categories and Category Groups the proposal added unless something now uses them. Undoing the same id again answers with the first result.",
 			inputSchema: { id: proposalId },
-			annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false }
+			annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: false }
 		},
 		async ({ id }) => await callBudge('/agent/proposals/undo', { body: { id } })
 	);

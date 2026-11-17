@@ -13,6 +13,7 @@ import {
 	type ProposedChange
 } from './lib/agentProposal';
 import { insertCategory, insertGroup } from './lib/categories';
+import { categoriesCutoverUndoNeeds } from './lib/laterCutover';
 import { publicError } from './lib/publicError';
 import { categorizeTransaction, recategorizeSplitLine, splitLinesOf } from './lib/transactions';
 
@@ -302,8 +303,10 @@ async function isInUse(ctx: MutationCtx, categoryId: Id<'categories'>) {
 
 async function removeUnused(ctx: MutationCtx, proposal: Doc<'agentProposals'>) {
 	const removedCategories: string[] = [];
+	const cutoverUndoNeeds = await categoriesCutoverUndoNeeds(ctx);
 	for (const { id, name } of proposal.createdCategories) {
-		if ((await ctx.db.get('categories', id)) === null || (await isInUse(ctx, id))) continue;
+		if (cutoverUndoNeeds.has(id) || (await ctx.db.get('categories', id)) === null) continue;
+		if (await isInUse(ctx, id)) continue;
 		await ctx.db.delete('categories', id);
 		removedCategories.push(name);
 	}

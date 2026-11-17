@@ -69,6 +69,31 @@ function refuse({ refused }: Refusal) {
 	return new Response(refused, { status: 400, headers: { 'content-type': 'text/plain' } });
 }
 
+const BODY_BYTE_LIMIT = 64 * 1024;
+
+const tooLarge = () =>
+	new Response(`The request body is larger than ${String(BODY_BYTE_LIMIT / 1024)} KiB.`, {
+		status: 413,
+		headers: { 'content-type': 'text/plain' }
+	});
+
+async function boundedText(request: Request) {
+	const reader = request.body?.getReader();
+	if (reader === undefined) return '';
+	const decoder = new TextDecoder();
+	let text = '';
+	let size = 0;
+	for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+		size += chunk.value.byteLength;
+		if (size > BODY_BYTE_LIMIT) {
+			await reader.cancel();
+			return null;
+		}
+		text += decoder.decode(chunk.value, { stream: true });
+	}
+	return text + decoder.decode();
+}
+
 type HttpCtx = Parameters<Parameters<typeof httpAction>[0]>[0];
 
 function agentRoute(
@@ -105,17 +130,17 @@ export const transactionsRoute = agentRoute(async (ctx, query) => {
 });
 
 export const applyProposalRoute = agentRoute(async (ctx, _query, request) => {
-	const answer: ApplyAnswer = await ctx.runMutation(internal.agentProposals.apply, {
-		body: await request.text()
-	});
+	const body = await boundedText(request);
+	if (body === null) return tooLarge();
+	const answer: ApplyAnswer = await ctx.runMutation(internal.agentProposals.apply, { body });
 	if ('refused' in answer) return refuse(answer);
 	return json(answer);
 });
 
 export const undoProposalRoute = agentRoute(async (ctx, _query, request) => {
-	const answer: UndoAnswer = await ctx.runMutation(internal.agentProposals.undo, {
-		body: await request.text()
-	});
+	const body = await boundedText(request);
+	if (body === null) return tooLarge();
+	const answer: UndoAnswer = await ctx.runMutation(internal.agentProposals.undo, { body });
 	if ('refused' in answer) return refuse(answer);
 	return json(answer);
 });

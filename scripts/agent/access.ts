@@ -46,19 +46,25 @@ function convex(args: string[], input?: string) {
 	return result.stdout;
 }
 
-function siteUrlOf(target: string[]) {
-	const answer: unknown = JSON.parse(
-		convex(['run', '--inline-query', 'process.env.CONVEX_SITE_URL', ...target])
-	);
-	if (typeof answer !== 'string' || !answer.startsWith('http')) {
+const deploymentQuery =
+	'({ siteUrl: process.env.CONVEX_SITE_URL, fingerprint: process.env.BUDGE_AGENT_KEY_SHA256 ?? null })';
+
+function deploymentOf(target: string[]) {
+	const answer: unknown = JSON.parse(convex(['run', '--inline-query', deploymentQuery, ...target]));
+	const { siteUrl, fingerprint } = (answer ?? {}) as Record<string, unknown>;
+	if (typeof siteUrl !== 'string' || !siteUrl.startsWith('http')) {
 		throw new Error('the deployment did not report its site URL.');
 	}
-	return answer;
+	return { siteUrl, fingerprint: typeof fingerprint === 'string' ? fingerprint : null };
+}
+
+function fingerprintOf(key: string) {
+	return createHash('sha256').update(key).digest('hex');
 }
 
 function newKey() {
 	const key = `budge_agent_${randomBytes(32).toString('base64url')}`;
-	return { key, fingerprint: createHash('sha256').update(key).digest('hex') };
+	return { key, fingerprint: fingerprintOf(key) };
 }
 
 function admitNewKey(siteUrl: string, target: string[]) {
@@ -91,7 +97,7 @@ function register(cli: 'claude' | 'codex') {
 
 export function setup(args: string[]) {
 	const target = targetOf(args);
-	const siteUrl = siteUrlOf(target);
+	const { siteUrl } = deploymentOf(target);
 	admitNewKey(siteUrl, target);
 	console.log(`Agent access is on for ${describeTarget(target)} (${siteUrl}).`);
 	console.log(`The Agent Key is in ${agentConfigPath()}, readable only by you.`);
@@ -111,28 +117,54 @@ function requireConfig() {
 	return config;
 }
 
-function requireSameDeployment({ siteUrl, target }: AgentConfig) {
-	const found = siteUrlOf(target);
-	if (found !== siteUrl) {
+function command(name: string, target: string[]) {
+	return ['`bun run agent', name, ...target].join(' ') + '`';
+}
+
+function admitsLocalKey({ siteUrl, key, target }: AgentConfig) {
+	const found = deploymentOf(target);
+	if (found.siteUrl !== siteUrl) {
 		throw new Error(
-			`the Agent Key belongs to ${siteUrl}, but from here ${describeTarget(target)} is ${found}. Run this in the checkout that ran setup.`
+			`the Agent Key belongs to ${siteUrl}, but from here ${describeTarget(target)} is ${found.siteUrl}. Run this in the checkout that ran setup.`
 		);
 	}
+	if (found.fingerprint === null) return 'off';
+	return found.fingerprint === fingerprintOf(key) ? 'admitted' : 'another key';
 }
 
 export function rotate() {
 	const config = requireConfig();
-	requireSameDeployment(config);
 	const { siteUrl, target } = config;
+	if (admitsLocalKey(config) !== 'admitted') {
+		throw new Error(
+			`${describeTarget(target)} (${siteUrl}) does not admit the Agent Key in ${agentConfigPath()}. Run ${command('setup', target)} to replace both.`
+		);
+	}
 	admitNewKey(siteUrl, target);
 	console.log(`Replaced the Agent Key for ${describeTarget(target)}. The old key no longer works.`);
 }
 
 export function revoke(args: string[]) {
 	const config = readAgentConfig();
-	if (config !== undefined) requireSameDeployment(config);
-	const target = config?.target ?? targetOf(args);
-	convex(['env', 'remove', FINGERPRINT_VARIABLE, ...target]);
+	const asked = targetOf(args);
+	if (config === undefined) {
+		convex(['env', 'remove', FINGERPRINT_VARIABLE, ...asked]);
+		console.log(`Agent access is off for ${describeTarget(asked)}.`);
+		return;
+	}
+	const { target } = config;
+	if (asked.length > 0 && asked.join(' ') !== target.join(' ')) {
+		throw new Error(
+			`the Agent Key in ${agentConfigPath()} belongs to ${describeTarget(target)}, not ${describeTarget(asked)}. Run ${command('revoke', [])} first, then ${command('revoke', asked)}.`
+		);
+	}
+	const state = admitsLocalKey(config);
+	if (state === 'another key') {
+		throw new Error(
+			`${describeTarget(target)} admits a different Agent Key than the one in ${agentConfigPath()}, so revoking would cut off another checkout's agent. To turn it off anyway, delete that file and run ${command('revoke', target)}.`
+		);
+	}
+	if (state === 'admitted') convex(['env', 'remove', FINGERPRINT_VARIABLE, ...target]);
 	removeAgentConfig();
 	console.log(`Agent access is off for ${describeTarget(target)}; the local Agent Key is deleted.`);
 }

@@ -564,6 +564,37 @@ describe('undoing a Categorization Proposal', () => {
 		);
 	});
 
+	test('keeps a new Category that undoing the latest cutover move would put back', async () => {
+		const { t, owner, groups, read } = await spending();
+		await apply(t, {
+			id: 'proposal-before-cutover',
+			newCategories: [{ name: 'Snacks', groupId: groups.Everyday }],
+			changes: [
+				{
+					transactionId: idOf(read, 'SAMPLE COFFEE 0042'),
+					fromCategoryId: null,
+					toNewCategory: 'Snacks'
+				}
+			]
+		});
+		const later = { cutoverDate: '2026-09-01', today: '2026-11-17' };
+		const preview = await owner.query(api.settings.previewLaterCutover, later);
+		assert(preview.kind === 'ready', `expected a ready preview, got ${preview.kind}`);
+		const moveId = await owner.mutation(api.settings.applyLaterCutover, {
+			...later,
+			fingerprint: preview.fingerprint,
+			unlockReconciled: true
+		});
+
+		const response = await agentPost(t, '/agent/proposals/undo', {
+			id: 'proposal-before-cutover'
+		});
+
+		expect(await response.json()).toMatchObject({ restored: 0, removedCategories: [] });
+		await owner.mutation(api.settings.undoLaterCutover, { moveId });
+		expect((await rows(t)).get('SAMPLE COFFEE 0042')?.category?.name).toBe('Snacks');
+	});
+
 	test('answers a second undo with the first result and changes nothing more', async () => {
 		const { t, owner, categories } = await appliedThenEdited();
 		const first = await agentPost(t, '/agent/proposals/undo', { id: 'proposal-to-undo' });
@@ -756,5 +787,36 @@ describe('a malformed Categorization Proposal', () => {
 
 		expect(response.status).toBe(400);
 		expect(await response.text()).toContain(mention);
+	});
+});
+
+describe('a request body over the size limit', () => {
+	function paddedPost(t: Backend, path: string, body: unknown) {
+		return t.fetch(path, {
+			method: 'POST',
+			headers: { authorization: `Bearer ${agentKey}`, 'content-type': 'application/json' },
+			body: JSON.stringify(body) + ' '.repeat(64 * 1024)
+		});
+	}
+
+	test('is refused with 413 before Budge applies or undoes anything', async () => {
+		const { t, categories, read } = await spending();
+		const coffee = idOf(read, 'SAMPLE COFFEE 0042');
+		const proposal = {
+			id: 'proposal-padded',
+			changes: [{ transactionId: coffee, fromCategoryId: null, toCategoryId: categories.Dining }]
+		};
+
+		const applied = await paddedPost(t, '/agent/proposals', proposal);
+
+		expect(applied.status).toBe(413);
+		expect(await applied.text()).toContain('larger than 64 KiB');
+		expect((await rows(t)).get('SAMPLE COFFEE 0042')?.category).toBeNull();
+
+		await apply(t, proposal);
+		const undone = await paddedPost(t, '/agent/proposals/undo', { id: 'proposal-padded' });
+
+		expect(undone.status).toBe(413);
+		expect((await rows(t)).get('SAMPLE COFFEE 0042')?.category?.id).toBe(categories.Dining);
 	});
 });
