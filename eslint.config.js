@@ -7,6 +7,8 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import ts from 'typescript-eslint';
 
+import conciseCopy from './eslint/rules/concise-copy.js';
+import existingLongCopy from './eslint/existing-long-copy.js';
 import noComments from './eslint/rules/no-comments.js';
 import noEffectDefects from './eslint/rules/no-effect-defects.js';
 import ownedWrites from './eslint/rules/owned-writes.js';
@@ -113,6 +115,7 @@ export default defineConfig(
 		plugins: {
 			local: {
 				rules: {
+					'concise-copy': conciseCopy,
 					'no-comments': noComments,
 					'no-effect-defects': noEffectDefects,
 					'owned-writes': ownedWrites
@@ -181,6 +184,10 @@ export default defineConfig(
 				}
 			]
 		}
+	},
+	{
+		files: ['src/**/*.svelte'],
+		rules: { 'local/concise-copy': ['error', { maxWords: 12, existing: existingLongCopy }] }
 	},
 	{
 		files: ['**/*.test.ts'],
