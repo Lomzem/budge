@@ -526,7 +526,7 @@
 		>
 			<h4 id="ignored-{connection._id}" class="font-bold">Ignored bank Accounts</h4>
 			<p class="pb-1 text-sm text-muted-foreground">
-				Budge skips their transactions. Bring one back to sync it again.
+				Budge skips them. Bring one back, then set it up to sync.
 			</p>
 			<ul class="flex flex-col divide-y">
 				{#each connection.ignored as ignored (ignored.connectionAccountId)}

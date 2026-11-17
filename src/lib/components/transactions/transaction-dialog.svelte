@@ -713,12 +713,7 @@
 					{@render splitLines()}
 				{/if}
 				{#if shown.selection.kind === 'transfer'}
-					<p class="text-sm text-muted-foreground">
-						{#if shown.cardPayment}
-							A card payment moves money from the Cash Account into the card.
-						{/if}
-						Editing or deleting one side changes both.
-					</p>
+					<p class="text-sm text-muted-foreground">Editing or deleting one side changes both.</p>
 				{/if}
 			</div>
 			{#if shown.candidates.length > 0}
@@ -887,7 +882,7 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>Unlock this Transaction?</AlertDialog.Title>
 			<AlertDialog.Description>
-				Its Account, date and amount become editable. Reconcile again to relock.
+				It goes back to Cleared and becomes editable. Reconcile again to relock.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

@@ -273,7 +273,7 @@
 					</div>
 				</dl>
 				<p>
-					Budge's estimate can be wrong. Check your statement for {since ?? 'the cutover date'}.
+					Estimates can be wrong. Check your balance at the start of {since ?? 'the cutover date'}.
 				</p>
 			</div>
 		</details>

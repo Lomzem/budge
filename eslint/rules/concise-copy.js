@@ -28,6 +28,8 @@ const childLists = (node) => {
 	return Array.isArray(node.children) ? [node.children] : [];
 };
 
+const copyAttributes = new Set(['alt', 'aria-description', 'aria-label', 'placeholder', 'title']);
+
 const textOf = (node) => {
 	if (!isInline(node)) return ' ';
 	if (node.type === 'SvelteText') return node.value;
@@ -55,18 +57,29 @@ export default {
 	},
 	create(context) {
 		const [{ maxWords }] = context.options;
-		const flatten = (run) => run.map(textOf).join('').replace(/\s+/g, ' ').trim();
-		const check = (run) => {
-			if (run.length === 0) return;
-			const words = flatten(run)
-				.split(' ')
-				.filter((word) => /\p{L}/u.test(word)).length;
+		const { sourceCode } = context;
+		const countWords = (text) => text.split(/\s+/).filter((word) => /\p{L}/u.test(word)).length;
+		const report = (words, start, end) => {
 			if (words <= maxWords) return;
-			context.report({
-				loc: { start: run[0].loc.start, end: run.at(-1).loc.end },
-				messageId: 'long',
-				data: { words, maxWords }
-			});
+			context.report({ loc: { start, end }, messageId: 'long', data: { words, maxWords } });
+		};
+		const firstWord = (run) => {
+			const node = run.find((child) => textOf(child).trim() !== '');
+			if (node.type !== 'SvelteText') return node.loc.start;
+			const leading = node.value.length - node.value.trimStart().length;
+			return sourceCode.getLocFromIndex(node.range[0] + leading);
+		};
+		const check = (run) => {
+			const text = run.map(textOf).join('');
+			if (text.trim() === '') return;
+			report(countWords(text), firstWord(run), run.at(-1).loc.end);
+		};
+		const checkAttribute = (node) => {
+			if (node.key.type !== 'SvelteName' || !copyAttributes.has(node.key.name)) return;
+			const text = node.value
+				.map((part) => (part.type === 'SvelteLiteral' ? part.value : 'X'))
+				.join('');
+			report(countWords(text), node.loc.start, node.loc.end);
 		};
 		const visit = (node) => {
 			for (const children of childLists(node)) {
@@ -90,7 +103,8 @@ export default {
 			SvelteEachBlock: visit,
 			SvelteAwaitBlock: visit,
 			SvelteKeyBlock: visit,
-			SvelteSnippetBlock: visit
+			SvelteSnippetBlock: visit,
+			SvelteAttribute: checkAttribute
 		};
 	}
 };

@@ -29,10 +29,10 @@ Before running Playwright E2E or changing Clerk setup, sign-in, or CI authentica
 
 ## UI copy
 
-| Rule                                                                                                                         | Enforced by                                                                                                                                                               |
-| ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One run of visible text in a `.svelte` file is at most 12 words.                                                             | `local/concise-copy` in `bun run lint`. An exception is an `eslint-disable-next-line local/concise-copy` comment with the reason, an expiry date and the approving human. |
-| Copy names the next action or the result. It leaves out how Budge works inside and what the heading or control already says. | Run `/unslop` on every UI string a change adds or rewrites, before `code-review`. The three-judge review scores it under language.                                        |
+| Rule                                                                                                                                        | Enforced by                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| One run of visible text, or one `alt`, `aria-label`, `aria-description`, `placeholder` or `title`, in a `.svelte` file is at most 12 words. | `local/concise-copy` in `bun run lint`. An exception is an `eslint-disable-next-line local/concise-copy -- <reason>` comment the owner approved. |
+| Copy names the next action or the result. It leaves out how Budge works inside and what the heading or control already says.                | Run `/unslop` on every UI string a change adds or rewrites, before `code-review`. The three-judge review scores it under language.               |
 
 ## Checking UI work in a browser
 

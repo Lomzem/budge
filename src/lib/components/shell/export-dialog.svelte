@@ -68,7 +68,7 @@
 			{:else if done}
 				<span class="text-foreground">{done}</span>
 			{:else}
-				CSV saves one file per table; your browser may ask first.
+				CSV saves one file per table; allow multiple downloads if asked.
 			{/if}
 		</p>
 		<Dialog.Footer {error}>

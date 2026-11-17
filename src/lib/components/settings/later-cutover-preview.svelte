@@ -247,7 +247,7 @@
 				{:else}
 					Budge removes the {formatCents(budget.removedAssignments.total)} assigned in {monthsText(
 						budget.removedAssignments.months
-					)}. {formatMonth(budget.month)} starts empty.
+					)}. Nothing carries over into {formatMonth(budget.month)}.
 				{/if}
 			</p>
 		</section>
@@ -277,7 +277,7 @@
 				<div class="flex min-w-0 flex-col gap-1">
 					<Label for="unlock-reconciled">Unlock the Reconciled history</Label>
 					<p id="unlock-reconciled-detail" class="text-sm text-muted-foreground">
-						Reconciled rows above become cleared, unreconciled Starting Balances.
+						Reconciled rows above fold into new Starting Balances, cleared but not reconciled.
 					</p>
 				</div>
 			</div>

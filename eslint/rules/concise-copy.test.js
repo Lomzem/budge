@@ -25,10 +25,16 @@ new RuleTester({ languageOptions: { parser: svelteParser } }).run('concise-copy'
 			code: "<p>Starts on {since ?? 'the cutover date that the person picked'}.</p>"
 		},
 		{
-			name: 'a child block starts a new run',
+			name: 'twelve words is the limit',
 			filename,
 			options,
-			code: '<p>One two three four five six seven {#if a}eight nine ten eleven twelve thirteen{/if}</p>'
+			code: '<p>One two three four five six seven eight nine ten eleven twelve.</p>'
+		},
+		{
+			name: 'a short attribute',
+			filename,
+			options,
+			code: '<input placeholder="Search Payees, memos and Bank Text" />'
 		}
 	],
 	invalid: [
@@ -45,6 +51,27 @@ new RuleTester({ languageOptions: { parser: svelteParser } }).run('concise-copy'
 			options,
 			code: '<p>Rename, reorder, hide, or <strong>delete</strong> Categories and their groups. <a href="/">Assign money</a> to them on the Budget.</p>',
 			errors: [long(16)]
+		},
+		{
+			name: 'thirteen words is over the limit',
+			filename,
+			options,
+			code: '<p>One two three four five six seven eight nine ten eleven twelve thirteen.</p>',
+			errors: [long(13)]
+		},
+		{
+			name: 'the report starts on the first word, where a disable-next-line comment points',
+			filename,
+			options,
+			code: '<p>\n\tOne two three four five six seven eight nine ten eleven twelve thirteen.\n</p>',
+			errors: [{ ...long(13), line: 2, column: 2 }]
+		},
+		{
+			name: 'user-facing attributes are copy too',
+			filename,
+			options,
+			code: '<button aria-label="One two three four five six seven eight nine ten eleven twelve {count}"></button><img alt="a" title="One two three four five six seven eight nine ten eleven twelve thirteen" />',
+			errors: [long(13), long(13)]
 		}
 	]
 });

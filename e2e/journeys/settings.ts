@@ -250,7 +250,7 @@ export const settings = {
 					name: `${formatMonth(monthOf(firstOfThisMonth))} budget`
 				});
 				await expect(budget.getByRole('row', { name: /^Ready to Assign/ })).toBeVisible();
-				await expect(budget).toContainText('starts empty');
+				await expect(budget).toContainText('Nothing carries over into');
 			});
 
 			await step(

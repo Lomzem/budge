@@ -282,7 +282,7 @@ export const accounts = {
 					const importIt = choose.getByRole('button', { name: 'Import its transactions' });
 					await expect(importIt).toHaveAttribute('aria-disabled', 'true');
 					await expect(importIt).toHaveAccessibleDescription(
-						/^The bank says this is a credit card, but Checking is a cash Account/
+						/^The bank says it's a credit card, but Checking is a cash Account/
 					);
 					await choose.getByRole('radio', { name: 'Into a new Account' }).check();
 					await expect(choose.getByLabel('Name')).toHaveValue('Sample Rewards Card');
@@ -432,7 +432,7 @@ export const accounts = {
 					await expect(dialog.getByTestId('imported-since')).toHaveText('None');
 					await expect(dialog).toContainText('Unknown. Not available to Budge.');
 					await expect(dialog).toContainText("Unknown. The bank doesn't say whether");
-					await expect(dialog).toContainText("A working connection doesn't prove it either.");
+					await expect(dialog).toContainText('Check your balance at the start of');
 				}
 			);
 
