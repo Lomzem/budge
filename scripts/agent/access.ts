@@ -1,10 +1,14 @@
 import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { convexCli } from '../local/backend';
 import { findCheckout } from '../local/checkout';
+import { deploymentEnvOf, deploymentOverrides } from '../local/deployment';
 import { inheritedEnvWithoutDeploymentSettings } from '../local/env-file';
+import { treatAsSecret } from '../local/redaction';
 import {
 	agentCommand,
 	agentConfigPath,
@@ -16,6 +20,22 @@ import {
 
 const FINGERPRINT_VARIABLE = 'BUDGE_AGENT_KEY_SHA256';
 const SERVER_NAME = 'budge';
+const CONVEX_PROJECT = 'budge';
+
+const UNLINKED = "This checkout isn't linked to a Convex cloud project";
+const LOG_IN = 'Log in, then run this again:\n  bunx convex login\n  bun run agent setup --prod';
+const FIND_PRODUCTION = [
+	'Let setup find production through your Convex login:',
+	'  bun run agent setup --prod'
+].join('\n');
+const NAME_PRODUCTION = [
+	`Or name it yourself: open https://dashboard.convex.dev, choose the ${CONVEX_PROJECT} project, and switch to Production. The deployment name is in the page's URL, like happy-animal-123:`,
+	'  bun run agent setup --deployment <name>'
+].join('\n');
+
+function nothingChanged(problem: string, ...remedies: string[]) {
+	return new Error([`${problem} Nothing changed.`, ...remedies].join('\n\n'));
+}
 
 function targetOf(args: string[]) {
 	if (args.includes('--prod')) return ['--prod'];
@@ -30,6 +50,7 @@ function targetOf(args: string[]) {
 
 function describeTarget(target: string[]) {
 	if (target[0] === '--prod') return 'the production deployment';
+	if (target[1]?.endsWith(':prod')) return `the production deployment ${target[1]}`;
 	return target[1] === undefined ? "this checkout's dev deployment" : `deployment ${target[1]}`;
 }
 
@@ -57,6 +78,156 @@ function deploymentOf(target: string[]) {
 		throw new Error('the deployment did not report its site URL.');
 	}
 	return { siteUrl, fingerprint: typeof fingerprint === 'string' ? fingerprint : null };
+}
+
+function isLocal(siteUrl: string) {
+	return ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(siteUrl).hostname);
+}
+
+function namesCloud(target: string[]) {
+	return target.length > 0 && target[1] !== 'local';
+}
+
+function linksCloudProject(checkout: string) {
+	const { name } = deploymentEnvOf(checkout);
+	return name !== '' && !name.startsWith('anonymous:');
+}
+
+async function resolveTarget(target: string[]) {
+	if (!namesCloud(target)) return { target, ...deploymentOf(target) };
+	const { checkout } = findCheckout();
+	const overrides = deploymentOverrides(checkout).filter(
+		(where) => !where.endsWith('in the environment')
+	);
+	if (overrides.length > 0) {
+		throw nothingChanged(
+			`${overrides.join(', ')} would make the Convex CLI ignore ${target.join(' ')} and use another deployment.`,
+			`Remove ${overrides.length === 1 ? 'it' : 'them'}, then run this again.`
+		);
+	}
+	if (target[0] === '--prod' && !linksCloudProject(checkout)) return productionThroughLogin();
+	const found = deploymentOf(target);
+	if (isLocal(found.siteUrl)) {
+		throw nothingChanged(
+			`${UNLINKED}, so the Convex CLI answered for ${target[1] ?? ''} from the local backend (${found.siteUrl}) instead of a cloud deployment.`,
+			FIND_PRODUCTION,
+			NAME_PRODUCTION
+		);
+	}
+	return { target, ...found };
+}
+
+async function productionThroughLogin() {
+	const token = convexLoginToken();
+	const found: string[][] = [];
+	for (const team of await convexTeams(token)) {
+		const reference = await productionReference(token, team);
+		if (reference !== undefined) found.push(['--deployment', reference]);
+	}
+	const [target] = found;
+	if (target === undefined) {
+		throw nothingChanged(
+			`${UNLINKED}, so setup looked for production through your Convex login, and none of your Convex teams has a ${CONVEX_PROJECT} project with a production deployment.`,
+			NAME_PRODUCTION.replace('Or name it yourself', 'Name it yourself')
+		);
+	}
+	if (found.length > 1) {
+		throw nothingChanged(
+			`${UNLINKED}, and your Convex login reaches ${String(found.length)} ${CONVEX_PROJECT} production deployments.`,
+			['Pick one:', ...found.map((each) => `  bun run agent setup ${each.join(' ')}`)].join('\n')
+		);
+	}
+	console.log(`Found production through your Convex login: ${target[1] ?? ''}.`);
+	return { target, ...deploymentOf(target) };
+}
+
+function convexLoginToken() {
+	const notLoggedIn = nothingChanged(
+		`${UNLINKED}, so --prod can't reach production from here, and setup can't find it without your Convex login.`,
+		LOG_IN,
+		NAME_PRODUCTION
+	);
+	let token: unknown;
+	try {
+		const config: unknown = JSON.parse(
+			readFileSync(join(homedir(), '.convex', 'config.json'), 'utf8')
+		);
+		token = (config as Record<string, unknown> | null)?.accessToken;
+	} catch {
+		throw notLoggedIn;
+	}
+	if (typeof token !== 'string' || token === '') throw notLoggedIn;
+	treatAsSecret([token]);
+	return token;
+}
+
+async function convexApi(token: string, path: string): Promise<unknown> {
+	let response: Response;
+	try {
+		response = await fetch(`https://api.convex.dev${path}`, {
+			headers: { authorization: `Bearer ${token}` }
+		});
+	} catch (error) {
+		throw nothingChanged(
+			`Setup couldn't reach api.convex.dev to find production (${error instanceof Error ? error.message : String(error)}).`,
+			'Check your connection, then run this again.'
+		);
+	}
+	if (response.status === 404) return undefined;
+	if (response.status === 401 || response.status === 403) {
+		throw nothingChanged(
+			`Convex refused your login (HTTP ${String(response.status)}) when setup looked for production.`,
+			LOG_IN,
+			NAME_PRODUCTION
+		);
+	}
+	if (!response.ok) {
+		throw nothingChanged(
+			`Convex answered HTTP ${String(response.status)} when setup looked for production.`,
+			'Run this again in a moment.',
+			NAME_PRODUCTION
+		);
+	}
+	try {
+		return (await response.json()) as unknown;
+	} catch {
+		throw unexpectedAnswer('an answer');
+	}
+}
+
+function unexpectedAnswer(what: string) {
+	return nothingChanged(
+		`Convex sent ${what} in a shape setup doesn't recognize, so it can't find production.`,
+		NAME_PRODUCTION.replace('Or name it yourself', 'Name it yourself')
+	);
+}
+
+async function convexTeams(token: string) {
+	const teams = await convexApi(token, '/api/teams');
+	if (!Array.isArray(teams)) throw unexpectedAnswer('your team list');
+	return teams.map((team: unknown) => {
+		const slug = (team as Record<string, unknown> | null)?.slug;
+		if (typeof slug !== 'string') throw unexpectedAnswer('your team list');
+		return slug;
+	});
+}
+
+async function productionReference(token: string, team: string) {
+	const project = await convexApi(
+		token,
+		`/v1/teams/${encodeURIComponent(team)}/projects/${CONVEX_PROJECT}`
+	);
+	if (project === undefined) return undefined;
+	const { teamSlug, slug, prodDeploymentName } = (project ?? {}) as Record<string, unknown>;
+	if (prodDeploymentName === null) return undefined;
+	if (
+		typeof teamSlug !== 'string' ||
+		typeof slug !== 'string' ||
+		typeof prodDeploymentName !== 'string'
+	) {
+		throw unexpectedAnswer(`the ${CONVEX_PROJECT} project in team ${team}`);
+	}
+	return `${teamSlug}:${slug}:prod`;
 }
 
 function fingerprintOf(key: string) {
@@ -96,9 +267,8 @@ function register(cli: 'claude' | 'codex') {
 	return { registered: false, report: `${cli}: registration failed: ${added.stderr.trim()}` };
 }
 
-export function setup(args: string[]) {
-	const target = targetOf(args);
-	const { siteUrl } = deploymentOf(target);
+export async function setup(args: string[]) {
+	const { target, siteUrl } = await resolveTarget(targetOf(args));
 	admitNewKey(siteUrl, target);
 	console.log(`Agent access is on for ${describeTarget(target)} (${siteUrl}).`);
 	console.log(`The Agent Key is in ${agentConfigPath()}, readable only by you.`);
@@ -141,16 +311,21 @@ export function rotate() {
 	console.log(`Replaced the Agent Key for ${describeTarget(target)}. The old key no longer works.`);
 }
 
-export function revoke(args: string[]) {
+export async function revoke(args: string[]) {
 	const config = readAgentConfig();
 	const asked = targetOf(args);
 	if (config === undefined) {
-		convex(['env', 'remove', FINGERPRINT_VARIABLE, ...asked]);
-		console.log(`Agent access is off for ${describeTarget(asked)}.`);
+		const { target } = await resolveTarget(asked);
+		convex(['env', 'remove', FINGERPRINT_VARIABLE, ...target]);
+		console.log(`Agent access is off for ${describeTarget(target)}.`);
 		return;
 	}
 	const { target } = config;
-	if (asked.length > 0 && asked.join(' ') !== target.join(' ')) {
+	if (
+		asked.length > 0 &&
+		asked.join(' ') !== target.join(' ') &&
+		(await resolveTarget(asked)).siteUrl !== config.siteUrl
+	) {
 		throw new Error(
 			`the Agent Key in ${agentConfigPath()} belongs to ${describeTarget(target)}, not ${describeTarget(asked)}. Run ${agentCommand('revoke', [])} first, then ${agentCommand('revoke', asked)}.`
 		);

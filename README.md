@@ -4,11 +4,13 @@ A personal zero-based budget. Production runs at [budge.lomzem.dev](https://budg
 
 ## Agent access
 
-Agent access lets Claude Code and Codex read the production budget and apply Categorization Proposals you approve. Run setup after `bun install` and `bunx convex login`, from a checkout already linked to the Budge Convex project so that `--prod` reaches its production deployment.
+Agent access lets Claude Code and Codex read the production budget and apply Categorization Proposals you approve. Run setup after `bun install` and `bunx convex login`.
 
 ```sh
 bun run agent setup --prod
 ```
+
+When the checkout isn't linked to a Convex cloud project, for example because it runs a local backend, `--prod` can't reach production directly, so setup finds the `budge` project's production deployment through your Convex login. To name it yourself, open that deployment in the [Convex dashboard](https://dashboard.convex.dev) and copy its name from the page's URL, like `happy-animal-123`. Then run `bun run agent setup --deployment happy-animal-123`.
 
 Setup writes a new Agent Key to `~/.config/budge/agent.json` by default and makes production accept only that key. It then registers the `budge` tools with the Claude Code and Codex CLIs you have installed. The registered tools run from this checkout, so keep it in place. Start a new Claude Code or Codex session, such as a new T3 Code thread, to pick them up. Then ask something like "What is my Ready to Assign this month?"
 
