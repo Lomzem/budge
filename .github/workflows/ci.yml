@@ -128,7 +128,8 @@ jobs:
           SHARD: ${{ matrix.suite }}
         # Playwright passes an empty shard, so a shard that lists no tests fails here instead.
         run: |
-          bun run test:e2e --shard="$SHARD" --list | grep -q '^Total: [1-9]' || { echo "::error::Shard $SHARD lists no tests."; exit 1; }
+          bun run test:e2e --shard="$SHARD" --list > shard-tests.txt
+          grep -q '^Total: [1-9]' shard-tests.txt || { echo "::error::Shard $SHARD lists no tests."; exit 1; }
           bun run test:e2e --shard="$SHARD"
       # The repo is public, so its artifacts are too. Browser traces and screenshots can show
       # Clerk session tokens and the test user's email, and capacity's raw run records hold
