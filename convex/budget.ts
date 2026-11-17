@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 
 import { isIsoDate, isIsoMonth, monthOf } from '../src/lib/domain/dates';
-import { computeBudget } from '../src/lib/domain/budget';
+import { computeBudget, neededOf } from '../src/lib/domain/budget';
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { readBudgetInput } from './lib/budget';
@@ -183,15 +183,15 @@ export const cover = mutation({
 	}
 });
 
-export const assignTarget = mutation({
+export const assignNeeded = mutation({
 	args: { month: v.string(), categoryId: v.id('categories') },
 	returns: v.number(),
 	handler: async (ctx, args) => {
 		await requireOwner(ctx);
 		await requireBudgetMonth(ctx, args.month);
 		await requireAssignable(ctx, args.categoryId);
-		const needed =
-			(await readCategoryBudget(ctx, args.month, args.categoryId))?.target?.needed ?? 0;
+		const category = await readCategoryBudget(ctx, args.month, args.categoryId);
+		const needed = category === undefined ? 0 : neededOf(category);
 		if (needed > 0) {
 			await updateAssigned(ctx, args.month, args.categoryId, (assigned) => assigned + needed);
 		}

@@ -20,7 +20,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { formatCents, parseCents } from '$lib/domain/money';
 
-	import AssignTargetButton from './assign-target-button.svelte';
+	import AssignNeededButton from './assign-needed-button.svelte';
 	import AssignedInput from './assigned-input.svelte';
 	import { availableStatus, describeTarget, paymentNotes } from './status';
 	import TargetBar from './target-bar.svelte';
@@ -403,6 +403,15 @@
 			{:else}
 				<p class="text-sm text-muted-foreground">Available covers the card's debt.</p>
 			{/each}
+			{#if category.payment.uncovered > 0}
+				<AssignNeededButton
+					categoryId={openedForId}
+					needed={category.payment.uncovered}
+					onassigned={() => {
+						section?.focus({ preventScroll: true });
+					}}
+				/>
+			{/if}
 		</section>
 	{:else}
 		<section aria-labelledby="target-heading" class="flex flex-col gap-2">
@@ -418,7 +427,7 @@
 					<p class={['text-sm', status.class]}>{status.text}</p>
 				{/if}
 				{#if category.target.needed > 0}
-					<AssignTargetButton
+					<AssignNeededButton
 						categoryId={openedForId}
 						needed={category.target.needed}
 						onassigned={() => {

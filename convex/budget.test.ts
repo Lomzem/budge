@@ -264,7 +264,7 @@ describe('Targets', () => {
 			{ id: b.groceries, name: 'Groceries', dueDate: '2026-10-20', amount: 40_000, funded: false }
 		]);
 
-		const assigned = await b.owner.mutation(api.budget.assignTarget, {
+		const assigned = await b.owner.mutation(api.budget.assignNeeded, {
 			month: '2026-10',
 			categoryId: b.groceries
 		});
@@ -279,7 +279,7 @@ describe('Targets', () => {
 		});
 		expect(after.upcoming).toMatchObject([{ id: b.groceries, funded: true }]);
 		expect(after.readyToAssign.amount).toBe(before.readyToAssign.amount - 30_000);
-		const assignedOnceNothingIsLeft = await b.owner.mutation(api.budget.assignTarget, {
+		const assignedOnceNothingIsLeft = await b.owner.mutation(api.budget.assignNeeded, {
 			month: '2026-10',
 			categoryId: b.groceries
 		});
@@ -293,7 +293,7 @@ describe('Targets', () => {
 			target: { kind: 'byDate', amount: 12_000, firstDate: '2026-11-03', everyMonths: 3 }
 		});
 		for (const month of ['2026-10', '2026-11']) {
-			await b.owner.mutation(api.budget.assignTarget, { month, categoryId: b.rent });
+			await b.owner.mutation(api.budget.assignNeeded, { month, categoryId: b.rent });
 		}
 		await b.spend('2026-11-03', -12_000, b.rent);
 

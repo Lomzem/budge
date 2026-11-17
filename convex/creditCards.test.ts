@@ -139,6 +139,37 @@ describe('a Payment Category', () => {
 		expect((await b.view()).readyToAssign.amount).toBe(280_000);
 	});
 
+	test('Assign funds only the uncovered debt, leaving money waiting on an overspent Category to its Cover', async () => {
+		const b = await budgetWithCard();
+		await b.assign(b.groceries, 10_000);
+		await b.buy('2026-08-03', -15_000, b.groceries);
+		const discoverPayment = (await b.row('Discover')).id;
+		const before = (await b.view()).readyToAssign.amount;
+
+		const assigned = await b.owner.mutation(api.budget.assignNeeded, {
+			month: '2026-08',
+			categoryId: discoverPayment
+		});
+
+		const startingDebt = 20_000;
+		expect(assigned).toBe(startingDebt);
+		expect(await b.row('Discover')).toMatchObject({
+			assigned: startingDebt,
+			available: 35_000,
+			payment: {
+				waitingOn: [{ id: b.groceries, name: 'Groceries', amount: 5_000 }],
+				uncovered: 0
+			}
+		});
+		expect((await b.view()).readyToAssign.amount).toBe(before - startingDebt);
+		expect(
+			await b.owner.mutation(api.budget.assignNeeded, {
+				month: '2026-08',
+				categoryId: discoverPayment
+			})
+		).toBe(0);
+	});
+
 	test('is managed by Budge, so the owner cannot rename, hide, delete, or target it', async () => {
 		const b = await budgetWithCard();
 		const discoverPayment = (await b.row('Discover')).id;

@@ -16,7 +16,7 @@ export class BudgetMonth {
 	readonly #setAssigned = useMutation(api.budget.setAssigned);
 	readonly #moveMoney = useMutation(api.budget.moveMoney);
 	readonly #cover = useMutation(api.budget.cover);
-	readonly #assignTarget = useMutation(api.budget.assignTarget);
+	readonly #assignNeeded = useMutation(api.budget.assignNeeded);
 	readonly #setTarget = useMutation(api.categories.setTarget);
 
 	readonly view: BudgetView | undefined = $derived.by(() => {
@@ -91,8 +91,8 @@ export class BudgetMonth {
 		return await this.#cover({ month: this.month, categoryId });
 	}
 
-	async assignTarget(categoryId: Id<'categories'>) {
-		await this.#assignTarget({ month: this.month, categoryId });
+	async assignNeeded(categoryId: Id<'categories'>) {
+		await this.#assignNeeded({ month: this.month, categoryId });
 	}
 
 	async setTarget(

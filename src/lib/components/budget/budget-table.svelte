@@ -6,9 +6,10 @@
 	import { getBudgetMonth, type BudgetView } from '$lib/budget.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
+	import { neededOf } from '$lib/domain/budget';
 	import { formatCents } from '$lib/domain/money';
 
-	import AssignTargetButton from './assign-target-button.svelte';
+	import AssignNeededButton from './assign-needed-button.svelte';
 	import AssignedInput from './assigned-input.svelte';
 	import { availableStatus, waitingNotes } from './status';
 	import TargetBar from './target-bar.svelte';
@@ -49,6 +50,7 @@
 {#snippet name(category: CategoryBudget)}
 	{@const status = availableStatus(category)}
 	{@const selected = category.id === selectedId}
+	{@const needed = neededOf(category)}
 	<button
 		type="button"
 		class="block w-full rounded-sm text-left font-medium break-words whitespace-normal underline-offset-4 hover:underline xs:pl-3 pointer-coarse:py-2"
@@ -73,12 +75,12 @@
 	{#if status?.text}
 		<span class="block text-xs whitespace-normal xs:pl-3 {status.class}">{status.text}</span>
 	{/if}
-	{#if category.target && category.target.needed > 0}
+	{#if needed > 0}
 		<div class="mt-1 xs:pl-3">
-			<AssignTargetButton
+			<AssignNeededButton
 				categoryId={category.id}
-				needed={category.target.needed}
-				label="Assign {formatCents(category.target.needed)} to {category.name}"
+				{needed}
+				label="Assign {formatCents(needed)} to {category.name}"
 				size="xs"
 				variant="outline"
 				onassigned={() => {

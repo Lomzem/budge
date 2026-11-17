@@ -28,7 +28,7 @@
 	async function assign() {
 		error = '';
 		assigning = true;
-		const assigned = await attempt(() => budget.assignTarget(categoryId));
+		const assigned = await attempt(() => budget.assignNeeded(categoryId));
 		assigning = false;
 		if (assigned.ok) onassigned();
 		else error = assigned.error?.message ?? "Budge couldn't assign the money. Try again.";

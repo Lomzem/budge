@@ -5,6 +5,7 @@ Budget for card purchases, refunds, Overspending and payments without counting d
 ## Sub-features
 
 - `card-start`: payment Category and uncovered starting debt.
+- `card-assign`: `Assign $X` funds exactly the uncovered debt from Ready to Assign, leaving money waiting on overspent Categories to their Cover.
 - `card-spend`, `card-refund`, `card-cover`, `card-payment`: full-amount movement and waiting-on status.
 
 ## How to get to it (user POV)
@@ -15,7 +16,7 @@ Budget for card purchases, refunds, Overspending and payments without counting d
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/credit-cards.ts`, also run by `bun run test:e2e:local`):
 
-- `credit-cards/debt`: the seeded Card's Payment Category shows the debt not yet covered.
+- `credit-cards/debt`: the seeded Card's Payment Category shows the debt not yet covered (`card-start`); the inspector offers `Assign $612.48`, and the table's `Assign $612.48 to Card` funds it, removes both buttons and the uncovered note, returns focus to the Card name, lowers Ready to Assign by $612.48, and survives a reload (`card-assign`).
 
 Preconditions:
 
@@ -27,8 +28,9 @@ Preconditions:
 
 ## Gotchas
 
+- **Manual drive:** at 320 px, the table row's `Assign $X` and the inspector's `Assign $X` fit without horizontal scroll; the inspector button funds the debt and keeps the `waiting on` notes.
 - **Manual drive:** fund starting debt by increasing the Credit Card Payment Category’s Assigned in the Budget table; require Ready to Assign to fall and uncovered debt to shrink. When fully covered and nothing is waiting on it, its inspector's `Card payment` section reads `Available covers the card's debt.` (any `waiting on` or uncovered-debt note replaces it).
 - **Manual drive:** rename the Credit Card Account and require its Credit Card Payment Category to take the same name after reload.
 
 - Assert deltas against fixture baseline; the illustrative $30/$50 case requires neutral pre-existing amounts or explicit baseline calculations.
-- Sources: ticket 10; public Accounts/Transactions/Budget operations.
+- Sources: ticket 10; public Accounts/Transactions/Budget operations, including `budget.assignNeeded`.
