@@ -331,7 +331,7 @@
 											<CircleAlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
 										{/if}
 										<span class="min-w-0 break-words">
-											Its earlier Transactions are still in
+											Earlier Transactions are still in
 											<a
 												href={resolve('/(app)/accounts/[accountId]', {
 													accountId: feed.historyIn.accountId
@@ -340,7 +340,7 @@
 													'underline underline-offset-4 hover:no-underline',
 													feed.startingBalanceConfirmed && 'font-medium text-foreground'
 												]}>{feed.historyIn.name}</a
-											>. Only new ones come to {feed.name}.
+											>. New ones go to {feed.name}.
 										</span>
 									</span>
 								{/if}
@@ -526,8 +526,7 @@
 		>
 			<h4 id="ignored-{connection._id}" class="font-bold">Ignored bank Accounts</h4>
 			<p class="pb-1 text-sm text-muted-foreground">
-				Budge skips their transactions. Bring one back and set it up to choose where its new
-				transactions go, from the next sync. The ones it already brought in stay where they are.
+				Budge skips their transactions. Bring one back to sync it again.
 			</p>
 			<ul class="flex flex-col divide-y">
 				{#each connection.ignored as ignored (ignored.connectionAccountId)}
@@ -563,9 +562,7 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>Remove {connection.name}?</AlertDialog.Title>
 			<AlertDialog.Description>
-				Budge stops syncing it and forgets its bank Accounts and any transactions waiting for setup.
-				Transactions it already brought in stay in your Accounts. To sync this bank again, connect
-				it again.
+				Budge stops syncing and drops transactions waiting for setup. Imported ones stay.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

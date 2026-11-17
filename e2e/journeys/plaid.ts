@@ -444,9 +444,7 @@ export const plaid = {
 				await openBank(page);
 				await actionsOf('Sample Community Bank').click();
 				await page.getByRole('menuitem', { name: 'Remove connection…' }).click();
-				await expect(confirmOf('Sample Community Bank')).toContainText(
-					'Transactions it already brought in stay'
-				);
+				await expect(confirmOf('Sample Community Bank')).toContainText('Imported ones stay');
 				await confirmOf('Sample Community Bank').getByRole('button', { name: 'Keep it' }).click();
 				await expect(confirmOf('Sample Community Bank')).toBeHidden();
 				await expect(actionsOf('Sample Community Bank')).toBeFocused();

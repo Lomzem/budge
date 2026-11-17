@@ -162,10 +162,7 @@
 	>
 		<Dialog.Header>
 			<Dialog.Title>Import a bank file</Dialog.Title>
-			<Dialog.Description>
-				A Capital One CSV or QFX file, or a Discover CSV file. Budge reads it on this device and
-				saves only its rows.
-			</Dialog.Description>
+			<Dialog.Description>Capital One CSV or QFX, or Discover CSV.</Dialog.Description>
 		</Dialog.Header>
 		<form class="flex min-w-0 flex-col gap-4" onsubmit={save}>
 			<div class="flex flex-col gap-2">

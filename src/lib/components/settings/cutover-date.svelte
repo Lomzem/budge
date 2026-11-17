@@ -141,9 +141,7 @@
 						onclick={() => undoMove(move.moveId, move.from)}>Undo move</Button
 					>
 					<span id="undo-move-detail" class="sr-only">
-						Puts the start date back on {formatDate(move.from)}, with the Transactions before {formatDate(
-							move.to
-						)} back in their Accounts.
+						Moves the start date back to {formatDate(move.from)}, with its history.
 					</span>
 				{/if}
 			</div>

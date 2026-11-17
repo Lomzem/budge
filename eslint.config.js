@@ -8,7 +8,6 @@ import globals from 'globals';
 import ts from 'typescript-eslint';
 
 import conciseCopy from './eslint/rules/concise-copy.js';
-import existingLongCopy from './eslint/existing-long-copy.js';
 import noComments from './eslint/rules/no-comments.js';
 import noEffectDefects from './eslint/rules/no-effect-defects.js';
 import ownedWrites from './eslint/rules/owned-writes.js';
@@ -187,7 +186,7 @@ export default defineConfig(
 	},
 	{
 		files: ['src/**/*.svelte'],
-		rules: { 'local/concise-copy': ['error', { maxWords: 12, existing: existingLongCopy }] }
+		rules: { 'local/concise-copy': ['error', { maxWords: 12 }] }
 	},
 	{
 		files: ['**/*.test.ts'],

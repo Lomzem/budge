@@ -28,6 +28,13 @@ const childLists = (node) => {
 	return Array.isArray(node.children) ? [node.children] : [];
 };
 
+const textOf = (node) => {
+	if (!isInline(node)) return ' ';
+	if (node.type === 'SvelteText') return node.value;
+	if (node.type === 'SvelteMustacheTag') return 'X';
+	return node.children.map(textOf).join('');
+};
+
 export default {
 	meta: {
 		type: 'suggestion',
@@ -36,55 +43,25 @@ export default {
 			{
 				type: 'object',
 				properties: {
-					maxWords: { type: 'integer', minimum: 1 },
-					existing: {
-						type: 'array',
-						items: {
-							type: 'object',
-							properties: { file: { type: 'string' }, text: { type: 'string' } },
-							required: ['file', 'text'],
-							additionalProperties: false
-						}
-					}
+					maxWords: { type: 'integer', minimum: 1 }
 				},
 				required: ['maxWords'],
 				additionalProperties: false
 			}
 		],
 		messages: {
-			stale: 'Remove "{{text}}" from eslint/existing-long-copy.js; this file no longer has it.',
 			long: '{{words}} words of UI copy; the limit is {{maxWords}}. Cut what the heading, control or result already says, and drop explanations of how Budge works inside. Run /unslop on it.'
 		}
 	},
 	create(context) {
-		const [{ maxWords, existing = [] }] = context.options;
-		const { sourceCode } = context;
-		const file = context.filename.replaceAll('\\', '/');
-		const grandfathered = new Map(
-			existing
-				.filter((entry) => file.endsWith('/' + entry.file))
-				.map((entry) => [entry.text, false])
-		);
-		const textOf = (node, expression) => {
-			if (!isInline(node)) return ' ';
-			if (node.type === 'SvelteText') return node.value;
-			if (node.type === 'SvelteMustacheTag') return expression(node);
-			return node.children.map((child) => textOf(child, expression)).join('');
-		};
-		const flatten = (run, expression) =>
-			run
-				.map((node) => textOf(node, expression))
-				.join('')
-				.replace(/\s+/g, ' ')
-				.trim();
+		const [{ maxWords }] = context.options;
+		const flatten = (run) => run.map(textOf).join('').replace(/\s+/g, ' ').trim();
 		const check = (run) => {
 			if (run.length === 0) return;
-			const text = flatten(run, (node) => sourceCode.getText(node));
-			const words = flatten(run, () => 'X')
+			const words = flatten(run)
 				.split(' ')
 				.filter((word) => /\p{L}/u.test(word)).length;
-			if (grandfathered.has(text)) grandfathered.set(text, true);
-			if (words <= maxWords || grandfathered.has(text)) return;
+			if (words <= maxWords) return;
 			context.report({
 				loc: { start: run[0].loc.start, end: run.at(-1).loc.end },
 				messageId: 'long',
@@ -107,12 +84,6 @@ export default {
 		};
 		return {
 			Program: visit,
-			'Program:exit'() {
-				for (const [text, seen] of grandfathered) {
-					if (!seen)
-						context.report({ loc: { line: 1, column: 0 }, messageId: 'stale', data: { text } });
-				}
-			},
 			SvelteElement: visit,
 			SvelteIfBlock: visit,
 			SvelteElseBlock: visit,

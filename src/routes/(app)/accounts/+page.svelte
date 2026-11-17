@@ -59,7 +59,7 @@
 		>
 			<p class="font-bold">No Accounts yet</p>
 			<p class="text-muted-foreground">
-				Add an Account with its current balance, or connect a bank from the <a
+				Add an Account, or connect a bank on the <a
 					href={resolve('/bank')}
 					class="underline underline-offset-4 hover:no-underline">Bank</a
 				> page.

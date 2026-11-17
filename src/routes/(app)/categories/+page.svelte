@@ -252,7 +252,7 @@
 			</Button>
 		</div>
 	</header>
-	<p id="reorder-hint" class="sr-only">Press the arrow keys, Home or End to move it, or drag it.</p>
+	<p id="reorder-hint" class="sr-only">Use arrow keys, Home or End to move it, or drag it.</p>
 	<p id="rename-hint" class="sr-only">Rename</p>
 
 	<p role="alert" class="-my-4 min-h-6 text-sm text-destructive">{actionError}</p>
@@ -264,9 +264,7 @@
 	{:else if !list.data}
 		<p role="status" class="text-muted-foreground">Loading…</p>
 	{:else if groups.length === 0}
-		<p class="text-muted-foreground">
-			No Categories yet. Add a Category Group, then Categories to assign money to.
-		</p>
+		<p class="text-muted-foreground">No Categories yet. Add a Category Group, then Categories.</p>
 	{:else}
 		<div class="flex max-w-2xl flex-col gap-4">
 			{#each groups as group, groupIndex (group._id)}

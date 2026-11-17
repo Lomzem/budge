@@ -486,7 +486,7 @@
 			</p>
 		</div>
 		<p class="text-sm text-muted-foreground">
-			Line amounts follow the Direction; a minus sign turns a line the other way.
+			Line amounts follow the Direction; a minus sign flips a line.
 		</p>
 	</fieldset>
 {/snippet}
@@ -573,7 +573,7 @@
 			{#if locked}
 				<div class="flex flex-wrap items-center justify-between gap-2 text-sm">
 					<p class="text-muted-foreground">
-						Reconciled: its Account, date, and amount are locked, and it can't be deleted.
+						Reconciled. You can't change its Account, date or amount, or delete it.
 					</p>
 					<Button
 						type="button"
@@ -653,7 +653,7 @@
 			{/if}
 			{#if startingBalance}
 				<p class="text-sm text-muted-foreground">
-					A starting balance stays in its Account, with no Payee and one Category.
+					A starting balance has no Payee and one Category.
 				</p>
 			{/if}
 			<div class="flex items-start gap-6">
@@ -717,7 +717,7 @@
 						{#if shown.cardPayment}
 							A card payment moves money from the Cash Account into the card.
 						{/if}
-						The other side is kept in step: editing or deleting one side changes both.
+						Editing or deleting one side changes both.
 					</p>
 				{/if}
 			</div>
@@ -789,8 +789,7 @@
 					</ul>
 					{#if transaction.moreBankRows}
 						<p class="text-sm text-muted-foreground">
-							More Bank Rows back this Transaction than are shown here. Flagged ones come first, and
-							search still finds every Bank Text.
+							More Bank Rows back this Transaction than shown. Flagged ones are first.
 						</p>
 					{/if}
 				</section>
@@ -864,10 +863,9 @@
 			</AlertDialog.Title>
 			<AlertDialog.Description>
 				{#if transaction?.transfer}
-					The bank removed it. Both sides are deleted, here and in {transaction.transfer
-						.accountName}. This can't be undone.
+					The bank removed it. This permanently deletes it in {transaction.transfer.accountName} too.
 				{:else}
-					The bank removed it. Its amount comes out of the Account balance. This can't be undone.
+					The bank removed it. This permanently deletes it.
 				{/if}
 			</AlertDialog.Description>
 		</AlertDialog.Header>
@@ -889,8 +887,7 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>Unlock this Transaction?</AlertDialog.Title>
 			<AlertDialog.Description>
-				It stops being Reconciled right away, so its Account, date and amount can change and it can
-				be deleted. Reconcile the Account again to lock it.
+				Its Account, date and amount become editable. Reconcile again to relock.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

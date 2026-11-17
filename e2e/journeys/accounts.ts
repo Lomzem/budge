@@ -337,7 +337,7 @@ export const accounts = {
 			await step('choosing Checking says the bank gave no kind to check against', async () => {
 				await choose.getByRole('radio', { name: 'Into Checking' }).check();
 				await expect(choose).toContainText(
-					"The bank didn't say what kind of account this is, so make sure it is a cash Account like Checking."
+					"The bank didn't say its kind. Make sure it's a cash Account."
 				);
 				await expect(importIt).not.toHaveAttribute('aria-disabled', 'true');
 			});
@@ -374,7 +374,7 @@ export const accounts = {
 				async () => {
 					await intoSavings.check();
 					await expect(choose).toContainText(
-						"The bank didn't say what kind of account this is, so make sure it is a cash Account like Savings."
+						"The bank didn't say its kind. Make sure it's a cash Account."
 					);
 					await choose.getByRole('button', { name: 'Import its transactions' }).click();
 					const starting = page.getByRole('dialog', { name: 'Starting balance' });
@@ -549,7 +549,7 @@ export const accounts = {
 
 			const plus = feedOf(page, 'Sample Credit Union', 'Sample Savings Plus ending 4417');
 			const stillInSavings =
-				'Its earlier Transactions are still in Savings. Only new ones come to Savings Plus.';
+				'Earlier Transactions are still in Savings. New ones go to Savings Plus.';
 			const bankNeeds = async () => {
 				const bank = page
 					.getByRole('navigation', { name: /^Sections/ })
@@ -589,7 +589,7 @@ export const accounts = {
 			await step(
 				'once confirmed, the notice reads as information and counts in no "need you" count',
 				async () => {
-					const notice = plus.getByText(/^Its earlier Transactions are still in/);
+					const notice = plus.getByText(/^Earlier Transactions are still in/);
 					await expect(notice).toBeVisible();
 					expect(await colorOf(notice)).toBe(
 						await colorOf(plus.getByText('from Sample Savings Plus ending 4417'))
@@ -635,9 +635,7 @@ export const accounts = {
 				const button = await openHeld(page, 'Sample Holiday Club ending 1180');
 				const choose = page.getByRole('dialog', { name: 'Sample Holiday Club ending 1180' });
 				await choose.getByRole('radio', { name: 'Nowhere: ignore this bank Account' }).check();
-				await expect(
-					choose.getByText(/^Its transactions are dropped, and Budge stops asking\./)
-				).toBeVisible();
+				await expect(choose.getByText(/^Budge drops its transactions\./)).toBeVisible();
 				await choose.getByRole('button', { name: 'Ignore' }).click();
 				await expect(choose).toBeHidden();
 				await expect(button).toBeHidden();

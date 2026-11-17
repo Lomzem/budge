@@ -165,8 +165,7 @@
 		<div class="flex max-w-prose flex-col gap-1">
 			<h1 class="text-2xl font-bold tracking-tight">Bank</h1>
 			<p class="text-muted-foreground">
-				New transactions arrive Unapproved as they post, ready to review on each Account. They count
-				in your budget right away, and Budge checks each bank daily.
+				New transactions arrive Unapproved on each Account. Budge checks banks daily.
 			</p>
 		</div>
 		<div class="grid min-w-44">
@@ -191,18 +190,15 @@
 	{:else}
 		{#if blocker === 'unavailable'}
 			<p id="bank-blocker" class="rounded-lg bg-warning-tint p-4">
-				Bank sync isn't set up on this server: it needs Plaid credentials. You can still import a
-				bank file from an Account's page.
+				Bank sync needs Plaid credentials. Import a bank file from an Account.
 			</p>
 		{:else if blocker === 'cutover'}
 			<p id="bank-blocker" class="rounded-lg bg-warning-tint p-4">
-				Set the cutover date below before connecting a bank, so Budge knows which transactions to
-				bring in.
+				Set the cutover date below before connecting a bank.
 			</p>
 		{:else if bank.service?.environment === 'sandbox'}
 			<p class="rounded-lg bg-muted p-4">
-				This server uses Plaid's sandbox, so no real bank is involved. In Plaid Link, pick any bank
-				and sign in as <kbd class="font-bold">user_good</kbd> with password
+				Plaid sandbox. Sign in as <kbd class="font-bold">user_good</kbd> with password
 				<kbd class="font-bold">pass_good</kbd>.
 			</p>
 		{/if}
@@ -222,8 +218,7 @@
 					<LandmarkIcon aria-hidden="true" class="size-6 text-muted-foreground" />
 					<p class="font-bold">No banks connected yet</p>
 					<p class="max-w-prose text-muted-foreground">
-						Connect a bank to bring in its transactions automatically. Without one, import a bank
-						file from an Account's page.
+						Connect a bank, or import a bank file from an Account.
 					</p>
 				</div>
 			{:else}

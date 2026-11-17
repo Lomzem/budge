@@ -261,25 +261,21 @@
 									id="held-mismatch"
 									class="col-start-1 row-start-1 self-start rounded-md bg-warning-tint p-4 text-warning"
 								>
-									The bank says this is {kindName(session.bankAccount.kind)}, but {target.name} is {kindName(
+									The bank says it's {kindName(session.bankAccount.kind)}, but {target.name} is {kindName(
 										target.kind
-									)}, so its balance would count the wrong way. Choose a matching Account or a new
-									one.
+									)}. Pick another Account.
 								</p>
 							{:else if target !== undefined}
 								<p class="col-start-1 row-start-1 self-start rounded-md bg-muted p-4">
 									{#if session.bankAccount.kind === null}
-										The bank didn't say what kind of account this is, so make sure it is {kindName(
-											target.kind
-										)} like {target.name}.
+										The bank didn't say its kind. Make sure it's {kindName(target.kind)}.
 									{/if}
 									Its transactions join {target.name}. Next, you check {target.name}'s Starting
 									Balance.
 								</p>
 							{:else if session.choice === 'ignore'}
 								<p class="col-start-1 row-start-1 self-start rounded-md bg-muted p-4">
-									Its transactions are dropped, and Budge stops asking. Bring it back from its Bank
-									card any time.
+									Budge drops its transactions. Bring it back from its Bank card.
 								</p>
 							{/if}
 						</div>
