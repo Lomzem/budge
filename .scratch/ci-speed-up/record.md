@@ -2,7 +2,7 @@
 
 Status: resolved
 
-Change: d1ab150 on `main`. Measure any run with `.scratch/ci-speed-up/timing.sh <run-id> <attempt>`.
+Change: d1ab150 and b6e9472 (budget job) on `main`. Measure any run with `.scratch/ci-speed-up/timing.sh <run-id> <attempt>`.
 
 ## Result
 
@@ -10,6 +10,7 @@ Change: d1ab150 on `main`. Measure any run with `.scratch/ci-speed-up/timing.sh 
 |---|---:|---:|---:|
 | Before (`e2e` one job) | 14 first-attempt successes, Nov 14–17 | 609 s | 497–671 s |
 | After (run 44188445437, attempts 1–3) | 3 | 188 s | 170–197 s |
+| With the budget job (run 44193684555) | 1 | 210 s | — |
 
 Before, `e2e` set the wall clock in all 15 sampled runs: capacity (107 s median) then 64 serial journeys (468 s). After, the slowest browser shard sets it (shard 2/4: 141–162 s Playwright), with `checks` close behind (135–167 s; ESLint 59–73 s, Vitest 43–56 s). Shards split by test count, not time, so shard 2 carries slower journeys. Each shard pays about 35 s of fixed setup (install, headless shell 12–33 s, backend 6–9 s) plus a ~10 s app build.
 
