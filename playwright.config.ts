@@ -14,6 +14,7 @@ export default defineConfig({
 	globalSetup: './e2e/global.setup.ts',
 	forbidOnly: !!process.env.CI,
 
+	fullyParallel: true,
 	workers: 1,
 	use: { timezoneId: journeyTimeZone },
 	reporter: process.env.CI ? 'github' : 'list',

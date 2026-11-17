@@ -9,12 +9,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A newer push to a pull request supersedes its older run. Every push to main runs to the end,
+  # because its secret scan covers only that push's commits.
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       # The app reads its Convex URL at build time, so typechecking needs one. Nothing serves it.
       PUBLIC_CONVEX_URL: http://127.0.0.1:3210
@@ -42,6 +45,7 @@ jobs:
 
   gitleaks:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,7 +57,16 @@ jobs:
           GITLEAKS_ENABLE_COMMENTS: false
 
   e2e:
+    name: e2e (${{ matrix.suite }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      # Report every shard, so one flaky journey doesn't hide the others' results.
+      fail-fast: false
+      matrix:
+        # Each entry gets its own runner and its own local Convex backend. The capacity contract
+        # runs beside the browser journeys, which are split by test across four shards.
+        suite: [capacity, 1/4, 2/4, 3/4, 4/4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -64,7 +77,9 @@ jobs:
           node-version: 24
       - run: bun install --frozen-lockfile
       - name: Install Playwright browser
-        run: bunx playwright install --with-deps chromium
+        if: matrix.suite != 'capacity'
+        # Headless runs use only the headless shell.
+        run: bunx playwright install --with-deps --only-shell chromium
       # An anonymous local deployment: no Convex account, no cloud quota, never production.
       # The first push fails until the required env vars are set; `convex dev` then retries it.
       # The test user is the owner of this backend.
@@ -90,6 +105,8 @@ jobs:
           cat convex.log
           exit 1
       - name: Import capacity contract
+        if: matrix.suite == 'capacity'
+        timeout-minutes: 10
         env:
           PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEV_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_DEV_SECRET_KEY }}
@@ -98,22 +115,31 @@ jobs:
           E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
         run: bun run capacity:check
       - name: Playwright
-        # The Clerk development instance and its one hand-made test user. Never production.
+        if: matrix.suite != 'capacity'
+        timeout-minutes: 15
+        # The Clerk development instance and its one hand-made test user. Never production:
+        # global setup refuses any other credentials.
         env:
           PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEV_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_DEV_SECRET_KEY }}
+          CLERK_JWT_ISSUER_DOMAIN: ${{ secrets.CLERK_DEV_JWT_ISSUER_DOMAIN }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
+          SHARD: ${{ matrix.suite }}
+        # Playwright passes an empty shard, so a shard that lists no tests fails here instead.
         run: |
-          for name in PUBLIC_CLERK_PUBLISHABLE_KEY CLERK_SECRET_KEY E2E_CLERK_USER_EMAIL; do
-            [ -n "${!name}" ] || { echo "::error::$name is empty: add its Clerk development secret to the repo."; exit 1; }
-          done
-          bun run test:e2e
-      - name: Upload Playwright report
+          bun run test:e2e --shard="$SHARD" --list | grep -q '^Total: [1-9]' || { echo "::error::Shard $SHARD lists no tests."; exit 1; }
+          bun run test:e2e --shard="$SHARD"
+      # The repo is public, so its artifacts are too. Browser traces and screenshots can show
+      # Clerk session tokens and the test user's email, and capacity's raw run records hold
+      # backend log entries, so only the backend log and the capacity table are kept.
+      - name: Upload failure logs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-report
+          name: e2e-${{ strategy.job-index }}
           path: |
-            playwright-report/
             convex.log
+            test-results/capacity/*/table.md
+          if-no-files-found: ignore
           retention-days: 7
