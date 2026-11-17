@@ -16,7 +16,7 @@ Before, `e2e` set the wall clock in all 15 sampled runs: capacity (107 s median)
 
 ## Decisions
 
-- Shard journeys 4 ways by test (`fullyParallel`, one worker per shard, own backend each). Each shard lists its tests first, because Playwright passes an empty shard.
+- Shard journeys 4 ways by test (`fullyParallel`, one worker per shard, own backend each). Each shard lists its tests to a file first, because Playwright passes an empty shard; piping the list into `grep -q` broke Playwright's pipe and logged a false EPIPE error.
 - Capacity runs as its own matrix entry. Playwright global setup now runs the dev-only Clerk credential check that capacity used to provide before Playwright in the same job.
 - `--only-shell` Chromium install: 24 s median before, 12–33 s after.
 - Cancel superseded runs on PRs only; each main push keeps its event-scoped secret scan.
@@ -40,3 +40,4 @@ Before, `e2e` set the wall clock in all 15 sampled runs: capacity (107 s median)
 - Flaky journeys seen in the baseline window: `categories/reorder`, `categories/late-rename`, `plaid/superseded-sync`, `budget/month-jump`, and one Convex startup `Error fetching POST`. A flake now costs a ~3 min shard rerun instead of a 10 min job.
 - Next wall-clock limiter: shard balance and `checks` (ESLint). Options: a fifth shard, or splitting `checks` into lint and test jobs.
 - Budget level: after the next speed-up, the owner can decide whether to lower the 300 s budget.
+- Runner noise: run 44194482443 failed the budget on `e2e (4/4)` at 307 s. Its tests took the usual 122 s; the apt mirror served the browser's system packages at 167 kB/s (164 s install against the usual 12–33 s). Shard 2/4 failed the known `categories/reorder` flake in the same run. If slow apt installs recur, try the Playwright container image, which ships the browser and its dependencies.
