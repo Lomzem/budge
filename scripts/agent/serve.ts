@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 
 import { NEW_NAME_LIMIT, PROPOSAL_CHANGE_LIMIT, PROPOSAL_ID } from '../../convex/lib/agentProposal';
+import { TRANSACTIONS_LIMIT } from '../../convex/lib/agentQuery';
 
 import { readAgentConfig } from './config';
 
@@ -189,7 +190,13 @@ export function serveAgentTools() {
 				uncategorized: z.literal(true).optional().describe('only Uncategorized Transactions'),
 				approval: z.enum(['approved', 'unapproved']).optional(),
 				search: z.string().optional().describe('words in Payee, memo, or Bank Text'),
-				limit: z.number().int().min(1).max(100).optional().describe('rows per page, default 50'),
+				limit: z
+					.number()
+					.int()
+					.min(1)
+					.max(TRANSACTIONS_LIMIT)
+					.optional()
+					.describe('rows per page, default 50'),
 				cursor: z.string().optional()
 			},
 			annotations: readOnly

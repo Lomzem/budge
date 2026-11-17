@@ -137,18 +137,22 @@ describe('the agent budget read', () => {
 	});
 
 	test.each([
-		['a month that is not YYYY-MM', '/agent/budget?month=August&today=2026-08-20'],
-		['a missing month', '/agent/budget?today=2026-08-20'],
-		['an impossible date', '/agent/budget?month=2026-08&today=2026-02-30'],
-		['a missing date', '/agent/budget?month=2026-08'],
-		['an unknown parameter', '/agent/budget?month=2026-08&today=2026-08-20&accountId=x']
-	])('refuses %s with a plain message', async (_, path) => {
+		['a month that is not YYYY-MM', '/agent/budget?month=August&today=2026-08-20', 'month must'],
+		['a missing month', '/agent/budget?today=2026-08-20', 'month must'],
+		['an impossible date', '/agent/budget?month=2026-08&today=2026-02-30', 'today must'],
+		['a missing date', '/agent/budget?month=2026-08', 'today must'],
+		[
+			'an unknown parameter',
+			'/agent/budget?month=2026-08&today=2026-08-20&accountId=x',
+			'Unknown parameter accountId'
+		]
+	])('refuses %s with a plain message', async (_, path, mention) => {
 		const { t } = await startBudget();
 
 		const response = await agentGet(t, path);
 
 		expect(response.status).toBe(400);
-		expect(await response.text()).toMatch(/\S/);
+		expect(await response.text()).toContain(mention);
 	});
 });
 
@@ -329,18 +333,18 @@ describe('the agent Transactions read', () => {
 	});
 
 	test.each([
-		['a date that is not YYYY-MM-DD', 'from=08/01/2026'],
-		['a limit of zero', 'limit=0'],
-		['a limit above 100', 'limit=101'],
-		['a limit that is not a number', 'limit=ten'],
-		['an unknown approval', 'approval=maybe'],
-		['uncategorized other than true', 'uncategorized=yes'],
-		['a Category and uncategorized together', 'categoryId=CATEGORY&uncategorized=true'],
-		['split lines without a Category', 'splitLines=true'],
-		['a malformed Account ID', 'accountId=not-an-id'],
-		['an Account ID as the Category', 'categoryId=ACCOUNT'],
-		['an unknown parameter', 'month=2026-08']
-	])('refuses %s with a plain message', async (_, query) => {
+		['a date that is not YYYY-MM-DD', 'from=08/01/2026', 'from must'],
+		['a limit of zero', 'limit=0', 'limit must'],
+		['a limit above 100', 'limit=101', 'limit must'],
+		['a limit that is not a number', 'limit=ten', 'limit must'],
+		['an unknown approval', 'approval=maybe', 'approval must'],
+		['uncategorized other than true', 'uncategorized=yes', 'uncategorized accepts'],
+		['a Category and uncategorized together', 'categoryId=CATEGORY&uncategorized=true', 'not both'],
+		['split lines without a Category', 'splitLines=true', 'splitLines=true needs'],
+		['a malformed Account ID', 'accountId=not-an-id', 'No Account has'],
+		['an Account ID as the Category', 'categoryId=ACCOUNT', 'No Category has'],
+		['an unknown parameter', 'month=2026-08', 'Unknown parameter month']
+	])('refuses %s with a plain message', async (_, query, mention) => {
 		const { t, accounts, categories } = await startBudget({
 			accounts: { Checking: ['cash', 100_000] },
 			groups: { Everyday: ['Groceries'] }
@@ -352,7 +356,7 @@ describe('the agent Transactions read', () => {
 		const response = await agentGet(t, `/agent/transactions?${filled}`);
 
 		expect(response.status).toBe(400);
-		expect(await response.text()).toMatch(/\S/);
+		expect(await response.text()).toContain(mention);
 	});
 
 	test('refuses a Category that was removed', async () => {
