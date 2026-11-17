@@ -32,7 +32,7 @@ function firstRefusal(problems: (string | null)[]): Refusal | null {
 	return problem === undefined ? null : { refused: problem };
 }
 
-export function parseAccountsQuery(query: URLSearchParams): Refusal | null {
+export function parseEmptyQuery(query: URLSearchParams): Refusal | null {
 	return firstRefusal([unknownParameterIn(query, [])]);
 }
 

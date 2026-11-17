@@ -1,6 +1,6 @@
 # 02 — Agent categorization: apply, conflicts, and undo
 
-Status: needs-triage
+Status: implemented on feat/agent-access; see the spec's Verification section
 Blocked by: 01
 Spec: ../spec.md
 
@@ -18,3 +18,10 @@ After the owner approves a Categorization Proposal in chat, the agent applies it
 - MCP tools: `budge_apply_proposal`, `budge_undo_proposal`, `budge_proposals`, with descriptions that require owner approval in chat before apply and listing unclear Transactions as questions.
 
 ## Comments
+
+- **Undo path deviation:** Convex HTTP routes match exact paths or prefixes, not path parameters, so undo is `POST /agent/proposals/undo` with the JSON body `{"id": "<proposal id>"}` instead of `POST /agent/proposals/<id>/undo`.
+- **Apply answer:** `{id, changes: [{transactionId, line, outcome}], created: {groups, categories}, undone}`. Each outcome is `applied`, `changed` (the Transaction, line, or Category is not what the agent read, or the Transaction is gone), `transfer`, `startingBalance`, `split` (a split Transaction named without a line), or `notAllowed` (the target is hidden, in a hidden Group, or not a normal Category, such as Ready to Assign). The whole proposal is refused with a 400 for malformed input, an unknown ID, a hidden or special `groupId`, or a new name that matches an existing Category or Group.
+- **Undo answer:** `{id, restored, keptTransactionIds, removedCategories, removedGroups}`. A second undo returns the first undo's answer.
+- **"In use"** for a created Category means: any Transaction or split line, any Assignment, any Target, or any Payee's Remembered Category. A created Group is removed only when it has no Categories left.
+- **Recent read:** `GET /agent/proposals` returns the 20 most recent proposals with `applied`, `refused`, and `undone`.
+- **Backup:** the export includes the new `agentProposals` table, like `cutoverMoveHistory`.

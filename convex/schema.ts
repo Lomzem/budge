@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
 import { accountKind } from './lib/accountKind';
+import { proposalOutcome } from './lib/agentProposal';
 import { webhookKeyValidator } from './lib/plaidWebhook';
 import { targetValidator } from './lib/targets';
 
@@ -234,6 +235,29 @@ export default defineSchema({
 		),
 		bankRows: v.array(v.object({ bankRowId: v.id('imports'), matched: v.boolean() }))
 	}).index('by_moveId', ['moveId']),
+
+	agentProposals: defineTable({
+		proposalId: v.string(),
+		changes: v.array(
+			v.object({
+				transactionId: v.id('transactions'),
+				line: v.optional(v.number()),
+				fromCategoryId: v.union(v.id('categories'), v.null()),
+				toCategoryId: v.id('categories'),
+				outcome: proposalOutcome
+			})
+		),
+		createdGroups: v.array(v.object({ id: v.id('categoryGroups'), name: v.string() })),
+		createdCategories: v.array(v.object({ id: v.id('categories'), name: v.string() })),
+		undo: v.optional(
+			v.object({
+				restored: v.number(),
+				keptTransactionIds: v.array(v.id('transactions')),
+				removedCategories: v.array(v.string()),
+				removedGroups: v.array(v.string())
+			})
+		)
+	}).index('by_proposalId', ['proposalId']),
 
 	monthlyTotals: defineTable({
 		month: v.string(),

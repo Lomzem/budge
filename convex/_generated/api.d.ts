@@ -15,6 +15,7 @@ import type {
 } from "convex/server";
 import type * as accounts from "../accounts.js";
 import type * as agent from "../agent.js";
+import type * as agentProposals from "../agentProposals.js";
 import type * as bankConnections from "../bankConnections.js";
 import type * as budget from "../budget.js";
 import type * as categories from "../categories.js";
@@ -26,6 +27,7 @@ import type * as imports from "../imports.js";
 import type * as lib_accountKind from "../lib/accountKind.js";
 import type * as lib_accounts from "../lib/accounts.js";
 import type * as lib_agentKey from "../lib/agentKey.js";
+import type * as lib_agentProposal from "../lib/agentProposal.js";
 import type * as lib_agentQuery from "../lib/agentQuery.js";
 import type * as lib_agentWire from "../lib/agentWire.js";
 import type * as lib_bankChanges from "../lib/bankChanges.js";
@@ -70,6 +72,7 @@ import type * as transactions from "../transactions.js";
 declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
   agent: typeof agent;
+  agentProposals: typeof agentProposals;
   bankConnections: typeof bankConnections;
   budget: typeof budget;
   categories: typeof categories;
@@ -81,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   "lib/accountKind": typeof lib_accountKind;
   "lib/accounts": typeof lib_accounts;
   "lib/agentKey": typeof lib_agentKey;
+  "lib/agentProposal": typeof lib_agentProposal;
   "lib/agentQuery": typeof lib_agentQuery;
   "lib/agentWire": typeof lib_agentWire;
   "lib/bankChanges": typeof lib_bankChanges;

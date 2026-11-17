@@ -86,3 +86,29 @@ export async function requireOwnGroup(
 	if (group.kind !== 'normal') throw publicError('INVALID_INPUT', 'Budge manages that group.');
 	return group;
 }
+
+export async function insertGroup(ctx: MutationCtx, name: string) {
+	let position = 0;
+	for await (const group of ctx.db.query('categoryGroups')) {
+		position = Math.max(position, group.position + 1);
+	}
+	return await ctx.db.insert('categoryGroups', { name, position, kind: 'normal' });
+}
+
+export async function insertCategory(
+	ctx: MutationCtx,
+	groupId: Id<'categoryGroups'>,
+	name: string
+) {
+	const last = await ctx.db
+		.query('categories')
+		.withIndex('by_group_position', (q) => q.eq('groupId', groupId))
+		.order('desc')
+		.first();
+	return await ctx.db.insert('categories', {
+		groupId,
+		name,
+		position: last === null ? 0 : last.position + 1,
+		kind: 'normal'
+	});
+}

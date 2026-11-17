@@ -276,6 +276,32 @@ export async function categorizeTransaction(
 	);
 }
 
+export async function recategorizeSplitLine(
+	ctx: MutationCtx,
+	existing: Doc<'transactions'>,
+	line: number,
+	categoryId: Id<'categories'>
+) {
+	const lines = await splitLinesOf(ctx, existing._id);
+	await saveTransaction(
+		ctx,
+		existing,
+		{
+			accountId: existing.accountId,
+			date: existing.date,
+			amount: existing.amount,
+			payee: (await payeeNameOf(ctx, existing)) ?? '',
+			memo: existing.memo ?? '',
+			splits: lines.map((split, index) => ({
+				categoryId: index === line ? categoryId : split.categoryId,
+				amount: split.amount,
+				memo: split.memo ?? ''
+			}))
+		},
+		{ approve: false, rememberCategory: false }
+	);
+}
+
 async function rememberPayee(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'> | null,

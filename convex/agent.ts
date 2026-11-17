@@ -4,10 +4,11 @@ import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { env, httpAction, internalQuery, type QueryCtx } from './_generated/server';
 import { accountRows, readAccounts } from './accounts';
+import type { ApplyAnswer, RecentProposals, UndoAnswer } from './agentProposals';
 import { budgetMonth, readBudget } from './budget';
 import { admitsAgentKey } from './lib/agentKey';
 import {
-	parseAccountsQuery,
+	parseEmptyQuery,
 	parseBudgetQuery,
 	parseTransactionsQuery,
 	type Refusal
@@ -70,19 +71,21 @@ function refuse({ refused }: Refusal) {
 
 type HttpCtx = Parameters<Parameters<typeof httpAction>[0]>[0];
 
-function agentRoute(answer: (ctx: HttpCtx, query: URLSearchParams) => Promise<Response>) {
+function agentRoute(
+	answer: (ctx: HttpCtx, query: URLSearchParams, request: Request) => Promise<Response>
+) {
 	return httpAction(async (ctx, request) => {
 		const admitted = await admitsAgentKey(
 			request.headers.get('authorization'),
 			env.BUDGE_AGENT_KEY_SHA256
 		);
 		if (!admitted) return new Response(null, { status: 401 });
-		return await answer(ctx, new URL(request.url).searchParams);
+		return await answer(ctx, new URL(request.url).searchParams, request);
 	});
 }
 
 export const accountsRoute = agentRoute(async (ctx, query) => {
-	const refusal = parseAccountsQuery(query);
+	const refusal = parseEmptyQuery(query);
 	if (refusal !== null) return refuse(refusal);
 	return json(accountsForAgent(await ctx.runQuery(internal.agent.accounts, {})));
 });
@@ -99,4 +102,27 @@ export const transactionsRoute = agentRoute(async (ctx, query) => {
 	});
 	if ('refused' in page) return refuse(page);
 	return json(transactionsForAgent(page));
+});
+
+export const applyProposalRoute = agentRoute(async (ctx, _query, request) => {
+	const answer: ApplyAnswer = await ctx.runMutation(internal.agentProposals.apply, {
+		body: await request.text()
+	});
+	if ('refused' in answer) return refuse(answer);
+	return json(answer);
+});
+
+export const undoProposalRoute = agentRoute(async (ctx, _query, request) => {
+	const answer: UndoAnswer = await ctx.runMutation(internal.agentProposals.undo, {
+		body: await request.text()
+	});
+	if ('refused' in answer) return refuse(answer);
+	return json(answer);
+});
+
+export const recentProposalsRoute = agentRoute(async (ctx, query) => {
+	const refusal = parseEmptyQuery(query);
+	if (refusal !== null) return refuse(refusal);
+	const recent: RecentProposals = await ctx.runQuery(internal.agentProposals.recent, {});
+	return json(recent);
 });
