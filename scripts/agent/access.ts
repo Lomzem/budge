@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { convexCli } from '../local/backend';
 import { findCheckout } from '../local/checkout';
+import { inheritedEnvWithoutDeploymentSettings } from '../local/env-file';
 import {
 	agentConfigPath,
 	readAgentConfig,
@@ -34,6 +35,7 @@ function describeTarget(target: string[]) {
 function convex(args: string[], input?: string) {
 	const result = spawnSync(process.execPath, ['--no-env-file', convexCli, ...args], {
 		cwd: findCheckout().checkout,
+		env: inheritedEnvWithoutDeploymentSettings(),
 		encoding: 'utf8',
 		input,
 		stdio: ['pipe', 'pipe', 'pipe']
@@ -76,13 +78,15 @@ function register(cli: 'claude' | 'codex') {
 	];
 	const scope = cli === 'claude' ? ['--scope', 'user'] : [];
 	const removed = spawnSync(cli, ['mcp', 'remove', ...scope, SERVER_NAME], { encoding: 'utf8' });
-	if (removed.error !== undefined) return `${cli}: not installed, skipped`;
+	if (removed.error !== undefined)
+		return { registered: true, report: `${cli}: not installed, skipped` };
 	const added = spawnSync(cli, ['mcp', 'add', ...scope, SERVER_NAME, '--', ...server], {
 		encoding: 'utf8'
 	});
-	return added.status === 0
-		? `${cli}: registered the ${SERVER_NAME} tools`
-		: `${cli}: registration failed: ${added.stderr.trim()}`;
+	if (added.status === 0) {
+		return { registered: true, report: `${cli}: registered the ${SERVER_NAME} tools` };
+	}
+	return { registered: false, report: `${cli}: registration failed: ${added.stderr.trim()}` };
 }
 
 export function setup(args: string[]) {
@@ -92,7 +96,11 @@ export function setup(args: string[]) {
 	console.log(`Agent access is on for ${describeTarget(target)} (${siteUrl}).`);
 	console.log(`The Agent Key is in ${agentConfigPath()}, readable only by you.`);
 	if (args.includes('--no-register')) return;
-	for (const cli of ['claude', 'codex'] as const) console.log(register(cli));
+	for (const cli of ['claude', 'codex'] as const) {
+		const { registered, report } = register(cli);
+		console.log(report);
+		if (!registered) process.exitCode = 1;
+	}
 }
 
 function requireConfig() {
@@ -103,14 +111,27 @@ function requireConfig() {
 	return config;
 }
 
+function requireSameDeployment({ siteUrl, target }: AgentConfig) {
+	const found = siteUrlOf(target);
+	if (found !== siteUrl) {
+		throw new Error(
+			`the Agent Key belongs to ${siteUrl}, but from here ${describeTarget(target)} is ${found}. Run this in the checkout that ran setup.`
+		);
+	}
+}
+
 export function rotate() {
-	const { siteUrl, target } = requireConfig();
+	const config = requireConfig();
+	requireSameDeployment(config);
+	const { siteUrl, target } = config;
 	admitNewKey(siteUrl, target);
 	console.log(`Replaced the Agent Key for ${describeTarget(target)}. The old key no longer works.`);
 }
 
 export function revoke(args: string[]) {
-	const target = readAgentConfig()?.target ?? targetOf(args);
+	const config = readAgentConfig();
+	if (config !== undefined) requireSameDeployment(config);
+	const target = config?.target ?? targetOf(args);
 	convex(['env', 'remove', FINGERPRINT_VARIABLE, ...target]);
 	removeAgentConfig();
 	console.log(`Agent access is off for ${describeTarget(target)}; the local Agent Key is deleted.`);

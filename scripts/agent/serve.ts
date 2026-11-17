@@ -80,7 +80,7 @@ export function serveAgentTools() {
 		'budge_transactions',
 		{
 			title: 'Budge Transactions',
-			description: `One page of the owner's Transactions, newest first. Each row has date, kind (normal, split, transfer, startingBalance), Account, Payee, Category, amount, memo, cleared, reconciled, approved, split lines, transfer Account, and Bank Text. Pass nextCursor back as cursor for the next page. ${MONEY_NOTE}`,
+			description: `One page of the owner's Transactions, newest first (best matches first when you pass search). Each row has date, kind (normal, split, transfer, startingBalance), Account, Payee, Category, amount, memo, cleared, reconciled, approved, split lines, transfer Account, and Bank Text. Pass nextCursor back as cursor for the next page. ${MONEY_NOTE}`,
 			inputSchema: {
 				from: isoDate.optional().describe('first date, YYYY-MM-DD'),
 				to: isoDate.optional().describe('last date, YYYY-MM-DD'),

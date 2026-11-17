@@ -1,6 +1,6 @@
 # 01 — Agent reads: Agent Key, setup, and read tools
 
-Status: ready-for-agent
+Status: implemented on feat/agent-access; see the spec's Verification section
 Spec: ../spec.md
 
 ## Goal

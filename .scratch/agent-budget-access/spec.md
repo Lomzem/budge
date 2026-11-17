@@ -68,7 +68,13 @@ Cache scout findings on this worktree: current export paginates full tables with
 
 ## Verification and remaining work
 
-Documentation only so far. No app, tests, deployments, commits, or pushes run. Continue the interview, record settled decisions as they arrive, then obtain architectural decisions from Opus. Add glossary terms only when a project-specific term is resolved; add ADRs only for settled decisions with meaningful trade-offs and reversal costs.
+Ticket 01 is implemented on `feat/agent-access` (commits 2671de6, 066a3f8, af4f975 and the review-fix commit after them). Ticket 01's scope is the reads contract; where the Proposed architecture below lists more reads (Payees, Payee filter, caps on every read), ticket 01 supersedes it.
+
+- **Automated:** `convex/agent.test.ts` drives the `/agent/*` routes through convex-test `t.fetch` (the agreed seam): the Agent Key admits and refuses, 400s for bad input and unknown or removed IDs, the dollar shapes, filters, and paging. Format, lint, both typechecks, and all 1004 tests pass.
+- **Live, against a worktree-local anonymous backend:** setup (`--no-register`) wrote a 0600 key file; an MCP client listed the three tools and read the seeded October budget, Accounts, and Transactions; zod refused `limit: 500`; rotate made the old key 401; revoke made every key 401 and deleted the file. After review fixes: an ambient `CONVEX_DEPLOY_KEY` no longer redirects setup; rotate and revoke refuse when the checkout's deployment is not the one the key belongs to; a loose pre-existing key file comes back 0600 with no staged file left; a failed registration exits 1.
+- **Not run:** `capacity:check` needs the main checkout's `.env.local`, which is missing until the restore thread finishes. Real setup on the owner's deployment and user-scope registration need the owner.
+- **Review answers:** search results keep the shared reader's relevance order; the tool description says so. The budget and Accounts reads stay unpaged: they read what the owner's own budget screen reads. Interrupted rotation recovers by running rotate again; the config write is atomic, so the old config stays readable.
+- **Remaining:** ticket 02; Sol `/correct` once on the integration branch; shipping via a Sol thread.
 
 ## Opus design review, pending owner decisions
 

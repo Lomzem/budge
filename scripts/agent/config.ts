@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -36,8 +36,9 @@ export function readAgentConfig(): AgentConfig | undefined {
 export function writeAgentConfig(config: AgentConfig) {
 	const path = agentConfigPath();
 	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-	writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
-	chmodSync(path, 0o600);
+	const staged = `${path}.${String(process.pid)}.tmp`;
+	writeFileSync(staged, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+	renameSync(staged, path);
 }
 
 export function removeAgentConfig() {
