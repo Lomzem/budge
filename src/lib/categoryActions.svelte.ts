@@ -92,8 +92,8 @@ export class CategoryActions {
 
 	moveToGroup(categoryId: Id<'categories'>, groupId: Id<'categoryGroups'>) {
 		const index = this.groups.find((g) => g._id === groupId)?.categories.length;
-		if (index === undefined) return;
-		void this.#save(categoryId, () => this.#move({ categoryId, groupId, index }));
+		if (index === undefined) return Promise.resolve(false);
+		return this.#save(categoryId, () => this.#move({ categoryId, groupId, index }));
 	}
 
 	placeGroup(groupId: Id<'categoryGroups'>, target: Id<'categoryGroups'>) {

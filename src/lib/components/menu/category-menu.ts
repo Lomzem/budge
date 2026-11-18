@@ -6,7 +6,17 @@ import type { MenuEntry } from './types';
 export function categoryMenu(
 	actions: CategoryActions,
 	categoryId: Id<'categories'>,
-	{ rename, remove }: { rename: () => void; remove: () => void }
+	{
+		rename,
+		remove,
+		hidden,
+		moved
+	}: {
+		rename: () => void;
+		remove: () => void;
+		hidden?: (saved: Promise<boolean>) => void;
+		moved?: (saved: Promise<boolean>, groupId: Id<'categoryGroups'>) => void;
+	}
 ): MenuEntry[] {
 	const group = actions.groups.find((g) => g.categories.some((c) => c._id === categoryId));
 	if (group === undefined) return [];
@@ -41,7 +51,8 @@ export function categoryMenu(
 					key: other._id,
 					label: other.name,
 					run: () => {
-						actions.moveToGroup(categoryId, other._id);
+						const saved = actions.moveToGroup(categoryId, other._id);
+						moved?.(saved, other._id);
 					}
 				}))
 		},
@@ -49,7 +60,8 @@ export function categoryMenu(
 			kind: 'item',
 			label: 'Hide',
 			run: () => {
-				void actions.setHidden(categoryId, true);
+				const saved = actions.setHidden(categoryId, true);
+				hidden?.(saved);
 			}
 		},
 		{ kind: 'separator' },

@@ -42,6 +42,13 @@ async function fromRowMenu(page: Page, row: Locator, action: string) {
 	await page.getByRole('menuitem', { name: action, exact: true }).click();
 }
 
+async function fromKeyboardMenu(page: Page, category: string, action: string) {
+	await page.getByRole('button', { name: category, exact: true }).focus();
+	await page.keyboard.press('Shift+F10');
+	await page.getByRole('menuitem', { name: action, exact: true }).focus();
+	await page.keyboard.press('Enter');
+}
+
 async function fromGroupMenu(page: Page, group: string, action: string) {
 	await page.getByRole('button', { name: `${group} actions`, exact: true }).click();
 	await page.getByRole('menuitem', { name: action, exact: true }).click();
@@ -53,6 +60,16 @@ async function holdDown(page: Page, target: Locator) {
 	const screen = await touchscreen(page);
 	await screen.touch('touchStart', [{ id: 1, x, y }]);
 	await page.waitForTimeout(900);
+	await screen.touch('touchEnd', []);
+	await screen.detach();
+}
+
+async function tapTheCornerOf(page: Page, target: Locator) {
+	await target.scrollIntoViewIfNeeded();
+	const box = await target.boundingBox();
+	if (box === null) throw new Error(`${String(target)} has no box to tap`);
+	const screen = await touchscreen(page);
+	await screen.touch('touchStart', [{ id: 1, x: box.x + 3, y: box.y + box.height - 3 }]);
 	await screen.touch('touchEnd', []);
 	await screen.detach();
 }
@@ -231,10 +248,14 @@ export const categories = {
 					await fromGroupMenu(page, 'Smoke Test Shelf', 'Move up');
 					await expect.poll(() => groupOrder(page)).toEqual(raised);
 
-					await rowOf(page, 'Smoke Test Renamed').click({ button: 'right' });
-					await page.getByRole('menuitem', { name: 'Move to group' }).click();
-					await page.getByRole('menuitem', { name: 'Everyday', exact: true }).click();
+					await fromKeyboardMenu(page, 'Smoke Test Renamed', 'Move to group');
+					await page.keyboard.press('ArrowRight');
+					await page.getByRole('menuitem', { name: 'Everyday', exact: true }).focus();
+					await page.keyboard.press('Enter');
 					await expect.poll(() => namesIn(everyday)).toContain('Smoke Test Renamed');
+					await expect(
+						page.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
+					).toBeFocused();
 
 					await reloadOnceSaved(page);
 					await expect.poll(() => namesIn(everyday)).toEqual([...swapped, 'Smoke Test Renamed']);
@@ -243,18 +264,36 @@ export const categories = {
 			);
 
 			await step(
-				'Hide moves it under Hidden, and Show from the keyboard brings it back with focus on it',
+				'Hide from the keyboard moves it under Hidden and focus to its neighbour, and Show brings it back with focus on it',
 				async () => {
-					await fromRowMenu(page, rowOf(page, 'Smoke Test Renamed'), 'Hide');
+					const everyday = groupOf(page, 'Everyday');
+					const neighbour = (await namesIn(everyday)).at(-2) ?? '';
+					await fromKeyboardMenu(page, 'Smoke Test Renamed', 'Hide');
 					const hidden = page.getByRole('region', { name: 'Hidden' });
 					await expect(hidden.getByRole('listitem')).toContainText(['Smoke Test Renamed']);
 					const restored = page.getByRole('button', { name: 'Smoke Test Renamed', exact: true });
 					await expect(restored).toHaveCount(0);
+					await expect(page.getByRole('button', { name: neighbour, exact: true })).toBeFocused();
 					await reloadOnceSaved(page);
 					await hidden.getByRole('button', { name: 'Show Smoke Test Renamed' }).focus();
 					await page.keyboard.press('Enter');
 					await expect(restored).toBeFocused();
 					await expect(hidden).toHaveCount(0);
+
+					const groups = await groupOrder(page);
+					const shelfAt = groups.indexOf('Smoke Test Shelf');
+					const nextGroup = groups[shelfAt + 1] ?? groups[shelfAt - 1] ?? '';
+					await page.getByRole('button', { name: 'Smoke Test Shelf actions' }).focus();
+					await page.keyboard.press('Enter');
+					await page.getByRole('menuitem', { name: 'Hide', exact: true }).focus();
+					await page.keyboard.press('Enter');
+					await expect(hidden.getByRole('button', { name: 'Show Smoke Test Shelf' })).toBeVisible();
+					await expect(page.locator('[data-group-id]', { hasText: nextGroup })).toBeFocused();
+					await hidden.getByRole('button', { name: 'Show Smoke Test Shelf' }).focus();
+					await page.keyboard.press('Enter');
+					await expect(
+						page.locator('[data-group-id]', { hasText: 'Smoke Test Shelf' })
+					).toBeFocused();
 				}
 			);
 
@@ -311,8 +350,27 @@ export const categories = {
 				await expect(page.getByRole('menu')).toHaveCount(0);
 				await expect(everyday).toHaveAttribute('aria-expanded', 'true');
 				await expect(rowOf(page, 'Groceries')).not.toHaveAttribute('data-state', 'selected');
-				await stopTouching?.();
 			});
+			await step('with the menu open again, a tap on the Coffee name only closes it', async () => {
+				await holdDown(page, page.getByRole('button', { name: 'Groceries', exact: true }));
+				await expect(page.getByRole('menu')).toBeVisible();
+				await tap(page, page.getByRole('button', { name: 'Coffee', exact: true }));
+				await expect(page.getByRole('menu')).toHaveCount(0);
+				await expect(page.getByRole('dialog')).toHaveCount(0);
+				await expect(rowOf(page, 'Coffee')).not.toHaveAttribute('data-state', 'selected');
+			});
+			await step(
+				'with the menu open again, a tap on a blank part of the Coffee row only closes it',
+				async () => {
+					await holdDown(page, page.getByRole('button', { name: 'Groceries', exact: true }));
+					await expect(page.getByRole('menu')).toBeVisible();
+					await tapTheCornerOf(page, rowOf(page, 'Coffee').getByRole('cell').nth(1));
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await expect(page.getByRole('dialog')).toHaveCount(0);
+					await expect(rowOf(page, 'Coffee')).not.toHaveAttribute('data-state', 'selected');
+					await stopTouching?.();
+				}
+			);
 		}
 	},
 	'held-rename': {

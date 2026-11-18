@@ -58,6 +58,7 @@
 
 	let renaming: string | null = $state(null);
 	let menuOpenFor: string | null = $state(null);
+	let leaving: string | null = null;
 
 	let deletingCategory: { id: Id<'categories'>; name: string } | undefined = $state();
 	let deleteCategoryOpen = $state(false);
@@ -80,9 +81,21 @@
 	}
 
 	function focusVisible(selector: string) {
-		[...document.querySelectorAll<HTMLElement>(selector)]
-			.find((element) => element.checkVisibility())
-			?.focus();
+		const element = [...document.querySelectorAll<HTMLElement>(selector)].find((candidate) =>
+			candidate.checkVisibility()
+		);
+		element?.focus();
+		return element !== undefined;
+	}
+
+	async function focusOnceItLeaves(id: string, saved: Promise<boolean>, selectors: string[]) {
+		leaving = id;
+		const ok = await saved;
+		if (leaving === id) leaving = null;
+		await tick();
+		if (document.activeElement !== null && document.activeElement !== document.body) return;
+		const order = ok ? selectors : [`[data-category-id="${id}"], [data-group-id="${id}"]`];
+		order.some(focusVisible);
 	}
 
 	function focusName(id: Id<'categories'>) {
@@ -94,8 +107,27 @@
 		focusVisible(selector);
 	}
 
-	function categoryEntries(category: CategoryBudget): MenuEntry[] {
+	function neighbourOf<T extends { id: string }>(list: readonly T[], id: string) {
+		const at = list.findIndex((item) => item.id === id);
+		return list[at + 1] ?? list[at - 1];
+	}
+
+	function categoryEntries(category: CategoryBudget, group: Group): MenuEntry[] {
+		const neighbour = neighbourOf(group.categories, category.id);
 		return categoryMenu(actions, category.id, {
+			hidden: (saved) => {
+				void focusOnceItLeaves(category.id, saved, [
+					neighbour === undefined
+						? `[data-group-id="${group.id}"]`
+						: `[data-category-id="${neighbour.id}"]`
+				]);
+			},
+			moved: (saved, groupId) => {
+				void focusOnceItLeaves(category.id, saved, [
+					`[data-category-id="${category.id}"]`,
+					`[data-group-id="${groupId}"]`
+				]);
+			},
 			rename: () => {
 				renaming = category.id;
 			},
@@ -146,7 +178,12 @@
 				kind: 'item',
 				label: 'Hide',
 				run: () => {
-					void actions.setGroupHidden(group.id, true);
+					const neighbour = neighbourOf(groups, group.id);
+					void focusOnceItLeaves(
+						group.id,
+						actions.setGroupHidden(group.id, true),
+						neighbour === undefined ? [] : [`[data-group-id="${neighbour.id}"]`]
+					);
 				}
 			},
 			{ kind: 'separator' },
@@ -165,7 +202,7 @@
 
 	function keepFocusForRename(id: string) {
 		return (event: Event) => {
-			if (renaming === id) event.preventDefault();
+			if (renaming === id || leaving === id) event.preventDefault();
 		};
 	}
 
@@ -431,7 +468,7 @@
 								{/snippet}
 							</ContextMenu.Trigger>
 							<ContextMenu.Content onCloseAutoFocus={keepFocusForRename(category.id)}>
-								<MenuEntries menu="context" entries={categoryEntries(category)} />
+								<MenuEntries menu="context" entries={categoryEntries(category, group)} />
 							</ContextMenu.Content>
 						</ContextMenu.Root>
 					{:else}
