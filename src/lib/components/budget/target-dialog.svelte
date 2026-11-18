@@ -120,7 +120,7 @@
 
 			{#if kind === 'monthly'}
 				<fieldset class="flex flex-col gap-2">
-					<legend class="mb-2 text-sm font-medium">Each month</legend>
+					<legend class="mb-2 text-sm font-medium">Funding</legend>
 					<RadioGroup.Root bind:value={mode}>
 						<div class="flex items-center gap-2">
 							<RadioGroup.Item value="refill" id="target-refill" />

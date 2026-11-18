@@ -12,9 +12,3 @@ export function rowsOf(account: Pick<HeldAccount, 'rows' | 'moreRows'>) {
 		? '1 transaction waiting'
 		: `${count} transactions waiting`;
 }
-
-export function waitingNote(account: Pick<HeldAccount, 'rows' | 'moreRows'>) {
-	return account.rows === 0 && !account.moreRows
-		? 'Its transactions from the next sync wait here until you choose where they go.'
-		: `${rowsOf(account)}. They wait here until you choose where they go.`;
-}

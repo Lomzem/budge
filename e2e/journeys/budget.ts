@@ -204,7 +204,7 @@ export const budget = {
 					expect(count).toBeGreaterThan(0);
 					await chip.click();
 					await expect(
-						page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
+						page.getByRole('heading', { level: 1, name: 'Transactions', exact: true })
 					).toBeVisible();
 					await expect(chosen(filter)).toHaveText(option);
 					await expect(rows).toHaveCount(count);
@@ -357,14 +357,14 @@ export const budget = {
 					await expect(page).toHaveURL(new RegExp(`[?&]month=${String(nextYear)}-09(&|$)`));
 
 					const sections = page.getByRole('navigation', { name: 'Sections', exact: true });
-					await sections.getByRole('link', { name: /^Categories/ }).click();
-					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await sections.getByRole('link', { name: /^Transactions/ }).click();
+					await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible();
 					await page.goBack();
 					await expect(heading('September')).toBeVisible();
 					await expect(groceries).toHaveValue(typed(september));
 
 					await page.goForward();
-					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible();
 					await page.goBack();
 					await expect(heading('September')).toBeVisible();
 					await page.getByRole('button', { name: 'Previous month', exact: true }).click();
@@ -389,8 +389,8 @@ export const budget = {
 					};
 					await openBudget(page);
 					const current = cents(await groceries.inputValue());
-					await sections.getByRole('link', { name: /^Categories/ }).click();
-					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await sections.getByRole('link', { name: /^Transactions/ }).click();
+					await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible();
 					await sections.getByRole('link', { name: /^Budget/ }).click();
 					await showing(0, current);
 					await page.getByRole('button', { name: 'Next month', exact: true }).click();
@@ -401,14 +401,14 @@ export const budget = {
 					await expect(page).toHaveURL(/[?&]month=/);
 
 					await page.goBack();
-					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible();
 					await page.goBack();
 					await showing(0, current);
 					await expect(page).not.toHaveURL(/[?&]month=/);
 					await reloadOnceSaved(page);
 					await showing(0, current);
 					await page.goForward();
-					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible();
 					await page.goForward();
 					await showing(1, next);
 				}
@@ -547,14 +547,14 @@ export const budget = {
 				header(group).getByRole('button', { name: new RegExp(`^${group}( \\d+ overspent)?$`) });
 
 			await step(
-				"on a 320 px touch screen a Group's Add Category button takes taps across 44 px",
+				"on a 320 px touch screen a Group's actions button takes taps across 44 px",
 				async () => {
 					await page.goto('about:blank');
 					await page.setViewportSize({ width: 320, height: 640 });
 					const stopTouching = await useATouchScreen(page);
 					await openBudget(page);
 					await expectTapTargetHeight(
-						page.getByRole('button', { name: 'Add Category to Everyday', exact: true }),
+						page.getByRole('button', { name: 'Everyday actions', exact: true }),
 						44
 					);
 					await expectNothingPastTheRightEdge(page);

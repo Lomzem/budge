@@ -107,7 +107,7 @@ export const settings = {
 				await expect(
 					page
 						.getByRole('navigation', { name: 'Sections and Accounts' })
-						.getByRole('link', { name: 'Accounts 1 Unapproved' })
+						.getByRole('link', { name: 'Transactions 1 Unapproved' })
 				).toBeVisible();
 			});
 		}
@@ -180,11 +180,9 @@ export const settings = {
 					await region.getByRole('button', { name: 'Change' }).click();
 					await saveCutover(page, cutover);
 					const preview = previewDialog(page, cutover);
-					await expect(preview).toContainText(
-						`Nothing is dated before ${formatDate(cutover)}, so no balance or Transaction changes.`
-					);
+					await expect(preview).toContainText('Balances and Transactions stay the same.');
 					await expect(preview).not.toContainText('is after today');
-					await preview.getByRole('button', { name: 'Move start date' }).click();
+					await preview.getByRole('button', { name: 'Move cutover date' }).click();
 					await expect(preview).toBeHidden();
 					await expectCutover(page, cutover);
 					await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
@@ -229,9 +227,7 @@ export const settings = {
 				expect(saved < firstOfThisMonth).toBe(true);
 				await region.getByRole('button', { name: 'Change' }).click();
 				await saveCutover(page, firstOfThisMonth);
-				await expect(preview).toContainText(
-					`Currently ${formatDate(saved)}. Nothing changes until you move it.`
-				);
+				await expect(preview).toContainText(`Currently ${formatDate(saved)}.`);
 				await expect(
 					preview.getByRole('heading', {
 						name: `Starting Balances on ${formatDate(firstOfThisMonth)}`
@@ -261,7 +257,7 @@ export const settings = {
 					const cancel = preview.getByRole('button', { name: 'Cancel' });
 					await cancel.focus();
 					await page.keyboard.press('Tab');
-					await expect(preview.getByRole('button', { name: 'Move start date' })).toBeFocused();
+					await expect(preview.getByRole('button', { name: 'Move cutover date' })).toBeFocused();
 					await page.keyboard.press('Tab');
 					await expect(preview.getByRole('button', { name: 'Close' })).toBeFocused();
 					await page.keyboard.press('Tab');
@@ -338,14 +334,13 @@ export const settings = {
 	},
 	'later-move': {
 		title:
-			'confirming a later cutover date with Reconciled history needs its unlock, folds the history in, and Settings undoes it, on desktop and on 320 and 390 px phones',
+			'confirming a later cutover date with Reconciled history needs its unlock and folds the history in, on desktop and on 320 and 390 px phones',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			const region = cutoverRegion(page);
 			const firstOfThisMonth = dayOfMonth(monthOf(localToday()), 1);
 			const firstOfLastMonth = dayOfMonth(monthOf(addDays(firstOfThisMonth, -1)), 1);
 			const preview = previewDialog(page, firstOfThisMonth);
-			const undo = region.getByRole('button', { name: 'Undo move' });
 			let saved = '';
 
 			await step('reconcile Card and leave one earlier Checking row uncleared', async () => {
@@ -381,7 +376,7 @@ export const settings = {
 						/Checking: 1 Transaction \((\S+)\) that hasn't cleared counts in the Starting Balance as if it had, so the cleared balance changes by \1\./
 					);
 					await expect(preview).toContainText(/Card: \d+ Transactions \(\S+\) you reconciled/);
-					const move = preview.getByRole('button', { name: 'Move start date' });
+					const move = preview.getByRole('button', { name: 'Move cutover date' });
 					await expect(move).toBeDisabled();
 					const unlock = preview.getByRole('checkbox', { name: 'Unlock the Reconciled history' });
 					await unlock.focus();
@@ -391,63 +386,16 @@ export const settings = {
 				}
 			);
 
-			await step(
-				'Move start date folds the history in and Settings offers the undo on return',
-				async () => {
-					await preview.getByRole('button', { name: 'Move start date' }).click();
-					await expect(preview).toBeHidden();
-					await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
-					await expectCutover(page, firstOfThisMonth);
-					await openAccount(page, 'Checking');
-					await expect(
-						page.getByRole('checkbox', {
-							name: new RegExp(`^Cleared: .+, ${formatDate(firstOfLastMonth)}$`)
-						})
-					).toHaveCount(0);
-					await page.goto('/settings');
-					await expectCutover(page, firstOfThisMonth);
-					await expect(region).toContainText(
-						`Starts on ${formatDate(firstOfThisMonth)}, moved from ${formatDate(saved)}.`
-					);
-					await expect(undo).toHaveAccessibleDescription(
-						`Moves the start date back to ${formatDate(saved)}, with its history.`
-					);
-				}
-			);
-
-			await step('Undo move by keyboard puts the date and the history back', async () => {
-				await page.setViewportSize({ width: 1280, height: 800 });
-				await page.goto('/settings');
-				await undo.focus();
-				await page.keyboard.press('Enter');
-				await expect(region.getByRole('status')).toHaveText(
-					`The start date is back on ${formatDate(saved)}, with its history.`
-				);
-				await expectCutover(page, saved);
-				await expect(undo).toHaveCount(0);
-				await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
-				await reloadOnceSaved(page);
-				await expectCutover(page, saved);
-				await expect(undo).toHaveCount(0);
-				await openAccount(page, 'Checking');
-				await expect(
-					page.getByRole('checkbox', {
-						name: new RegExp(`^Cleared: .+, ${formatDate(firstOfLastMonth)}$`)
-					})
-				).not.toHaveCount(0);
-			});
-
 			for (const width of [320, 390]) {
 				await step(
-					`on a ${String(width)} px phone, the move and its Undo stay on screen and clear of the tab bar and the dialog's header`,
+					`on a ${String(width)} px phone, the unlock and Move cutover date stay clear of the dialog's header`,
 					async () => {
 						await page.setViewportSize({ width, height: 640 });
-						const tabs = page.getByRole('navigation', { name: 'Sections', exact: true });
-						await tabs.getByRole('link', { name: 'Settings' }).click();
+						await page.goto('/settings');
 						await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
 						const pinned = preview.locator('[data-slot="dialog-bar"]');
 						const unlock = preview.getByRole('checkbox', { name: 'Unlock the Reconciled history' });
-						const move = preview.getByRole('button', { name: 'Move start date' });
+						const move = preview.getByRole('button', { name: 'Move cutover date' });
 						await region.getByRole('button', { name: 'Change' }).click();
 						await saveCutover(page, firstOfThisMonth);
 						await expectNothingPastTheRightEdge(page);
@@ -455,22 +403,32 @@ export const settings = {
 							await control.scrollIntoViewIfNeeded();
 							await expectClearOf(control, pinned);
 						}
+						if (width === 320) {
+							await page.keyboard.press('Escape');
+							await expect(preview).toBeHidden();
+							return;
+						}
 						await unlock.check();
 						await move.click();
 						await expect(preview).toBeHidden();
-						await expectCutover(page, firstOfThisMonth);
-						await undo.scrollIntoViewIfNeeded();
-						await expectClearOf(undo, tabs);
-						await expectNothingPastTheRightEdge(page);
-						await undo.click();
-						await expect(region.getByRole('status')).toHaveText(
-							`The start date is back on ${formatDate(saved)}, with its history.`
-						);
-						await expectCutover(page, saved);
 						await expectNothingPastTheRightEdge(page);
 					}
 				);
 			}
+
+			await step('the move folds the history in, and a reload keeps it', async () => {
+				await page.setViewportSize({ width: 1280, height: 800 });
+				await expectCutover(page, firstOfThisMonth);
+				expect(saved).not.toBe(firstOfThisMonth);
+				await reloadOnceSaved(page);
+				await expectCutover(page, firstOfThisMonth);
+				await openAccount(page, 'Checking');
+				await expect(
+					page.getByRole('checkbox', {
+						name: new RegExp(`^Cleared: .+, ${formatDate(firstOfLastMonth)}$`)
+					})
+				).toHaveCount(0);
+			});
 		}
 	}
 } satisfies Record<string, Journey>;

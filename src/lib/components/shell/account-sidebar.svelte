@@ -1,10 +1,9 @@
 <script lang="ts">
 	import PlusIcon from '@lucide/svelte/icons/plus';
-	import { useQuery } from 'convex-svelte';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { api } from '$convex/_generated/api';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import { getBankConnections } from '$lib/bankConnections.svelte';
 	import AccountDialog from '$lib/components/accounts/account-dialog.svelte';
@@ -21,8 +20,8 @@
 	const bank = getBankConnections();
 	let { ready }: { ready: boolean } = $props();
 
-	const unapproved = useQuery(api.transactions.unapprovedCount, () => (ready ? {} : 'skip'));
-	const unapprovedCount = $derived(unapproved.data ?? 0);
+	const unapproved = getShellQueries().unapprovedCount;
+	const unapprovedCount = $derived(ready ? (unapproved.data ?? 0) : 0);
 	let addOpen = $state(false);
 
 	const total = (list: Account[]) => list.reduce((sum, account) => sum + account.balance, 0);
@@ -50,7 +49,7 @@
 					>
 						<Icon aria-hidden="true" class="size-5 shrink-0 text-muted-foreground" />
 						<span class="flex-1">{section.label}</span>
-						{#if section.href === '/accounts' && unapprovedCount > 0}
+						{#if section.href === '/transactions' && unapprovedCount > 0}
 							<SectionBadge count={formatUnapprovedCount(unapprovedCount)} label="Unapproved" />
 						{:else if section.href === '/bank' && bank.needingYou > 0}
 							<SectionBadge
@@ -90,7 +89,9 @@
 						</h3>
 						<ul class="flex flex-col gap-0.5">
 							{#each group.accounts as account (account._id)}
-								{@const href = resolve('/(app)/accounts/[accountId]', { accountId: account._id })}
+								{@const href = resolve('/(app)/transactions/[accountId]', {
+									accountId: account._id
+								})}
 								<li>
 									<a
 										{href}

@@ -4,9 +4,9 @@ import { addDays, formatDate, localToday } from '../../src/lib/domain/dates';
 import { choose, expectNothingPastTheRightEdge, reloadOnceSaved, type Journey } from './journey';
 
 async function openAllAccounts(page: Page) {
-	await page.goto('/accounts');
+	await page.goto('/transactions');
 	await expect(
-		page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
+		page.getByRole('heading', { level: 1, name: 'Transactions', exact: true })
 	).toBeVisible();
 }
 
@@ -155,10 +155,10 @@ export const search = {
 				'a link whose filters name nothing Budge offers drops them and lists every Transaction',
 				async () => {
 					expect(landlordId).toBeTruthy();
-					await page.goto(`/accounts?account=${landlordId}&category=123&payee=xyz&q=`);
+					await page.goto(`/transactions?account=${landlordId}&category=123&payee=xyz&q=`);
 					await expect(page.getByLabel('Payee', { exact: true })).toHaveText('Any Payee');
 					await expect.poll(async () => (await listedPayees(page)).length).toBeGreaterThan(3);
-					await expect(page).toHaveURL(/\/accounts$/);
+					await expect(page).toHaveURL(/\/transactions$/);
 					await expect(page.getByText("Budge couldn't load Transactions")).toHaveCount(0);
 				}
 			);

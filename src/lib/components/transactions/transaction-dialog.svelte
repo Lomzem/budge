@@ -23,6 +23,7 @@
 	import { SPLIT_LINE_LIMIT } from '$lib/domain/splits';
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import type { FocusReturn } from '$lib/focusReturn';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 
 	import { categoryChoices, labelOf, rememberCopy, transferChoices } from './categoryChoices';
 	import {
@@ -78,8 +79,7 @@
 	const unmatch = useMutation(api.imports.unmatch);
 	const resolveBankChange = useMutation(api.imports.resolveBankChange);
 	const unlock = useMutation(api.transactions.unlock);
-	const categories = useQuery(api.categories.list, () => (open ? {} : 'skip'));
-	const payees = useQuery(api.payees.list, () => (open ? {} : 'skip'));
+	const { categories, payees } = getShellQueries();
 
 	const freshDraft = () =>
 		openDraft({
@@ -486,7 +486,7 @@
 			</p>
 		</div>
 		<p class="text-sm text-muted-foreground">
-			Line amounts follow the Direction; a minus sign flips a line.
+			Use a minus sign for a line in the opposite Direction.
 		</p>
 	</fieldset>
 {/snippet}
@@ -652,9 +652,7 @@
 				</div>
 			{/if}
 			{#if startingBalance}
-				<p class="text-sm text-muted-foreground">
-					A starting balance has no Payee and one Category.
-				</p>
+				<p class="text-sm text-muted-foreground">A starting balance has no Payee.</p>
 			{/if}
 			<div class="flex items-start gap-6">
 				<fieldset>
@@ -783,9 +781,7 @@
 						{/each}
 					</ul>
 					{#if transaction.moreBankRows}
-						<p class="text-sm text-muted-foreground">
-							More Bank Rows back this Transaction than shown. Flagged ones are first.
-						</p>
+						<p class="text-sm text-muted-foreground">Only some Bank Rows are shown.</p>
 					{/if}
 				</section>
 			{/if}

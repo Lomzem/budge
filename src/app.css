@@ -255,6 +255,11 @@
 	padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Keeps iOS from opening its own callout over a long-press menu. */
+@utility touch-callout-none {
+	-webkit-touch-callout: none;
+}
+
 @utility fade-edges {
 	mask-image: linear-gradient(
 		to right,
@@ -271,9 +276,4 @@
 
 @utility fade-end {
 	--fade-end: 2.5rem;
-}
-
-/* A label column that takes the free room beside a figure column as wide as its figure. */
-@utility grid-cols-label-figure {
-	grid-template-columns: minmax(0, 1fr) auto;
 }

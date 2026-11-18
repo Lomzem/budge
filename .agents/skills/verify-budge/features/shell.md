@@ -1,20 +1,20 @@
-# Navigation, theme and Home Screen
+# Navigation, theme and standalone iPhone
 
-Navigate between budgeting views, retain theme choice, and expose iPhone installation guidance.
+Navigate between budgeting views and retain theme choice.
 
 ## Sub-features
 
-- `shell-nav`: five Sections (Budget, Accounts, Bank, Categories, Settings) in the desktop sidebar and the phone tab bar; direct routes.
+- `shell-nav`: four Sections (Budget, Transactions, Bank, Settings) in the desktop sidebar and the phone tab bar; direct routes.
 - `shell-theme`: `Match this device`/Light/Dark persistent choice on Settings (radiogroup `Theme`); without a stored choice it follows the device.
-- `shell-install`: guidance dialog; real standalone iPhone resume/auth.
+- `shell-install`: standalone iPhone launch, resume and auth.
 - `shell-stable`: no layout shift on any page at desktop or phone width.
 
 ## How to get to it (user POV)
 
 - Desktop (`lg` and up): the `Sections and Accounts` sidebar lists the Sections, then each Account under its Cash/Credit group with balances; `Add Account` sits beside the Accounts heading.
-- Phone: the `Sections` tab bar at the bottom. Accounts lists the Accounts as a `nav` named `Accounts` above All Transactions, inside the `Your Accounts` disclosure (collapsed unless opened before; arriving with a query string forces it closed); an Account page keeps the Accounts tab current (`aria-current="true"`).
-- Badges: Accounts shows the Unapproved count, Bank the things that need the owner. Screen readers hear `Accounts, 3 Unapproved`.
-- Settings → Theme radio group; Settings → This device → `Add to Home Screen` (only when not already standalone).
+- Phone: the `Sections` tab bar at the bottom. Transactions lists the Accounts as a `nav` named `Accounts` above `All Accounts`, inside the `Your Accounts` disclosure (collapsed unless opened before; arriving with a query string forces it closed); an Account page keeps the Transactions tab current (`aria-current="true"`).
+- Badges: Transactions shows the Unapproved count, Bank the things that need the owner. Screen readers hear `Transactions 3 Unapproved`.
+- Settings → `Theme` radio group.
 
 ## Driving it with Playwright
 
@@ -31,15 +31,15 @@ Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
 
-- **Navigate:** require the heading, `aria-current="page"` on the Section, and no horizontal overflow at 320 px. Follow `Manage Categories` from the Budget (manual drive beyond the journey).
+- **Navigate:** require the heading, `aria-current="page"` on the Section, and no horizontal overflow at 320 px.
 - **Theme:** on `/settings`, choose `getByRole("radio", { name: "Dark" })`, capture; reload, require the choice kept and readable contrast. Repeat Light and `Match this device`; change the OS color-scheme preference for `Match this device` and require the app follows it. Check focus visibility.
-- **Guidance:** Settings → Add to Home Screen; the dialog's steps follow the device: on iPhone/iPad Safari (title `Add to Home Screen`, Share/Add/Open as Web App), on Android Chrome (`Add to Home Screen`, menu → Add to home screen → Install), elsewhere (title `Install Budge`, Chrome/Edge install). Require the title and steps for the emulated device, dismiss and restore focus. On a real iPhone separately install, verify standalone launch, GitHub/email auth, live data after background/resume, 7-day session renewal, safe areas and light/dark status bar.
+- **Standalone iPhone:** install from Safari’s Share menu. Verify standalone launch, GitHub/email auth, live data after background/resume, 7-day session renewal, safe areas and light/dark status bar.
 
 ## Gotchas
 
 - **Load:** a hard load of any Section paints the sidebar (or the phone tab bar) with the Sections at once, with `Loading…` in the page area; the Accounts list and badges join when the owner check finishes. Only a forbidden account or an unreachable server shows the centered Budge screen.
 - **Focus after a dialog:** closing any dialog focuses what opened it (for a dialog opened from a menu item, the menu's trigger), else the destination its page names (each feature file lists them), else `#main`; focus on `<body>` after a dialog closes is a bug. When another dialog stays open beneath it, focus stays inside that dialog: on its opener, destination or fallback when inside it, else its first focusable control.
-- **Manual drive:** keyboard-activate `Skip to content` and require focus on `#main`. In the sidebar, verify the Unapproved and Bank badges, Cash/Credit group totals and each Account balance against the Accounts page.
+- **Manual drive:** keyboard-activate `Skip to content` and require focus on `#main`. In the sidebar, verify the Unapproved and Bank badges, Cash/Credit group totals and each Account balance against the `Your Accounts` disclosure at phone width.
 
 - Desktop Chromium mobile emulation does not prove iOS installation, safe areas, standalone auth or resume. No real-device proof in this run.
 - Sources: tickets 02, 04, 23; `e2e/journeys/shell.ts`; no additional public Convex API. Deployment/CI and capacity measurements in 01/04/23 are operational prerequisites, not UI paths; they remain outside local verification.

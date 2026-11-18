@@ -113,7 +113,7 @@
 			});
 		}
 		if (connection.overdue) {
-			found.push({ tone: 'warn', text: 'Has missed its daily sync. Try Sync now.' });
+			found.push({ tone: 'warn', text: 'Sync overdue. Try Sync now.' });
 		}
 		return [...found, ...late];
 	});
@@ -143,11 +143,7 @@
 	const reconnectFirst = $derived(
 		connection.status === 'needsAttention' || connection.consentEndsAt !== null
 	);
-	const hinted = $derived(connection.bankLogin && !reconnectFirst);
-	const reconnectReason = $derived.by(() => {
-		if (!connection.bankLogin) return `problems-${connection._id}`;
-		return hinted ? `reconnect-hint-${connection._id}` : undefined;
-	});
+	const reconnectReason = $derived(connection.bankLogin ? undefined : `problems-${connection._id}`);
 
 	interface Seen {
 		_id: Id<'connectionAccounts'>;
@@ -304,7 +300,7 @@
 							<div class="flex min-w-0 flex-1 basis-48 flex-col text-sm">
 								<span class="break-words text-muted-foreground">
 									<a
-										href={resolve('/(app)/accounts/[accountId]', { accountId: feed.accountId })}
+										href={resolve('/(app)/transactions/[accountId]', { accountId: feed.accountId })}
 										class="font-medium text-foreground underline underline-offset-4 hover:no-underline"
 										>{feed.name}</a
 									>
@@ -333,14 +329,14 @@
 										<span class="min-w-0 break-words">
 											Earlier Transactions are still in
 											<a
-												href={resolve('/(app)/accounts/[accountId]', {
+												href={resolve('/(app)/transactions/[accountId]', {
 													accountId: feed.historyIn.accountId
 												})}
 												class={[
 													'underline underline-offset-4 hover:no-underline',
 													feed.startingBalanceConfirmed && 'font-medium text-foreground'
 												]}>{feed.historyIn.name}</a
-											>. New ones go to {feed.name}.
+											>.
 										</span>
 									</span>
 								{/if}
@@ -376,11 +372,6 @@
 						</li>
 					{/each}
 				</ul>
-			{/if}
-			{#if hinted}
-				<p id="reconnect-hint-{connection._id}" class="text-sm break-words text-muted-foreground">
-					Reconnect if the bank asks you to sign in again.
-				</p>
 			{/if}
 		</div>
 		<div
@@ -479,9 +470,6 @@
 			class="flex flex-col gap-1 border-t px-4 pt-3 pb-4 sm:px-5"
 		>
 			<h4 id="held-{connection._id}" class="font-bold">New bank Accounts</h4>
-			<p class="pb-1 text-sm text-muted-foreground">
-				Their transactions wait here until you choose where they go.
-			</p>
 			<ul class="flex flex-col divide-y">
 				{#each rows as row (row._id)}
 					<li class="flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
@@ -525,9 +513,6 @@
 			class="flex flex-col gap-1 border-t px-4 pt-3 pb-4 sm:px-5"
 		>
 			<h4 id="ignored-{connection._id}" class="font-bold">Ignored bank Accounts</h4>
-			<p class="pb-1 text-sm text-muted-foreground">
-				Budge skips them. Bring one back, then set it up to sync.
-			</p>
 			<ul class="flex flex-col divide-y">
 				{#each connection.ignored as ignored (ignored.connectionAccountId)}
 					{@const name = ignored.name ?? 'An unnamed bank Account'}
@@ -562,7 +547,7 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>Remove {connection.name}?</AlertDialog.Title>
 			<AlertDialog.Description>
-				Budge stops syncing and drops transactions waiting for setup. Imported ones stay.
+				Syncing stops and transactions waiting for setup are deleted. Imported ones stay.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

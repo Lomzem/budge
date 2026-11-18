@@ -17,8 +17,9 @@
 		files = $bindable(),
 		class: className,
 		'data-slot': dataSlot = 'input',
+		variant = 'default',
 		...restProps
-	}: Props = $props();
+	}: Props & { variant?: 'default' | 'cell' } = $props();
 </script>
 
 {#if type === 'file'}
@@ -40,6 +41,7 @@
 		data-slot={dataSlot}
 		class={cn(
 			'h-9 w-full min-w-0 rounded-md border border-input bg-card px-3 py-1 text-base transition-colors file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60 aria-invalid:border-destructive aria-invalid:outline-destructive pointer-coarse:h-11',
+			variant === 'cell' && 'h-8 border-transparent bg-transparent hover:border-input',
 			className
 		)}
 		{type}

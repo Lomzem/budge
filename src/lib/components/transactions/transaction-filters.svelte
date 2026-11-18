@@ -1,11 +1,10 @@
 <script lang="ts">
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import XIcon from '@lucide/svelte/icons/x';
-	import { useQuery } from 'convex-svelte';
 	import { tick } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 
-	import { api } from '$convex/_generated/api';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 	import { getAccounts } from '$lib/accounts.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -37,8 +36,7 @@
 	} = $props();
 
 	const accounts = getAccounts();
-	const categories = useQuery(api.categories.list, {});
-	const payees = useQuery(api.payees.list, {});
+	const { categories, payees } = getShellQueries();
 	const active = $derived(Object.values(values).some((value) => value !== ''));
 	let filtersOpen = $state(false);
 	let searchInput: HTMLInputElement | null = $state(null);

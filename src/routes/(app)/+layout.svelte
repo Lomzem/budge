@@ -11,6 +11,7 @@
 	import TabBar from '$lib/components/shell/tab-bar.svelte';
 	import { setupConvexWithClerk } from '$lib/convex.svelte';
 	import { readPublicError } from '$lib/publicError';
+	import { ShellQueries, setShellQueries } from '$lib/shellQueries.svelte';
 
 	import type { LayoutProps } from './$types';
 
@@ -25,6 +26,7 @@
 	setBankConnections(new BankConnections(() => accounts.loaded));
 	const budget = new BudgetMonth(() => auth.isAuthenticated);
 	setBudgetMonth(budget);
+	setShellQueries(new ShellQueries(() => auth.isAuthenticated));
 
 	const access = $derived.by(() => {
 		if (auth.isLoading) return 'loading';

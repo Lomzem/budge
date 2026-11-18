@@ -49,18 +49,11 @@ export function describeTarget(target: TargetProgress): string {
 	const { definition } = target;
 	const amount = formatCents(definition.amount);
 	if (definition.kind === 'monthly') {
-		const what =
-			definition.mode === 'refill'
-				? `Refill up to ${amount} each month`
-				: `Set aside ${amount} each month`;
-		return definition.dueDay === undefined
-			? what
-			: `${what}, due on the ${ordinal(definition.dueDay)}`;
+		const what = definition.mode === 'refill' ? `Refill to ${amount} monthly` : `${amount} monthly`;
+		return definition.dueDay === undefined ? what : `${what}, due ${ordinal(definition.dueDay)}`;
 	}
-	const by = `Have ${amount} Available by ${formatDate(target.dueDate ?? definition.firstDate)}`;
+	const by = `${amount} by ${formatDate(target.dueDate ?? definition.firstDate)}`;
 	const every = definition.everyMonths;
 	if (every === undefined) return by;
-	return every === 1
-		? `${by}, repeating every month`
-		: `${by}, repeating every ${String(every)} months`;
+	return every === 1 ? `${by}, monthly` : `${by}, every ${String(every)} months`;
 }

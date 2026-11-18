@@ -29,7 +29,7 @@
 		{preventScroll}
 		data-slot="select-content"
 		class={cn(
-			'relative z-50 flex max-h-(--bits-select-content-available-height) max-w-(--bits-select-content-available-width) min-w-(--bits-select-anchor-width) origin-(--bits-select-content-transform-origin) flex-col overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-lg ring-1 ring-border duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+			'relative z-50 flex max-h-(--bits-select-content-available-height) max-w-(--bits-select-content-available-width) min-w-(--bits-select-anchor-width) origin-(--bits-select-content-transform-origin) flex-col overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-lg ring-1 ring-border duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',
 			className
 		)}
 		{...restProps}

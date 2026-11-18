@@ -123,7 +123,7 @@
 <Dialog.Header>
 	<Dialog.Title>Start on {newDate}?</Dialog.Title>
 	<Dialog.Description>
-		Currently {formatDate(from)}. Nothing changes until you move it.
+		Currently {formatDate(from)}.
 	</Dialog.Description>
 </Dialog.Header>
 
@@ -134,9 +134,7 @@
 {:else if shown.kind === 'unsupported'}
 	<p data-testid="preview-unsupported">{shown.message}</p>
 {:else if shown.kind === 'nothingBefore'}
-	<p>
-		Nothing is dated before {newDate}, so no balance or Transaction changes.
-	</p>
+	<p>Balances and Transactions stay the same.</p>
 	{#if to > today}
 		<p>
 			{newDate} is after today. Budge skips bank transactions before it.
@@ -282,14 +280,13 @@
 				</div>
 			</div>
 		{/if}
-		<p class="text-muted-foreground">Settings offers Undo move until the date moves again.</p>
 	{/if}
 {/if}
 
 <Dialog.Footer {error}>
 	<Button variant="outline" type="button" onclick={oncancel}>Cancel</Button>
 	{#if shown?.kind === 'nothingBefore'}
-		<Button type="button" disabled={moving} onclick={onmove}>Move start date</Button>
+		<Button type="button" disabled={moving} onclick={onmove}>Move cutover date</Button>
 	{:else if shown?.kind === 'ready'}
 		{@const fingerprint = shown.fingerprint}
 		<Button
@@ -297,7 +294,7 @@
 			disabled={moving || (needsUnlock && !unlocked)}
 			onclick={() => {
 				onconfirm(fingerprint, needsUnlock && unlocked);
-			}}>Move start date</Button
+			}}>Move cutover date</Button
 		>
 	{/if}
 </Dialog.Footer>

@@ -467,7 +467,8 @@ export const categorize = mutation({
 	returns: v.null(),
 	handler: async (ctx, { transactionId, choice }) => {
 		await requireOwner(ctx);
-		await categorizeTransaction(ctx, await requireTransaction(ctx, transactionId), choice);
+		const approve = choice.kind !== 'uncategorized';
+		await categorizeTransaction(ctx, await requireTransaction(ctx, transactionId), choice, approve);
 		return null;
 	}
 });

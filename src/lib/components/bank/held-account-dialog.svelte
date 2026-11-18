@@ -15,7 +15,7 @@
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import type { FocusReturn } from '$lib/focusReturn';
 
-	import { labelOf, waitingNote } from './held';
+	import { labelOf, rowsOf } from './held';
 
 	type AccountKind = 'cash' | 'creditCard';
 	interface MappedAccount {
@@ -77,7 +77,7 @@
 			bankAccount: {
 				_id: account._id,
 				label: labelOf(account),
-				waiting: waitingNote(account),
+				waiting: rowsOf(account),
 				kind: account.kind
 			},
 			choice: (account.kind === null ? undefined : sameName(account)?._id) ?? 'new',
@@ -275,7 +275,7 @@
 								</p>
 							{:else if session.choice === 'ignore'}
 								<p class="col-start-1 row-start-1 self-start rounded-md bg-muted p-4">
-									Budge drops its transactions. Bring it back from its Bank card.
+									Its waiting transactions are deleted. Bring it back from its Bank card.
 								</p>
 							{/if}
 						</div>

@@ -2,7 +2,35 @@ import { expect } from '@playwright/test';
 
 import { expectNothingPastTheRightEdge, openBudget, type Journey } from './journey';
 
-const SECTIONS = ['Budget', 'Accounts', 'Bank', 'Categories', 'Settings'] as const;
+const SECTIONS = ['Budget', 'Transactions', 'Bank', 'Settings'] as const;
+
+const SECTION_CONTENT = {
+	Budget: 'table',
+	Transactions: 'table',
+	Bank: 'button',
+	Settings: 'button'
+} as const;
+
+interface LoadingWatch {
+	sawLoading?: boolean;
+}
+
+function watchForLoading() {
+	const watch = window as unknown as LoadingWatch;
+	watch.sawLoading = false;
+	const isLoading = (node: Node) =>
+		node instanceof HTMLElement &&
+		[node, ...node.querySelectorAll('[role="status"]')].some(
+			(element) => element.matches('[role="status"]') && element.textContent.trim() === 'Loading…'
+		);
+	new MutationObserver((records) => {
+		if (records.some((record) => [...record.addedNodes].some(isLoading))) watch.sawLoading = true;
+	}).observe(document.body, { subtree: true, childList: true });
+}
+
+function sawLoading() {
+	return (window as unknown as LoadingWatch).sawLoading === true;
+}
 
 export const shell = {
 	navigate: {
@@ -32,6 +60,21 @@ export const shell = {
 				}
 			});
 
+			await step(
+				'returning to a Section shows its content at once, with no Loading… in between',
+				async () => {
+					for (const name of SECTIONS) {
+						await page.evaluate(watchForLoading);
+						await sidebar.getByRole('link', { name: new RegExp(`^${name}`) }).click();
+						await expect(page.getByRole('heading', { level: 1, name, exact: true })).toBeVisible();
+						await expect(
+							page.getByRole('main').locator(SECTION_CONTENT[name]).first()
+						).toBeVisible();
+						expect(await page.evaluate(sawLoading), `${name} showed Loading…`).toBe(false);
+					}
+				}
+			);
+
 			await step('a wheel over the Budget table or the sidebar scrolls the page', async () => {
 				await page.setViewportSize({ width: 1280, height: 800 });
 				await sidebar.getByRole('link', { name: /^Budget/ }).click();
@@ -55,7 +98,7 @@ export const shell = {
 			});
 
 			await step(
-				'each tab opens its Section with no sideways scroll, and an Account keeps Accounts current',
+				'each tab opens its Section with no sideways scroll, and an Account keeps Transactions current',
 				async () => {
 					for (const name of SECTIONS) {
 						const tab = tabs.getByRole('link', { name: new RegExp(`^${name}`) });
@@ -64,7 +107,7 @@ export const shell = {
 						await expect(tab).toHaveAttribute('aria-current', 'page');
 						await expectNothingPastTheRightEdge(page);
 					}
-					await tabs.getByRole('link', { name: /^Accounts/ }).click();
+					await tabs.getByRole('link', { name: /^Transactions/ }).click();
 					await page.getByText('Your Accounts').click();
 					await page
 						.getByRole('navigation', { name: 'Accounts' })
@@ -73,7 +116,7 @@ export const shell = {
 					await expect(
 						page.getByRole('heading', { level: 1, name: 'Checking', exact: true })
 					).toBeVisible();
-					await expect(tabs.getByRole('link', { name: /^Accounts/ })).toHaveAttribute(
+					await expect(tabs.getByRole('link', { name: /^Transactions/ })).toHaveAttribute(
 						'aria-current',
 						'true'
 					);
@@ -88,9 +131,8 @@ export const shell = {
 			await page.setViewportSize({ width: 390, height: 844 });
 			const pages = [
 				['/', 'Budget'],
-				['/accounts', 'Accounts'],
+				['/transactions', 'Transactions'],
 				['/bank', 'Bank'],
-				['/categories', 'Categories'],
 				['/settings', 'Settings']
 			] as const;
 
@@ -107,7 +149,7 @@ export const shell = {
 			}
 
 			await step('the Checking register loads in place and scrolls to its end', async () => {
-				await page.goto('/accounts');
+				await page.goto('/transactions');
 				await page.getByText('Your Accounts').click();
 				await page
 					.getByRole('navigation', { name: 'Accounts' })

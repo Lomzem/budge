@@ -250,11 +250,7 @@ export const inspector = {
 			const available = (name: string) => centsIn(cellsOf(name).nth(3));
 			const sync = await pausableSync(page);
 			const expectEveryday = async (names: string[], gone: string[]) => {
-				const everyday = page.url().endsWith('/categories')
-					? page
-							.getByRole('region')
-							.filter({ has: page.getByRole('button', { name: 'Move Everyday', exact: true }) })
-					: rowgroup('Everyday');
+				const everyday = rowgroup('Everyday');
 				for (const name of names) {
 					await expect(everyday.getByRole('button', { name, exact: true })).toBeVisible();
 				}
@@ -413,9 +409,6 @@ export const inspector = {
 					await page.setViewportSize({ width: 1280, height: 800 });
 					await reloadOnceSaved(page);
 					await expectEveryday(['Sample Grocer', 'Coffee', 'Dining Out'], ['Sample Groceries']);
-					await page.goto('/categories');
-					await expectEveryday(['Sample Grocer', 'Coffee', 'Dining Out'], ['Sample Groceries']);
-					await openBudget(page);
 				}
 			);
 
@@ -441,7 +434,7 @@ export const inspector = {
 				async () => {
 					const savingsToggle = rowgroup('Savings Goals')
 						.getByRole('rowheader')
-						.getByRole('button', { name: /^Savings Goals/ });
+						.getByRole('button', { name: /^Savings Goals(?! actions)/ });
 					await savingsToggle.click();
 					await expect(savingsToggle).toHaveAttribute('aria-expanded', 'false');
 					const actions = inspector.getByRole('button', { name: 'Sample Market actions' });
@@ -457,12 +450,12 @@ export const inspector = {
 				}
 			);
 
-			await step('Hide from budget closes the inspector and lists it as hidden', async () => {
+			await step('Hide closes the inspector and lists it as hidden', async () => {
 				await inspector.getByRole('button', { name: 'Sample Market actions' }).click();
-				await page.getByRole('menuitem', { name: 'Hide from budget' }).click();
+				await page.getByRole('menuitem', { name: 'Hide', exact: true }).click();
 				await expect(inspector).toHaveCount(0);
 				await expect(page.locator('#main')).toBeFocused();
-				const hidden = page.getByRole('region', { name: 'Hidden Categories' });
+				const hidden = page.getByRole('region', { name: 'Hidden' });
 				await expect(hidden).toContainText('Sample Market');
 				await reloadOnceSaved(page);
 				await expect(hidden).toContainText('Sample Market');
@@ -478,7 +471,7 @@ export const inspector = {
 					await openBudget(page);
 					await page.getByRole('button', { name: 'Transit', exact: true }).click();
 					await inspector.getByRole('button', { name: 'Transit actions' }).click();
-					await page.getByRole('menuitem', { name: 'Hide from budget' }).click();
+					await page.getByRole('menuitem', { name: 'Hide', exact: true }).click();
 					await server.held;
 					await page.getByRole('button', { name: 'Coffee', exact: true }).click();
 					await inspector.getByRole('button', { name: 'Coffee actions' }).click();
@@ -486,9 +479,7 @@ export const inspector = {
 					const field = inspector.getByRole('textbox', { name: 'Category name' });
 					await field.fill('Coffee Draft');
 					server.release();
-					await expect(page.getByRole('region', { name: 'Hidden Categories' })).toContainText(
-						'Transit'
-					);
+					await expect(page.getByRole('region', { name: 'Hidden' })).toContainText('Transit');
 					await page.keyboard.type(' Kept');
 					await expect(field).toBeFocused();
 					await expect(field).toHaveValue('Coffee Draft Kept');

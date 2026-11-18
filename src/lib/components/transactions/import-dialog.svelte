@@ -20,6 +20,7 @@
 	import { readBankFile } from '$lib/import';
 	import { readPublicError } from '$lib/publicError';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 
 	type FileRows = FunctionArgs<typeof api.imports.commit>['rows'];
 	type PreviewCandidate = Extract<
@@ -33,7 +34,7 @@
 	}: { open?: boolean; defaultAccountId?: Id<'accounts'> | undefined } = $props();
 
 	const accounts = getAccounts();
-	const settings = useQuery(api.settings.get, () => (open ? {} : 'skip'));
+	const { settings } = getShellQueries();
 	const commit = useMutation(api.imports.commit);
 
 	let accountId = $state('');
@@ -162,7 +163,7 @@
 	>
 		<Dialog.Header>
 			<Dialog.Title>Import a bank file</Dialog.Title>
-			<Dialog.Description>Capital One CSV or QFX, or Discover CSV.</Dialog.Description>
+			<Dialog.Description>Capital One or Discover CSV, or QFX.</Dialog.Description>
 		</Dialog.Header>
 		<form class="flex min-w-0 flex-col gap-4" onsubmit={save}>
 			<div class="flex flex-col gap-2">

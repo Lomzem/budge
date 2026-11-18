@@ -264,7 +264,8 @@ async function keptFields(ctx: MutationCtx, existing: Doc<'transactions'>) {
 export async function categorizeTransaction(
 	ctx: MutationCtx,
 	existing: Doc<'transactions'>,
-	choice: CategoryChoice
+	choice: CategoryChoice,
+	approve = false
 ) {
 	if (existing.split === true) {
 		throw publicError('INVALID_INPUT', 'A split Transaction takes its Categories on its lines.');
@@ -278,7 +279,7 @@ export async function categorizeTransaction(
 			...(choice.kind === 'category' ? { categoryId: choice.categoryId } : {}),
 			...(choice.kind === 'transfer' ? { payee: '', transferAccountId: choice.accountId } : {})
 		},
-		{ approve: false, rememberCategory: choice.kind === 'category' && choice.remember === true }
+		{ approve, rememberCategory: choice.kind === 'category' && choice.remember === true }
 	);
 }
 

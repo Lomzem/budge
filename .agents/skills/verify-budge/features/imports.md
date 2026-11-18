@@ -10,7 +10,7 @@ Preview invented bank files before saving; match existing Transactions, retain e
 
 ## How to get to it (user POV)
 
-- The Accounts page or a named Account → `Import file`; Account selection inside `Import a bank file`.
+- The Transactions page or a named Account → `Import file`; Account selection inside `Import a bank file`.
 - Imported Transaction edit dialog → Bank Text / Unmatch / Approve; desktop row Approve and list Approve all N.
 
 ## Driving it with Playwright

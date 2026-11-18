@@ -175,16 +175,25 @@ describe('categorizing a Transaction in place', () => {
 		return { ...budget, transactionId };
 	}
 
-	test('changes only its Category and leaves it Unapproved', async () => {
+	test('picking a Category approves it, and Uncategorized leaves approval alone', async () => {
 		const { owner, checking, categories, transactionId, page } = await unapprovedClearedGroceries();
 		const untouched = {
 			date: '2026-08-14',
 			amount: -4_250,
 			payeeName: 'Corner Grocer',
 			memo: 'Weekly shop',
-			cleared: true,
-			approved: false
+			cleared: true
 		};
+
+		await owner.mutation(api.transactions.categorize, {
+			transactionId,
+			choice: { kind: 'uncategorized' }
+		});
+		expect((await page(checking))[0]).toMatchObject({
+			...untouched,
+			categoryId: null,
+			approved: false
+		});
 
 		await owner.mutation(api.transactions.categorize, {
 			transactionId,
@@ -192,14 +201,9 @@ describe('categorizing a Transaction in place', () => {
 		});
 		expect((await page(checking))[0]).toMatchObject({
 			...untouched,
-			categoryId: categories.Groceries
+			categoryId: categories.Groceries,
+			approved: true
 		});
-
-		await owner.mutation(api.transactions.categorize, {
-			transactionId,
-			choice: { kind: 'uncategorized' }
-		});
-		expect((await page(checking))[0]).toMatchObject({ ...untouched, categoryId: null });
 	});
 
 	test('a Transfer choice pays the card from the Cash Account', async () => {
@@ -217,7 +221,7 @@ describe('categorizing a Transaction in place', () => {
 			payeeName: null,
 			categoryId: null,
 			transfer: { accountId: card },
-			approved: false
+			approved: true
 		});
 	});
 
@@ -296,6 +300,7 @@ describe('categorizing several Transactions at once', () => {
 			transactionId: first,
 			choice: { kind: 'category', categoryId: categories.Dining, remember: true }
 		});
+		await owner.mutation(api.transactions.unapprove, { transactionIds: [first] });
 
 		await owner.mutation(api.transactions.categorizeMany, {
 			transactionIds: [first, third],
@@ -357,6 +362,9 @@ describe('categorizing several Transactions at once', () => {
 		await owner.mutation(api.transactions.categorize, {
 			transactionId: plain,
 			choice: { kind: 'category', categoryId: categories.Dining }
+		});
+		await owner.mutation(api.transactions.unapprove, {
+			transactionIds: [losesItsCategory, plain]
 		});
 		await owner.mutation(api.transactions.approve, { transactionId: alreadyApproved });
 

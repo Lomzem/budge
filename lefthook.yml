@@ -8,6 +8,9 @@ pre-commit:
   # gitleaks runs last, so it scans the index after the fixers have re-staged their files.
   piped: true
   jobs:
+    - name: UI ownership
+      run: sh scripts/ui-owner.sh
+
     - name: lint
       group:
         parallel: true

@@ -2,19 +2,15 @@
 	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
-	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
-	import { useQuery } from 'convex-svelte';
 	import { Result } from 'effect';
 	import { tick, untrack } from 'svelte';
 	import { on } from 'svelte/events';
 	import { MediaQuery, SvelteSet } from 'svelte/reactivity';
 
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { navigating, page } from '$app/state';
-	import { api } from '$convex/_generated/api';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
 	import { getBankConnections } from '$lib/bankConnections.svelte';
@@ -23,6 +19,7 @@
 	import AddCategoryDialog from '$lib/components/budget/add-category-dialog.svelte';
 	import BudgetTable from '$lib/components/budget/budget-table.svelte';
 	import CategoryInspector from '$lib/components/budget/category-inspector.svelte';
+	import HiddenCategories from '$lib/components/budget/hidden-categories.svelte';
 	import MonthPicker from '$lib/components/budget/month-picker.svelte';
 	import UpcomingList from '$lib/components/budget/upcoming-list.svelte';
 	import CutoverDate from '$lib/components/settings/cutover-date.svelte';
@@ -66,10 +63,8 @@
 		else kept.searchParams.set('month', budget.month);
 		keepInUrl(kept);
 	});
-	const settings = useQuery(api.settings.get, {});
-	const unapproved = useQuery(api.transactions.unapprovedCount, {});
+	const { settings, unapprovedCount: unapproved, bankChangeCount: bankChanges } = getShellQueries();
 	const unapprovedCount = $derived(unapproved.data ?? 0);
-	const bankChanges = useQuery(api.transactions.bankChangeCount, {});
 	const bankChangeCount = $derived(bankChanges.data ?? { count: 0, complete: true });
 	let addAccountOpen = $state(false);
 	let cutoverUnsetOnArrival = $state(false);
@@ -162,7 +157,7 @@
 	interface Need {
 		text: string;
 		short?: string;
-		link?: { path: '/accounts' | '/bank'; query: string };
+		link?: { path: '/transactions' | '/bank'; query: string };
 		action?: () => void;
 		tone: 'bad' | 'warn';
 	}
@@ -202,21 +197,21 @@
 			const count = view.uncategorizedCount;
 			list.push({
 				text: `${String(count)} Uncategorized`,
-				link: { path: '/accounts', query: '?category=uncategorized' },
+				link: { path: '/transactions', query: '?category=uncategorized' },
 				tone: 'warn'
 			});
 		}
 		if (unapprovedCount > 0) {
 			list.push({
 				text: `${formatUnapprovedCount(unapprovedCount)} Unapproved`,
-				link: { path: '/accounts', query: '?status=unapproved' },
+				link: { path: '/transactions', query: '?status=unapproved' },
 				tone: 'warn'
 			});
 		}
 		if (bankChangeCount.count > 0 || !bankChangeCount.complete) {
 			list.push({
 				text: formatBankChangeCount(bankChangeCount),
-				link: { path: '/accounts', query: '?status=bank-changes' },
+				link: { path: '/transactions', query: '?status=bank-changes' },
 				tone: 'warn'
 			});
 		}
@@ -386,27 +381,17 @@
 			</div>
 			{#if readyToAssign}
 				<div
-					class={[
-						'grid w-full grid-cols-label-figure items-baseline gap-x-3 gap-y-0.5 rounded-lg px-4 py-3 xs:gap-x-4 sm:w-auto sm:gap-x-8 sm:px-5',
-						readyToAssign.amount < 0 ? 'bg-destructive-tint' : 'bg-funded-tint'
-					]}
+					class="flex w-full items-baseline justify-between gap-4 sm:w-auto sm:flex-col sm:items-end sm:gap-0"
 				>
-					<p class="text-sm font-bold whitespace-nowrap">Ready to Assign</p>
+					<p class="text-sm font-medium text-muted-foreground">Ready to Assign</p>
 					<p
 						data-testid="ready-to-assign"
 						class={[
-							'text-right text-lg leading-tight font-bold whitespace-nowrap tabular-nums xs:text-2xl sm:row-span-2 sm:self-center sm:text-3xl',
+							'text-xl leading-tight font-bold whitespace-nowrap tabular-nums sm:text-2xl',
 							readyToAssign.amount < 0 ? 'text-destructive' : 'text-funded'
 						]}
 					>
 						{formatCents(readyToAssign.amount)}
-					</p>
-					<p class="col-span-2 min-h-4 text-xs sm:col-span-1">
-						{#if readyToAssign.uncategorized < 0}
-							{formatCents(-readyToAssign.uncategorized)} of spending has no Category yet
-						{:else if readyToAssign.uncategorized > 0}
-							{formatCents(readyToAssign.uncategorized)} of income has no Category yet
-						{/if}
 					</p>
 				</div>
 			{/if}
@@ -446,16 +431,11 @@
 				{/if}
 			</button>
 		{/snippet}
-		<section
-			aria-label="Needs you"
-			class="relative -my-1 flex h-10 items-center pointer-coarse:h-13"
-		>
-			{#if needs.length === 0}
-				<p class="flex items-center gap-2 text-muted-foreground">
-					<CircleCheckIcon aria-hidden="true" class="size-5 text-funded" />
-					Nothing needs you right now.
-				</p>
-			{:else}
+		{#if needs.length > 0}
+			<section
+				aria-label="Needs you"
+				class="relative -my-1 flex h-10 items-center pointer-coarse:h-13"
+			>
 				<div
 					class={[
 						'-mx-1 flex min-w-0 flex-1 fade-edges',
@@ -498,24 +478,21 @@
 				</div>
 				{@render needsScroller(-1, needsBefore)}
 				{@render needsScroller(1, needsAfter)}
-			{/if}
-		</section>
+			</section>
+		{/if}
 
 		{#if accounts.all.length === 0 && settings.data?.cutoverDate !== null}
 			<section
 				class="flex max-w-2xl flex-col items-start gap-3 rounded-lg border border-dashed border-input p-6"
 			>
-				<p class="font-bold">Nothing to budget yet</p>
-				<p class="text-muted-foreground">
-					Add an Account, or connect a bank on the <a
-						href={resolve('/bank')}
-						class="underline underline-offset-4 hover:no-underline">Bank</a
-					> page.
-				</p>
-				<Button onclick={() => (addAccountOpen = true)}>
-					<PlusIcon aria-hidden="true" />
-					Add Account
-				</Button>
+				<p class="font-bold">No Accounts yet</p>
+				<div class="flex flex-wrap gap-2">
+					<Button onclick={() => (addAccountOpen = true)}>
+						<PlusIcon aria-hidden="true" />
+						Add Account
+					</Button>
+					<Button variant="outline" href={resolve('/bank')}>Connect a bank</Button>
+				</div>
 			</section>
 		{/if}
 
@@ -543,7 +520,6 @@
 					<PlusIcon aria-hidden="true" />
 					Add Category
 				</Button>
-				<Button variant="ghost" size="sm" href={resolve('/categories')}>Manage Categories</Button>
 			</div>
 			{#if view.groups.length > 0}
 				<div class="lg:flex lg:items-start lg:gap-8" aria-busy={budget.stale}>
@@ -572,10 +548,7 @@
 									{#if selected}
 										<div class="rounded-lg border bg-card p-5">{@render inspector()}</div>
 									{:else}
-										<p class="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-											Select a Category.
-										</p>
-										<UpcomingList upcoming={view.upcoming} />
+										<UpcomingList upcoming={view.upcoming} today={budget.today} />
 									{/if}
 								</div>
 							</ScrollArea>
@@ -583,33 +556,14 @@
 					{/if}
 				</div>
 				{#if !wide.current}
-					<UpcomingList upcoming={view.upcoming} />
+					<UpcomingList upcoming={view.upcoming} today={budget.today} />
 				{/if}
-			{:else if view.hidden.length === 0}
-				<p class="text-muted-foreground">
-					No Categories yet. Add a Category Group, then Categories.
-				</p>
-			{:else if view.upcoming.length > 0}
-				<UpcomingList upcoming={view.upcoming} />
+			{:else}
+				<UpcomingList upcoming={view.upcoming} today={budget.today} />
 			{/if}
 		</section>
 
-		{#if view.hidden.length > 0}
-			<section aria-labelledby="hidden-heading" class="flex flex-col gap-2">
-				<h2 id="hidden-heading" class="text-lg font-bold">Hidden Categories</h2>
-				<ul class="flex max-w-md flex-col divide-y rounded-lg border bg-card">
-					{#each view.hidden as category (category.id)}
-						<li class="flex justify-between gap-4 px-4 py-2">
-							<span class="truncate">{category.name}</span>
-							<span class={['shrink-0', category.available < 0 && 'text-destructive']}>
-								<span class="sr-only">{category.available < 0 ? 'Overspent' : 'Available'}</span>
-								{formatCents(category.available)}
-							</span>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/if}
+		<HiddenCategories hidden={view.hidden} />
 	</div>
 {/if}
 
@@ -617,8 +571,8 @@
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger>
 			{#snippet child({ props })}
-				<Button variant="ghost" size="icon" aria-label="Edit Categories" {...props}>
-					<PencilIcon aria-hidden="true" />
+				<Button variant="ghost" size="icon" aria-label="Add Category or Group" {...props}>
+					<PlusIcon aria-hidden="true" />
 				</Button>
 			{/snippet}
 		</DropdownMenu.Trigger>
@@ -638,13 +592,6 @@
 				}}
 			>
 				Add Category
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={() => {
-					void goto(resolve('/categories'));
-				}}
-			>
-				Manage Categories
 			</DropdownMenu.Item>
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>

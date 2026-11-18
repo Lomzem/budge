@@ -48,7 +48,6 @@ export function rememberCopy(
 	remembered: string | null | undefined
 ): { readonly label: string; readonly hint: string } {
 	const label = `Remember for ${payee}’s later imports`;
-	if (remembered === undefined) return { label, hint: '' };
-	if (remembered === null) return { label, hint: 'Nothing is remembered yet.' };
+	if (remembered == null) return { label, hint: '' };
 	return { label, hint: `Remembered now: ${labelOf(choices, remembered) ?? 'another Category'}.` };
 }

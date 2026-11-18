@@ -17,7 +17,7 @@ export const targets = {
 			const dialog = page.getByRole('dialog');
 			const bar = page.getByRole('progressbar', { name: `${name} Target` }).first();
 			const upcoming = page.getByRole('region', { name: 'Upcoming' });
-			const row = upcoming.getByRole('row').filter({ hasText: name });
+			const row = upcoming.getByRole('listitem').filter({ hasText: name });
 			const nameButton = page.getByRole('button', { name, exact: true });
 
 			const twentyFiveDollarsMoreThanAssigned = await step(
@@ -48,7 +48,8 @@ export const targets = {
 					await expect(region.getByText('$25.00 more needed')).toBeVisible();
 					await expect(upcoming).toHaveCount(0);
 					await nameButton.click();
-					await expect(row).toContainText('No');
+					await expect(row).toContainText('Not funded');
+					await expect(row).not.toContainText(/\b(Funded|No)\b/);
 					await nameButton.click();
 				}
 			);
@@ -66,7 +67,8 @@ export const targets = {
 				await expect(region.getByRole('button', { name: 'Assign $25.00' })).toHaveCount(0);
 				await expect(nameButton).toBeFocused();
 				await nameButton.click();
-				await expect(row).toContainText('Yes');
+				await expect(row).toBeVisible();
+				await expect(row).not.toContainText(/\b(Not funded|Funded|No)\b/);
 				await expect.poll(assigned).toBe(twentyFiveDollarsMoreThanAssigned);
 				await reloadOnceSaved(page);
 				await expect.poll(assigned).toBe(twentyFiveDollarsMoreThanAssigned);

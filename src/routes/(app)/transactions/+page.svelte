@@ -33,13 +33,13 @@
 </script>
 
 <svelte:head>
-	<title>Accounts · Budge</title>
+	<title>Transactions · Budge</title>
 </svelte:head>
 
 <div class="flex flex-col gap-4 sm:gap-6">
 	<header class="flex items-end justify-between gap-4">
 		<div class="flex flex-col gap-1">
-			<h1 class="text-2xl font-bold tracking-tight">Accounts</h1>
+			<h1 class="text-2xl font-bold tracking-tight">Transactions</h1>
 			<p class="text-muted-foreground">
 				Net balance
 				<span class={['font-bold text-foreground', total < 0 && 'text-destructive']}>
@@ -58,12 +58,7 @@
 			class="flex max-w-2xl flex-col items-start gap-2 rounded-lg border border-dashed border-input p-6"
 		>
 			<p class="font-bold">No Accounts yet</p>
-			<p class="text-muted-foreground">
-				Add an Account, or connect a bank on the <a
-					href={resolve('/bank')}
-					class="underline underline-offset-4 hover:no-underline">Bank</a
-				> page.
-			</p>
+			<Button variant="outline" href={resolve('/bank')}>Connect a bank</Button>
 		</section>
 	{:else}
 		<details class="group lg:hidden" open={listOpenOnArrival} ontoggle={remember}>
@@ -91,7 +86,7 @@
 							{#each group.accounts as account (account._id)}
 								<li>
 									<a
-										href={resolve('/(app)/accounts/[accountId]', { accountId: account._id })}
+										href={resolve('/(app)/transactions/[accountId]', { accountId: account._id })}
 										class="flex min-h-12 items-center gap-3 px-4 py-2 hover:bg-accent"
 									>
 										<span class="flex-1 truncate font-bold">{account.name}</span>
@@ -108,7 +103,7 @@
 			</nav>
 		</details>
 		<section aria-labelledby="all-transactions" class="flex flex-col gap-3">
-			<h2 id="all-transactions" class="text-lg font-bold">All Transactions</h2>
+			<h2 id="all-transactions" class="text-lg font-bold">All Accounts</h2>
 			<TransactionTable />
 		</section>
 	{/if}

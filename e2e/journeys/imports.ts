@@ -73,7 +73,7 @@ export const imports = {
 				await page.goto('/');
 				const sidebar = page.getByRole('navigation', { name: 'Sections and Accounts' });
 				await expect(
-					sidebar.getByRole('link', { name: /^Accounts \d+ Unapproved$/ })
+					sidebar.getByRole('link', { name: /^Transactions \d+ Unapproved$/ })
 				).toBeVisible();
 				await openAccount(page, 'Savings');
 			});
