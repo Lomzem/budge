@@ -125,7 +125,10 @@ export const settings = {
 				await openBudget(page);
 				await expect(region.getByLabel('Cutover date')).toBeVisible();
 				await expect(region.getByRole('button', { name: 'Cancel' })).toHaveCount(0);
-				await page.getByRole('complementary').getByRole('button', { name: 'Add Account' }).click();
+				await page
+					.getByRole('navigation', { name: 'Sections and Accounts' })
+					.getByRole('button', { name: 'Add Account' })
+					.click();
 				const dialog = page.getByRole('dialog', { name: 'Add Account' });
 				await expect(dialog).toContainText('Set the cutover date first');
 				await expect(dialog.getByLabel('Name')).toHaveCount(0);

@@ -68,7 +68,7 @@
 </script>
 
 {#snippet balance(available: number)}
-	<span class={['shrink-0 tabular-nums', available < 0 && 'text-destructive']}>
+	<span class={['ml-auto shrink-0 tabular-nums', available < 0 && 'text-destructive']}>
 		<span class="sr-only">{available < 0 ? 'Overspent' : 'Available'}</span>
 		{formatCents(available)}
 	</span>
@@ -80,7 +80,7 @@
 		<ul class="flex flex-col divide-y rounded-lg border bg-card">
 			{#each rows as row (row.id)}
 				<li class="flex min-h-11 flex-wrap items-center gap-x-4 px-4 py-1.5">
-					<span class="min-w-0 flex-1">
+					<span class="min-w-0 grow">
 						<span class={['block break-words', row.kind === 'group' && 'font-semibold']}
 							>{row.name}</span
 						>

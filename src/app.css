@@ -260,6 +260,11 @@
 	-webkit-touch-callout: none;
 }
 
+/* Gives fields inside a long-press row back iOS's own copy and paste callout. */
+@utility touch-callout-default {
+	-webkit-touch-callout: default;
+}
+
 @utility fade-edges {
 	mask-image: linear-gradient(
 		to right,

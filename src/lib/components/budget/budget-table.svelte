@@ -213,6 +213,17 @@
 		};
 	}
 
+	function isHandler(handler: unknown): handler is (event: Event) => void {
+		return typeof handler === 'function';
+	}
+
+	function outsideFields(handler: unknown) {
+		return (event: Event) => {
+			if (event.target instanceof Element && event.target.closest('input, textarea')) return;
+			if (isHandler(handler)) handler(event);
+		};
+	}
+
 	function clickWithAMenuOpenOnlyClosesIt(node: HTMLElement) {
 		let dismissing = false;
 		const readMenuBeforeItsDismissal = () => {
@@ -348,7 +359,7 @@
 			{/snippet}
 		</InlineName>
 		{#if group.kind === 'normal'}
-			<DropdownMenu.Root>
+			<DropdownMenu.Root onOpenChange={tracksMenu(group.id)}>
 				<DropdownMenu.Trigger>
 					{#snippet child({ props })}
 						<Button variant="ghost" size="icon-xs" aria-label="{group.name} actions" {...props}>
@@ -431,9 +442,11 @@
 						{@const selected = category.id === selectedId}
 						<ContextMenu.Root onOpenChange={tracksMenu(category.id)}>
 							<ContextMenu.Trigger disabled={group.kind !== 'normal'}>
-								{#snippet child({ props })}
+								{#snippet child({ props }: { props: Record<string, unknown> })}
 									<Table.Row
 										{...props}
+										oncontextmenu={outsideFields(props.oncontextmenu)}
+										onpointerdown={outsideFields(props.onpointerdown)}
 										tabindex={undefined}
 										data-state={selected ? 'selected' : undefined}
 										opens

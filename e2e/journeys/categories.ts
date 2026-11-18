@@ -10,6 +10,7 @@ import {
 	reloadOnceSaved,
 	tap,
 	touchscreen,
+	typed,
 	useATouchScreen,
 	type Journey
 } from './journey';
@@ -37,8 +38,12 @@ async function groupOrder(page: Page) {
 	return names.map((name) => name.trim().split('\n')[0] ?? '');
 }
 
+async function rightClickTheNameCell(row: Locator) {
+	await row.getByRole('cell').first().click({ button: 'right' });
+}
+
 async function fromRowMenu(page: Page, row: Locator, action: string) {
-	await row.click({ button: 'right' });
+	await rightClickTheNameCell(row);
 	await page.getByRole('menuitem', { name: action, exact: true }).click();
 }
 
@@ -68,8 +73,15 @@ async function tapTheCornerOf(page: Page, target: Locator) {
 	await target.scrollIntoViewIfNeeded();
 	const box = await target.boundingBox();
 	if (box === null) throw new Error(`${String(target)} has no box to tap`);
+	const corner = { x: box.x + 3, y: box.y + box.height - 3 };
+	const owned = await target.evaluate(
+		(element, { x, y }) => element.contains(document.elementFromPoint(x, y)),
+		corner
+	);
+	if (!owned)
+		throw new Error(`Something covers the corner of ${String(target)}, so a tap there misses it`);
 	const screen = await touchscreen(page);
-	await screen.touch('touchStart', [{ id: 1, x: box.x + 3, y: box.y + box.height - 3 }]);
+	await screen.touch('touchStart', [{ id: 1, ...corner }]);
 	await screen.touch('touchEnd', []);
 	await screen.detach();
 }
@@ -190,7 +202,7 @@ export const categories = {
 				async () => {
 					const groceries = rowOf(page, 'Groceries');
 					const other = rowOf(page, 'Smoke Test Renamed');
-					await groceries.click({ button: 'right' });
+					await rightClickTheNameCell(groceries);
 					await expect(page.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
 					const name = await centerOf(
 						other.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
@@ -226,7 +238,7 @@ export const categories = {
 
 					await fromRowMenu(page, rowOf(page, second), 'Move up');
 					await expect.poll(() => namesIn(everyday)).toEqual(swapped);
-					await rowOf(page, second).click({ button: 'right' });
+					await rightClickTheNameCell(rowOf(page, second));
 					await expect(page.getByRole('menuitem', { name: 'Move up' })).toHaveAttribute(
 						'data-disabled'
 					);
@@ -327,7 +339,7 @@ export const categories = {
 	},
 	'touch-menu': {
 		title:
-			'on a 320 px touch screen, holding a Category name opens its menu without selecting it, and a tap outside only closes it',
+			'on a 320 px touch screen, holding a Category name opens its menu without selecting it, a tap outside any Budget menu only closes it, and Assigned fields never open a row menu',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			let stopTouching: (() => Promise<void>) | undefined;
@@ -380,11 +392,50 @@ export const categories = {
 				async () => {
 					await holdDown(page, page.getByRole('button', { name: 'Groceries', exact: true }));
 					await expect(page.getByRole('menu')).toBeVisible();
-					await tapTheCornerOf(page, rowOf(page, 'Coffee').getByRole('cell').nth(1));
+					await tapTheCornerOf(page, rowOf(page, 'Coffee').getByRole('cell').first());
 					await expect(page.getByRole('menu')).toHaveCount(0);
 					await expect(page.getByRole('dialog')).toHaveCount(0);
 					await expect(rowOf(page, 'Coffee')).not.toHaveAttribute('data-state', 'selected');
+				}
+			);
+			await step(
+				'a tap on the Groceries Assigned field opens no menu and takes the amount typed',
+				async () => {
+					const assigned = page.getByRole('textbox', { name: 'Assigned for Groceries' });
+					await tap(page, assigned);
+					await expect(assigned).toBeFocused();
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await page.keyboard.type('400');
+					await page.keyboard.press('Enter');
+					await expect(assigned).toHaveValue(typed(40_000));
+				}
+			);
+			await step(
+				"with a group's ⋯ menu open, a tap on the Transit name only closes it",
+				async () => {
+					await tap(page, page.getByRole('button', { name: 'Everyday actions' }));
+					await expect(page.getByRole('menu')).toBeVisible();
+					await tap(page, page.getByRole('button', { name: 'Transit', exact: true }));
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await expect(page.getByRole('dialog')).toHaveCount(0);
+					await expect(rowOf(page, 'Transit')).not.toHaveAttribute('data-state', 'selected');
 					await stopTouching?.();
+				}
+			);
+			await step(
+				"on a desktop, a right-click in an Assigned field opens no row menu, and a click on a name with a group's ⋯ menu open only closes it",
+				async () => {
+					await page.setViewportSize({ width: 1280, height: 800 });
+					await page
+						.getByRole('textbox', { name: 'Assigned for Transit' })
+						.click({ button: 'right' });
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await page.getByRole('button', { name: 'Bills actions' }).click();
+					await expect(page.getByRole('menu')).toBeVisible();
+					await page.getByRole('button', { name: 'Coffee', exact: true }).click();
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await expect(rowOf(page, 'Coffee')).not.toHaveAttribute('data-state', 'selected');
+					await expect(page.getByRole('region', { name: 'Coffee' })).toHaveCount(0);
 				}
 			);
 		}

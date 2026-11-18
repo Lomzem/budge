@@ -53,11 +53,11 @@
 		Skip to content
 	</a>
 	<div class="flex flex-1">
-		<aside class="hidden w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground lg:block">
+		<div class="hidden w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground lg:block">
 			<div class="sticky top-0 flex h-svh flex-col">
 				<AccountSidebar ready={access === 'owner'} />
 			</div>
-		</aside>
+		</div>
 		<main
 			id="main"
 			tabindex="-1"
