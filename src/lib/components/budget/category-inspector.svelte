@@ -213,7 +213,7 @@
 <section
 	bind:this={section}
 	id="category-inspector"
-	aria-labelledby="inspector-heading"
+	aria-label={category.name}
 	tabindex="-1"
 	class="flex flex-col gap-4 outline-none"
 	onkeydown={keydown}
@@ -235,7 +235,7 @@
 			}}
 		>
 			{#snippet children(name: string)}
-				<h2 id="inspector-heading" class="min-w-0 flex-1 text-lg font-bold break-words">{name}</h2>
+				<h2 class="min-w-0 flex-1 text-lg font-bold break-words">{name}</h2>
 			{/snippet}
 		</InlineName>
 		<div class="flex shrink-0 items-center">

@@ -622,7 +622,7 @@
 	>
 		<Dialog.Content
 			showCloseButton={false}
-			aria-labelledby="inspector-heading"
+			aria-label={selected?.name}
 			onOpenAutoFocus={(event: Event) => {
 				event.preventDefault();
 				document.getElementById('category-inspector')?.focus({ preventScroll: true });

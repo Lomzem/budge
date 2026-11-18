@@ -412,22 +412,30 @@ export const inspector = {
 				}
 			);
 
-			await step('Rename in the inspector edits its heading in place', async () => {
-				await page.getByRole('button', { name: 'Sample Grocer', exact: true }).click();
-				await inspector.getByRole('button', { name: 'Sample Grocer actions' }).click();
-				await page.getByRole('menuitem', { name: 'Rename' }).click();
-				const field = inspector.getByRole('textbox', { name: 'Category name' });
-				await expect(field).toBeFocused();
-				await field.fill('Sample Market');
-				await field.press('Enter');
-				await expect(inspector.getByRole('heading', { name: 'Sample Market' })).toBeVisible();
-				await expect(
-					inspector.getByRole('button', { name: 'Sample Market actions' })
-				).toBeFocused();
-				await expect(
-					rowgroup('Everyday').getByRole('button', { name: 'Sample Market', exact: true })
-				).toBeVisible();
-			});
+			await step(
+				'Rename in the inspector edits its heading in place, and keeps it named',
+				async () => {
+					await page.getByRole('button', { name: 'Sample Grocer', exact: true }).click();
+					await inspector.getByRole('button', { name: 'Sample Grocer actions' }).click();
+					await page.getByRole('menuitem', { name: 'Rename' }).click();
+					const field = inspector.getByRole('textbox', { name: 'Category name' });
+					await expect(field).toBeFocused();
+					await expect(
+						page.getByRole('region', { name: 'Sample Grocer', exact: true }).getByRole('textbox', {
+							name: 'Category name'
+						})
+					).toBeFocused();
+					await field.fill('Sample Market');
+					await field.press('Enter');
+					await expect(inspector.getByRole('heading', { name: 'Sample Market' })).toBeVisible();
+					await expect(
+						inspector.getByRole('button', { name: 'Sample Market actions' })
+					).toBeFocused();
+					await expect(
+						rowgroup('Everyday').getByRole('button', { name: 'Sample Market', exact: true })
+					).toBeVisible();
+				}
+			);
 
 			await step(
 				'Move to group into a collapsed Savings Goals opens that group to show it, and keeps it open',
