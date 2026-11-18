@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 
 import { ordinal } from '../../src/lib/domain/dates';
-import { cents, choose, openBudget, typed, type Journey } from './journey';
+import { cents, choose, openBudget, typed, reloadOnceSaved, type Journey } from './journey';
 
 export const targets = {
 	monthly: {
@@ -68,7 +68,7 @@ export const targets = {
 				await nameButton.click();
 				await expect(row).toContainText('Yes');
 				await expect.poll(assigned).toBe(twentyFiveDollarsMoreThanAssigned);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect.poll(assigned).toBe(twentyFiveDollarsMoreThanAssigned);
 			});
 

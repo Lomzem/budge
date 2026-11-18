@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import { addDays, formatDate, localToday } from '../../src/lib/domain/dates';
-import { choose, expectNothingPastTheRightEdge, type Journey } from './journey';
+import { choose, expectNothingPastTheRightEdge, reloadOnceSaved, type Journey } from './journey';
 
 async function openAllAccounts(page: Page) {
 	await page.goto('/accounts');
@@ -168,7 +168,7 @@ export const search = {
 				async () => {
 					const payee = page.getByLabel('Payee', { exact: true });
 					await choose(payee, 'Sample Landlord');
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(payee).toHaveText('Sample Landlord');
 					await choose(payee, 'Sample Coffee Shop');
 					await expect

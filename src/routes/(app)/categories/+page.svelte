@@ -184,7 +184,7 @@
 			aria-describedby="reorder-hint"
 			aria-keyshortcuts="ArrowUp ArrowDown Home End"
 			disabled={count < 2}
-			{@attach reorderHandle(index, count, onmove)}
+			{@attach reorderHandle(() => ({ index, count, onmove }))}
 		>
 			<GripVerticalIcon aria-hidden="true" />
 		</Button>

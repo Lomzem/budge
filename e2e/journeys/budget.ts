@@ -13,6 +13,7 @@ import {
 	tap,
 	typed,
 	useATouchScreen,
+	reloadOnceSaved,
 	type Journey
 } from './journey';
 
@@ -67,7 +68,7 @@ export const budget = {
 			});
 
 			await step('a reload keeps Assigned and Ready to Assign', async () => {
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(assigned).toHaveValue(tenDollarsMore);
 				await expect.poll(readyToAssign).toBe(before.readyToAssign - 1_000);
 			});
@@ -116,7 +117,7 @@ export const budget = {
 					await assigned.press('Escape');
 					await assigned.blur();
 					await expect(assigned).toHaveValue(typed(-2_000));
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(assigned).toHaveValue(typed(-2_000));
 					await expect.poll(readyToAssign).toBe(settled);
 				}
@@ -157,7 +158,7 @@ export const budget = {
 			await step('Groceries keeps the old amount, after a reload too', async () => {
 				await expect(assigned).toHaveValue(before.assigned);
 				await expect.poll(readyToAssign).toBe(before.readyToAssign);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(assigned).toHaveValue(before.assigned);
 				await expect.poll(readyToAssign).toBe(before.readyToAssign);
 			});
@@ -286,7 +287,7 @@ export const budget = {
 				await months.getByRole('button', { name: monthName(12), exact: true }).click();
 				await expect(page.getByText(monthName(12), { exact: true })).toBeVisible();
 				await expect(picker).toBeFocused();
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(page.getByText(monthName(12), { exact: true })).toBeVisible();
 			});
 
@@ -333,7 +334,7 @@ export const budget = {
 							exact: true
 						});
 					const sync = await pausableSync(page);
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(heading('August')).toBeVisible();
 					const august = cents(await groceries.inputValue());
 					await picker.click();
@@ -404,7 +405,7 @@ export const budget = {
 					await page.goBack();
 					await showing(0, current);
 					await expect(page).not.toHaveURL(/[?&]month=/);
-					await page.reload();
+					await reloadOnceSaved(page);
 					await showing(0, current);
 					await page.goForward();
 					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
@@ -453,7 +454,7 @@ export const budget = {
 						await showing(1, next);
 						await page.goBack();
 						await showing(0, current);
-						await page.reload();
+						await reloadOnceSaved(page);
 						await showing(0, current);
 					};
 
@@ -515,7 +516,7 @@ export const budget = {
 				await groceries.fill(typed(sixFigures));
 				await groceries.press('Enter');
 				await shows(groceriesRow, before.available + raise);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(groceries).toHaveValue(typed(sixFigures));
 			});
 
@@ -574,7 +575,7 @@ export const budget = {
 				await assigned.press('Enter');
 				await expect.poll(readyToAssign).toBe(before.ready - 500);
 				await expect(page.getByRole('dialog')).toHaveCount(0);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(assigned).toHaveValue(typed(before.assigned + 500));
 			});
 
@@ -608,7 +609,7 @@ export const budget = {
 			);
 
 			await step('the collapse lasts through a reload', async () => {
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(toggle(overspentGroup)).toHaveAttribute('aria-expanded', 'false');
 			});
 

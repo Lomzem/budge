@@ -7,6 +7,7 @@ import {
 	expectTapTargetHeight,
 	openAccount,
 	useATouchScreen,
+	reloadOnceSaved,
 	type Journey
 } from './journey';
 
@@ -354,7 +355,7 @@ export const plaid = {
 				await savings.getByRole('button', { name: 'Reconnect', exact: true }).click();
 				await expect(savings.getByRole('status')).toHaveText(notSetUp);
 				await expect(savings.getByRole('button', { name: 'Reconnect', exact: true })).toBeEnabled();
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(savings).toContainText(needsReconnect);
 			});
 		}
@@ -389,7 +390,7 @@ export const plaid = {
 			await step('Reconnect reports the failure, and the consent notice returns', async () => {
 				await creditUnion.getByRole('button', { name: 'Reconnect', exact: true }).click();
 				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(creditUnion).toContainText('Reconnect to renew it.');
 			});
 		}

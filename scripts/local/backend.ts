@@ -1,5 +1,13 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	utimesSync,
+	writeFileSync
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -144,6 +152,11 @@ function servedDeployment(dir: string, ports: BackendPorts) {
 		: undefined;
 }
 
+function repushAfterEnvVarsChange(dir: string) {
+	const now = new Date();
+	utimesSync(join(dir, 'convex', 'auth.config.ts'), now, now);
+}
+
 export async function waitForAnonymousBackend(
 	backend: ChildProcess,
 	dir: string,
@@ -167,14 +180,14 @@ export async function waitForAnonymousBackend(
 	});
 	if (deployment === undefined) throw new Error('the anonymous backend did not start');
 
-	for (const [name, value] of [
-		['CLERK_JWT_ISSUER_DOMAIN', credentials.CLERK_JWT_ISSUER_DOMAIN],
-		['BUDGE_OWNER_SUBJECT', credentials.E2E_CLERK_USER_ID]
-	] as const) {
-		if ((await runConvex(deployment, dir, ['env', 'set', name], value)) !== 0) {
-			throw new Error(`setting ${name} failed`);
-		}
+	const variables = [
+		`CLERK_JWT_ISSUER_DOMAIN=${credentials.CLERK_JWT_ISSUER_DOMAIN}`,
+		`BUDGE_OWNER_SUBJECT=${credentials.E2E_CLERK_USER_ID}`
+	].join('\n');
+	if ((await runConvex(deployment, dir, ['env', 'set', '--force'], variables)) !== 0) {
+		throw new Error('setting the backend env vars failed');
 	}
+	repushAfterEnvVarsChange(dir);
 	await waitFor('Convex functions', 120, () => {
 		stillRunning();
 		return readFileSync(logPath, 'utf8').includes('Convex functions ready');
