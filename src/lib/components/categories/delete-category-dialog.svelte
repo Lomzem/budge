@@ -67,8 +67,7 @@
 		<Dialog.Header>
 			<Dialog.Title>Delete {category?.name ?? 'Category'}</Dialog.Title>
 			<Dialog.Description>
-				Its Transactions and Assigned amounts move to the Category you pick, in every month, so
-				every Available stays exact. This can't be undone.
+				Its Transactions and Assigned amounts move to the Category you pick, permanently.
 			</Dialog.Description>
 		</Dialog.Header>
 		{#if choices.length === 0}

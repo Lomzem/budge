@@ -273,10 +273,7 @@
 					</div>
 				</dl>
 				<p>
-					Budge's estimate is the bank's balance less the imported Transactions, so a missing
-					Transaction or an out-of-date balance makes it wrong. A working connection doesn't prove
-					it either. Compare it with your bank statement balance for the start of {since ??
-						'the cutover date'}.
+					Estimates can be wrong. Check your balance at the start of {since ?? 'the cutover date'}.
 				</p>
 			</div>
 		</details>

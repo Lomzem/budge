@@ -181,7 +181,7 @@ export const settings = {
 					await saveCutover(page, cutover);
 					const preview = previewDialog(page, cutover);
 					await expect(preview).toContainText(
-						`Nothing is dated before ${formatDate(cutover)}, so moving the date changes no balance and no Transaction.`
+						`Nothing is dated before ${formatDate(cutover)}, so no balance or Transaction changes.`
 					);
 					await expect(preview).not.toContainText('is after today');
 					await preview.getByRole('button', { name: 'Move start date' }).click();
@@ -194,14 +194,14 @@ export const settings = {
 			);
 
 			await step(
-				'a date after today with nothing dated before it says the coming days’ bank transactions won’t come in',
+				'a date after today with nothing dated before it says Budge skips bank transactions before it',
 				async () => {
 					const future = addDays(localToday(), 17);
 					await region.getByRole('button', { name: 'Change' }).click();
 					await saveCutover(page, future);
 					const preview = previewDialog(page, future);
 					await expect(preview).toContainText(
-						`${formatDate(future)} is after today. Bank transactions dated before it, including the coming days, won't be brought in.`
+						`${formatDate(future)} is after today. Budge skips bank transactions before it.`
 					);
 					await expect(preview.getByRole('button', { name: 'Cancel' })).toBeFocused();
 					await preview.getByRole('button', { name: 'Cancel' }).click();
@@ -230,7 +230,7 @@ export const settings = {
 				await region.getByRole('button', { name: 'Change' }).click();
 				await saveCutover(page, firstOfThisMonth);
 				await expect(preview).toContainText(
-					`A preview of moving the cutover date from ${formatDate(saved)}. Nothing changes until you move it.`
+					`Currently ${formatDate(saved)}. Nothing changes until you move it.`
 				);
 				await expect(
 					preview.getByRole('heading', {
@@ -251,7 +251,7 @@ export const settings = {
 					name: `${formatMonth(monthOf(firstOfThisMonth))} budget`
 				});
 				await expect(budget.getByRole('row', { name: /^Ready to Assign/ })).toBeVisible();
-				await expect(budget).toContainText('starts with nothing carried over');
+				await expect(budget).toContainText('Nothing carries over into');
 			});
 
 			await step(
@@ -410,7 +410,7 @@ export const settings = {
 						`Starts on ${formatDate(firstOfThisMonth)}, moved from ${formatDate(saved)}.`
 					);
 					await expect(undo).toHaveAccessibleDescription(
-						`Puts the start date back on ${formatDate(saved)}, with the Transactions before ${formatDate(firstOfThisMonth)} back in their Accounts.`
+						`Moves the start date back to ${formatDate(saved)}, with its history.`
 					);
 				}
 			);

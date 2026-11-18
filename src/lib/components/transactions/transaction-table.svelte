@@ -1192,11 +1192,10 @@
 			</AlertDialog.Title>
 			<AlertDialog.Description>
 				{#if confirmRemoval?.row.transfer}
-					The bank removed {confirmRemoval.payee}. Both sides are deleted, here and in {confirmRemoval
-						.row.transfer.accountName}. This can't be undone.
+					The bank removed {confirmRemoval.payee}. This permanently deletes it in {confirmRemoval
+						.row.transfer.accountName} too.
 				{:else}
-					The bank removed {confirmRemoval?.payee}. Its amount comes out of the Account balance.
-					This can't be undone.
+					The bank removed {confirmRemoval?.payee}. This permanently deletes it.
 				{/if}
 			</AlertDialog.Description>
 		</AlertDialog.Header>

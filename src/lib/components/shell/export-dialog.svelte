@@ -59,7 +59,7 @@
 		<Dialog.Header>
 			<Dialog.Title>Export</Dialog.Title>
 			<Dialog.Description>
-				Download everything in Budge as a backup. Bank Connection tokens are left out.
+				Download everything as a backup, without Bank Connection tokens.
 			</Dialog.Description>
 		</Dialog.Header>
 		<p role="status" class="min-h-10 text-sm text-muted-foreground">
@@ -68,8 +68,7 @@
 			{:else if done}
 				<span class="text-foreground">{done}</span>
 			{:else}
-				JSON is one file. CSV is one file per table, so your browser may ask to allow several
-				downloads.
+				CSV saves one file per table; allow multiple downloads if asked.
 			{/if}
 		</p>
 		<Dialog.Footer {error}>

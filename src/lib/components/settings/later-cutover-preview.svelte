@@ -123,7 +123,7 @@
 <Dialog.Header>
 	<Dialog.Title>Start on {newDate}?</Dialog.Title>
 	<Dialog.Description>
-		A preview of moving the cutover date from {formatDate(from)}. Nothing changes until you move it.
+		Currently {formatDate(from)}. Nothing changes until you move it.
 	</Dialog.Description>
 </Dialog.Header>
 
@@ -135,12 +135,11 @@
 	<p data-testid="preview-unsupported">{shown.message}</p>
 {:else if shown.kind === 'nothingBefore'}
 	<p>
-		Nothing is dated before {newDate}, so moving the date changes no balance and no Transaction.
+		Nothing is dated before {newDate}, so no balance or Transaction changes.
 	</p>
 	{#if to > today}
 		<p>
-			{newDate} is after today. Bank transactions dated before it, including the coming days, won't be
-			brought in.
+			{newDate} is after today. Budge skips bank transactions before it.
 		</p>
 	{/if}
 {:else}
@@ -246,9 +245,9 @@
 				{#if budget.removedAssignments.count === 0}
 					No Category has money assigned before {formatMonth(budget.month)}.
 				{:else}
-					The {formatCents(budget.removedAssignments.total)} assigned in {monthsText(
+					Budge removes the {formatCents(budget.removedAssignments.total)} assigned in {monthsText(
 						budget.removedAssignments.months
-					)} goes, and {formatMonth(budget.month)} starts with nothing carried over.
+					)}. Nothing carries over into {formatMonth(budget.month)}.
 				{/if}
 			</p>
 		</section>
@@ -278,8 +277,7 @@
 				<div class="flex min-w-0 flex-col gap-1">
 					<Label for="unlock-reconciled">Unlock the Reconciled history</Label>
 					<p id="unlock-reconciled-detail" class="text-sm text-muted-foreground">
-						Reconciled Transactions and Starting Balances above fold into new Starting Balances,
-						which are cleared but not reconciled.
+						Reconciled rows above fold into new Starting Balances, cleared but not reconciled.
 					</p>
 				</div>
 			</div>

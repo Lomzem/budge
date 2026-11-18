@@ -83,8 +83,7 @@
 	<div class="flex flex-col gap-1">
 		<h2 id="cutover-heading" class="text-lg font-bold">Cutover date</h2>
 		<p class="text-muted-foreground">
-			Budge tracks money from this date on. Bank transactions dated earlier aren't brought in, and
-			each Account's starting balance is its balance on this date.
+			Budge tracks money and imports bank transactions from this date.
 		</p>
 	</div>
 	{#if settings.error}
@@ -144,9 +143,7 @@
 						onclick={() => undoMove(move.moveId, move.from)}>Undo move</Button
 					>
 					<span id="undo-move-detail" class="sr-only">
-						Puts the start date back on {formatDate(move.from)}, with the Transactions before {formatDate(
-							move.to
-						)} back in their Accounts.
+						Moves the start date back to {formatDate(move.from)}, with its history.
 					</span>
 				{/if}
 			</div>

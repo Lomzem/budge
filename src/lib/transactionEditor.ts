@@ -113,7 +113,6 @@ export interface View<Candidate> {
 	readonly selection: Selection;
 	readonly remembering: Remembering | undefined;
 	readonly transferAccounts: readonly AccountChoice[];
-	readonly cardPayment: boolean;
 	readonly remainder: number | undefined;
 	readonly candidates: readonly Candidate[];
 	readonly link: string;
@@ -605,7 +604,6 @@ export function view<Candidate extends { readonly _id: Id<'transactions'> }>(
 		selection,
 		remembering,
 		transferAccounts,
-		cardPayment: isCardPayment(draft, selection, world.accounts),
 		remainder: remainderOf(draft),
 		candidates,
 		link,
