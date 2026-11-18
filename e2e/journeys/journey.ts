@@ -59,8 +59,17 @@ export async function chooseBankFile(page: Page, name: string, csv: string) {
 	await field.setInputFiles({ name, mimeType: 'text/csv', buffer: Buffer.from(csv) });
 }
 
+const signedInStartup = 20_000;
+
+async function signedIn(page: Page) {
+	await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible({
+		timeout: signedInStartup
+	});
+}
+
 export async function openBudget(page: Page) {
 	await page.goto('/');
+	await signedIn(page);
 	await expect(page.getByRole('heading', { level: 1, name: 'Budget', exact: true })).toBeVisible();
 }
 
@@ -206,4 +215,5 @@ function leavesWithoutUnsavedWarning(page: Page) {
 export async function reloadOnceSaved(page: Page) {
 	await expect.poll(() => leavesWithoutUnsavedWarning(page)).toBe(true);
 	await page.reload();
+	await signedIn(page);
 }
