@@ -16,6 +16,7 @@ import {
 	openAccount,
 	openBudget,
 	typed,
+	reloadOnceSaved,
 	type Journey
 } from './journey';
 
@@ -135,7 +136,7 @@ export const settings = {
 			await step('saving the first date keeps it on the Budget, then in Settings', async () => {
 				await saveCutover(page, cutover);
 				await expectCutover(page, cutover);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(region).toHaveCount(0);
 				await page.goto('/settings');
 				await expectCutover(page, cutover);
@@ -156,7 +157,7 @@ export const settings = {
 					await region.getByRole('button', { name: 'Change' }).click();
 					await saveCutover(page, dayEarlier);
 					await expectCutover(page, dayEarlier);
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expectCutover(page, dayEarlier);
 				}
 			);
@@ -187,7 +188,7 @@ export const settings = {
 					await expect(preview).toBeHidden();
 					await expectCutover(page, cutover);
 					await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expectCutover(page, cutover);
 				}
 			);
@@ -296,7 +297,7 @@ export const settings = {
 				await expect(region.getByLabel('Cutover date')).toBeFocused();
 				await page.keyboard.press('Escape');
 				await expectCutover(page, saved);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expectCutover(page, saved);
 			});
 
@@ -425,7 +426,7 @@ export const settings = {
 				await expectCutover(page, saved);
 				await expect(undo).toHaveCount(0);
 				await expect(region.getByRole('button', { name: 'Change' })).toBeFocused();
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expectCutover(page, saved);
 				await expect(undo).toHaveCount(0);
 				await openAccount(page, 'Checking');

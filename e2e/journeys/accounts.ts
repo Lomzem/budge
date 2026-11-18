@@ -10,6 +10,7 @@ import {
 	openAccount,
 	openBudget,
 	typed,
+	reloadOnceSaved,
 	type Journey
 } from './journey';
 
@@ -93,11 +94,11 @@ export const accounts = {
 			});
 
 			await step('reload preserves the extra $100 in Savings and Ready to Assign', async () => {
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect.poll(savingsBalance).toBe(before.savings + 10_000);
 				await openBudget(page);
 				await expect.poll(readyToAssign).toBe(before.ready + 10_000);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect.poll(readyToAssign).toBe(before.ready + 10_000);
 			});
 
@@ -116,7 +117,7 @@ export const accounts = {
 			await step('Ready to Assign stays unchanged by the Transfer after reload', async () => {
 				await openBudget(page);
 				await expect.poll(readyToAssign).toBe(before.ready + 10_000);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect.poll(readyToAssign).toBe(before.ready + 10_000);
 			});
 		}
@@ -581,7 +582,7 @@ export const accounts = {
 						"Savings Plus's starting balance is confirmed. Its bank Account's earlier Transactions are still in Savings. Open Savings"
 					);
 					await expect(confirmed.getByRole('link', { name: 'Open Savings' })).toBeFocused();
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(plus).toContainText(stillInSavings);
 				}
 			);
@@ -662,7 +663,7 @@ export const accounts = {
 			);
 
 			await step('after a reload, the other held Accounts remain and it stays gone', async () => {
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(
 					heldRegion(page).getByRole('button', { name: 'Set up Sample Savings Plus ending 4417' })
 				).toBeVisible();

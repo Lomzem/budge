@@ -198,3 +198,12 @@ export async function expectTapTargetHeight(target: Locator, height: number) {
 	);
 	expect(missedAt, `${String(target)} misses taps within ${String(height)} px`).toEqual([]);
 }
+
+function leavesWithoutUnsavedWarning(page: Page) {
+	return page.evaluate(() => window.dispatchEvent(new Event('beforeunload', { cancelable: true })));
+}
+
+export async function reloadOnceSaved(page: Page) {
+	await expect.poll(() => leavesWithoutUnsavedWarning(page)).toBe(true);
+	await page.reload();
+}

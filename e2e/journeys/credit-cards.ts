@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { centsIn, openBudget, type Journey } from './journey';
+import { centsIn, openBudget, reloadOnceSaved, type Journey } from './journey';
 
 export const creditCards = {
 	debt: {
@@ -46,7 +46,7 @@ export const creditCards = {
 					await expect(page.getByText('of card debt not yet covered')).toHaveCount(0);
 					await expect(inspector).toBeFocused();
 					await expect.poll(readyToAssign).toBe(before - seededCardsStartingDebt);
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect.poll(readyToAssign).toBe(before - seededCardsStartingDebt);
 					await expect(page.getByText('of card debt not yet covered')).toHaveCount(0);
 				}

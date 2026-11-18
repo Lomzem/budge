@@ -10,6 +10,7 @@ import {
 	expectClearOf,
 	expectNothingPastTheRightEdge,
 	openAccount,
+	reloadOnceSaved,
 	type Journey
 } from './journey';
 
@@ -295,7 +296,7 @@ export const transactions = {
 			);
 
 			await step('after reload the row keeps Groceries and stays Unapproved', async () => {
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(categoryOf('SAMPLE HARDWARE 2208')).toHaveAccessibleName(/^Groceries, /);
 				await expect(unapproved('SAMPLE HARDWARE 2208')).toBeVisible();
 			});
@@ -390,7 +391,7 @@ export const transactions = {
 			await step('let the Dining Out save land, and it is kept after reload', async () => {
 				categorize.release();
 				await expect(category).toHaveAccessibleName(/^Dining Out, /);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(category).toHaveAccessibleName(/^Dining Out, /);
 			});
 
@@ -399,7 +400,7 @@ export const transactions = {
 			const imported = await step(
 				'reload so searches for a Transfer to link are held, then on an imported row pick Transfer: Savings and, while its search is held, Groceries, which saves',
 				async () => {
-					await page.reload();
+					await reloadOnceSaved(page);
 					const id = await page
 						.getByRole('button', { name: /Category of SAMPLE PET SUPPLY 0311 on / })
 						.first()
@@ -423,7 +424,7 @@ export const transactions = {
 					await choose(category, 'Coffee');
 					await expect(category).toHaveAccessibleName(/^Coffee, /);
 					await expect(imported).toHaveAccessibleName(/^Groceries, /);
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(imported).toHaveAccessibleName(/^Groceries, /);
 				}
 			);
@@ -932,7 +933,7 @@ export const transactions = {
 			await step(
 				'grouping survives a reload and keeps a selection when turned off, and every row keeps its own Payee',
 				async () => {
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(grouping).toHaveAttribute('aria-pressed', 'true');
 					await rowBoxes(lookalike).check();
 					await grouping.click();
@@ -990,7 +991,7 @@ export const transactions = {
 						),
 						bankRow(older, addDays(today, -20), '3.30')
 					]);
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(rowBoxes(newer)).not.toHaveCount(0);
 					await expect(rowBoxes(older)).toHaveCount(0);
 					await page.getByRole('button', { name: 'Show more', exact: true }).click();

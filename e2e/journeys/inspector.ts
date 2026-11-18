@@ -11,6 +11,7 @@ import {
 	tap,
 	typed,
 	useATouchScreen,
+	reloadOnceSaved,
 	type Journey
 } from './journey';
 
@@ -101,7 +102,7 @@ export const inspector = {
 					await expect(region.getByLabel('Amount')).toHaveValue('7.00');
 					await expect.poll(() => assigned('Groceries')).toBe(before.groceries - 1_000);
 					await expect.poll(() => assigned('Coffee')).toBe(before.coffee + 1_000);
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect.poll(() => assigned('Groceries')).toBe(before.groceries - 1_000);
 					await expect.poll(() => assigned('Coffee')).toBe(before.coffee + 1_000);
 					await groceries.click();
@@ -308,7 +309,7 @@ export const inspector = {
 						inspector.getByRole('button', { name: 'Cover from another Category' })
 					).toHaveCount(0);
 					expect(await readyToAssign()).toBe(before);
-					await page.reload();
+					await reloadOnceSaved(page);
 					await page.getByRole('button', { name: overspent, exact: true }).click();
 					await expect(inspector).not.toContainText('Overspent by');
 				}
@@ -358,7 +359,7 @@ export const inspector = {
 					await expect.poll(() => available(name)).toBe(0);
 					await expect(assignedField(page)).toHaveValue(typed(assigned + shortfall));
 					await expect.poll(() => readyToAssign()).toBe(ready - shortfall);
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(assignedField(page)).toHaveValue(typed(assigned + shortfall));
 					await expect.poll(() => available(name)).toBe(0);
 					expect(await readyToAssign()).toBe(ready - shortfall);
@@ -386,7 +387,7 @@ export const inspector = {
 					await expect(inspector).toBeFocused();
 					await expect(inspector.getByRole('textbox', { name: 'Category name' })).toHaveCount(0);
 					await expectEveryday(['Sample Groceries', 'Coffee'], ['Groceries']);
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expectEveryday(['Sample Groceries', 'Coffee'], ['Groceries']);
 				}
 			);
@@ -410,7 +411,7 @@ export const inspector = {
 					await expect(stepped.getByRole('textbox', { name: 'Category name' })).toHaveCount(0);
 					await stopTouching();
 					await page.setViewportSize({ width: 1280, height: 800 });
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expectEveryday(['Sample Grocer', 'Coffee', 'Dining Out'], ['Sample Groceries']);
 					await page.goto('/categories');
 					await expectEveryday(['Sample Grocer', 'Coffee', 'Dining Out'], ['Sample Groceries']);
@@ -463,7 +464,7 @@ export const inspector = {
 				await expect(page.locator('#main')).toBeFocused();
 				const hidden = page.getByRole('region', { name: 'Hidden Categories' });
 				await expect(hidden).toContainText('Sample Market');
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(hidden).toContainText('Sample Market');
 				await expect(page.getByRole('button', { name: 'Sample Market', exact: true })).toHaveCount(
 					0
@@ -509,7 +510,7 @@ export const inspector = {
 				await expect(dialog).toBeHidden();
 				await expect(inspector).toHaveCount(0);
 				await expect(page.locator('#main')).toBeFocused();
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(page.getByRole('button', { name: 'Dining Out', exact: true })).toHaveCount(0);
 				await expect.poll(() => activity('Coffee')).toBe(coffee + diningOut);
 			});

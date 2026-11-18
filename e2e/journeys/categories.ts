@@ -12,6 +12,7 @@ import {
 	touchscreen,
 	useATouchScreen,
 	type Finger,
+	reloadOnceSaved,
 	type Journey
 } from './journey';
 
@@ -158,7 +159,7 @@ export const categories = {
 				await addCategory.getByLabel('Name').fill('Sample Bike Fund');
 				await addCategory.getByRole('button', { name: 'Add' }).click();
 				await expect(addCategory).toBeHidden();
-				await page.reload();
+				await reloadOnceSaved(page);
 				const savings = page
 					.getByRole('rowgroup')
 					.filter({ has: page.getByRole('rowheader', { name: /Savings Goals/ }) });
@@ -204,7 +205,7 @@ export const categories = {
 					await addCategory.getByLabel('Name', { exact: true }).fill('Smoke Test Category');
 					await addCategory.getByRole('button', { name: 'Add' }).click();
 					await expect(addCategory).toBeHidden();
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(groupOf(page, 'Smoke Test Group')).toHaveCount(1);
 					await expect
 						.poll(() => orderIn(groupOf(page, 'Smoke Test Group')))
@@ -228,7 +229,7 @@ export const categories = {
 					await name.fill('Sample Edited Afterwards');
 					createdGroup.release();
 					await expect(addCategory).toBeHidden();
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect
 						.poll(() => orderIn(groupOf(page, 'Sample Held Group')))
 						.toEqual(['Sample Held Group', 'Sample Submitted Category']);
@@ -297,7 +298,7 @@ export const categories = {
 					await expect(
 						page.getByRole('button', { name: 'Move Smoke Test Renamed', exact: true })
 					).toBeAttached();
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(
 						page.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
 					).toBeVisible();
@@ -322,7 +323,7 @@ export const categories = {
 					await expect(field).toHaveValue('Groceries');
 					await expect(groupField).toBeHidden();
 					await field.press('Escape');
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(groupOf(page, 'Everyday')).toBeVisible();
 					await expect(page.getByRole('button', { name: 'Groceries', exact: true })).toBeVisible();
 				}
@@ -364,7 +365,7 @@ export const categories = {
 						page.getByRole('button', { name: 'Transit Held', exact: true })
 					).toBeVisible();
 
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(
 						page.getByRole('button', { name: 'Transit Held', exact: true })
 					).toBeVisible();
@@ -416,7 +417,7 @@ export const categories = {
 					await groupField.press('Escape');
 					await expect(groupField).toBeHidden();
 
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(groupOf(page, 'Savings Goals')).toBeVisible();
 					await expect(carRepairs).toBeAttached();
 					await page.goto('about:blank');
@@ -439,7 +440,7 @@ export const categories = {
 					await expect(
 						page.getByRole('button', { name: 'Move Smoke Test Shelf', exact: true })
 					).toBeAttached();
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(groupOf(page, 'Smoke Test Shelf')).toBeVisible();
 				}
 			);
@@ -501,7 +502,7 @@ export const categories = {
 					await expect(handle).toBeFocused();
 					moved.release();
 					await expect(async () => {
-						await page.reload();
+						await reloadOnceSaved(page);
 						await expect(everyday.getByRole('button', { name: /^Move / })).toHaveCount(5);
 						expect(await orderIn(everyday)).toEqual([
 							'Everyday',
@@ -677,7 +678,7 @@ export const categories = {
 			});
 
 			await step('a reload and the Budget keep the new order', async () => {
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect
 					.poll(() => orderIn(everyday))
 					.toEqual(['Everyday', 'Transit', 'Groceries', 'Dining Out', 'Coffee']);
@@ -693,7 +694,7 @@ export const categories = {
 			const refused = "Budge couldn't save that. Try again.";
 			const lasts = async (order: () => Promise<string[]>, expected: string[]) => {
 				await expect(async () => {
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect(everyday.getByRole('button', { name: /^Move / })).toHaveCount(5);
 					expect(await order()).toEqual(expected);
 				}).toPass();
@@ -832,7 +833,7 @@ export const categories = {
 					const renamed = groups.with(-1, 'Rainy Day Fund');
 					await expect.poll(() => groupOrder(page)).toEqual(renamed);
 
-					await page.reload();
+					await reloadOnceSaved(page);
 					await expect.poll(() => groupOrder(page)).toEqual(renamed);
 					expect(await orderIn(everyday)).toEqual([
 						'Everyday',
@@ -908,7 +909,7 @@ export const categories = {
 				renamed.release();
 				await expect(named('Sample Fast Groceries')).toBeVisible();
 				await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(named('Sample Fast Groceries')).toBeVisible();
 			});
 		}
@@ -991,7 +992,7 @@ export const categories = {
 			);
 
 			await step('a reload keeps both saved names and the group name that failed', async () => {
-				await page.reload();
+				await reloadOnceSaved(page);
 				await expect(named('Sample Refused Groceries')).toBeVisible();
 				await expect(named('Sample Typed Coffee')).toBeVisible();
 				await expect(named('Everyday')).toBeVisible();
