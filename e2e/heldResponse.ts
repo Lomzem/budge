@@ -17,7 +17,6 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 	};
 	const queued: Frame[] = [];
 	let browser: WebSocketRoute | undefined;
-	let holding = false;
 	let released = false;
 	const { promise: held, resolve: markHeld } = Promise.withResolvers<undefined>();
 
@@ -35,11 +34,9 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 			server.send(frame);
 		});
 		server.onMessage((frame) => {
-			if (callOf(frame) !== -1 && !released) {
-				holding = true;
-				markHeld(undefined);
-			}
-			if (holding) queued.push(frame);
+			const heldResponse = !released && callOf(frame) !== -1;
+			if (heldResponse) markHeld(undefined);
+			if (heldResponse || queued.length > 0) queued.push(frame);
 			else socket.send(frame);
 		});
 	});
@@ -62,7 +59,6 @@ export async function holdResponseTo(page: Page, udfPath: string) {
 			return callOf(frame);
 		},
 		release() {
-			holding = false;
 			released = true;
 			for (const frame of queued.splice(0)) browser?.send(frame);
 		}
