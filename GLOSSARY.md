@@ -117,7 +117,7 @@ A link to a financial institution that imports Transactions into one or more Acc
 _Avoid_: Integration, link, feed
 
 **Unapproved**:
-An imported Transaction you have not yet reviewed. It already counts in balances and the budget; approving it only marks it reviewed. Picking a Category or Transfer for it from the Transaction list approves it; agents and bulk changes approve only when asked.
+An imported Transaction you have not yet reviewed. It already counts in balances and the budget; approving it only marks it reviewed. Picking a Category or Transfer for it from the Transaction list approves it, and picking Uncategorized there leaves it Unapproved. Saving it from its editor approves it, as any edit does. Agents and bulk changes approve only when asked.
 _Avoid_: Pending, new, inbox
 
 **Bank Row**:
