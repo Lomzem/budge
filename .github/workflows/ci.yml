@@ -81,7 +81,7 @@ jobs:
         # Headless runs use only the headless shell, whose libraries the runner image already has.
         run: bunx playwright install --only-shell chromium
       # An anonymous local deployment: no Convex account, no cloud quota, never production.
-      # The first push fails until the required env vars are set; `convex dev` then retries it.
+      # The first push fails until the required env vars are set.
       # The test user is the owner of this backend.
       - name: Start local Convex backend
         env:
@@ -98,6 +98,8 @@ jobs:
           done
           printf 'CLERK_JWT_ISSUER_DOMAIN=%s\nBUDGE_OWNER_SUBJECT=%s\n' "$CLERK_JWT_ISSUER_DOMAIN" "$E2E_CLERK_USER_ID" |
             bunx convex env set --force
+          # `convex dev` misses an env var change that lands before it watches env vars, but always re-pushes when a file it read changes.
+          touch convex/auth.config.ts
           for _ in $(seq 1 60); do
             grep -q 'Convex functions ready' convex.log && exit 0
             sleep 2
