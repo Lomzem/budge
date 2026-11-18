@@ -351,7 +351,7 @@
 					>
 						<ChevronLeftIcon />
 					</Button>
-					<h2 aria-live="polite" class="min-w-40 text-center text-lg font-bold">
+					<h2 aria-live="polite" class="min-w-40 text-center text-lg font-bold whitespace-nowrap">
 						<MonthPicker />
 					</h2>
 					<Button
