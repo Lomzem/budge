@@ -33,7 +33,7 @@ Use [the protocol](../../docs/quality/ui-review/README.md) and [the rubric](../.
 
 ### Revision
 
-Branch `feat/budget-first-ui`. Review the clean commit your worktree starts at, and record its SHA (`git rev-parse HEAD`).
+Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the clean commit it is at when you start, and record its SHA (`git rev-parse HEAD`).
 
 ### Features, journeys and fixtures
 
@@ -87,7 +87,7 @@ Sol ran a code review (14 findings) and a copy review (42 findings). [spec.md](s
 
 ### Sessions
 
-Each judge has its own worktree at the pinned commit, created by the orchestrator, and owns that checkout's app, login, seed, and evidence. Run your judging in parallel with the others.
+The orchestrator couldn't create per-judge worktrees, so the judges run one at a time in the single checkout `/home/lomzem/proj/budge-ui`, as the protocol allows. Each judge starts the app, logs in, seeds, judges, runs `bun run app down`, and records release before the next judge starts. The coordinator moves each finished report out of the checkout before the next judge starts, so no judge sees another's report.
 
 | Judge | Model and reasoning effort | Report file                                            |
 | ----- | -------------------------- | ------------------------------------------------------ |
@@ -95,4 +95,4 @@ Each judge has its own worktree at the pinned commit, created by the orchestrato
 | Sol B | gpt-6.2-sol, high          | `.scratch/budget-first-ui/ui-review-round-1-sol-b.md` |
 | Opus  | claude-opus-5-5            | `.scratch/budget-first-ui/ui-review-round-1-opus.md`  |
 
-Each judge writes the report file in their own worktree and returns its full text.
+Each judge writes their report file and returns its full text.

@@ -197,12 +197,14 @@ Kept:
 - `Use the bank's`: width-limited; its aria-label carries the full action.
 - `Took the bank's version` and `Remember for X's later imports`: scope claims unverified. Deferred.
 
+## Verification after the popup fix (dcff540)
+
+- Sol ran three checks, all exit 0: `bun run check` (1,128 tests and the capacity contracts), `bun run test` (1,128 tests), and the full live journey suite (64 of 64).
+- Opus ran `bun run app verify` on categories/manage, categories/touch-menu, inspector/cover-and-manage, targets/monthly, shell/navigate, shell/phone-pages, transactions/categorize and plaid/status. All passed. Evidence: `test-results/verify-budge/budget-first-ui-opus/`.
+- `gitleaks git --staged --redact` found nothing. Committed as `dcff540`. The UI review brief is `680e696`.
+
 ## Remaining
 
-- `bun run check` (capacity:check needs `bun run app up`).
-- Full journey, check, and unit rerun after the popup fix (Sol, running).
-- verify-budge in the browser, including instant tab switches.
-- Three-judge UI review.
-- gitleaks.
-- Commit, then ship through a top-level Sol thread.
-- Follow-up: a Sol scout on removing the backend cutover undo.
+- Three-judge UI review, round 1, at `680e696`: Sol A, Sol B and Opus are running in separate worktrees. Brief: [ui-review-round-1.md](ui-review-round-1.md).
+- Ship through a top-level Sol thread once the gate passes.
+- Follow-up: a Sol scout on removing the backend cutover undo and on the Clerk variables in `e2e/run-local.ts`. Running.
