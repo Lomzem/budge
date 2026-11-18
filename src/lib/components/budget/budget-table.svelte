@@ -176,13 +176,13 @@
 		};
 	}
 
-	function clickClosingAMenuOnlyClosesIt(node: HTMLElement) {
+	function clickWithAMenuOpenOnlyClosesIt(node: HTMLElement) {
 		let dismissing = false;
 		const readMenuBeforeItsDismissal = () => {
 			dismissing = menuOpenFor !== null;
 		};
 		const click = (event: MouseEvent) => {
-			if (!dismissing || event.detail === 0) return;
+			if (event.detail === 0 || (!dismissing && menuOpenFor === null)) return;
 			dismissing = false;
 			event.stopPropagation();
 		};
@@ -351,7 +351,7 @@
 	</Table.Cell>
 {/snippet}
 
-<div class="@container" {@attach clickClosingAMenuOnlyClosesIt}>
+<div class="@container" {@attach clickWithAMenuOpenOnlyClosesIt}>
 	<Table.Root layout="fixed">
 		<Table.Header>
 			<Table.Row>
@@ -436,9 +436,12 @@
 						</ContextMenu.Root>
 					{:else}
 						<Table.Row>
-							<Table.Cell colspan={4}>
-								<span class="pl-3 text-muted-foreground">No Categories yet.</span>
+							<Table.Cell>
+								<span class="text-muted-foreground xs:pl-3">No Categories yet.</span>
 							</Table.Cell>
+							<Table.Cell />
+							<Table.Cell showFrom="xl" />
+							<Table.Cell showFrom="md" />
 						</Table.Row>
 					{/each}
 				{/if}

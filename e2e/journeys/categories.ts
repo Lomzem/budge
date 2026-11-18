@@ -57,16 +57,26 @@ async function holdDown(page: Page, target: Locator) {
 	await screen.detach();
 }
 
+async function everydayWidthOnAPhone(page: Page) {
+	await page.setViewportSize({ width: 320, height: 640 });
+	const box = await page.locator('[data-group-id]', { hasText: 'Everyday' }).boundingBox();
+	await page.setViewportSize({ width: 1280, height: 800 });
+	return box?.width ?? 0;
+}
+
 export const categories = {
 	manage: {
 		title:
 			'Categories are added, renamed, moved, hidden, shown, and deleted from the Budget menu, and the changes last',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
+			let everydayAtTheStart = 0;
 			await step(
 				"Budget's Add Category requires a group, and offers to make a new one",
 				async () => {
 					await openBudget(page);
+					everydayAtTheStart = await everydayWidthOnAPhone(page);
+					expect(everydayAtTheStart).toBeGreaterThan(0);
 					await page.getByRole('button', { name: 'Add Category', exact: true }).click();
 					const addCategory = page.getByRole('dialog', { name: 'Add Category' });
 					await expect(
@@ -248,37 +258,50 @@ export const categories = {
 				}
 			);
 
-			await step('delete the Category into Groceries, then its empty group', async () => {
-				await fromRowMenu(page, rowOf(page, 'Smoke Test Renamed'), 'Delete…');
-				const deleteCategory = page.getByRole('dialog', { name: 'Delete Smoke Test Renamed' });
-				await choose(deleteCategory.getByLabel('Move its history to'), 'Groceries');
-				await deleteCategory.getByRole('button', { name: 'Delete Category' }).click();
-				await expect(deleteCategory).toBeHidden();
-				await expect(page.getByRole('button', { name: /^Smoke Test Renamed/ })).toHaveCount(0);
+			await step(
+				'delete the Category into Groceries, which leaves its group empty without narrowing the phone table, then delete the group',
+				async () => {
+					await fromRowMenu(page, rowOf(page, 'Smoke Test Renamed'), 'Delete…');
+					const deleteCategory = page.getByRole('dialog', { name: 'Delete Smoke Test Renamed' });
+					await choose(deleteCategory.getByLabel('Move its history to'), 'Groceries');
+					await deleteCategory.getByRole('button', { name: 'Delete Category' }).click();
+					await expect(deleteCategory).toBeHidden();
+					await expect(page.getByRole('button', { name: /^Smoke Test Renamed/ })).toHaveCount(0);
+					await expect(
+						groupOf(page, 'Smoke Test Shelf').getByText('No Categories yet.')
+					).toBeVisible();
+					expect(
+						await everydayWidthOnAPhone(page),
+						'Everyday at 320 px once a group is empty'
+					).toBeCloseTo(everydayAtTheStart, 0);
 
-				await fromGroupMenu(page, 'Smoke Test Shelf', 'Delete…');
-				const deleteGroup = page.getByRole('dialog', { name: 'Delete Smoke Test Shelf' });
-				await deleteGroup.getByRole('button', { name: 'Delete group' }).click();
-				await expect(deleteGroup).toBeHidden();
-				await expect(page.locator('[data-group-id]', { hasText: 'Smoke Test Shelf' })).toHaveCount(
-					0
-				);
-			});
+					await fromGroupMenu(page, 'Smoke Test Shelf', 'Delete…');
+					const deleteGroup = page.getByRole('dialog', { name: 'Delete Smoke Test Shelf' });
+					await deleteGroup.getByRole('button', { name: 'Delete group' }).click();
+					await expect(deleteGroup).toBeHidden();
+					await expect(
+						page.locator('[data-group-id]', { hasText: 'Smoke Test Shelf' })
+					).toHaveCount(0);
+				}
+			);
 		}
 	},
 	'touch-menu': {
 		title:
-			'on a 320 px touch screen, holding a Category row opens its menu without selecting it, and a tap outside only closes it',
+			'on a 320 px touch screen, holding a Category name opens its menu without selecting it, and a tap outside only closes it',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			let stopTouching: (() => Promise<void>) | undefined;
-			await step('hold Groceries until its menu opens', async () => {
+			await step('hold the Groceries name until its menu opens', async () => {
 				await page.setViewportSize({ width: 320, height: 640 });
 				stopTouching = await useATouchScreen(page);
 				await openBudget(page);
 				const groceries = rowOf(page, 'Groceries');
-				await holdDown(page, groceries.getByRole('cell').last());
+				const name = page.getByRole('button', { name: 'Groceries', exact: true });
+				await holdDown(page, name);
 				await expect(page.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
+				await expect(page.getByRole('dialog')).toHaveCount(0);
+				await expect(name).toHaveAttribute('aria-expanded', 'false');
 				await expect(groceries).not.toHaveAttribute('data-state', 'selected');
 				await expectNothingPastTheRightEdge(page);
 			});
