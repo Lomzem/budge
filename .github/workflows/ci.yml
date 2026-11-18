@@ -78,8 +78,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Install Playwright browser
         if: matrix.suite != 'capacity'
-        # Headless runs use only the headless shell.
-        run: bunx playwright install --with-deps --only-shell chromium
+        # Headless runs use only the headless shell, whose libraries the runner image already has.
+        run: bunx playwright install --only-shell chromium
       # An anonymous local deployment: no Convex account, no cloud quota, never production.
       # The first push fails until the required env vars are set; `convex dev` then retries it.
       # The test user is the owner of this backend.
