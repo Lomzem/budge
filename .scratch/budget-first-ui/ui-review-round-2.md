@@ -66,19 +66,21 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
 
 - Every menu action persists after a reload.
 - Ready to Assign changes only when money moves.
-- Closing a menu never selects a row or opens the inspector.
+- Closing a menu, whether a row menu or a group's ⋯ menu, never selects a row or opens the inspector.
+- A tap or right-click in an Assigned field edits that field and opens no row menu.
 - Tab switches between Budget, Transactions, Bank and Settings never show `Loading…` once the app has loaded.
 - Picking a Category drops the row from the Unapproved count.
 - Showing a hidden Category or group from the keyboard leaves focus on it.
 - Hiding a Category or group, or moving a Category to another group, from the keyboard leaves focus in Budget: on the next Category or group, or on the moved Category.
 - On a 320 px phone a row menu and its "Move to group" submenu stay on screen, with 44 px items.
+- At 320 px a long hidden name wraps at word boundaries on its own line.
 
-### Checks already completed (on `b3cfe92`)
+### Checks already completed (on `7d53b3b`, the code of `a772249`)
 
 | Check                                             | Exit code | Result                                                     |
 | ------------------------------------------------- | --------- | ---------------------------------------------------------- |
 | `bun run check`                                   | 0         | Includes lint, lint:ui, typecheck and 1,128 Vitest tests   |
-| Full live journey suite with `bun run app verify` | 0         | 64/64, run `r2-full-b3cfe92`, clean tree                   |
+| Full live journey suite with `bun run app verify` | 0         | 64/64, run `r2-full-7d53b3b`, clean tree                   |
 | `gitleaks` on each commit's staged changes        | 0         | Clean                                                      |
 
 A judge re-checking round 1 gets their own findings and dispositions in their task. Read no `ui-review-round-1*` file and no other judge's report or evidence.
