@@ -167,13 +167,12 @@ export async function waitForAnonymousBackend(
 	});
 	if (deployment === undefined) throw new Error('the anonymous backend did not start');
 
-	for (const [name, value] of [
-		['CLERK_JWT_ISSUER_DOMAIN', credentials.CLERK_JWT_ISSUER_DOMAIN],
-		['BUDGE_OWNER_SUBJECT', credentials.E2E_CLERK_USER_ID]
-	] as const) {
-		if ((await runConvex(deployment, dir, ['env', 'set', name], value)) !== 0) {
-			throw new Error(`setting ${name} failed`);
-		}
+	const variables = [
+		`CLERK_JWT_ISSUER_DOMAIN=${credentials.CLERK_JWT_ISSUER_DOMAIN}`,
+		`BUDGE_OWNER_SUBJECT=${credentials.E2E_CLERK_USER_ID}`
+	].join('\n');
+	if ((await runConvex(deployment, dir, ['env', 'set', '--force'], variables)) !== 0) {
+		throw new Error('setting the backend env vars failed');
 	}
 	await waitFor('Convex functions', 120, () => {
 		stillRunning();

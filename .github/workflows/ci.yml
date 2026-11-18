@@ -96,8 +96,8 @@ jobs:
             curl -sf http://127.0.0.1:3210/version > /dev/null && grep -q '^PUBLIC_CONVEX_URL=' .env.local 2>/dev/null && break
             sleep 2
           done
-          bunx convex env set CLERK_JWT_ISSUER_DOMAIN "$CLERK_JWT_ISSUER_DOMAIN"
-          bunx convex env set BUDGE_OWNER_SUBJECT "$E2E_CLERK_USER_ID"
+          printf 'CLERK_JWT_ISSUER_DOMAIN=%s\nBUDGE_OWNER_SUBJECT=%s\n' "$CLERK_JWT_ISSUER_DOMAIN" "$E2E_CLERK_USER_ID" |
+            bunx convex env set --force
           for _ in $(seq 1 60); do
             grep -q 'Convex functions ready' convex.log && exit 0
             sleep 2
