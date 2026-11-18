@@ -382,16 +382,15 @@ export const plaid = {
 			});
 
 			await step('the card says when consent ends', async () => {
-				await expect(creditUnion).toContainText(
-					/Your consent at the bank ends .+\. Reconnect to renew it\./
-				);
+				await expect(creditUnion).toContainText(/Consent at the bank ends .+?\./);
+				await expect(creditUnion).not.toContainText('Reconnect to');
 			});
 
 			await step('Reconnect reports the failure, and the consent notice returns', async () => {
 				await creditUnion.getByRole('button', { name: 'Reconnect', exact: true }).click();
 				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
 				await reloadOnceSaved(page);
-				await expect(creditUnion).toContainText('Reconnect to renew it.');
+				await expect(creditUnion).toContainText(/Consent at the bank ends .+\./);
 			});
 		}
 	},

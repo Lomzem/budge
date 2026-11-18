@@ -109,11 +109,11 @@
 		if (connection.consentEndsAt !== null) {
 			found.push({
 				tone: 'warn',
-				text: `Your consent at the bank ends ${day.format(connection.consentEndsAt)}. Reconnect to renew it.`
+				text: `Consent at the bank ends ${day.format(connection.consentEndsAt)}.`
 			});
 		}
 		if (connection.overdue) {
-			found.push({ tone: 'warn', text: 'Sync overdue. Try Sync now.' });
+			found.push({ tone: 'warn', text: 'Sync overdue.' });
 		}
 		return [...found, ...late];
 	});
