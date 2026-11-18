@@ -8,6 +8,7 @@ import {
 	expectNothingPastTheRightEdge,
 	openBudget,
 	reloadOnceSaved,
+	tap,
 	touchscreen,
 	useATouchScreen,
 	type Journey
@@ -231,20 +232,21 @@ export const categories = {
 				}
 			);
 
-			await step('Hide moves it under Hidden, and Show brings it back', async () => {
-				await fromRowMenu(page, rowOf(page, 'Smoke Test Renamed'), 'Hide');
-				const hidden = page.getByRole('region', { name: 'Hidden' });
-				await expect(hidden.getByRole('listitem')).toContainText(['Smoke Test Renamed']);
-				await expect(
-					page.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
-				).toHaveCount(0);
-				await reloadOnceSaved(page);
-				await hidden.getByRole('button', { name: 'Show Smoke Test Renamed' }).click();
-				await expect(
-					page.getByRole('button', { name: 'Smoke Test Renamed', exact: true })
-				).toBeVisible();
-				await expect(hidden).toHaveCount(0);
-			});
+			await step(
+				'Hide moves it under Hidden, and Show from the keyboard brings it back with focus on it',
+				async () => {
+					await fromRowMenu(page, rowOf(page, 'Smoke Test Renamed'), 'Hide');
+					const hidden = page.getByRole('region', { name: 'Hidden' });
+					await expect(hidden.getByRole('listitem')).toContainText(['Smoke Test Renamed']);
+					const restored = page.getByRole('button', { name: 'Smoke Test Renamed', exact: true });
+					await expect(restored).toHaveCount(0);
+					await reloadOnceSaved(page);
+					await hidden.getByRole('button', { name: 'Show Smoke Test Renamed' }).focus();
+					await page.keyboard.press('Enter');
+					await expect(restored).toBeFocused();
+					await expect(hidden).toHaveCount(0);
+				}
+			);
 
 			await step('delete the Category into Groceries, then its empty group', async () => {
 				await fromRowMenu(page, rowOf(page, 'Smoke Test Renamed'), 'Delete…');
@@ -265,20 +267,28 @@ export const categories = {
 		}
 	},
 	'touch-menu': {
-		title: 'on a 320 px touch screen, holding a Category row opens its menu without selecting it',
+		title:
+			'on a 320 px touch screen, holding a Category row opens its menu without selecting it, and a tap outside only closes it',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
+			let stopTouching: (() => Promise<void>) | undefined;
 			await step('hold Groceries until its menu opens', async () => {
 				await page.setViewportSize({ width: 320, height: 640 });
-				const stopTouching = await useATouchScreen(page);
+				stopTouching = await useATouchScreen(page);
 				await openBudget(page);
 				const groceries = rowOf(page, 'Groceries');
 				await holdDown(page, groceries.getByRole('cell').last());
 				await expect(page.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
 				await expect(groceries).not.toHaveAttribute('data-state', 'selected');
 				await expectNothingPastTheRightEdge(page);
-				await page.keyboard.press('Escape');
-				await stopTouching();
+			});
+			await step('tap outside the menu, which only closes it', async () => {
+				const everyday = page.getByRole('button', { name: 'Everyday', exact: true });
+				await tap(page, everyday);
+				await expect(page.getByRole('menu')).toHaveCount(0);
+				await expect(everyday).toHaveAttribute('aria-expanded', 'true');
+				await expect(rowOf(page, 'Groceries')).not.toHaveAttribute('data-state', 'selected');
+				await stopTouching?.();
 			});
 		}
 	},

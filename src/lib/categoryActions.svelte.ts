@@ -125,11 +125,11 @@ export class CategoryActions {
 	}
 
 	setHidden(categoryId: Id<'categories'>, hidden: boolean) {
-		void this.#save(categoryId, () => this.#setHidden({ categoryId, hidden }));
+		return this.#save(categoryId, () => this.#setHidden({ categoryId, hidden }));
 	}
 
 	setGroupHidden(groupId: Id<'categoryGroups'>, hidden: boolean) {
-		void this.#save(groupId, () => this.#setGroupHidden({ groupId, hidden }));
+		return this.#save(groupId, () => this.#setGroupHidden({ groupId, hidden }));
 	}
 
 	async #save(id: string, save: () => Promise<unknown>) {
@@ -137,7 +137,8 @@ export class CategoryActions {
 		this.#latest.set(id, ticket);
 		if (this.failure?.id === id) this.failure = null;
 		const saved = await attempt(save);
-		if (saved.ok || this.#latest.get(id) !== ticket) return;
+		if (saved.ok || this.#latest.get(id) !== ticket) return saved.ok;
 		this.failure = { id, message: saved.error?.message ?? refused };
+		return false;
 	}
 }

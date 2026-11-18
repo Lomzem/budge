@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tick } from 'svelte';
+
 	import type { Id } from '$convex/_generated/dataModel';
 	import type { BudgetView } from '$lib/budget.svelte';
 	import { CategoryActions } from '$lib/categoryActions.svelte';
@@ -50,9 +52,18 @@
 		})
 	);
 
-	function show(row: HiddenRow) {
-		if (row.kind === 'group') actions.setGroupHidden(row.id, false);
-		else actions.setHidden(row.id, false);
+	async function show(row: HiddenRow) {
+		const shown =
+			row.kind === 'group'
+				? await actions.setGroupHidden(row.id, false)
+				: await actions.setHidden(row.id, false);
+		if (!shown) return;
+		await tick();
+		if (document.activeElement !== null && document.activeElement !== document.body) return;
+		const restored = row.kind === 'group' ? 'data-group-id' : 'data-category-id';
+		[...document.querySelectorAll<HTMLElement>(`[${restored}="${row.id}"]`)]
+			.find((element) => element.checkVisibility())
+			?.focus();
 	}
 </script>
 
@@ -82,7 +93,7 @@
 						size="sm"
 						aria-label="Show {row.name}"
 						onclick={() => {
-							show(row);
+							void show(row);
 						}}
 					>
 						Show

@@ -146,7 +146,7 @@
 				kind: 'item',
 				label: 'Hide',
 				run: () => {
-					actions.setGroupHidden(group.id, true);
+					void actions.setGroupHidden(group.id, true);
 				}
 			},
 			{ kind: 'separator' },
@@ -184,7 +184,6 @@
 		const click = (event: MouseEvent) => {
 			if (!dismissing || event.detail === 0) return;
 			dismissing = false;
-			event.preventDefault();
 			event.stopPropagation();
 		};
 		window.addEventListener('pointerdown', readMenuBeforeItsDismissal, true);

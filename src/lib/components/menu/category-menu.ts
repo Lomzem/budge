@@ -49,7 +49,7 @@ export function categoryMenu(
 			kind: 'item',
 			label: 'Hide',
 			run: () => {
-				actions.setHidden(categoryId, true);
+				void actions.setHidden(categoryId, true);
 			}
 		},
 		{ kind: 'separator' },
