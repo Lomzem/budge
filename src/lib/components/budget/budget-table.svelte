@@ -270,14 +270,10 @@
 	</InlineName>
 	{#if category.target}
 		<div class="mt-1 xs:pl-3">
-			<TargetBar
-				progress={category.target.progress}
-				label="{category.name} Target"
-				text={status?.text ?? ''}
-			/>
+			<TargetBar progress={category.target.progress} label="{category.name} Target" />
 		</div>
 	{/if}
-	{#if status?.text && status.class !== 'text-funded'}
+	{#if status?.text}
 		<span class="block text-xs whitespace-normal xs:pl-3 {status.class}">{status.text}</span>
 	{/if}
 	{#if needed > 0}

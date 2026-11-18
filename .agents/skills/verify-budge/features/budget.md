@@ -16,7 +16,7 @@ Give money a job by editing a Category's Assigned amount and see Ready to Assign
 - `budget-month-jump`: the month heading is a button (`<Month Year>, choose a month`) that opens a year grid with `Previous year`/`Next year`; arrow keys move within the grid, months before the cutover month are disabled, and the arrows keep working. Each month change replaces the current history entry with a real navigation (`keepInUrl` in `src/lib/keepInUrl.ts`), so Back from another Section returns to the month viewed last, even after a reload. A history entry without `?month` is the current month: Back or Forward to one shows it, including a same-page traversal SvelteKit applies without navigating (such as Back past the `#main` entry Skip to content makes), while a link into the Budget without a month keeps the month viewed last.
 - `budget-target-assign`: a Category whose Target needs money shows `Assign $X to <name>` in its row.
 - `budget-carry`: a Category's Available rolls forward into the next month.
-- `budget-status`: `Funded` names a Target that is met; a Category without a Target shows no status for a positive Available (only its green amount).
+- `budget-status`: a met Target shows no status, only its full bar and green Available; a short one says how much more it needs.
 - `budget-review-links`: the `Needs you` chips: `N Uncategorized`, `N Unapproved` and `N bank changes` (`500+ bank changes` past the newest 500) link into the Transactions page already filtered (the last to Status `Bank changes`); `N Categories overspent` opens the first overspent Category's inspector. The Budget waits for every count before it paints, so chips never arrive one at a time; a strip that overflows fades at the clipped edge.
 
 ## How to get to it (user POV)

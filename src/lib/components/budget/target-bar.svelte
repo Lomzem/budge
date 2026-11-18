@@ -3,15 +3,12 @@
 
 	let {
 		progress,
-		label,
-		text
+		label
 	}: {
 		progress: number;
 
 		label: string;
-
-		text: string;
 	} = $props();
 </script>
 
-<Progress value={Math.round(progress * 100)} max={100} aria-label={label} aria-valuetext={text} />
+<Progress value={Math.round(progress * 100)} max={100} aria-label={label} />

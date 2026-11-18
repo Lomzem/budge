@@ -536,7 +536,7 @@
 						/>
 					</div>
 					{#if wide.current}
-						<aside
+						<div
 							class={[
 								'sticky top-8 -m-1 flex max-h-side-panel-height w-82 shrink-0 flex-col',
 								budget.stale && 'opacity-60'
@@ -552,7 +552,7 @@
 									{/if}
 								</div>
 							</ScrollArea>
-						</aside>
+						</div>
 					{/if}
 				</div>
 				{#if !wide.current}

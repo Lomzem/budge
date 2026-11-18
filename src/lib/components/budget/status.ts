@@ -23,7 +23,7 @@ export function availableStatus(
 				class: 'text-warning'
 			};
 		case 'funded':
-			return { text: category.target ? 'Funded' : '', class: 'text-funded' };
+			return { text: '', class: 'text-funded' };
 		case 'empty':
 			return undefined;
 	}

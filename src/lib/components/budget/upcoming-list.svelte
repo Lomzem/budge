@@ -13,11 +13,13 @@
 			{#each upcoming as row (row.id)}
 				{@const short = !row.funded && monthOf(row.dueDate) === monthOf(today)}
 				<li class="flex items-baseline gap-3 py-2">
-					<time datetime={row.dueDate} class="w-12 shrink-0 text-muted-foreground tabular-nums"
+					<time
+						datetime={row.dueDate}
+						class="w-14 shrink-0 whitespace-nowrap text-muted-foreground tabular-nums"
 						>{formatDate(row.dueDate, 'day')}</time
 					>
 					<span class="min-w-0 flex-1">
-						<span class="block truncate">{row.name}</span>
+						<span class="block break-words">{row.name}</span>
 						{#if short}
 							<span class="block text-xs text-warning">Not funded</span>
 						{/if}

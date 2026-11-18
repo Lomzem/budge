@@ -343,6 +343,22 @@ export const categories = {
 				await expect(name).toHaveAttribute('aria-expanded', 'false');
 				await expect(groceries).not.toHaveAttribute('data-state', 'selected');
 				await expectNothingPastTheRightEdge(page);
+				const moveToGroup = page.getByRole('menuitem', { name: 'Move to group' });
+				expect((await moveToGroup.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+				await tap(page, moveToGroup);
+				const groupsToMoveTo = page
+					.getByRole('menu')
+					.filter({ has: page.getByRole('menuitem', { name: 'Bills', exact: true }) });
+				await expect(groupsToMoveTo).toBeVisible();
+				const width = page.viewportSize()?.width ?? 0;
+				await expect
+					.poll(async () => {
+						const box = await groupsToMoveTo.boundingBox();
+						return box !== null && box.x >= 0 && box.x + box.width <= width;
+					})
+					.toBe(true);
+				const bills = groupsToMoveTo.getByRole('menuitem', { name: 'Bills', exact: true });
+				expect((await bills.boundingBox())?.height).toBeGreaterThanOrEqual(44);
 			});
 			await step('tap outside the menu, which only closes it', async () => {
 				const everyday = page.getByRole('button', { name: 'Everyday', exact: true });

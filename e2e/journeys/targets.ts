@@ -44,7 +44,6 @@ export const targets = {
 					);
 					await dialog.getByRole('button', { name: 'Save' }).click();
 					await expect(dialog).toBeHidden();
-					await expect(bar).toHaveAttribute('aria-valuetext', '$25.00 more needed');
 					await expect(region.getByText('$25.00 more needed')).toBeVisible();
 					await expect(upcoming).toHaveCount(0);
 					await nameButton.click();
@@ -61,8 +60,8 @@ export const targets = {
 					exact: true
 				});
 				await fromTable.click();
-				await expect(region.getByText('Funded', { exact: true })).toBeVisible();
-				await expect(bar).toHaveAttribute('aria-valuetext', 'Funded');
+				await expect(bar).toHaveAttribute('aria-valuenow', '100');
+				await expect(region).not.toContainText(/\bFunded\b/);
 				await expect(fromTable).toHaveCount(0);
 				await expect(region.getByRole('button', { name: 'Assign $25.00' })).toHaveCount(0);
 				await expect(nameButton).toBeFocused();

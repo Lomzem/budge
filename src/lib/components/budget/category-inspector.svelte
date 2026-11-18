@@ -376,12 +376,8 @@
 			<h3 id="target-heading" class="text-sm font-medium">Target</h3>
 			{#if category.target}
 				<p class="text-sm">{describeTarget(category.target)}</p>
-				<TargetBar
-					progress={category.target.progress}
-					label="{category.name} Target"
-					text={status?.text ?? ''}
-				/>
-				{#if status}
+				<TargetBar progress={category.target.progress} label="{category.name} Target" />
+				{#if status?.text}
 					<p class={['text-sm', status.class]}>{status.text}</p>
 				{/if}
 				{#if category.target.needed > 0}

@@ -81,7 +81,7 @@
 			{#each rows as row (row.id)}
 				<li class="flex min-h-11 flex-wrap items-center gap-x-4 px-4 py-1.5">
 					<span class="min-w-0 flex-1">
-						<span class={['block truncate', row.kind === 'group' && 'font-semibold']}
+						<span class={['block break-words', row.kind === 'group' && 'font-semibold']}
 							>{row.name}</span
 						>
 					</span>
@@ -102,7 +102,7 @@
 						<ul class="flex basis-full flex-col pb-1 pl-4 text-sm text-muted-foreground">
 							{#each row.categories as member (member.id)}
 								<li class="flex items-center gap-4">
-									<span class="min-w-0 flex-1 truncate">{member.name}</span>
+									<span class="min-w-0 flex-1 break-words">{member.name}</span>
 									{@render balance(member.available)}
 								</li>
 							{/each}
