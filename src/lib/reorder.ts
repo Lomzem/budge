@@ -57,11 +57,13 @@ function keepFocusWhenMoved(event: FocusEvent) {
 	});
 }
 
-export function reorderHandle(
-	index: number,
-	count: number,
-	onmove: (to: number) => void
-): Attachment<HTMLElement> {
+export interface ReorderPosition {
+	readonly index: number;
+	readonly count: number;
+	readonly onmove: (to: number) => void;
+}
+
+export function reorderHandle(position: () => ReorderPosition): Attachment<HTMLElement> {
 	return (handle) => {
 		let drag: Drag | null = null;
 
@@ -148,7 +150,7 @@ export function reorderHandle(
 		function drop(event: PointerEvent) {
 			if (drag?.pointerId !== event.pointerId) return;
 			const dropped = end();
-			if (dropped !== null && dropped.to !== dropped.from) onmove(dropped.to);
+			if (dropped !== null && dropped.to !== dropped.from) position().onmove(dropped.to);
 		}
 
 		function interrupt(event: PointerEvent) {
@@ -164,6 +166,7 @@ export function reorderHandle(
 
 		function key(event: KeyboardEvent) {
 			if (drag !== null) return;
+			const { index, count, onmove } = position();
 			const target = keyTargets[event.key]?.(index, count);
 			if (target === undefined) return;
 			event.preventDefault();

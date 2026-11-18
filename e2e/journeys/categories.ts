@@ -57,15 +57,19 @@ async function groupOrder(page: Page) {
 	);
 }
 
-async function drag(page: Page, handle: Locator, onto: Locator) {
+async function drag(page: Page, handle: Locator, onto: Locator, midway?: () => Promise<void>) {
 	await handle.scrollIntoViewIfNeeded();
 	await onto.scrollIntoViewIfNeeded();
 	const from = await handle.boundingBox();
 	const to = await onto.boundingBox();
 	if (from === null || to === null) throw new Error('A drag needs both rows on screen.');
-	await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+	const x = from.x + from.width / 2;
+	const start = from.y + from.height / 2;
+	await page.mouse.move(x, start);
 	await page.mouse.down();
-	await page.mouse.move(from.x + from.width / 2, to.y + 2, { steps: 8 });
+	await page.mouse.move(x, (start + to.y + 2) / 2, { steps: 4 });
+	await midway?.();
+	await page.mouse.move(x, to.y + 2, { steps: 4 });
 	await page.mouse.up();
 }
 
@@ -665,17 +669,34 @@ export const categories = {
 				}
 			);
 
-			await step('dragging Transit by its handle onto the first row puts it first', async () => {
-				await page.setViewportSize({ width: 1280, height: 800 });
-				await drag(
-					page,
-					everyday.getByRole('button', { name: 'Move Transit' }),
-					everyday.getByRole('listitem').first()
-				);
-				await expect
-					.poll(() => orderIn(everyday))
-					.toEqual(['Everyday', 'Transit', 'Groceries', 'Dining Out', 'Coffee']);
-			});
+			await step(
+				'dragging Transit by its handle onto the first row puts it first, even when another tab renames Coffee and back mid-drag',
+				async () => {
+					await page.setViewportSize({ width: 1280, height: 800 });
+					const elsewhere = await page.context().newPage();
+					await openCategories(elsewhere);
+					const renameElsewhere = async (from: string, to: string) => {
+						await elsewhere.getByRole('button', { name: from, exact: true }).click();
+						const field = elsewhere.getByRole('textbox', { name: 'Category name' });
+						await field.fill(to);
+						await field.press('Enter');
+						await expect(everyday.getByRole('button', { name: to, exact: true })).toBeVisible();
+					};
+					await drag(
+						page,
+						everyday.getByRole('button', { name: 'Move Transit' }),
+						everyday.getByRole('listitem').first(),
+						async () => {
+							await renameElsewhere('Coffee', 'Sample Coffee Beans');
+							await renameElsewhere('Sample Coffee Beans', 'Coffee');
+							await elsewhere.close();
+						}
+					);
+					await expect
+						.poll(() => orderIn(everyday))
+						.toEqual(['Everyday', 'Transit', 'Groceries', 'Dining Out', 'Coffee']);
+				}
+			);
 
 			await step('a reload and the Budget keep the new order', async () => {
 				await reloadOnceSaved(page);
