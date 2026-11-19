@@ -713,6 +713,11 @@ export const transactions = {
 				'a Transfer picked with an ordinary row keeps its Category while the ordinary row takes the new one',
 				async () => {
 					const transfer = page.getByRole('checkbox', { name: /^Select Transfer,/ }).first();
+					await expect(async () => {
+						if ((await transfer.count()) === 0)
+							await page.getByRole('button', { name: 'Show more' }).click();
+						await expect(transfer).toBeVisible({ timeout: 1_000 });
+					}).toPass();
 					const transferCategory = await categoryIn(transfer).getAttribute('aria-label');
 					await transfer.check();
 					await hardware.check();
