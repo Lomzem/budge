@@ -30,7 +30,7 @@
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
 	import { formatBankChangeCount } from '$lib/domain/bankChanges';
-	import { mainRegion } from '$lib/focusReturn';
+	import { mainRegion, type FocusDestination } from '$lib/focusReturn';
 	import { keepInUrl } from '$lib/keepInUrl';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 
@@ -141,6 +141,28 @@
 			? undefined
 			: view?.groups.find((group) => group.categories.some((c) => c.id === selectedId))?.id
 	);
+	let besideSelected: string[] = [];
+	$effect.pre(() => {
+		if (selected === undefined || view === undefined) return;
+		const group = view.groups.find((g) => g.categories.some((c) => c.id === selected.id));
+		if (group === undefined) return;
+		const at = group.categories.findIndex((c) => c.id === selected.id);
+		const neighbour = group.categories[at + 1] ?? group.categories[at - 1];
+		besideSelected = [
+			...(neighbour === undefined ? [] : [`[data-category-id="${neighbour.id}"]`]),
+			`[data-group-id="${group.id}"]`
+		];
+	});
+
+	const besideTheLastSelected: FocusDestination = () =>
+		besideSelected
+			.map((selector) =>
+				[...document.querySelectorAll<HTMLElement>(selector)].find((element) =>
+					element.checkVisibility()
+				)
+			)
+			.find((element) => element !== undefined) ?? mainRegion();
+
 	let selectedPlacement: { id: Id<'categories'>; group: Id<'categoryGroups'> } | null = null;
 	$effect.pre(() => {
 		const id = selectedId;
@@ -312,7 +334,7 @@
 			selectedId = null;
 			await tick();
 			if (document.activeElement === null || document.activeElement === document.body) {
-				mainRegion()?.focus();
+				besideTheLastSelected()?.focus();
 			}
 		})();
 	});
@@ -628,7 +650,7 @@
 				document.getElementById('category-inspector')?.focus({ preventScroll: true });
 			}}
 			onEscapeKeydown={leaveEscapeInsideTheInspectorToIt}
-			returnFocus={{ fallback: mainRegion }}
+			returnFocus={{ fallback: besideTheLastSelected }}
 		>
 			{@render inspector()}
 		</Dialog.Content>

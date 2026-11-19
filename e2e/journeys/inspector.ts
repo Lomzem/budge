@@ -458,19 +458,24 @@ export const inspector = {
 				}
 			);
 
-			await step('Hide closes the inspector and lists it as hidden', async () => {
-				await inspector.getByRole('button', { name: 'Sample Market actions' }).click();
-				await page.getByRole('menuitem', { name: 'Hide', exact: true }).click();
-				await expect(inspector).toHaveCount(0);
-				await expect(page.locator('#main')).toBeFocused();
-				const hidden = page.getByRole('region', { name: 'Hidden' });
-				await expect(hidden).toContainText('Sample Market');
-				await reloadOnceSaved(page);
-				await expect(hidden).toContainText('Sample Market');
-				await expect(page.getByRole('button', { name: 'Sample Market', exact: true })).toHaveCount(
-					0
-				);
-			});
+			await step(
+				'Hide closes the inspector, lists it as hidden, and leaves focus on the Category beside it',
+				async () => {
+					await inspector.getByRole('button', { name: 'Sample Market actions' }).click();
+					await page.getByRole('menuitem', { name: 'Hide', exact: true }).click();
+					await expect(inspector).toHaveCount(0);
+					await expect(
+						page.getByRole('button', { name: 'Car Repairs', exact: true })
+					).toBeFocused();
+					const hidden = page.getByRole('region', { name: 'Hidden' });
+					await expect(hidden).toContainText('Sample Market');
+					await reloadOnceSaved(page);
+					await expect(hidden).toContainText('Sample Market');
+					await expect(
+						page.getByRole('button', { name: 'Sample Market', exact: true })
+					).toHaveCount(0);
+				}
+			);
 
 			await step(
 				'a Hide answered after another Category opened hides the first and leaves the one opened with its draft and focus',
