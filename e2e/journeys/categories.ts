@@ -276,7 +276,7 @@ export const categories = {
 			);
 
 			await step(
-				'Hide from the keyboard moves it under Hidden and focus to its neighbour, and Show brings it back with focus on it',
+				'Hide from the keyboard moves it under Hidden and focus to its neighbour, and Show opens its collapsed group with focus on it',
 				async () => {
 					const everyday = groupOf(page, 'Everyday');
 					const neighbour = (await namesIn(everyday)).at(-2) ?? '';
@@ -287,8 +287,12 @@ export const categories = {
 					await expect(restored).toHaveCount(0);
 					await expect(page.getByRole('button', { name: neighbour, exact: true })).toBeFocused();
 					await reloadOnceSaved(page);
+					const everydayToggle = page.locator('[data-group-id]', { hasText: 'Everyday' });
+					await everydayToggle.click();
+					await expect(everydayToggle).toHaveAttribute('aria-expanded', 'false');
 					await hidden.getByRole('button', { name: 'Show Smoke Test Renamed' }).focus();
 					await page.keyboard.press('Enter');
+					await expect(everydayToggle).toHaveAttribute('aria-expanded', 'true');
 					await expect(restored).toBeFocused();
 					await expect(hidden).toHaveCount(0);
 

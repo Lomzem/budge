@@ -18,7 +18,8 @@
 		| { kind: 'group'; id: Id<'categoryGroups'>; name: string; categories: Member[] }
 		| ({ kind: 'category' } & Member);
 
-	let { hidden }: { hidden: BudgetView['hidden'] } = $props();
+	let { hidden, reveal }: { hidden: BudgetView['hidden']; reveal: (id: Id<'categories'>) => void } =
+		$props();
 
 	const actions = new CategoryActions();
 
@@ -58,6 +59,7 @@
 				? await actions.setGroupHidden(row.id, false)
 				: await actions.setHidden(row.id, false);
 		if (!shown) return;
+		if (row.kind === 'category') reveal(row.id);
 		await tick();
 		if (document.activeElement !== null && document.activeElement !== document.body) return;
 		const restored = row.kind === 'group' ? 'data-group-id' : 'data-category-id';

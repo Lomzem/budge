@@ -563,7 +563,7 @@
 			{/if}
 		</section>
 
-		<HiddenCategories hidden={view.hidden} />
+		<HiddenCategories hidden={view.hidden} reveal={expandGroupOf} />
 	</div>
 {/if}
 
