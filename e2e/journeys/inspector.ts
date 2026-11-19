@@ -116,6 +116,19 @@ export const inspector = {
 				}
 			);
 
+			await step(
+				'a click on Coffee while the inspector menu is open only closes the menu, and the started move stays',
+				async () => {
+					await region.getByLabel('Amount').fill('13.25');
+					await region.getByRole('button', { name: 'Groceries actions' }).click();
+					await expect(page.getByRole('menu')).toBeVisible();
+					await page.getByRole('button', { name: 'Coffee', exact: true }).click();
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await expect(page.getByRole('region', { name: 'Coffee' })).toHaveCount(0);
+					await expect(region.getByLabel('Amount')).toHaveValue('13.25');
+				}
+			);
+
 			await step('a Category with no amount is refused and nothing moves', async () => {
 				await region.getByLabel('Amount').fill('');
 				await region.getByLabel('Amount').press('Enter');

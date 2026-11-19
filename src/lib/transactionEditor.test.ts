@@ -498,6 +498,25 @@ describe('transferring between Accounts', () => {
 		}
 	);
 
+	test.each([
+		{ row: 'a saved card charge', from: visa, amount: -1240, offered: [] },
+		{
+			row: 'a saved card payment received',
+			from: visa,
+			amount: 4000,
+			offered: [checking, savings]
+		},
+		{ row: 'a saved Checking inflow', from: checking, amount: 4000, offered: [savings] }
+	])(
+		'the editor offers $row only the Transfers that keep its amount, as its row does',
+		({ from, amount, offered }) => {
+			const saved = savedRow({ accountId: from._id, amount, bankRows: [{}] });
+			const opened = openDraft({ saved, defaultAccountId: undefined, accounts, today: '' });
+
+			expect(view(opened, worldWith({ saved }), noCandidates).transferAccounts).toEqual(offered);
+		}
+	);
+
 	describe('linking the other side of an import', () => {
 		const imported = savedRow({ bankRows: [{}], payeeName: 'Transfer to savings' });
 		const world = worldWith({ saved: imported });

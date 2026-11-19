@@ -238,12 +238,24 @@ export const categories = {
 
 					await fromRowMenu(page, rowOf(page, second), 'Move up');
 					await expect.poll(() => namesIn(everyday)).toEqual(swapped);
-					await rightClickTheNameCell(rowOf(page, second));
+					await rowOf(page, second).getByRole('cell').last().click({ button: 'right' });
 					await expect(page.getByRole('menuitem', { name: 'Move up' })).toHaveAttribute(
 						'data-disabled'
 					);
 					await page.keyboard.press('Escape');
 					await expect(page.getByRole('menu')).toHaveCount(0);
+					await expect(page.getByRole('button', { name: second, exact: true })).toBeFocused();
+					await groupOf(page, 'Smoke Test Shelf')
+						.getByRole('row')
+						.first()
+						.getByRole('cell')
+						.last()
+						.click({ button: 'right' });
+					await page.keyboard.press('Escape');
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await expect(
+						page.locator('[data-group-id]', { hasText: 'Smoke Test Shelf' })
+					).toBeFocused();
 
 					const groups = await groupOrder(page);
 					const shelfAt = groups.indexOf('Smoke Test Shelf');

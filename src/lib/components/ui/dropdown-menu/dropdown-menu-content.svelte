@@ -15,6 +15,7 @@
 		children,
 		onOpenAutoFocus = (event: Event) => {
 			event.preventDefault();
+			if (ref?.contains(document.activeElement) && document.activeElement !== ref) return;
 			ref?.querySelector<HTMLElement>('[role^="menuitem"]:not([data-disabled])')?.focus();
 		},
 		...restProps

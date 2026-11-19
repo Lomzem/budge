@@ -206,6 +206,20 @@
 		};
 	}
 
+	function returnFocusToTheRow(id: string, row: string) {
+		const keep = keepFocusForRename(id);
+		return (event: Event) => {
+			keep(event);
+			const at = document.activeElement;
+			const nowhere = at === null || at === document.body || at.closest('[role="menu"]') !== null;
+			if (event.defaultPrevented || !nowhere) return;
+			event.preventDefault();
+			[...document.querySelectorAll<HTMLElement>(row)]
+				.find((element) => element.checkVisibility())
+				?.focus();
+		};
+	}
+
 	function tracksMenu(id: string) {
 		return (open: boolean) => {
 			if (open) menuOpenFor = id;
@@ -227,7 +241,7 @@
 	function clickWithAMenuOpenOnlyClosesIt(node: HTMLElement) {
 		let dismissing = false;
 		const readMenuBeforeItsDismissal = () => {
-			dismissing = menuOpenFor !== null;
+			dismissing = menuOpenFor !== null || document.querySelector('[role="menu"]') !== null;
 		};
 		const click = (event: MouseEvent) => {
 			if (event.detail === 0 || (!dismissing && menuOpenFor === null)) return;
@@ -432,7 +446,9 @@
 							</Table.Row>
 						{/snippet}
 					</ContextMenu.Trigger>
-					<ContextMenu.Content onCloseAutoFocus={keepFocusForRename(group.id)}>
+					<ContextMenu.Content
+						onCloseAutoFocus={returnFocusToTheRow(group.id, `[data-group-id="${group.id}"]`)}
+					>
 						<MenuEntries menu="context" entries={groupEntries(group)} />
 					</ContextMenu.Content>
 				</ContextMenu.Root>
@@ -476,7 +492,12 @@
 									</Table.Row>
 								{/snippet}
 							</ContextMenu.Trigger>
-							<ContextMenu.Content onCloseAutoFocus={keepFocusForRename(category.id)}>
+							<ContextMenu.Content
+								onCloseAutoFocus={returnFocusToTheRow(
+									category.id,
+									`[data-category-id="${category.id}"]`
+								)}
+							>
 								<MenuEntries menu="context" entries={categoryEntries(category, group)} />
 							</ContextMenu.Content>
 						</ContextMenu.Root>
