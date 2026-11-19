@@ -75,12 +75,12 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
 - On a 320 px phone a row menu and its "Move to group" submenu stay on screen, with 44 px items.
 - At 320 px a long hidden name wraps at word boundaries on its own line.
 
-### Checks already completed (on `2903219`, the code of `9316a42`)
+### Checks already completed (on `4578e5a`, the code of `efd75db`)
 
 | Check                                             | Exit code | Result                                                     |
 | ------------------------------------------------- | --------- | ---------------------------------------------------------- |
-| `bun run check`                                   | 0         | Includes lint, lint:ui, typecheck and 1,128 Vitest tests   |
-| Full live journey suite with `bun run app verify` | 0         | 64/64, run `r2-full-2903219`, clean tree                   |
+| `bun run check`                                   | 0         | Includes lint, lint:ui, typecheck and 1,131 Vitest tests   |
+| Full live journey suite with `bun run app verify` | 0         | 64/64, run `r2-full-4578e5a`, clean tree                   |
 | `gitleaks` on each commit's staged changes        | 0         | Clean                                                      |
 
 A judge re-checking round 1 gets their own findings and dispositions in their task. Read no `ui-review-round-1*` file and no other judge's report or evidence.
