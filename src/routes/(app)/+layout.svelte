@@ -23,10 +23,12 @@
 	const whoami = useQuery(api.owner.whoami, () => (auth.isAuthenticated ? {} : 'skip'));
 	const accounts = new Accounts(() => auth.isAuthenticated);
 	setAccounts(accounts);
-	setBankConnections(new BankConnections(() => accounts.loaded));
+	const bank = new BankConnections(() => accounts.loaded);
+	setBankConnections(bank);
 	const budget = new BudgetMonth(() => auth.isAuthenticated);
 	setBudgetMonth(budget);
-	setShellQueries(new ShellQueries(() => auth.isAuthenticated));
+	const shell = new ShellQueries(() => auth.isAuthenticated);
+	setShellQueries(shell);
 
 	const access = $derived.by(() => {
 		if (auth.isLoading) return 'loading';
@@ -35,7 +37,13 @@
 		if (failure) {
 			return readPublicError(failure)?.code === 'FORBIDDEN' ? 'forbidden' : 'failed';
 		}
-		return whoami.isLoading || !accounts.loaded ? 'loading' : 'owner';
+		const settled =
+			!whoami.isLoading &&
+			accounts.loaded &&
+			shell.settled &&
+			budget.settled &&
+			(bank.loaded || bank.failed);
+		return settled ? 'owner' : 'loading';
 	});
 </script>
 

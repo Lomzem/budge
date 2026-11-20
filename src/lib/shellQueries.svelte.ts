@@ -9,6 +9,11 @@ export class ShellQueries {
 	readonly bankChangeCount: UseQueryReturn<typeof api.transactions.bankChangeCount>;
 	readonly categories: UseQueryReturn<typeof api.categories.list>;
 	readonly payees: UseQueryReturn<typeof api.payees.list>;
+	readonly settled = $derived.by(() =>
+		[this.settings, this.unapprovedCount, this.bankChangeCount, this.categories, this.payees].every(
+			(query) => query.data !== undefined || query.error !== undefined
+		)
+	);
 
 	constructor(enabled: () => boolean) {
 		const args = () => (enabled() ? {} : 'skip');

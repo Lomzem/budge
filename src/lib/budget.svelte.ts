@@ -28,6 +28,7 @@ export class BudgetMonth {
 	readonly stale = $derived.by(() => this.view === undefined && this.shown !== undefined);
 	readonly readyToAssign = $derived.by(() => this.#query.data?.readyToAssign);
 	readonly error = $derived.by(() => this.#query.error);
+	readonly settled = $derived.by(() => this.shown !== undefined || this.error !== undefined);
 
 	readonly firstMonth = $derived.by(() => this.#query.data?.firstMonth ?? null);
 
