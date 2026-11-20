@@ -165,7 +165,7 @@ export const categories = {
 			);
 
 			await step(
-				'a right-click on a row opens its menu; Rename edits in place, refuses an empty name, and Escape keeps the old one',
+				'a right-click on a row opens its menu; Rename edits in place, refuses an empty name, and Escape keeps the old one; Delete of a one-Category group speaks of one Category',
 				async () => {
 					await fromRowMenu(page, rowOf(page, 'Smoke Test Category'), 'Rename');
 					const field = page.getByRole('textbox', { name: 'Category name' });
@@ -194,6 +194,14 @@ export const categories = {
 					await expect
 						.poll(() => namesIn(groupOf(page, 'Smoke Test Shelf')))
 						.toEqual(['Smoke Test Renamed']);
+					await fromGroupMenu(page, 'Smoke Test Shelf', 'Delete…');
+					const oneCategoryGroup = page.getByRole('dialog', { name: 'Delete Smoke Test Shelf' });
+					await expect(oneCategoryGroup.getByText(/group you pick/)).toHaveText(
+						'Its Category moves to the group you pick, with its history.'
+					);
+					await expect(oneCategoryGroup.getByLabel('Move its Category to')).toBeVisible();
+					await page.keyboard.press('Escape');
+					await expect(oneCategoryGroup).toBeHidden();
 				}
 			);
 

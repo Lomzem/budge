@@ -36,5 +36,5 @@ Preconditions:
 
 ## Gotchas
 
-- With no eligible history destination, deleting a Category asks for another Category. Deleting a populated group needs another ordinary group.
+- With no eligible history destination, deleting a Category asks for another Category. Deleting a populated group needs another ordinary group. `categories/manage` checks that Delete group for a group with one Category says `Its Category moves to the group you pick, with its history.` and labels the field `Move its Category to`.
 - Sources: ticket 06, public `categories.list/createGroup/create/rename/renameGroup/move/moveGroup/setHidden/setGroupHidden/remove/removeGroup`.
