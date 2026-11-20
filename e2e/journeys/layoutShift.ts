@@ -37,15 +37,22 @@ function observeLayoutShifts(binding: string) {
 	for (const type of ['pointerdown', 'keydown', 'input', 'change']) {
 		addEventListener(type, noteInput, true);
 	}
+	const sinceInput = (at: number) => at - lastInput >= 0 && at - lastInput < RECENT_INPUT_MS;
 	const pointerQueries = ['(pointer: coarse)', '(hover: hover)'].map((query) => matchMedia(query));
 	const pointerNow = () => pointerQueries.map((query) => String(query.matches)).join();
 	let pointer = pointerNow();
+	let pointerUnchangedAt = performance.now();
+	let shiftsOfPointerSwitch = { from: -Infinity, until: -Infinity };
 	const notePointerSwitch = () => {
 		const now = pointerNow();
-		if (now === pointer) return;
+		const at = performance.now();
+		if (now !== pointer)
+			shiftsOfPointerSwitch = { from: pointerUnchangedAt, until: at + RECENT_INPUT_MS };
 		pointer = now;
-		lastInput = performance.now();
+		pointerUnchangedAt = at;
 	};
+	const sincePointerSwitch = (at: number) =>
+		at >= shiftsOfPointerSwitch.from && at < shiftsOfPointerSwitch.until;
 	for (const query of pointerQueries) query.addEventListener('change', notePointerSwitch);
 
 	const requested = new Map<string, RequestedOperation>();
@@ -157,7 +164,8 @@ function observeLayoutShifts(binding: string) {
 		];
 		notePointerSwitch();
 		for (const entry of entries) {
-			if (entry.hadRecentInput || entry.startTime - lastInput < RECENT_INPUT_MS) continue;
+			if (entry.hadRecentInput || sinceInput(entry.startTime)) continue;
+			if (sincePointerSwitch(entry.startTime)) continue;
 			if (answersARequest(entry.startTime)) continue;
 			const sent = report?.({
 				url: location.pathname + location.search,
