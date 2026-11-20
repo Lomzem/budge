@@ -74,13 +74,15 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
 - Hiding a Category or group, or moving a Category to another group, from the keyboard leaves focus in Budget: on the next Category or group, or on the moved Category.
 - On a 320 px phone a row menu and its "Move to group" submenu stay on screen, with 44 px items.
 - At 320 px a long hidden name wraps at word boundaries on its own line.
+- An Escape while the inspector's Delete or Target dialog is open closes only that dialog; the inspector and an unsaved Move money amount stay.
+- In a ⋯ menu, End pressed right after Enter focuses the last item, and focus stays on the item the keyboard reached while the menu is open.
 
-### Checks already completed (on `08ff85e`, the code of `0db8941`)
+### Checks already completed (on `c08534e`, the code of `6e8e541`)
 
 | Check                                             | Exit code | Result                                                     |
 | ------------------------------------------------- | --------- | ---------------------------------------------------------- |
 | `bun run check`                                   | 0         | Includes lint, lint:ui, typecheck and 1,131 Vitest tests   |
-| Full live journey suite with `bun run app verify` | 0         | 64/64, run `r2-full-08ff85e-b`, clean tree                 |
+| Full live journey suite with `bun run app verify` | 0         | 64/64, run `r2-full-a23`, tree identical to `c08534e`     |
 | `gitleaks` on each commit's staged changes        | 0         | Clean                                                      |
 
 A judge re-checking round 1 gets their own findings and dispositions in their task. Read no `ui-review-round-1*` file and no other judge's report or evidence.
