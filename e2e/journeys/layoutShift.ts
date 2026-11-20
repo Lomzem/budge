@@ -37,6 +37,16 @@ function observeLayoutShifts(binding: string) {
 	for (const type of ['pointerdown', 'keydown', 'input', 'change']) {
 		addEventListener(type, noteInput, true);
 	}
+	const pointerQueries = ['(pointer: coarse)', '(hover: hover)'].map((query) => matchMedia(query));
+	const pointerNow = () => pointerQueries.map((query) => String(query.matches)).join();
+	let pointer = pointerNow();
+	const notePointerSwitch = () => {
+		const now = pointerNow();
+		if (now === pointer) return;
+		pointer = now;
+		lastInput = performance.now();
+	};
+	for (const query of pointerQueries) query.addEventListener('change', notePointerSwitch);
 
 	const requested = new Map<string, RequestedOperation>();
 	const mutationOrAction = (requestId: unknown) => `request ${String(requestId)}`;
@@ -145,6 +155,7 @@ function observeLayoutShifts(binding: string) {
 		const report = (window as unknown as Record<string, (shift: LayoutShift) => Promise<void>>)[
 			binding
 		];
+		notePointerSwitch();
 		for (const entry of entries) {
 			if (entry.hadRecentInput || entry.startTime - lastInput < RECENT_INPUT_MS) continue;
 			if (answersARequest(entry.startTime)) continue;
