@@ -22,6 +22,10 @@ function groupOf(page: Page, name: string) {
 		.filter({ has: page.getByRole('rowheader', { name: new RegExp(`^${name}`) }) });
 }
 
+function heightOf(target: Locator) {
+	return target.evaluate((element: HTMLElement) => element.offsetHeight);
+}
+
 function rowOf(page: Page, name: string) {
 	return page
 		.getByRole('row')
@@ -264,6 +268,7 @@ export const categories = {
 						.getByRole('cell')
 						.last()
 						.click({ button: 'right' });
+					await expect(page.getByRole('menu')).toBeVisible();
 					await page.keyboard.press('Escape');
 					await expect(page.getByRole('menu')).toHaveCount(0);
 					await expect(
@@ -387,7 +392,7 @@ export const categories = {
 				await expect(groceries).not.toHaveAttribute('data-state', 'selected');
 				await expectNothingPastTheRightEdge(page);
 				const moveToGroup = page.getByRole('menuitem', { name: 'Move to group' });
-				expect((await moveToGroup.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+				expect(await heightOf(moveToGroup)).toBeGreaterThanOrEqual(44);
 				await tap(page, moveToGroup);
 				const groupsToMoveTo = page
 					.getByRole('menu')
@@ -401,7 +406,7 @@ export const categories = {
 					})
 					.toBe(true);
 				const bills = groupsToMoveTo.getByRole('menuitem', { name: 'Bills', exact: true });
-				expect((await bills.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+				expect(await heightOf(bills)).toBeGreaterThanOrEqual(44);
 			});
 			await step('tap outside the menu, which only closes it', async () => {
 				const everyday = page.getByRole('button', { name: 'Everyday', exact: true });
