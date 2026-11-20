@@ -42,7 +42,7 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
   - `categories/manage`, `categories/touch-menu`, `categories/held-rename`, `categories/failed-rename`
   - `inspector/move-money`, `inspector/cover-and-manage`
   - `targets/monthly`
-  - `shell/navigate`, `shell/cold-start`, `shell/phone-pages`
+  - `shell/navigate`, `shell/cold-start`, `shell/failed-query`, `shell/phone-pages`
   - `imports/approve`
   - `transactions/categorize`, `transactions/select-categorize`, `transactions/approve-phone`
   - `plaid/status`, `plaid/consent`, `export/files`, `budget/assign`
@@ -79,14 +79,16 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
 - At 320 px a long hidden name wraps at word boundaries on its own line.
 - An Escape while the inspector's Delete or Target dialog is open closes only that dialog; the inspector and an unsaved Move money amount stay.
 - In a ⋯ menu, End pressed right after Enter focuses the last item, and focus stays on the item the keyboard reached while the menu is open.
-- While a menu is open over a dialog, a click or tap on the dialog only closes the menu; on a phone, Move, Clear, Close, Previous and Next in the inspector dialog do nothing until the menu is closed.
+- While a row menu or ⋯ menu is open, a click, tap or right-click anywhere outside it only closes it. Nothing under the press changes, and no row is selected. This holds over a dialog too: on a phone, Move, Clear, Close, Previous and Next in the inspector dialog do nothing until the menu is closed.
+- If one of the shared queries (Settings, the counts, Categories, Payees) fails, the app shows `Budge couldn't reach its server.` with the server's message, as it does for a failed owner check or Accounts query. No Section opens with part of its data.
+- Deleting a group that has one Category speaks of one Category: `Its Category moves to the group you pick, with its history.`
 
-### Checks already completed (on `02de368`, the code of `0197a7f`)
+### Checks already completed (on `a64f414`, the dev-branch commit with this branch's code)
 
 | Check                                             | Exit code | Result                                                     |
 | ------------------------------------------------- | --------- | ---------------------------------------------------------- |
 | `bun run check`                                   | 0         | Includes lint, lint:ui, typecheck and 1,145 Vitest tests   |
-| Full live journey suite with `bun run app verify` | 0         | 65/65 in run `full-02de368`, clean tree                    |
+| Full live journey suite with `bun run app verify` | 0         | 66/66 in run `r2-a64f414`, clean tree                      |
 | `gitleaks` on each commit's staged changes        | 0         | Clean                                                      |
 
 A judge re-checking round 1 gets their own findings and dispositions in their task. Read no `ui-review-round-1*` file and no other judge's report or evidence.
