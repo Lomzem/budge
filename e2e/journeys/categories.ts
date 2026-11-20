@@ -490,6 +490,44 @@ export const categories = {
 			);
 		}
 	},
+	'only-group': {
+		title:
+			'with no other Category Group to take over its Category, Delete group asks for one in a single line and offers no Delete',
+		fixture: 'empty-budget',
+		run: async (page, { step }) => {
+			await step('set the cutover date and add one Category in a new group', async () => {
+				await openBudget(page);
+				const cutover = page.getByRole('region', { name: 'Cutover date', exact: true });
+				await cutover.getByRole('button', { name: 'Save' }).click();
+				await expect(cutover.getByRole('button', { name: 'Change' })).toBeVisible();
+				await page.getByRole('button', { name: 'Add Category', exact: true }).click();
+				const addCategory = page.getByRole('dialog', { name: 'Add Category' });
+				await choose(addCategory.getByLabel('Category Group'), 'New Category Group…');
+				await addCategory.getByLabel('Group name').fill('Smoke Test Group');
+				await addCategory.getByLabel('Name', { exact: true }).fill('Smoke Test Category');
+				await addCategory.getByRole('button', { name: 'Add' }).click();
+				await expect(addCategory).toBeHidden();
+				await expect
+					.poll(() => namesIn(groupOf(page, 'Smoke Test Group')))
+					.toEqual(['Smoke Test Category']);
+			});
+
+			await step(
+				'Delete group says only that another group must take over the Category',
+				async () => {
+					await fromGroupMenu(page, 'Smoke Test Group', 'Delete…');
+					const dialog = page.getByRole('dialog', { name: 'Delete Smoke Test Group' });
+					await expect(dialog).toHaveAccessibleDescription(
+						'Add another Category Group to take over this Category and its history.'
+					);
+					await expect(dialog).not.toContainText('group you pick');
+					await expect(dialog.getByRole('button', { name: 'Delete group' })).toHaveCount(0);
+					await page.keyboard.press('Escape');
+					await expect(dialog).toBeHidden();
+				}
+			);
+		}
+	},
 	'held-rename': {
 		title: 'a rename still on its way neither overwrites a later rename nor comes back after it',
 		fixture: 'budget-with-accounts',

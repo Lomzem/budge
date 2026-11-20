@@ -63,22 +63,20 @@
 		<Dialog.Header>
 			<Dialog.Title>Delete {group?.name ?? 'Category Group'}</Dialog.Title>
 			<Dialog.Description>
-				{#if count > 0}
+				{#if count === 0}
+					It has no Categories.
+				{:else if choices.length === 0}
+					{count === 1
+						? 'Add another Category Group to take over this Category and its history.'
+						: 'Add another Category Group to take over these Categories and their history.'}
+				{:else}
 					{count === 1
 						? 'Its Category moves to the group you pick, with its history.'
 						: `Its ${String(count)} Categories move to the group you pick, with their history.`}
-				{:else}
-					It has no Categories.
 				{/if}
 			</Dialog.Description>
 		</Dialog.Header>
-		{#if count > 0 && choices.length === 0}
-			<p class="text-sm text-muted-foreground">
-				Add another Category Group first, to take over {count === 1
-					? 'this Category'
-					: 'these Categories'}.
-			</p>
-		{:else}
+		{#if count === 0 || choices.length > 0}
 			<form class="flex flex-col gap-4" onsubmit={submit}>
 				{#if count > 0}
 					<div class="flex flex-col gap-2">
