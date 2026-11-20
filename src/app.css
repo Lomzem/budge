@@ -219,6 +219,16 @@
 	html:has([data-selection-bar]) {
 		scroll-padding-top: calc(var(--selection-bar-height, 0px) + 1rem);
 	}
+	/* While a menu is open over a dialog, a click or tap on the dialog only closes the menu. */
+	body:has(
+			:is(
+				[data-slot='dropdown-menu-content'],
+				[data-slot='context-menu-content']
+			)[data-state='open']
+		)
+		:is([data-slot='dialog-content'], [data-slot='dialog-content'] *) {
+		pointer-events: none !important;
+	}
 	h1,
 	h2,
 	h3 {

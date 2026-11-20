@@ -239,6 +239,32 @@ export const inspector = {
 			);
 
 			await step(
+				'on a phone, a click on Move with the inspector ⋯ menu open only closes the menu, and the started move stays',
+				async () => {
+					const dialog = page.getByRole('dialog', { name: 'Groceries' });
+					const amount = dialog.getByLabel('Amount');
+					await groceries.click();
+					await choose(dialog.getByRole('button', { name: 'From', exact: true }), /^Coffee \(/);
+					await amount.fill('5.00');
+					const move = await dialog
+						.getByRole('button', { name: 'Move', exact: true })
+						.boundingBox();
+					if (!move) throw new Error('Move has no box');
+					const actions = dialog.getByRole('button', { name: 'Groceries actions' });
+					await actions.click();
+					await expect(page.getByRole('menu')).toBeVisible();
+					await page.mouse.click(move.x + move.width / 2, move.y + move.height / 2);
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await expect(actions).toBeFocused();
+					await expect(amount).toHaveValue('5.00');
+					expect(await assigned('Coffee')).toBe(before.coffee);
+					await amount.press('Escape');
+					await page.keyboard.press('Escape');
+					await expect(dialog).toBeHidden();
+				}
+			);
+
+			await step(
 				'the phone inspector steps to the next Category and focuses its Assigned field',
 				async () => {
 					await groceries.click();
