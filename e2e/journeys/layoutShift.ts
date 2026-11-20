@@ -169,10 +169,15 @@ function observeLayoutShifts(binding: string) {
 			if (entry.hadRecentInput || sinceInput(entry.startTime)) continue;
 			if (sincePointerSwitch(entry.startTime)) continue;
 			if (answersARequest(entry.startTime)) continue;
+			const sources = entry.sources ?? [];
+			const nothingMoved = sources.every(
+				(source) => box(source.previousRect) === box(source.currentRect)
+			);
+			if (sources.length > 0 && nothingMoved) continue;
 			const sent = report?.({
 				url: location.pathname + location.search,
 				value: entry.value,
-				moved: (entry.sources ?? []).map(
+				moved: sources.map(
 					(source) =>
 						`${describe(source.node)} [${box(source.previousRect)} → ${box(source.currentRect)}]`
 				)

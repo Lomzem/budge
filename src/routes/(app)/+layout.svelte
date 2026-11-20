@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { useAuth, useQuery } from 'convex-svelte';
 
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+
 	import { api } from '$convex/_generated/api';
 	import { Accounts, setAccounts } from '$lib/accounts.svelte';
 	import { BankConnections, setBankConnections } from '$lib/bankConnections.svelte';
@@ -10,6 +13,7 @@
 	import SignOutButton from '$lib/components/shell/sign-out-button.svelte';
 	import TabBar from '$lib/components/shell/tab-bar.svelte';
 	import { setupConvexWithClerk } from '$lib/convex.svelte';
+	import { isIsoMonth } from '$lib/domain/dates';
 	import { readPublicError } from '$lib/publicError';
 	import { ShellQueries, setShellQueries } from '$lib/shellQueries.svelte';
 
@@ -25,7 +29,13 @@
 	setAccounts(accounts);
 	const bank = new BankConnections(() => accounts.loaded);
 	setBankConnections(bank);
-	const budget = new BudgetMonth(() => auth.isAuthenticated);
+	const monthTheBudgetLinkNames = (url: URL) => {
+		const linked = url.searchParams.get('month');
+		return url.pathname === resolve('/') && linked !== null && isIsoMonth(linked)
+			? linked
+			: undefined;
+	};
+	const budget = new BudgetMonth(() => auth.isAuthenticated, monthTheBudgetLinkNames(page.url));
 	setBudgetMonth(budget);
 	const shell = new ShellQueries(() => auth.isAuthenticated);
 	setShellQueries(shell);

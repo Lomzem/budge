@@ -9,7 +9,7 @@ import { addMonths, localToday, monthOf } from '$lib/domain/dates';
 export type BudgetView = FunctionReturnType<typeof api.budget.month>;
 
 export class BudgetMonth {
-	month = $state(monthOf(localToday()));
+	month = $state('');
 
 	today = $state(localToday());
 	readonly #query: UseQueryReturn<typeof api.budget.month>;
@@ -37,7 +37,8 @@ export class BudgetMonth {
 		return first !== null && this.month > first;
 	});
 
-	constructor(enabled: () => boolean) {
+	constructor(enabled: () => boolean, linkedMonth?: string) {
+		this.month = linkedMonth ?? monthOf(localToday());
 		this.#query = useQuery(
 			api.budget.month,
 			() => (enabled() ? { month: this.month, today: this.today } : 'skip'),

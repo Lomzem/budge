@@ -22,6 +22,27 @@ function monthOf(monthsFromNow: number) {
 	return new Date(today.getFullYear(), today.getMonth() + monthsFromNow, 1);
 }
 
+interface StaleMonthWatch {
+	sawStaleMonth?: boolean;
+}
+
+function watchForAStaleMonth() {
+	const watch = window as unknown as StaleMonthWatch;
+	watch.sawStaleMonth = false;
+	new MutationObserver(() => {
+		if (document.querySelector('[aria-busy="true"]')) watch.sawStaleMonth = true;
+	}).observe(document, {
+		subtree: true,
+		childList: true,
+		attributes: true,
+		attributeFilter: ['aria-busy']
+	});
+}
+
+function sawAStaleMonth() {
+	return (window as unknown as StaleMonthWatch).sawStaleMonth === true;
+}
+
 function monthName(monthsFromNow: number) {
 	return monthOf(monthsFromNow).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 }
@@ -320,6 +341,20 @@ export const budget = {
 				await page.keyboard.press('Enter');
 				await expect(page.getByText(`August ${nextYear}`, { exact: true })).toBeVisible();
 			});
+
+			await step(
+				"a reload on the linked month shows that month's own Assigned, never another month's dimmed",
+				async () => {
+					const nextYear = String(new Date().getFullYear() + 1);
+					await page.addInitScript(watchForAStaleMonth);
+					await reloadOnceSaved(page);
+					await expect(page.getByText(`August ${nextYear}`, { exact: true })).toBeVisible();
+					await expect(
+						page.getByRole('textbox', { name: 'Assigned for Groceries', exact: true })
+					).toHaveValue(typed(0));
+					expect(await page.evaluate(sawAStaleMonth)).toBe(false);
+				}
+			);
 
 			await step(
 				'after a reload, the month chosen last is the one Back returns to from another Section, with its own Assigned, typed once that month has loaded',
