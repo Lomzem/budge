@@ -5,6 +5,7 @@ import {
 	centerOf,
 	choicesOf,
 	choose,
+	clickTheSpotOf,
 	expectNothingPastTheRightEdge,
 	openBudget,
 	reloadOnceSaved,
@@ -75,7 +76,12 @@ async function tapTheCornerOf(page: Page, target: Locator) {
 	if (box === null) throw new Error(`${String(target)} has no box to tap`);
 	const corner = { x: box.x + 3, y: box.y + box.height - 3 };
 	const owned = await target.evaluate(
-		(element, { x, y }) => element.contains(document.elementFromPoint(x, y)),
+		(element, { x, y }) =>
+			element.contains(
+				document
+					.elementsFromPoint(x, y)
+					.find((shown) => !shown.matches('[data-slot="menu-dismiss-layer"]')) ?? null
+			),
 		corner
 	);
 	if (!owned)
@@ -459,7 +465,7 @@ export const categories = {
 					await expect(page.getByRole('menu')).toHaveCount(0);
 					await page.getByRole('button', { name: 'Bills actions' }).click();
 					await expect(page.getByRole('menu')).toBeVisible();
-					await page.getByRole('button', { name: 'Coffee', exact: true }).click();
+					await clickTheSpotOf(page, page.getByRole('button', { name: 'Coffee', exact: true }));
 					await expect(page.getByRole('menu')).toHaveCount(0);
 					await expect(rowOf(page, 'Coffee')).not.toHaveAttribute('data-state', 'selected');
 					await expect(page.getByRole('region', { name: 'Coffee' })).toHaveCount(0);

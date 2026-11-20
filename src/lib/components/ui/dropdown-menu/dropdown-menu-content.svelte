@@ -63,7 +63,7 @@
 		onInteractOutside={rememberTheTriggerOfAClickOutside}
 		onCloseAutoFocus={returnFocusOnlyWhenTheMenuCloses}
 		class={cn(
-			'z-50 flex max-h-(--bits-dropdown-menu-content-available-height) w-max max-w-(--bits-dropdown-menu-content-available-width) min-w-44 origin-(--bits-dropdown-menu-content-transform-origin) flex-col overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-lg ring-1 ring-border duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',
+			'z-60 flex max-h-(--bits-dropdown-menu-content-available-height) w-max max-w-(--bits-dropdown-menu-content-available-width) min-w-44 origin-(--bits-dropdown-menu-content-transform-origin) flex-col overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-lg ring-1 ring-border duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',
 			className
 		)}
 		{...restProps}

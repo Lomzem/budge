@@ -242,24 +242,6 @@
 		};
 	}
 
-	function clickWithAMenuOpenOnlyClosesIt(node: HTMLElement) {
-		let dismissing = false;
-		const readMenuBeforeItsDismissal = () => {
-			dismissing = menuOpenFor !== null || document.querySelector('[role="menu"]') !== null;
-		};
-		const click = (event: MouseEvent) => {
-			if (event.detail === 0 || (!dismissing && menuOpenFor === null)) return;
-			dismissing = false;
-			event.stopPropagation();
-		};
-		window.addEventListener('pointerdown', readMenuBeforeItsDismissal, true);
-		node.addEventListener('click', click, true);
-		return () => {
-			window.removeEventListener('pointerdown', readMenuBeforeItsDismissal, true);
-			node.removeEventListener('click', click, true);
-		};
-	}
-
 	function rowClick(id: string, open: () => void) {
 		return (event: MouseEvent) => {
 			if (menuOpenFor === id || renaming === id || !clickedTheRow(event)) return;
@@ -413,7 +395,7 @@
 	</Table.Cell>
 {/snippet}
 
-<div class="@container" {@attach clickWithAMenuOpenOnlyClosesIt}>
+<div class="@container">
 	<Table.Root layout="fixed">
 		<Table.Header>
 			<Table.Row>

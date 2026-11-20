@@ -219,15 +219,23 @@
 	html:has([data-selection-bar]) {
 		scroll-padding-top: calc(var(--selection-bar-height, 0px) + 1rem);
 	}
-	/* While a menu is open over a dialog, a click or tap on the dialog only closes the menu. */
+	/* While a menu is open, a click or tap anywhere outside it lands on this layer and only closes the menu. */
+	[data-slot='menu-dismiss-layer'] {
+		position: fixed;
+		inset: 0;
+		z-index: 55;
+		display: none;
+		pointer-events: auto;
+	}
 	body:has(
 			:is(
 				[data-slot='dropdown-menu-content'],
 				[data-slot='context-menu-content']
 			)[data-state='open']
 		)
-		:is([data-slot='dialog-content'], [data-slot='dialog-content'] *) {
-		pointer-events: none !important;
+		[data-slot='menu-dismiss-layer'],
+	[data-slot='menu-dismiss-layer'][data-pressed] {
+		display: block;
 	}
 	h1,
 	h2,

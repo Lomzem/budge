@@ -7,8 +7,10 @@ import {
 	centsIn,
 	choicesOf,
 	choose,
+	clickTheSpotOf,
 	openBudget,
 	tap,
+	touchscreen,
 	typed,
 	useATouchScreen,
 	reloadOnceSaved,
@@ -122,7 +124,7 @@ export const inspector = {
 					await region.getByLabel('Amount').fill('13.25');
 					await region.getByRole('button', { name: 'Groceries actions' }).click();
 					await expect(page.getByRole('menu')).toBeVisible();
-					await page.getByRole('button', { name: 'Coffee', exact: true }).click();
+					await clickTheSpotOf(page, page.getByRole('button', { name: 'Coffee', exact: true }));
 					await expect(page.getByRole('menu')).toHaveCount(0);
 					await expect(page.getByRole('region', { name: 'Coffee' })).toHaveCount(0);
 					await expect(region.getByLabel('Amount')).toHaveValue('13.25');
@@ -246,19 +248,63 @@ export const inspector = {
 					await groceries.click();
 					await choose(dialog.getByRole('button', { name: 'From', exact: true }), /^Coffee \(/);
 					await amount.fill('5.00');
-					const move = await dialog
-						.getByRole('button', { name: 'Move', exact: true })
-						.boundingBox();
-					if (!move) throw new Error('Move has no box');
 					const actions = dialog.getByRole('button', { name: 'Groceries actions' });
 					await actions.click();
 					await expect(page.getByRole('menu')).toBeVisible();
-					await page.mouse.click(move.x + move.width / 2, move.y + move.height / 2);
+					await clickTheSpotOf(page, dialog.getByRole('button', { name: 'Move', exact: true }));
 					await expect(page.getByRole('menu')).toHaveCount(0);
 					await expect(actions).toBeFocused();
 					await expect(amount).toHaveValue('5.00');
 					expect(await assigned('Coffee')).toBe(before.coffee);
 					await amount.press('Escape');
+					await page.keyboard.press('Escape');
+					await expect(dialog).toBeHidden();
+				}
+			);
+
+			await step(
+				'on a phone, a tap just outside the inspector ⋯ menu, level with Move down, only closes the menu',
+				async () => {
+					const dialog = page.getByRole('dialog', { name: 'Groceries' });
+					const amount = dialog.getByLabel('Amount');
+					const next = dialog.getByRole('button', { name: 'Next Category: Dining Out' });
+					await groceries.click();
+					await choose(dialog.getByRole('button', { name: 'From', exact: true }), /^Coffee \(/);
+					await amount.fill('5.00');
+					await expect(next).toBeVisible();
+					const stopTouching = await useATouchScreen(page);
+					await dialog.getByRole('button', { name: 'Groceries actions' }).click();
+					const menu = page.getByRole('menu');
+					const moveDown = menu.getByRole('menuitem', { name: 'Move down' });
+					await expect(moveDown).toBeEnabled();
+					await menu.evaluate((opened) =>
+						Promise.all(opened.getAnimations({ subtree: true }).map((shown) => shown.finished))
+					);
+					const edge = await menu.boundingBox();
+					const row = await moveDown.boundingBox();
+					if (!edge || !row) throw new Error('The open menu has no box');
+					const justOutside = { id: 1, x: edge.x - 2, y: row.y + row.height / 2 };
+					expect(
+						await page.evaluate(
+							({ x, y }) => document.elementFromPoint(x, y)?.closest('[role="menu"]') ?? null,
+							justOutside
+						),
+						'the tap point lies outside the menu'
+					).toBeNull();
+					const screen = await touchscreen(page);
+					await screen.touch('touchStart', [justOutside]);
+					await screen.touch('touchEnd', []);
+					await screen.detach();
+					await stopTouching();
+					await expect(menu).toHaveCount(0);
+					await expect(next).toBeVisible();
+					await expect(amount).toHaveValue('5.00');
+					await amount.press('Escape');
+					await page.keyboard.press('Escape');
+					await expect(dialog).toBeHidden();
+					await reloadOnceSaved(page);
+					await groceries.click();
+					await expect(next).toBeVisible();
 					await page.keyboard.press('Escape');
 					await expect(dialog).toBeHidden();
 				}
