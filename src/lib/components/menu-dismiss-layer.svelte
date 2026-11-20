@@ -37,14 +37,15 @@
 			clearTimeout(letGo);
 			pressed = false;
 		};
-		const keepTheBrowserMenuClosed = (event: MouseEvent) => {
+		const rightClickLanded = (event: MouseEvent) => {
 			event.preventDefault();
+			landed();
 		};
 		node.addEventListener('pointerdown', press);
 		node.addEventListener('pointerup', release);
 		node.addEventListener('pointercancel', release);
 		node.addEventListener('click', landed);
-		node.addEventListener('contextmenu', keepTheBrowserMenuClosed);
+		node.addEventListener('contextmenu', rightClickLanded);
 		window.addEventListener('blur', landed);
 		return () => {
 			clearTimeout(letGo);
@@ -52,7 +53,7 @@
 			node.removeEventListener('pointerup', release);
 			node.removeEventListener('pointercancel', release);
 			node.removeEventListener('click', landed);
-			node.removeEventListener('contextmenu', keepTheBrowserMenuClosed);
+			node.removeEventListener('contextmenu', rightClickLanded);
 			window.removeEventListener('blur', landed);
 		};
 	}

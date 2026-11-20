@@ -38,6 +38,6 @@ Preconditions:
 - **Manual drive:** the From/To picker includes hidden Categories and excludes the current Category. Zero, negative or invalid Amount shows `Enter an amount above zero, such as 25.00.`; a positive move may make the source Assigned negative while preserving Ready to Assign.
 
 - A touch probe must turn on touch emulation (`useATouchScreen`) before it measures a menu: touch emulation removes the scrollbar and moves a centered dialog and its menu about 12 px. A point measured before that can land inside the menu.
-- Under an open menu, Playwright's `locator.click()` on a page element times out because the dismiss layer covers it. Use `clickTheSpotOf` (`e2e/journeys/journey.ts`) to click the point the user sees.
+- Under an open menu, Playwright's `locator.click()` on a page element times out because the dismiss layer covers it. Use `clickTheSpotOf` (`e2e/journeys/journey.ts`) to click the point the user sees. Just after a press closes a menu, `locator.click()` also waits until the layer leaves (up to 600 ms), so it can't prove that a quick next click reaches the page; use `clickTheSpotOf` there too.
 - Cover requires actual negative Available; if fixture has no negative Category create Overspending via UI or report blocked, not passed by opening an inspector.
 - Sources: ticket 07, ux-efficiency ticket 01; public `budget.moveMoney/cover/month`, `categories.list/rename/move/setHidden/remove`.
