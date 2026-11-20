@@ -630,6 +630,7 @@
 				steps={wide.current ? undefined : stepsAround(inspected.id)}
 				onstep={stepTo}
 				onclose={closeInspector}
+				focusAfterRemoval={besideTheLastSelected}
 			/>
 		{/key}
 	{/if}

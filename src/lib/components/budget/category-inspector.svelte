@@ -20,6 +20,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { formatCents, parseCents } from '$lib/domain/money';
+	import { mainRegion, type FocusDestination } from '$lib/focusReturn';
 
 	import AssignNeededButton from './assign-needed-button.svelte';
 	import AssignedInput from './assigned-input.svelte';
@@ -37,7 +38,8 @@
 		readyToAssign,
 		steps,
 		onstep,
-		onclose
+		onclose,
+		focusAfterRemoval = mainRegion
 	}: {
 		category: CategoryBudget;
 
@@ -50,6 +52,8 @@
 		steps?: { previous: Step; next: Step } | undefined;
 		onstep?: (id: Id<'categories'>) => void;
 		onclose: () => void;
+
+		focusAfterRemoval?: FocusDestination;
 	} = $props();
 
 	const budget = getBudgetMonth();
@@ -497,6 +501,7 @@
 	bind:open={deleteOpen}
 	category={{ id: openedForId, name: category.name }}
 	groups={actions.groups}
+	focusAfterDelete={focusAfterRemoval}
 />
 
 <TargetDialog

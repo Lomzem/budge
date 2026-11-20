@@ -555,23 +555,28 @@ export const inspector = {
 				}
 			);
 
-			await step('Delete… moves its history to the Category picked, then it is gone', async () => {
-				const diningOut = await activity('Dining Out');
-				expect(diningOut).not.toBe(0);
-				const coffee = await activity('Coffee');
-				await page.getByRole('button', { name: 'Dining Out', exact: true }).click();
-				await inspector.getByRole('button', { name: 'Dining Out actions' }).click();
-				await page.getByRole('menuitem', { name: 'Delete…' }).click();
-				const dialog = page.getByRole('dialog', { name: 'Delete Dining Out' });
-				await choose(dialog.getByLabel('Move its history to'), 'Coffee');
-				await dialog.getByRole('button', { name: 'Delete Category' }).click();
-				await expect(dialog).toBeHidden();
-				await expect(inspector).toHaveCount(0);
-				await expect(page.locator('#main')).toBeFocused();
-				await reloadOnceSaved(page);
-				await expect(page.getByRole('button', { name: 'Dining Out', exact: true })).toHaveCount(0);
-				await expect.poll(() => activity('Coffee')).toBe(coffee + diningOut);
-			});
+			await step(
+				'Delete… moves its history to the Category picked, then it is gone and focus is on the Category beside it',
+				async () => {
+					const diningOut = await activity('Dining Out');
+					expect(diningOut).not.toBe(0);
+					const coffee = await activity('Coffee');
+					await page.getByRole('button', { name: 'Dining Out', exact: true }).click();
+					await inspector.getByRole('button', { name: 'Dining Out actions' }).click();
+					await page.getByRole('menuitem', { name: 'Delete…' }).click();
+					const dialog = page.getByRole('dialog', { name: 'Delete Dining Out' });
+					await choose(dialog.getByLabel('Move its history to'), 'Coffee');
+					await dialog.getByRole('button', { name: 'Delete Category' }).click();
+					await expect(dialog).toBeHidden();
+					await expect(inspector).toHaveCount(0);
+					await expect(page.getByRole('button', { name: 'Coffee', exact: true })).toBeFocused();
+					await reloadOnceSaved(page);
+					await expect(page.getByRole('button', { name: 'Dining Out', exact: true })).toHaveCount(
+						0
+					);
+					await expect.poll(() => activity('Coffee')).toBe(coffee + diningOut);
+				}
+			);
 		}
 	}
 } satisfies Record<string, Journey>;
