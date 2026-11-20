@@ -22,6 +22,27 @@ function monthOf(monthsFromNow: number) {
 	return new Date(today.getFullYear(), today.getMonth() + monthsFromNow, 1);
 }
 
+interface StaleMonthWatch {
+	sawStaleMonth?: boolean;
+}
+
+function watchForAStaleMonth() {
+	const watch = window as unknown as StaleMonthWatch;
+	watch.sawStaleMonth = false;
+	new MutationObserver(() => {
+		if (document.querySelector('[aria-busy="true"]')) watch.sawStaleMonth = true;
+	}).observe(document, {
+		subtree: true,
+		childList: true,
+		attributes: true,
+		attributeFilter: ['aria-busy']
+	});
+}
+
+function sawAStaleMonth() {
+	return (window as unknown as StaleMonthWatch).sawStaleMonth === true;
+}
+
 function monthName(monthsFromNow: number) {
 	return monthOf(monthsFromNow).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 }
@@ -204,7 +225,7 @@ export const budget = {
 					expect(count).toBeGreaterThan(0);
 					await chip.click();
 					await expect(
-						page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
+						page.getByRole('heading', { level: 1, name: 'Transactions', exact: true })
 					).toBeVisible();
 					await expect(chosen(filter)).toHaveText(option);
 					await expect(rows).toHaveCount(count);
@@ -322,6 +343,20 @@ export const budget = {
 			});
 
 			await step(
+				"a reload on the linked month shows that month's own Assigned, never another month's dimmed",
+				async () => {
+					const nextYear = String(new Date().getFullYear() + 1);
+					await page.addInitScript(watchForAStaleMonth);
+					await reloadOnceSaved(page);
+					await expect(page.getByText(`August ${nextYear}`, { exact: true })).toBeVisible();
+					await expect(
+						page.getByRole('textbox', { name: 'Assigned for Groceries', exact: true })
+					).toHaveValue(typed(0));
+					expect(await page.evaluate(sawAStaleMonth)).toBe(false);
+				}
+			);
+
+			await step(
 				'after a reload, the month chosen last is the one Back returns to from another Section, with its own Assigned, typed once that month has loaded',
 				async () => {
 					const nextYear = new Date().getFullYear() + 1;
@@ -357,14 +392,14 @@ export const budget = {
 					await expect(page).toHaveURL(new RegExp(`[?&]month=${String(nextYear)}-09(&|$)`));
 
 					const sections = page.getByRole('navigation', { name: 'Sections', exact: true });
-					await sections.getByRole('link', { name: /^Categories/ }).click();
-					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await sections.getByRole('link', { name: /^Transactions/ }).click();
+					await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible();
 					await page.goBack();
 					await expect(heading('September')).toBeVisible();
 					await expect(groceries).toHaveValue(typed(september));
 
 					await page.goForward();
-					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible();
 					await page.goBack();
 					await expect(heading('September')).toBeVisible();
 					await page.getByRole('button', { name: 'Previous month', exact: true }).click();
@@ -389,8 +424,8 @@ export const budget = {
 					};
 					await openBudget(page);
 					const current = cents(await groceries.inputValue());
-					await sections.getByRole('link', { name: /^Categories/ }).click();
-					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await sections.getByRole('link', { name: /^Transactions/ }).click();
+					await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible();
 					await sections.getByRole('link', { name: /^Budget/ }).click();
 					await showing(0, current);
 					await page.getByRole('button', { name: 'Next month', exact: true }).click();
@@ -401,14 +436,14 @@ export const budget = {
 					await expect(page).toHaveURL(/[?&]month=/);
 
 					await page.goBack();
-					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible();
 					await page.goBack();
 					await showing(0, current);
 					await expect(page).not.toHaveURL(/[?&]month=/);
 					await reloadOnceSaved(page);
 					await showing(0, current);
 					await page.goForward();
-					await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible();
+					await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible();
 					await page.goForward();
 					await showing(1, next);
 				}
@@ -547,14 +582,14 @@ export const budget = {
 				header(group).getByRole('button', { name: new RegExp(`^${group}( \\d+ overspent)?$`) });
 
 			await step(
-				"on a 320 px touch screen a Group's Add Category button takes taps across 44 px",
+				"on a 320 px touch screen a Group's actions button takes taps across 44 px",
 				async () => {
 					await page.goto('about:blank');
 					await page.setViewportSize({ width: 320, height: 640 });
 					const stopTouching = await useATouchScreen(page);
 					await openBudget(page);
 					await expectTapTargetHeight(
-						page.getByRole('button', { name: 'Add Category to Everyday', exact: true }),
+						page.getByRole('button', { name: 'Everyday actions', exact: true }),
 						44
 					);
 					await expectNothingPastTheRightEdge(page);

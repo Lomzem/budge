@@ -231,8 +231,19 @@ function assembledTransition(frame: Frame, chunks: string[]): Transition | 'part
 	return parse(chunks.splice(0).join('')) as Transition;
 }
 
+function querySetChanges(frame: Frame) {
+	const message = parse(frame) as {
+		type?: unknown;
+		modifications?: { type?: unknown; queryId?: unknown; udfPath?: unknown }[];
+	};
+	return message.type === 'ModifyQuerySet' ? (message.modifications ?? []) : [];
+}
+
 export async function withholdQueryResult(page: Page, udfPath: string) {
 	const queryIds = new Set<unknown>();
+	const pathOf = new Map<unknown, unknown>();
+	const passedPaths = new Set<unknown>();
+	const waiters: { paths: string[]; resolve: () => void }[] = [];
 	const withheld = new Map<unknown, Modification>();
 	const chunks: string[] = [];
 	let browser: WebSocketRoute | undefined;
@@ -244,15 +255,10 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 		browser = socket;
 		const server = socket.connectToServer();
 		socket.onMessage((frame) => {
-			const message = parse(frame) as {
-				type?: unknown;
-				modifications?: { type?: unknown; queryId?: unknown; udfPath?: unknown }[];
-			};
-			if (message.type === 'ModifyQuerySet') {
-				for (const change of message.modifications ?? []) {
-					if (change.type === 'Add' && change.udfPath === udfPath) queryIds.add(change.queryId);
-					if (change.type === 'Remove' && queryIds.has(change.queryId)) markDropped(undefined);
-				}
+			for (const change of querySetChanges(frame)) {
+				if (change.type === 'Add') pathOf.set(change.queryId, change.udfPath);
+				if (change.type === 'Add' && change.udfPath === udfPath) queryIds.add(change.queryId);
+				if (change.type === 'Remove' && queryIds.has(change.queryId)) markDropped(undefined);
 			}
 			server.send(frame);
 		});
@@ -271,11 +277,29 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 				else withheld.set(change.queryId, change);
 			}
 			socket.send(JSON.stringify({ ...transition, modifications: passed }));
+			for (const change of passed) {
+				if (change.type === 'QueryUpdated') passedPaths.add(pathOf.get(change.queryId));
+			}
+			for (const waiter of waiters.splice(0)) {
+				if (waiter.paths.every((path) => passedPaths.has(path))) waiter.resolve();
+				else waiters.push(waiter);
+			}
 		});
 	});
 
 	return {
 		dropped,
+		resultsReachBrowser(...paths: string[]): Promise<void> {
+			if (paths.every((path) => passedPaths.has(path))) return Promise.resolve();
+			const { promise, resolve } = Promise.withResolvers<undefined>();
+			waiters.push({
+				paths,
+				resolve: () => {
+					resolve(undefined);
+				}
+			});
+			return promise;
+		},
 		release() {
 			withholding = false;
 			if (withheld.size === 0) return;
@@ -288,6 +312,50 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 				})
 			);
 			withheld.clear();
+		}
+	};
+}
+
+export async function failQueryResult(page: Page, udfPath: string) {
+	const queryIds = new Set<unknown>();
+	const chunks: string[] = [];
+	let errorData: unknown;
+
+	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => {
+		const server = socket.connectToServer();
+		socket.onMessage((frame) => {
+			for (const change of querySetChanges(frame)) {
+				if (change.type === 'Add' && change.udfPath === udfPath) queryIds.add(change.queryId);
+				if (change.type === 'Remove') queryIds.delete(change.queryId);
+			}
+			server.send(frame);
+		});
+		server.onMessage((frame) => {
+			const transition = assembledTransition(frame, chunks);
+			if (transition === 'partial') return;
+			if (transition === undefined) {
+				socket.send(frame);
+				return;
+			}
+			const modifications = (transition.modifications ?? []).map((change) =>
+				change.type === 'QueryUpdated' && queryIds.has(change.queryId)
+					? {
+							type: 'QueryFailed',
+							queryId: change.queryId,
+							errorMessage: `${udfPath} failed`,
+							...(errorData === undefined ? {} : { errorData }),
+							logLines: [],
+							journal: null
+						}
+					: change
+			);
+			socket.send(JSON.stringify({ ...transition, modifications }));
+		});
+	});
+
+	return {
+		withErrorData(data: unknown) {
+			errorData = data;
 		}
 	};
 }

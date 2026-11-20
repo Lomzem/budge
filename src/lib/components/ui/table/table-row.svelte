@@ -9,9 +9,13 @@
 				strong: 'bg-muted/40 font-bold',
 				group: 'bg-muted/40 hover:bg-muted/40 has-aria-expanded:bg-muted/40'
 			},
-			opens: { true: 'cursor-pointer', false: '' }
+			opens: { true: 'cursor-pointer', false: '' },
+			holds: {
+				true: 'pointer-coarse:touch-callout-none pointer-coarse:select-none pointer-coarse:[&_input]:select-text pointer-coarse:[&_input]:touch-callout-default',
+				false: ''
+			}
 		},
-		defaultVariants: { weight: 'normal', opens: false }
+		defaultVariants: { weight: 'normal', opens: false, holds: false }
 	});
 
 	export type TableRowVariants = VariantProps<typeof tableRowVariants>;
@@ -27,6 +31,7 @@
 		children,
 		weight,
 		opens,
+		holds,
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLTableRowElement>> & TableRowVariants = $props();
 </script>
@@ -34,7 +39,7 @@
 <tr
 	bind:this={ref}
 	data-slot="table-row"
-	class={cn(tableRowVariants({ weight, opens }), className)}
+	class={cn(tableRowVariants({ weight, opens, holds }), className)}
 	{...restProps}
 >
 	{@render children?.()}

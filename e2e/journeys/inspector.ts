@@ -7,8 +7,10 @@ import {
 	centsIn,
 	choicesOf,
 	choose,
+	clickTheSpotOf,
 	openBudget,
 	tap,
+	touchscreen,
 	typed,
 	useATouchScreen,
 	reloadOnceSaved,
@@ -116,6 +118,34 @@ export const inspector = {
 				}
 			);
 
+			await step(
+				'a click on Coffee while the inspector menu is open only closes the menu, and the started move stays',
+				async () => {
+					await region.getByLabel('Amount').fill('13.25');
+					await region.getByRole('button', { name: 'Groceries actions' }).click();
+					await expect(page.getByRole('menu')).toBeVisible();
+					await clickTheSpotOf(page, page.getByRole('button', { name: 'Coffee', exact: true }));
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await expect(page.getByRole('region', { name: 'Coffee' })).toHaveCount(0);
+					await expect(region.getByLabel('Amount')).toHaveValue('13.25');
+				}
+			);
+
+			await step(
+				'an Escape still inside the inspector as Delete opens closes only Delete, and the started move stays',
+				async () => {
+					const actions = region.getByRole('button', { name: 'Groceries actions' });
+					await actions.click();
+					await page.getByRole('menuitem', { name: 'Delete…' }).click();
+					const deleting = page.getByRole('dialog', { name: 'Delete Groceries' });
+					await expect(deleting).toBeVisible();
+					await actions.dispatchEvent('keydown', { key: 'Escape', bubbles: true });
+					await expect(deleting).toHaveCount(0);
+					await expect(region).toBeVisible();
+					await expect(region.getByLabel('Amount')).toHaveValue('13.25');
+				}
+			);
+
 			await step('a Category with no amount is refused and nothing moves', async () => {
 				await region.getByLabel('Amount').fill('');
 				await region.getByLabel('Amount').press('Enter');
@@ -211,6 +241,76 @@ export const inspector = {
 			);
 
 			await step(
+				'on a phone, a click on Move with the inspector ⋯ menu open only closes the menu, and the started move stays',
+				async () => {
+					const dialog = page.getByRole('dialog', { name: 'Groceries' });
+					const amount = dialog.getByLabel('Amount');
+					await groceries.click();
+					await choose(dialog.getByRole('button', { name: 'From', exact: true }), /^Coffee \(/);
+					await amount.fill('5.00');
+					const actions = dialog.getByRole('button', { name: 'Groceries actions' });
+					await actions.click();
+					await expect(page.getByRole('menu')).toBeVisible();
+					await clickTheSpotOf(page, dialog.getByRole('button', { name: 'Move', exact: true }));
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await expect(actions).toBeFocused();
+					await expect(amount).toHaveValue('5.00');
+					expect(await assigned('Coffee')).toBe(before.coffee);
+					await amount.press('Escape');
+					await page.keyboard.press('Escape');
+					await expect(dialog).toBeHidden();
+				}
+			);
+
+			await step(
+				'on a phone, a tap just outside the inspector ⋯ menu, level with Move down, only closes the menu',
+				async () => {
+					const dialog = page.getByRole('dialog', { name: 'Groceries' });
+					const amount = dialog.getByLabel('Amount');
+					const next = dialog.getByRole('button', { name: 'Next Category: Dining Out' });
+					await groceries.click();
+					await choose(dialog.getByRole('button', { name: 'From', exact: true }), /^Coffee \(/);
+					await amount.fill('5.00');
+					await expect(next).toBeVisible();
+					const stopTouching = await useATouchScreen(page);
+					await dialog.getByRole('button', { name: 'Groceries actions' }).click();
+					const menu = page.getByRole('menu');
+					const moveDown = menu.getByRole('menuitem', { name: 'Move down' });
+					await expect(moveDown).toBeEnabled();
+					await menu.evaluate((opened) =>
+						Promise.all(opened.getAnimations({ subtree: true }).map((shown) => shown.finished))
+					);
+					const edge = await menu.boundingBox();
+					const row = await moveDown.boundingBox();
+					if (!edge || !row) throw new Error('The open menu has no box');
+					const justOutside = { id: 1, x: edge.x - 2, y: row.y + row.height / 2 };
+					expect(
+						await page.evaluate(
+							({ x, y }) => document.elementFromPoint(x, y)?.closest('[role="menu"]') ?? null,
+							justOutside
+						),
+						'the tap point lies outside the menu'
+					).toBeNull();
+					const screen = await touchscreen(page);
+					await screen.touch('touchStart', [justOutside]);
+					await screen.touch('touchEnd', []);
+					await screen.detach();
+					await stopTouching();
+					await expect(menu).toHaveCount(0);
+					await expect(next).toBeVisible();
+					await expect(amount).toHaveValue('5.00');
+					await amount.press('Escape');
+					await page.keyboard.press('Escape');
+					await expect(dialog).toBeHidden();
+					await reloadOnceSaved(page);
+					await groceries.click();
+					await expect(next).toBeVisible();
+					await page.keyboard.press('Escape');
+					await expect(dialog).toBeHidden();
+				}
+			);
+
+			await step(
 				'the phone inspector steps to the next Category and focuses its Assigned field',
 				async () => {
 					await groceries.click();
@@ -248,13 +348,11 @@ export const inspector = {
 					.getByRole('cell');
 			const activity = (name: string) => centsIn(cellsOf(name).nth(2));
 			const available = (name: string) => centsIn(cellsOf(name).nth(3));
+			const assigned = async (name: string) =>
+				cents(await page.getByRole('textbox', { name: `Assigned for ${name}` }).inputValue());
 			const sync = await pausableSync(page);
 			const expectEveryday = async (names: string[], gone: string[]) => {
-				const everyday = page.url().endsWith('/categories')
-					? page
-							.getByRole('region')
-							.filter({ has: page.getByRole('button', { name: 'Move Everyday', exact: true }) })
-					: rowgroup('Everyday');
+				const everyday = rowgroup('Everyday');
 				for (const name of names) {
 					await expect(everyday.getByRole('button', { name, exact: true })).toBeVisible();
 				}
@@ -413,35 +511,40 @@ export const inspector = {
 					await page.setViewportSize({ width: 1280, height: 800 });
 					await reloadOnceSaved(page);
 					await expectEveryday(['Sample Grocer', 'Coffee', 'Dining Out'], ['Sample Groceries']);
-					await page.goto('/categories');
-					await expectEveryday(['Sample Grocer', 'Coffee', 'Dining Out'], ['Sample Groceries']);
-					await openBudget(page);
 				}
 			);
 
-			await step('Rename in the inspector edits its heading in place', async () => {
-				await page.getByRole('button', { name: 'Sample Grocer', exact: true }).click();
-				await inspector.getByRole('button', { name: 'Sample Grocer actions' }).click();
-				await page.getByRole('menuitem', { name: 'Rename' }).click();
-				const field = inspector.getByRole('textbox', { name: 'Category name' });
-				await expect(field).toBeFocused();
-				await field.fill('Sample Market');
-				await field.press('Enter');
-				await expect(inspector.getByRole('heading', { name: 'Sample Market' })).toBeVisible();
-				await expect(
-					inspector.getByRole('button', { name: 'Sample Market actions' })
-				).toBeFocused();
-				await expect(
-					rowgroup('Everyday').getByRole('button', { name: 'Sample Market', exact: true })
-				).toBeVisible();
-			});
+			await step(
+				'Rename in the inspector edits its heading in place, and keeps it named',
+				async () => {
+					await page.getByRole('button', { name: 'Sample Grocer', exact: true }).click();
+					await inspector.getByRole('button', { name: 'Sample Grocer actions' }).click();
+					await page.getByRole('menuitem', { name: 'Rename' }).click();
+					const field = inspector.getByRole('textbox', { name: 'Category name' });
+					await expect(field).toBeFocused();
+					await expect(
+						page.getByRole('region', { name: 'Sample Grocer', exact: true }).getByRole('textbox', {
+							name: 'Category name'
+						})
+					).toBeFocused();
+					await field.fill('Sample Market');
+					await field.press('Enter');
+					await expect(inspector.getByRole('heading', { name: 'Sample Market' })).toBeVisible();
+					await expect(
+						inspector.getByRole('button', { name: 'Sample Market actions' })
+					).toBeFocused();
+					await expect(
+						rowgroup('Everyday').getByRole('button', { name: 'Sample Market', exact: true })
+					).toBeVisible();
+				}
+			);
 
 			await step(
 				'Move to group into a collapsed Savings Goals opens that group to show it, and keeps it open',
 				async () => {
 					const savingsToggle = rowgroup('Savings Goals')
 						.getByRole('rowheader')
-						.getByRole('button', { name: /^Savings Goals/ });
+						.getByRole('button', { name: /^Savings Goals(?! actions)/ });
 					await savingsToggle.click();
 					await expect(savingsToggle).toHaveAttribute('aria-expanded', 'false');
 					const actions = inspector.getByRole('button', { name: 'Sample Market actions' });
@@ -457,19 +560,24 @@ export const inspector = {
 				}
 			);
 
-			await step('Hide from budget closes the inspector and lists it as hidden', async () => {
-				await inspector.getByRole('button', { name: 'Sample Market actions' }).click();
-				await page.getByRole('menuitem', { name: 'Hide from budget' }).click();
-				await expect(inspector).toHaveCount(0);
-				await expect(page.locator('#main')).toBeFocused();
-				const hidden = page.getByRole('region', { name: 'Hidden Categories' });
-				await expect(hidden).toContainText('Sample Market');
-				await reloadOnceSaved(page);
-				await expect(hidden).toContainText('Sample Market');
-				await expect(page.getByRole('button', { name: 'Sample Market', exact: true })).toHaveCount(
-					0
-				);
-			});
+			await step(
+				'Hide closes the inspector, lists it as hidden, and leaves focus on the Category beside it',
+				async () => {
+					await inspector.getByRole('button', { name: 'Sample Market actions' }).click();
+					await page.getByRole('menuitem', { name: 'Hide', exact: true }).click();
+					await expect(inspector).toHaveCount(0);
+					await expect(
+						page.getByRole('button', { name: 'Car Repairs', exact: true })
+					).toBeFocused();
+					const hidden = page.getByRole('region', { name: 'Hidden' });
+					await expect(hidden).toContainText('Sample Market');
+					await reloadOnceSaved(page);
+					await expect(hidden).toContainText('Sample Market');
+					await expect(
+						page.getByRole('button', { name: 'Sample Market', exact: true })
+					).toHaveCount(0);
+				}
+			);
 
 			await step(
 				'a Hide answered after another Category opened hides the first and leaves the one opened with its draft and focus',
@@ -478,7 +586,7 @@ export const inspector = {
 					await openBudget(page);
 					await page.getByRole('button', { name: 'Transit', exact: true }).click();
 					await inspector.getByRole('button', { name: 'Transit actions' }).click();
-					await page.getByRole('menuitem', { name: 'Hide from budget' }).click();
+					await page.getByRole('menuitem', { name: 'Hide', exact: true }).click();
 					await server.held;
 					await page.getByRole('button', { name: 'Coffee', exact: true }).click();
 					await inspector.getByRole('button', { name: 'Coffee actions' }).click();
@@ -486,9 +594,7 @@ export const inspector = {
 					const field = inspector.getByRole('textbox', { name: 'Category name' });
 					await field.fill('Coffee Draft');
 					server.release();
-					await expect(page.getByRole('region', { name: 'Hidden Categories' })).toContainText(
-						'Transit'
-					);
+					await expect(page.getByRole('region', { name: 'Hidden' })).toContainText('Transit');
 					await page.keyboard.type(' Kept');
 					await expect(field).toBeFocused();
 					await expect(field).toHaveValue('Coffee Draft Kept');
@@ -497,23 +603,32 @@ export const inspector = {
 				}
 			);
 
-			await step('Delete… moves its history to the Category picked, then it is gone', async () => {
-				const diningOut = await activity('Dining Out');
-				expect(diningOut).not.toBe(0);
-				const coffee = await activity('Coffee');
-				await page.getByRole('button', { name: 'Dining Out', exact: true }).click();
-				await inspector.getByRole('button', { name: 'Dining Out actions' }).click();
-				await page.getByRole('menuitem', { name: 'Delete…' }).click();
-				const dialog = page.getByRole('dialog', { name: 'Delete Dining Out' });
-				await choose(dialog.getByLabel('Move its history to'), 'Coffee');
-				await dialog.getByRole('button', { name: 'Delete Category' }).click();
-				await expect(dialog).toBeHidden();
-				await expect(inspector).toHaveCount(0);
-				await expect(page.locator('#main')).toBeFocused();
-				await reloadOnceSaved(page);
-				await expect(page.getByRole('button', { name: 'Dining Out', exact: true })).toHaveCount(0);
-				await expect.poll(() => activity('Coffee')).toBe(coffee + diningOut);
-			});
+			await step(
+				'Delete… moves its history and Assigned money to the Category picked, then it is gone and focus is on the Category beside it',
+				async () => {
+					const diningOut = await activity('Dining Out');
+					expect(diningOut).not.toBe(0);
+					const coffee = await activity('Coffee');
+					const diningOutAssigned = await assigned('Dining Out');
+					expect(diningOutAssigned).not.toBe(0);
+					const coffeeAssigned = await assigned('Coffee');
+					await page.getByRole('button', { name: 'Dining Out', exact: true }).click();
+					await inspector.getByRole('button', { name: 'Dining Out actions' }).click();
+					await page.getByRole('menuitem', { name: 'Delete…' }).click();
+					const dialog = page.getByRole('dialog', { name: 'Delete Dining Out' });
+					await choose(dialog.getByLabel('Move its history to'), 'Coffee');
+					await dialog.getByRole('button', { name: 'Delete Category' }).click();
+					await expect(dialog).toBeHidden();
+					await expect(inspector).toHaveCount(0);
+					await expect(page.getByRole('button', { name: 'Coffee', exact: true })).toBeFocused();
+					await reloadOnceSaved(page);
+					await expect(page.getByRole('button', { name: 'Dining Out', exact: true })).toHaveCount(
+						0
+					);
+					await expect.poll(() => activity('Coffee')).toBe(coffee + diningOut);
+					await expect.poll(() => assigned('Coffee')).toBe(coffeeAssigned + diningOutAssigned);
+				}
+			);
 		}
 	}
 } satisfies Record<string, Journey>;

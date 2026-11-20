@@ -132,9 +132,7 @@ export const payees = {
 						await dialog.getByLabel('Payee').fill(florist);
 						await dialog.getByLabel('Amount').fill('12.50');
 						await choose(dialog.getByLabel('Category or Transfer'), 'Groceries');
-						await expect(remember(florist)).toHaveAccessibleDescription(
-							'Nothing is remembered yet.'
-						);
+						await expect(remember(florist)).toHaveAccessibleDescription('');
 						await expect(remember(florist)).toBeChecked();
 						if (!checked) await remember(florist).uncheck();
 						await dialog.getByRole('button', { name: 'Save', exact: true }).click();
@@ -157,7 +155,7 @@ export const payees = {
 				'on a 320 px phone Remember sits in the open Category above the tab bar',
 				async () => {
 					await page.setViewportSize({ width: 320, height: 640 });
-					await page.goto('/accounts');
+					await page.goto('/transactions');
 					const category = page
 						.getByRole('button', { name: /Category of Sample Coffee Shop on / })
 						.first();

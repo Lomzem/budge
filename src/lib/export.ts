@@ -44,5 +44,5 @@ export async function downloadCsv(data: BudgetExport, date: string) {
 			await new Promise((resolve) => setTimeout(resolve, CHROMIUM_CSV_DOWNLOAD_SPACING_MS));
 		download(`budge-${date}-${table}.csv`, 'text/csv', toCsv(rows));
 	}
-	return `Downloaded ${String(Object.keys(data).length)} CSV files, named budge-${date}-<table>.csv.`;
+	return `Downloaded ${String(Object.keys(data).length)} CSV files.`;
 }

@@ -30,6 +30,7 @@ function observeLayoutShifts(binding: string) {
 	const box = (rect: DOMRectReadOnly) =>
 		[rect.x, rect.y, rect.width, rect.height].map((n) => n.toFixed(1)).join(',');
 	const RECENT_INPUT_MS = 500;
+	const FRAME_BEFORE_INPUT_MS = 50;
 	let lastInput = -Infinity;
 	const noteInput = (event: Event) => {
 		lastInput = event.timeStamp;
@@ -37,6 +38,24 @@ function observeLayoutShifts(binding: string) {
 	for (const type of ['pointerdown', 'keydown', 'input', 'change']) {
 		addEventListener(type, noteInput, true);
 	}
+	const sinceInput = (at: number) =>
+		at - lastInput > -FRAME_BEFORE_INPUT_MS && at - lastInput < RECENT_INPUT_MS;
+	const pointerQueries = ['(pointer: coarse)', '(hover: hover)'].map((query) => matchMedia(query));
+	const pointerNow = () => pointerQueries.map((query) => String(query.matches)).join();
+	let pointer = pointerNow();
+	let pointerUnchangedAt = performance.now();
+	let shiftsOfPointerSwitch = { from: -Infinity, until: -Infinity };
+	const notePointerSwitch = () => {
+		const now = pointerNow();
+		const at = performance.now();
+		if (now !== pointer)
+			shiftsOfPointerSwitch = { from: pointerUnchangedAt, until: at + RECENT_INPUT_MS };
+		pointer = now;
+		pointerUnchangedAt = at;
+	};
+	const sincePointerSwitch = (at: number) =>
+		at >= shiftsOfPointerSwitch.from && at < shiftsOfPointerSwitch.until;
+	for (const query of pointerQueries) query.addEventListener('change', notePointerSwitch);
 
 	const requested = new Map<string, RequestedOperation>();
 	const mutationOrAction = (requestId: unknown) => `request ${String(requestId)}`;
@@ -145,13 +164,20 @@ function observeLayoutShifts(binding: string) {
 		const report = (window as unknown as Record<string, (shift: LayoutShift) => Promise<void>>)[
 			binding
 		];
+		notePointerSwitch();
 		for (const entry of entries) {
-			if (entry.hadRecentInput || entry.startTime - lastInput < RECENT_INPUT_MS) continue;
+			if (entry.hadRecentInput || sinceInput(entry.startTime)) continue;
+			if (sincePointerSwitch(entry.startTime)) continue;
 			if (answersARequest(entry.startTime)) continue;
+			const sources = entry.sources ?? [];
+			const nothingMoved = sources.every(
+				(source) => box(source.previousRect) === box(source.currentRect)
+			);
+			if (sources.length > 0 && nothingMoved) continue;
 			const sent = report?.({
 				url: location.pathname + location.search,
 				value: entry.value,
-				moved: (entry.sources ?? []).map(
+				moved: sources.map(
 					(source) =>
 						`${describe(source.node)} [${box(source.previousRect)} → ${box(source.currentRect)}]`
 				)

@@ -332,9 +332,8 @@ export const plaid = {
 
 			await step('only Sample Savings Bank asks for a reconnect', async () => {
 				await expect(savings).toContainText(needsReconnect);
-				await expect(savings).toContainText(
-					'Feeds no Budge Account yet. Reconnect to see its accounts and choose where they go.'
-				);
+				await expect(savings).toContainText('Feeds no Budge Account yet.');
+				await expect(savings).not.toContainText('choose where they go');
 				await expect(card(page, 'Sample Credit Union')).not.toContainText(needsReconnect);
 			});
 
@@ -382,16 +381,15 @@ export const plaid = {
 			});
 
 			await step('the card says when consent ends', async () => {
-				await expect(creditUnion).toContainText(
-					/Your consent at the bank ends .+\. Reconnect to renew it\./
-				);
+				await expect(creditUnion).toContainText(/Consent at the bank ends .+?\./);
+				await expect(creditUnion).not.toContainText('Reconnect to');
 			});
 
 			await step('Reconnect reports the failure, and the consent notice returns', async () => {
 				await creditUnion.getByRole('button', { name: 'Reconnect', exact: true }).click();
 				await expect(creditUnion.getByRole('status')).toHaveText(notSetUp);
 				await reloadOnceSaved(page);
-				await expect(creditUnion).toContainText('Reconnect to renew it.');
+				await expect(creditUnion).toContainText(/Consent at the bank ends .+\./);
 			});
 		}
 	},

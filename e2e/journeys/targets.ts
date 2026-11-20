@@ -17,7 +17,7 @@ export const targets = {
 			const dialog = page.getByRole('dialog');
 			const bar = page.getByRole('progressbar', { name: `${name} Target` }).first();
 			const upcoming = page.getByRole('region', { name: 'Upcoming' });
-			const row = upcoming.getByRole('row').filter({ hasText: name });
+			const row = upcoming.getByRole('listitem').filter({ hasText: name });
 			const nameButton = page.getByRole('button', { name, exact: true });
 
 			const twentyFiveDollarsMoreThanAssigned = await step(
@@ -44,11 +44,14 @@ export const targets = {
 					);
 					await dialog.getByRole('button', { name: 'Save' }).click();
 					await expect(dialog).toBeHidden();
-					await expect(bar).toHaveAttribute('aria-valuetext', '$25.00 more needed');
 					await expect(region.getByText('$25.00 more needed')).toBeVisible();
+					await expect
+						.poll(async () => Number(await bar.getAttribute('aria-valuenow')))
+						.toBeLessThan(100);
 					await expect(upcoming).toHaveCount(0);
 					await nameButton.click();
-					await expect(row).toContainText('No');
+					await expect(row).toContainText('Not funded');
+					await expect(row).not.toContainText(/\b(Funded|No)\b/);
 					await nameButton.click();
 				}
 			);
@@ -60,13 +63,14 @@ export const targets = {
 					exact: true
 				});
 				await fromTable.click();
-				await expect(region.getByText('Funded', { exact: true })).toBeVisible();
-				await expect(bar).toHaveAttribute('aria-valuetext', 'Funded');
+				await expect(bar).toHaveAttribute('aria-valuenow', '100');
+				await expect(region).not.toContainText(/\bFunded\b/);
 				await expect(fromTable).toHaveCount(0);
 				await expect(region.getByRole('button', { name: 'Assign $25.00' })).toHaveCount(0);
 				await expect(nameButton).toBeFocused();
 				await nameButton.click();
-				await expect(row).toContainText('Yes');
+				await expect(row).toBeVisible();
+				await expect(row).not.toContainText(/\b(Not funded|Funded|No)\b/);
 				await expect.poll(assigned).toBe(twentyFiveDollarsMoreThanAssigned);
 				await reloadOnceSaved(page);
 				await expect.poll(assigned).toBe(twentyFiveDollarsMoreThanAssigned);
@@ -75,6 +79,17 @@ export const targets = {
 			await step('on a phone the Upcoming list follows the table', async () => {
 				await page.setViewportSize({ width: 320, height: 640 });
 				await expect(upcoming).toBeVisible();
+				const table = page.getByRole('main').getByRole('table');
+				await expect
+					.poll(async () => {
+						const [tableBox, upcomingBox] = await Promise.all([
+							table.boundingBox(),
+							upcoming.boundingBox()
+						]);
+						if (tableBox === null || upcomingBox === null) return false;
+						return upcomingBox.y >= tableBox.y + tableBox.height;
+					})
+					.toBe(true);
 			});
 		}
 	}

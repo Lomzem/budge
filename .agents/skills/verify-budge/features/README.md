@@ -8,7 +8,7 @@ Follow [Launch and Doctor](../SKILL.md): own this checkout's instance, authentic
 
 ## Driving conventions
 
-Run a feature's journeys with `bun run app verify <feature>/<key>` (see [Journeys](../SKILL.md#journeys)); each feature file lists them at the top of its Driving section, and the manual recipes below them cover what they leave out. Recipes use `page` from an authenticated Playwright context and `expect` from `@playwright/test`. Start each independent mutation recipe from a fresh seed unless stated otherwise; reseeding destroys this instance's previous changes. Use roles, names, labels, and test IDs. Open Account routes through the sidebar's `navigation` named `Sections and Accounts`; at 320 px use the bottom `navigation` named `Sections` (exact), whose `Accounts` link leads to the Accounts page and each Account. Never share this checkout's seeded data with another driver.
+Run a feature's journeys with `bun run app verify <feature>/<key>` (see [Journeys](../SKILL.md#journeys)); each feature file lists them at the top of its Driving section, and the manual recipes below them cover what they leave out. Recipes use `page` from an authenticated Playwright context and `expect` from `@playwright/test`. Start each independent mutation recipe from a fresh seed unless stated otherwise; reseeding destroys this instance's previous changes. Use roles, names, labels, and test IDs. Open Account routes through the sidebar's `navigation` named `Sections and Accounts`; at 320 px use the bottom `navigation` named `Sections` (exact), whose `Transactions` link leads to the all-accounts register and each Account. Never share this checkout's seeded data with another driver.
 
 Every picker is a shadcn-svelte Select: a `combobox` button labeled like the old field, whose text is the chosen option. Category pickers (the dialog's `Category or Transfer` and split-line Categories, and each register row's Category) are the searchable `CategoryPicker` instead: a `button` that opens a Popover holding a `combobox` named `Search Categories` (or `Search Categories and Transfers`) over a `listbox` whose Transfer choices sit in the group `Transfer to or from`; typing on the closed button opens it with that text searched, and Enter picks the highlighted option. Pick with `choose(field, name)` from `e2e/journeys/journey.ts` (click, then the `option` in the `listbox`); read the offered options with `choicesOf(field)`. `selectOption` and `option:checked` no longer apply. Scrolling regions (Select and menu lists, dialog bodies, the sidebar, the Budget side panel, the Needs-you row, tables) are shadcn-svelte ScrollAreas: wheel or keyboard scrolls them, and the scrollbar shows on hover.
 
@@ -25,7 +25,7 @@ A journey description lists only what that journey asserts; label one-off or man
 | [Budget](budget.md)                 | Assigned, Ready to Assign, month navigation, desktop/mobile entry                            | 05         |
 | [Inspector](inspector.md)           | Inspect, From/To move, Cover, manage a Category, keyboard and phone                          | 07         |
 | [Targets](targets.md)               | Monthly, By date, repeat, Assign, Upcoming                                                   | 08         |
-| [Categories](categories.md)         | Groups, create, rename, order, move, hide, delete/history                                    | 06         |
+| [Categories](categories.md)         | Manage Categories and Groups on Budget, including visibility and history                     | 06         |
 | [Accounts](accounts.md)             | Cash/Card, starting balances, rename/order, held mapping and suggestions, setup confirmation | 03, 21     |
 | [Transactions](transactions.md)     | Dialog, CRUD, Direction, Cleared, list pagination                                            | 03, 05     |
 | [Transfers](transfers.md)           | Linked sides, edit/delete, imported candidate linking, card payments                         | 09, 22     |
@@ -40,11 +40,11 @@ A journey description lists only what that journey asserts; label one-off or man
 | [Settings](settings.md)             | Cutover first-of-month default, first use/change/cancel/constraints                          | 03, 23     |
 | [Auth](auth.md)                     | Sign-in/out, owner gate, expired session, GitHub/email                                       | 02, 23     |
 | [Export](export.md)                 | JSON/CSV completeness and exclusions                                                         | 13         |
-| [Shell](shell.md)                   | Routes, responsive navigation, theme, Home Screen/device checks                              | 02, 04, 23 |
+| [Shell](shell.md)                   | Routes, responsive navigation, theme, standalone iPhone checks                               | 02, 04, 23 |
 
 ## Route and public API coverage
 
-Route consumers: `/sign-in` → Auth; `/` → Budget/Inspector/Targets/Settings/Credit cards; `/categories` → Categories; `/accounts` and `/accounts/[accountId]` → Accounts/Transactions/Search/Imports/Transfers/Splits/Reconciliation/Payees. Shell, Plaid and Export span the authenticated routes.
+Route consumers: `/sign-in` → Auth; `/` → Budget/Inspector/Targets/Categories/Settings/Credit cards; `/transactions` and `/transactions/[accountId]` → Accounts/Transactions/Search/Imports/Transfers/Splits/Reconciliation/Payees. `/bank` → Plaid/Accounts/Settings; `/settings` → Settings/Export/Auth. Shell spans the authenticated routes.
 
 Each feature file's Sources line names the public Convex functions it covers. `scripts/app/featureMap.test.ts`, part of `bun run check`, fails when a public query, mutation or action is named in no feature file, when a journey is missing from its feature file, or when a feature file names a journey that does not exist.
 

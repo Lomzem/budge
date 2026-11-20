@@ -7,10 +7,13 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import ts from 'typescript-eslint';
 
+import bannedCopy from './eslint/rules/banned-copy.js';
 import conciseCopy from './eslint/rules/concise-copy.js';
 import noComments from './eslint/rules/no-comments.js';
 import noEffectDefects from './eslint/rules/no-effect-defects.js';
+import noHeadingLede from './eslint/rules/no-heading-lede.js';
 import ownedWrites from './eslint/rules/owned-writes.js';
+import shellQueries from './eslint/rules/shell-queries.js';
 import svelteConfig from './svelte.config.ts';
 
 const browserOnlyGlobals = new Set([
@@ -114,10 +117,13 @@ export default defineConfig(
 		plugins: {
 			local: {
 				rules: {
+					'banned-copy': bannedCopy,
 					'concise-copy': conciseCopy,
 					'no-comments': noComments,
 					'no-effect-defects': noEffectDefects,
-					'owned-writes': ownedWrites
+					'no-heading-lede': noHeadingLede,
+					'owned-writes': ownedWrites,
+					'shell-queries': shellQueries
 				}
 			}
 		},
@@ -185,8 +191,81 @@ export default defineConfig(
 		}
 	},
 	{
+		files: ['src/**/*.{svelte,ts}'],
+		rules: {
+			'local/shell-queries': ['error', { owner: 'src/lib/shellQueries.svelte.ts' }]
+		}
+	},
+	{
 		files: ['src/**/*.svelte'],
-		rules: { 'local/concise-copy': ['error', { maxWords: 12 }] }
+		rules: {
+			'local/concise-copy': ['error', { maxWords: 12 }],
+			'local/no-heading-lede': 'error'
+		}
+	},
+	{
+		files: ['src/**/*.{svelte,ts}'],
+		ignores: ['src/**/*.test.ts'],
+		rules: {
+			'local/banned-copy': [
+				'error',
+				{
+					phrases: [
+						{
+							pattern: '\\bright now\\b',
+							flags: 'i',
+							why: 'is filler.',
+							instead: 'When nothing needs doing, show nothing.'
+						},
+						{
+							pattern: '\\bNothing needs you\\b',
+							flags: 'i',
+							why: 'narrates an empty state.',
+							instead: 'Show nothing, or name the next action.'
+						},
+						{
+							pattern: '\\b(each|every) month\\b',
+							flags: 'i',
+							why: 'is wordy.',
+							instead: 'Write "monthly".'
+						},
+						{
+							pattern: '\\bdue on the\\b',
+							flags: 'i',
+							why: 'is wordy.',
+							instead: 'Write "due 1st".'
+						},
+						{
+							pattern: '\\bmoved from\\b',
+							flags: 'i',
+							why: 'narrates history the person did not ask for.',
+							instead: 'Show the current value only.'
+						},
+						{
+							pattern: '\\bBudge (checks|tracks|imports|syncs|keeps|watches|looks|uses|will)\\b',
+							why: 'explains how Budge works inside.',
+							instead: 'Say what the person sees or does next, or say nothing.'
+						},
+						{
+							pattern: '\\bif (you|the bank)\\b',
+							flags: 'i',
+							why: 'is conditional advice.',
+							instead: 'Show the action when it is needed instead of explaining when to use it.'
+						},
+						{
+							pattern: ' · ',
+							why: 'joins meta with middle dots.',
+							instead: 'Use a comma or separate elements.'
+						},
+						{
+							pattern: '\\b(Tip|Note):',
+							why: 'labels an explanation.',
+							instead: 'Cut the explanation.'
+						}
+					]
+				}
+			]
+		}
 	},
 	{
 		files: ['**/*.test.ts'],
@@ -252,6 +331,20 @@ export default defineConfig(
 						},
 						{ name: '../test', message: journeyRunsOutsidePlaywrightTest }
 					]
+				}
+			]
+		}
+	},
+	{
+		files: ['e2e/journeys/**/*.ts'],
+		ignores: ['e2e/journeys/journey.ts'],
+		rules: {
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='reload']",
+					message:
+						'Use reloadOnceSaved(page) so pending writes finish and the signed-in Section is ready.'
 				}
 			]
 		}

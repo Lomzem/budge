@@ -12,6 +12,7 @@
 
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts } from '$lib/accounts.svelte';
 	import { attempt } from '$lib/attempt';
@@ -29,6 +30,7 @@
 	import { mainRegion, type FocusReturn } from '$lib/focusReturn';
 	import { keepInUrl } from '$lib/keepInUrl';
 	import { usePaginatedQuery } from '$lib/paginatedQuery.svelte';
+	import { clickedTheRow } from '$lib/rowClick';
 
 	import {
 		optionOf,
@@ -116,8 +118,8 @@
 	});
 
 	const accounts = getAccounts();
-	const categoryList = useQuery(api.categories.list, {});
-	const payeeChoices = useQuery(api.payees.list, {});
+	const shellQueries = getShellQueries();
+	const { categories: categoryList, payees: payeeChoices } = shellQueries;
 	function idsOf<T>(query: { data: T | undefined }, ids: (data: T) => string[]) {
 		return query.data === undefined ? undefined : ids(query.data);
 	}
@@ -132,9 +134,6 @@
 		})
 	);
 	const applied = $derived(offered ?? noFilters);
-	const unchecked = $derived(
-		offered === undefined && Boolean(categoryList.error ?? payeeChoices.error)
-	);
 	$effect(() => {
 		if (offered === undefined) return;
 		const dropped = (['accountId', 'categoryId', 'payeeId'] as const).some(
@@ -195,11 +194,19 @@
 		},
 		{ initialNumItems: PAGE_SIZE }
 	);
-	const unapprovedCount = useQuery(api.transactions.unapprovedCount, () =>
-		offered === undefined ? 'skip' : scope
+	const accountUnapproved = useQuery(api.transactions.unapprovedCount, () =>
+		offered === undefined || scopeAccountId === undefined ? 'skip' : { accountId: scopeAccountId }
 	);
-	const bankChangeCount = useQuery(api.transactions.bankChangeCount, () =>
-		offered !== undefined && filters.bankChanges ? scope : 'skip'
+	const accountBankChanges = useQuery(api.transactions.bankChangeCount, () =>
+		offered !== undefined && filters.bankChanges && scopeAccountId !== undefined
+			? { accountId: scopeAccountId }
+			: 'skip'
+	);
+	const unapprovedCount = $derived(
+		scopeAccountId === undefined ? shellQueries.unapprovedCount : accountUnapproved
+	);
+	const bankChangeCount = $derived(
+		scopeAccountId === undefined ? shellQueries.bankChangeCount : accountBankChanges
 	);
 	const bankChangesCut = $derived(bankChangeCount.data?.complete === false);
 	const setCleared = useMutation(api.transactions.setCleared);
@@ -255,8 +262,6 @@
 
 	const problem = $derived.by(() => {
 		if (rowError !== '') return rowError;
-		if (unchecked)
-			return "Budge couldn't load the Categories or Payees to check your filters. Try reloading the page.";
 		if (first.error ?? second.error)
 			return "Budge couldn't load Transactions. Try reloading the page.";
 		return '';
@@ -334,7 +339,6 @@
 	const more = $derived(secondShown ? second : first);
 	const canShowMore = $derived(more.status === 'CanLoadMore' || more.status === 'LoadingMore');
 	const result = $derived.by(() => {
-		if (unchecked) return 'Transactions show once your filters are checked.';
 		if (rows.length === 0 && loading) return 'Loading Transactions…';
 		if (bankChangesCut) {
 			const newest = `the newest ${String(BANK_CHANGE_LIMIT)} bank changes`;
@@ -342,7 +346,7 @@
 			if (rows.length === 0) return `None of ${newest} is here. ${rest}`;
 			return `${countedTransactions(rows.length, filterValues)}, from ${newest}. ${rest}`;
 		}
-		if (rows.length === 0 && filters.bankChanges) return 'No bank changes wait on you.';
+		if (rows.length === 0 && filters.bankChanges) return 'No bank changes.';
 		if (rows.length === 0) return filtering ? 'No Transactions match.' : 'No Transactions yet.';
 		const counted = countedTransactions(rows.length, filterValues);
 		return canShowMore ? `${counted} shown, more below` : counted;
@@ -395,6 +399,8 @@
 	);
 	let rowError = $state('');
 	let approvingAll = $state(false);
+	let handedOffWaiting: Row[] | undefined;
+	let savedHandOffWaiting: Row[] | undefined;
 	const approveAllBlocked = $derived(
 		approvingAll || (approving?.length ?? unapprovedCount.data ?? 0) === 0
 	);
@@ -406,6 +412,11 @@
 	}
 
 	function editedRow() {
+		if (savedHandOffWaiting !== undefined) {
+			const next = nextUnapproved(savedHandOffWaiting);
+			savedHandOffWaiting = undefined;
+			return next;
+		}
 		if (editingSnapshot === undefined) return addButton;
 		if (deletedId === editingSnapshot._id) return null;
 		return editButtonOf(editingSnapshot);
@@ -438,13 +449,11 @@
 	}
 
 	function openFromRow(event: MouseEvent, row: Row) {
-		if (!(event.target instanceof Element)) return;
-		if (event.target.closest('button, a, input, label, [role="checkbox"], [data-pick]')) return;
-		if ((getSelection()?.toString() ?? '') !== '') return;
-		edit(row);
+		if (clickedTheRow(event)) edit(row);
 	}
 
 	function edit(row: Row, option?: string) {
+		handedOffWaiting = undefined;
 		preset = option;
 		deletedId = null;
 		editingSnapshot = row;
@@ -494,25 +503,31 @@
 		if (found === undefined) return undefined;
 		const remembers = remember && found.kind === 'category';
 		const unchanged = option === (picked.get(row._id) ?? savedOptionOf(row));
-		if (unchanged && (!remembers || option === row.rememberedCategoryId)) return undefined;
-		return { choice: remembers ? { ...found, remember } : found, remembers };
+		const approves = !row.approved && found.kind !== 'uncategorized';
+		if (unchanged && !approves && (!remembers || option === row.rememberedCategoryId)) {
+			return undefined;
+		}
+		return { choice: remembers ? { ...found, remember } : found, remembers, approves };
 	}
 
 	async function pickCategory(row: Row, option: string, payee: string, remember: boolean) {
 		const change = changeOf(row, option, remember);
 		if (change === undefined) return;
-		const { choice, remembers } = change;
+		const { choice, remembers, approves } = change;
 		rowError = '';
 		retireUndoOf(row._id);
 		const pick = (latestPick.get(row._id) ?? 0) + 1;
 		latestPick.set(row._id, pick);
 		picked.set(row._id, option);
 		const at = listed.findIndex((other) => other._id === row._id);
+		const waiting = [...listed.slice(at + 1), ...listed.slice(0, at).reverse()].filter(
+			(other) => !other.approved
+		);
 		const handOff = await linksAnImport(row, option);
 		if (latestPick.get(row._id) !== pick) return;
 		if (handOff) {
 			picked.delete(row._id);
-			edit(row, option);
+			handOffToDialog(row, option, waiting);
 			return;
 		}
 		const saved = await attempt(() => categorize({ transactionId: row._id, choice }));
@@ -523,11 +538,32 @@
 			return;
 		}
 		const label = labelOf(choicesFor(row), option) ?? 'Category';
+		const kept = remembers ? ' and remembered' : '';
 		announce(
-			remembers ? `${label} saved and remembered for ${payee}` : `${label} saved for ${payee}`
+			approves ? `Approved ${payee} as ${label}${kept}` : `${label} saved${kept} for ${payee}`
 		);
 		await tick();
-		if (document.activeElement === document.body) focusAfterCategorize(row, at);
+		const focusLost =
+			document.activeElement === document.body || document.activeElement === categoryPickerOf(row);
+		if (approves && focusLost) focusNextUnapproved(waiting);
+		else if (document.activeElement === document.body) focusAfterCategorize(row, at);
+	}
+
+	function handOffToDialog(row: Row, option: string, waiting: Row[]) {
+		edit(row, option);
+		if (!row.approved) handedOffWaiting = waiting;
+	}
+
+	function nextUnapproved(waiting: Row[]) {
+		const next = waiting.find((other) =>
+			rows.some((shown) => shown._id === other._id && !shown.approved)
+		);
+		const target = next && (categoryPickerOf(next) ?? editButtonOf(next));
+		return target ?? approveAllButton ?? addButton;
+	}
+
+	function focusNextUnapproved(waiting: Row[]) {
+		nextUnapproved(waiting)?.focus();
 	}
 
 	function focusAfterCategorize(row: Row, at: number) {
@@ -1062,7 +1098,7 @@
 							choices={bulkChoices}
 							optIn={{
 								label: 'Approve them too',
-								hint: 'Marks these Transactions reviewed. Balances already include them.',
+								hint: '',
 								accepts: () => true
 							}}
 							onValueChange={(option: string, approveToo: boolean) =>
@@ -1168,6 +1204,8 @@
 	defaultAccountId={accountId}
 	returnFocus={editingFocus}
 	ondone={(message: string) => {
+		savedHandOffWaiting = handedOffWaiting;
+		handedOffWaiting = undefined;
 		retireUndoOf(editingSnapshot?._id);
 		announce(message);
 	}}

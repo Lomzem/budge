@@ -1,11 +1,10 @@
 <script lang="ts">
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import XIcon from '@lucide/svelte/icons/x';
-	import { useQuery } from 'convex-svelte';
 	import { tick } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 
-	import { api } from '$convex/_generated/api';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 	import { getAccounts } from '$lib/accounts.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -37,8 +36,7 @@
 	} = $props();
 
 	const accounts = getAccounts();
-	const categories = useQuery(api.categories.list, {});
-	const payees = useQuery(api.payees.list, {});
+	const { categories, payees } = getShellQueries();
 	const active = $derived(Object.values(values).some((value) => value !== ''));
 	let filtersOpen = $state(false);
 	let searchInput: HTMLInputElement | null = $state(null);
@@ -53,10 +51,7 @@
 
 	function payeeChoices(): Choices {
 		return [
-			{
-				value: '',
-				label: payees.error ? "Payees didn't load. Reload to filter by one." : 'Any Payee'
-			},
+			{ value: '', label: 'Any Payee' },
 			...(payees.data ?? []).map((payee) => ({ value: payee._id, label: payee.name }))
 		];
 	}
@@ -124,12 +119,7 @@
 	function categoryChoices(): Choices {
 		const data = categories.data;
 		return [
-			{
-				value: '',
-				label: categories.error
-					? "Categories didn't load. Reload to filter by one."
-					: 'Any Category'
-			},
+			{ value: '', label: 'Any Category' },
 			{ value: UNCATEGORIZED, label: 'Uncategorized' },
 			...(data?.readyToAssignId ? [{ value: data.readyToAssignId, label: 'Ready to Assign' }] : []),
 			...(data?.groups ?? []).map((group) => ({

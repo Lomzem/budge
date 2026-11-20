@@ -59,8 +59,17 @@ export async function chooseBankFile(page: Page, name: string, csv: string) {
 	await field.setInputFiles({ name, mimeType: 'text/csv', buffer: Buffer.from(csv) });
 }
 
+const signedInStartup = 20_000;
+
+async function signedIn(page: Page) {
+	await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible({
+		timeout: signedInStartup
+	});
+}
+
 export async function openBudget(page: Page) {
 	await page.goto('/');
+	await signedIn(page);
 	await expect(page.getByRole('heading', { level: 1, name: 'Budget', exact: true })).toBeVisible();
 }
 
@@ -174,6 +183,15 @@ export async function centerOf(locator: Locator) {
 	return { x: box.x + box.width / 2, y: box.y + box.height / 2, top: box.y };
 }
 
+export async function clickTheSpotOf(
+	page: Page,
+	target: Locator,
+	button: 'left' | 'right' = 'left'
+) {
+	const { x, y } = await centerOf(target);
+	await page.mouse.click(x, y, { button });
+}
+
 export async function tap(page: Page, locator: Locator) {
 	await locator.scrollIntoViewIfNeeded();
 	const { x, y } = await centerOf(locator);
@@ -206,4 +224,5 @@ function leavesWithoutUnsavedWarning(page: Page) {
 export async function reloadOnceSaved(page: Page) {
 	await expect.poll(() => leavesWithoutUnsavedWarning(page)).toBe(true);
 	await page.reload();
+	await signedIn(page);
 }

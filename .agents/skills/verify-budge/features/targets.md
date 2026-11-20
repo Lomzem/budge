@@ -16,7 +16,7 @@ Set Monthly or By date Targets, fund the missing amount, and see the upcoming ob
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/targets.ts`, also run by `bun run test:e2e:local`):
 
-- `targets/monthly`: the Monthly recipe through Funded and Upcoming (`target-monthly`, `target-assign`, `target-upcoming`), funding from the table's `Assign $25.00 to Emergency Fund` button, which returns focus to the Category name and survives a reload.
+- `targets/monthly`: the Monthly recipe through Target funding and the Upcoming list (`target-monthly`, `target-assign`, `target-upcoming`), funding from the table's `Assign $25.00 to Emergency Fund` button, which returns focus to the Category name. The funded item stays in Upcoming without the `Not funded` marker. Before funding, the Target bar reports under 100%. Assigned survives reload, and at 320 px Upcoming starts below the table's bottom edge.
 
 The recipes below cover what the journeys leave out.
 
@@ -24,14 +24,14 @@ Preconditions:
 
 - Authenticated baseline from the index; reseed before independent mutations.
 
-- **Monthly:** open Emergency Fund inspector, click Add Target; dialog label Amount = current Assigned plus 25 dollars. Check `Set aside the amount`, select `Due day` matching today, Save. Require progressbar `Emergency Fund Target` aria-valuetext `$25.00 more needed`; close the inspector (Upcoming is not rendered while a Category is open) and require its Upcoming row not funded. Click `Assign $25.00` in the inspector, or `Assign $25.00 to Emergency Fund` in the Budget row; require Funded, Assigned +25, Ready to Assign −25 and Upcoming Yes after reload.
+- **Monthly:** open Emergency Fund inspector, click Add Target; dialog label Amount = current Assigned plus 25 dollars. Check `Set aside the amount`, select `Due day` matching today, Save. Require progressbar `Emergency Fund Target` aria-valuetext `$25.00 more needed`; close the inspector and require its Upcoming list item to show `Not funded`. Click `Assign $25.00` in the inspector, or `Assign $25.00 to Emergency Fund` in the Budget row; require Funded, Assigned +25, Ready to Assign −25 and the Upcoming item still listed without the `Not funded` marker after reload.
 - **Modes:** Edit Target, choose Refill up to the amount with known prior Available; require needed = max(0, target − prior Available − Assigned). Switch to By date, fill Available by and Repeat/Every how many months; require inclusive-month rounded-up funding and next due date after its month. Navigate months through the ordinary Budget controls to check rollover, not an internal clock setter.
 - **Remove/mobile:** Edit Target → Remove Target; require `Add Target` (no Target summary) after reload, unchanged Assigned. Check Upcoming at 320 px, and a hidden Category Target still appears when due within 30 days. Restore assignments via UI.
 
 ## Gotchas
 
 - Target controls appear only on non-payment Categories; Credit Card Payment Categories show Card payment instead.
-- Target progress appears in the Budget table as well as the inspector; the Monthly journey checks table progress. **Manual drive:** compare both surfaces. Upcoming uses today, even when viewing another month; due exactly 30 days ahead is excluded, and Amount shows the full Target amount rather than the funding shortfall.
+- Target progress appears in the Budget table as well as the inspector; the Monthly journey checks table progress. **Manual drive:** compare both surfaces. Target descriptions use commas before the due day or repeat interval. Upcoming uses today, even when viewing another month. Each item shows date, Category and amount. `Not funded` appears only on unfunded items due this month; due exactly 30 days ahead is excluded, and Amount shows the full Target amount rather than the funding shortfall.
 - **Manual drive:** invalid/nonpositive Amount shows an alert; By date needs a date and Repeat needs a whole interval of 1–120 months. Require failed validation to leave the dialog open and the saved Target unchanged.
 
 - Due day changes scheduling, not amount. Month-end due dates clamp; repeat interval is 1–120 months.

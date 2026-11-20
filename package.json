@@ -16,7 +16,7 @@
 		"typecheck": "bun run typecheck:app && bun run typecheck:convex",
 		"typecheck:app": "bun run sync && PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL:-http://127.0.0.1:3210} svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
 		"typecheck:convex": "effect-tsgo tsc@7.0.2 --project convex/tsconfig.json",
-		"lint": "eslint --max-warnings 0 .",
+		"lint": "eslint --max-warnings 0 . && eslint --config eslint.exceptions.config.js --quiet src",
 		"lint:ui": "eslint --config eslint.ui.config.js --max-warnings 0 .",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",

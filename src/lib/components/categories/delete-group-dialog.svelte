@@ -30,6 +30,7 @@
 
 	const choices = $derived(groups.filter((g) => g._id !== group?._id));
 	const count = $derived(group?.categories.length ?? 0);
+	const itsCategories = $derived(count === 1 ? 'its Category' : 'its Categories');
 
 	export function reset() {
 		dialog.open({});
@@ -42,7 +43,7 @@
 		if (!group) return;
 		const destination = choices.find((g) => g._id === destinationId);
 		if (count > 0 && !destination) {
-			error = 'Pick a group to move its Categories to.';
+			error = `Pick a group to move ${itsCategories} to.`;
 			return;
 		}
 		const id = group._id;
@@ -62,23 +63,24 @@
 		<Dialog.Header>
 			<Dialog.Title>Delete {group?.name ?? 'Category Group'}</Dialog.Title>
 			<Dialog.Description>
-				{#if count > 0}
-					Its {count === 1 ? 'Category moves' : `${String(count)} Categories move`} to the group you pick,
-					with all their history.
-				{:else}
+				{#if count === 0}
 					It has no Categories.
+				{:else if choices.length === 0}
+					{count === 1
+						? 'Add another Category Group to take over this Category and its history.'
+						: 'Add another Category Group to take over these Categories and their history.'}
+				{:else}
+					{count === 1
+						? 'Its Category moves to the group you pick, with its history.'
+						: `Its ${String(count)} Categories move to the group you pick, with their history.`}
 				{/if}
 			</Dialog.Description>
 		</Dialog.Header>
-		{#if count > 0 && choices.length === 0}
-			<p class="text-sm text-muted-foreground">
-				Add another Category Group first, to take over this one's Categories.
-			</p>
-		{:else}
+		{#if count === 0 || choices.length > 0}
 			<form class="flex flex-col gap-4" onsubmit={submit}>
 				{#if count > 0}
 					<div class="flex flex-col gap-2">
-						<Label for="delete-group-destination">Move its Categories to</Label>
+						<Label for="delete-group-destination">Move {itsCategories} to</Label>
 						<SelectField
 							id="delete-group-destination"
 							required

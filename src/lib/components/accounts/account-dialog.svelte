@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { useMutation, useQuery } from 'convex-svelte';
+	import { useMutation } from 'convex-svelte';
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -13,10 +13,11 @@
 	import { formatDate } from '$lib/domain/dates';
 	import { parseCents } from '$lib/domain/money';
 	import { mainRegion } from '$lib/focusReturn';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
-	const settings = useQuery(api.settings.get, {});
+	const { settings } = getShellQueries();
 	const createAccount = useMutation(api.accounts.create);
 
 	let name = $state('');
@@ -51,7 +52,7 @@
 			return;
 		}
 		open = false;
-		await goto(resolve('/(app)/accounts/[accountId]', { accountId: added.value }));
+		await goto(resolve('/(app)/transactions/[accountId]', { accountId: added.value }));
 	}
 </script>
 

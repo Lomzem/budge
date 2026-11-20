@@ -1,13 +1,11 @@
 <script lang="ts">
-	import LandmarkIcon from '@lucide/svelte/icons/landmark';
 	import PlusIcon from '@lucide/svelte/icons/plus';
-	import { useQuery } from 'convex-svelte';
 	import { tick, untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { api } from '$convex/_generated/api';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getAccounts, type Account } from '$lib/accounts.svelte';
 	import {
@@ -25,7 +23,7 @@
 
 	const accounts = getAccounts();
 	const bank = getBankConnections();
-	const settings = useQuery(api.settings.get, {});
+	const { settings } = getShellQueries();
 	const outcomes = new SvelteMap<Id<'connectionAccounts'>, string>();
 	let heldDialog: { open: (account: HeldAccount) => void } | undefined = $state();
 	let startingBalance: { open: (account: Account) => void } | undefined = $state();
@@ -46,7 +44,7 @@
 		if (settings.data?.cutoverDate === null) cutoverUnsetOnArrival = true;
 	});
 
-	const ready = $derived(bank.loaded && settings.data !== undefined);
+	const ready = $derived(bank.loaded);
 	const blocker = $derived.by(() => {
 		if (bank.service?.available === false) return 'unavailable';
 		if (settings.data?.cutoverDate === null) return 'cutover';
@@ -162,12 +160,7 @@
 
 <div class="flex max-w-4xl flex-col gap-6">
 	<header class="flex flex-wrap items-start justify-between gap-4">
-		<div class="flex max-w-prose flex-col gap-1">
-			<h1 class="text-2xl font-bold tracking-tight">Bank</h1>
-			<p class="text-muted-foreground">
-				New transactions arrive Unapproved on each Account. Budge checks banks daily.
-			</p>
-		</div>
+		<h1 class="text-2xl font-bold tracking-tight">Bank</h1>
 		<div class="grid min-w-44">
 			<Button
 				bind:ref={connectButton}
@@ -209,19 +202,9 @@
 			</div>
 		{/if}
 
-		<section aria-labelledby="connections-heading" class="flex flex-col gap-3">
-			<h2 id="connections-heading" class="text-lg font-bold">Connections</h2>
-			{#if bank.all.length === 0}
-				<div
-					class="flex flex-col items-start gap-2 rounded-lg border border-dashed border-input p-6"
-				>
-					<LandmarkIcon aria-hidden="true" class="size-6 text-muted-foreground" />
-					<p class="font-bold">No banks connected yet</p>
-					<p class="max-w-prose text-muted-foreground">
-						Connect a bank, or import a bank file from an Account.
-					</p>
-				</div>
-			{:else}
+		{#if bank.all.length > 0}
+			<section aria-labelledby="connections-heading" class="flex flex-col gap-3">
+				<h2 id="connections-heading" class="text-lg font-bold">Connections</h2>
 				<ul aria-label="Bank Connections" class="flex flex-col gap-4">
 					{#each connections as connection (connection._id)}
 						<li>
@@ -237,8 +220,8 @@
 						</li>
 					{/each}
 				</ul>
-			{/if}
-		</section>
+			</section>
+		{/if}
 	{/if}
 </div>
 
@@ -252,14 +235,14 @@
 		{#if result !== '' && next?.to === 'categorize'}
 			<a
 				bind:this={nextLink}
-				href="{resolve('/accounts')}?account={next.accountId}&category=uncategorized"
+				href="{resolve('/transactions')}?account={next.accountId}&category=uncategorized"
 				class="font-medium underline underline-offset-4 hover:no-underline"
 				>Categorize its Transactions</a
 			>
 		{:else if result !== '' && next?.to === 'history'}
 			<a
 				bind:this={nextLink}
-				href={resolve('/(app)/accounts/[accountId]', { accountId: next.accountId })}
+				href={resolve('/(app)/transactions/[accountId]', { accountId: next.accountId })}
 				class="font-medium underline underline-offset-4 hover:no-underline">Open {next.name}</a
 			>
 		{/if}

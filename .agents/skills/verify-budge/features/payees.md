@@ -12,7 +12,7 @@ Reuse a Payee's remembered Category, change it when Remember is checked (on by d
 ## How to get to it (user POV)
 
 - Add/Edit Transaction → Payee and Category or Transfer; with a Category and a Payee, the `Remember for <Payee>’s later imports` checkbox under it (its description says what is remembered now), or `<Category> is remembered for <Payee>’s later imports.` when the pick already is.
-- A register row's Category picker → the same checkbox at the foot of the open list (not on splits, Transfers without a Payee, or a Starting Balance). Transfers stay selectable while it is checked and never remember a Category; picking the row's current Category again remembers it. The Accounts page or a named Account → Payee filter (`#transaction-filter-payee`, populated by `payees.list`).
+- A register row's Category picker → the same checkbox at the foot of the open list (not on splits, Transfers without a Payee, or a Starting Balance). Transfers stay selectable while it is checked and never remember a Category; picking the row's current Category again remembers it. The Transactions page or a named Account → Payee filter (`#transaction-filter-payee`, populated by `payees.list`).
 - Import file → saved imported row → Edit Transaction → Payee.
 - Global Payee rename has no visible menu or route in this checkout.
 

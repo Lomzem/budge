@@ -310,7 +310,12 @@ function isCash(accounts: readonly AccountChoice[], accountId: string) {
 	return accounts.some((account) => account._id === accountId && account.kind === 'cash');
 }
 
-function transferAccountsOf(draft: Draft, accounts: readonly AccountChoice[]) {
+function transferAccountsOf(draft: Draft, world: World) {
+	const { accounts, saved } = world;
+	if (saved !== undefined) {
+		const amount = signedAmount(draft) ?? saved.amount;
+		return rowTransferAccounts({ accountId: draft.accountId, amount }, accounts);
+	}
 	return isCash(accounts, draft.accountId)
 		? accounts.filter((account) => account._id !== draft.accountId)
 		: accounts.filter((account) => account.kind === 'cash');
@@ -421,9 +426,7 @@ function newTransferSideOfImport(draft: Draft, world: World) {
 	if (selection.kind !== 'transfer' || saved.transfer?.accountId === selection.accountId) {
 		return undefined;
 	}
-	return transferAccountsOf(draft, world.accounts).find(
-		(account) => account._id === selection.accountId
-	);
+	return transferAccountsOf(draft, world).find((account) => account._id === selection.accountId);
 }
 
 export function linkQuery(
@@ -577,7 +580,7 @@ export function view<Candidate extends { readonly _id: Id<'transactions'> }>(
 	linkCandidates: Lookup<readonly Candidate[]>
 ): View<Candidate> {
 	const selection = selectionOf(draft, world);
-	const transferAccounts = transferAccountsOf(draft, world.accounts);
+	const transferAccounts = transferAccountsOf(draft, world);
 	const candidates =
 		newTransferSideOfImport(draft, world) !== undefined && linkCandidates.kind === 'loaded'
 			? linkCandidates.data

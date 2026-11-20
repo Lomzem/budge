@@ -27,12 +27,20 @@ Before exploring the codebase, read `docs/agents/domain.md` for the single-conte
 
 Before running Playwright E2E or changing Clerk setup, sign-in, or CI authentication, read `docs/agents/authentication.md`.
 
-## UI copy
+## Rules and their enforcers
 
-| Rule                                                                                                                                        | Enforced by                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| One run of visible text, or one `alt`, `aria-label`, `aria-description`, `placeholder` or `title`, in a `.svelte` file is at most 12 words. | `local/concise-copy` in `bun run lint`. An exception is an `eslint-disable-next-line local/concise-copy -- <reason>` comment the owner approved. |
-| Copy names the next action or the result. It leaves out how Budge works inside and what the heading or control already says.                | Run `/unslop` on every UI string a change adds or rewrites, before `code-review`. The three-judge review scores it under language.               |
+When the owner corrects a mistake, fix it and add its rule here with the strongest enforcer that works. An exception to a `local/` lint rule sits on the offending line as `eslint-disable-next-line <rule> -- <reason>; expires YYYY-MM-DD; approved by <owner>`, written only after the owner approves it.
+
+| Rule                                                                                                                                                                             | Enforced by                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Only Opus edits UI: `.svelte` files, `src/app.css`, `src/app.html`, `src/lib/components/**/*.ts`.                                                                                | `scripts/ui-owner.sh` in pre-commit refuses those staged paths from a Codex session. The owner's Codex permission profile can also set `src/**` to `read`.                    |
+| One run of visible text, or one `alt`, `aria-label`, `aria-description`, `placeholder` or `title`, in a `.svelte` file is at most 12 words.                                      | `local/concise-copy` in `bun run lint`.                                                                                                                                       |
+| Copy leaves out filler, empty-state narration, history, and how Budge works inside (`right now`, `Nothing needs you`, `each month`, `due on the`, `moved from`, `Budge checks`). | `local/banned-copy` in `bun run lint`. The phrase list is in `eslint.config.js`.                                                                                              |
+| A page or section heading (`h1`–`h3`) has no muted explanatory sentence under it.                                                                                                | `local/no-heading-lede` in `bun run lint`.                                                                                                                                    |
+| Copy names the next action or the result, says each fact once, and fits the device showing it.                                                                                   | The [copy review](docs/quality/copy-review.md) on every change that adds or rewrites UI text: Sol reports, Opus decides. The three-judge review scores it under language.     |
+| `settings.get`, the Unapproved and bank-change counts, `categories.list` and `payees.list` come from `getShellQueries()`, so tab switches never show Loading.                    | `local/shell-queries` in `bun run lint`. It reads its list from `src/lib/shellQueries.svelte.ts`.                                                                             |
+| Menu, select, and popover content unmounts as soon as it closes: no `data-closed:` exit animation, which leaves a closing popup catching the next tap. Dialogs keep theirs.      | `no-restricted-syntax` for `src/lib/components/ui/{context-menu,dropdown-menu,popover,select}/*-content.svelte` in `bun run lint:ui` (`eslint.ui.config.js`).                 |
+| An exception to a copy or shell-query rule names that one rule for one line, with a reason, an expiry date, and the owner's approval.                                            | `local/exception-terms` in the second pass of `bun run lint` (`eslint.exceptions.config.js`, which ignores inline disables). Blanket, file-wide, and expired exceptions fail. |
 
 ## Checking UI work in a browser
 
@@ -47,8 +55,9 @@ Run these for each ticket, scoped to the ticket's diff. A ticket is not done unt
 1. **Principles:** run `/principles` before designing, before writing tests, and before calling the ticket done, and read every matching reference in full.
 2. **Tests:** pass every test the ticket adds or changes through the `test-audit` authoring gate.
 3. **Running app:** prove the ticket's features with the `verify-budge` skill, and update its feature map when a feature changes.
-4. **Review:** run a local `code-review` and fix or answer every finding.
-5. **Corrections:** once the ticket lands on the integration branch, Sol runs `/correct` on it (analysis only). Opus decides on each suggestion, then implements the accepted ones on the same branch.
+4. **Copy:** run the [copy review](docs/quality/copy-review.md) on every UI string the ticket adds or changes, and record a disposition for each finding.
+5. **Review:** run a local `code-review` and fix or answer every finding.
+6. **Corrections:** once the ticket lands on the integration branch, Sol runs `/correct` on it (analysis only). Opus decides on each suggestion, then implements the accepted ones on the same branch.
 
 ## Pull requests
 

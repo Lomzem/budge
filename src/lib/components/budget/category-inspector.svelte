@@ -4,21 +4,23 @@
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import ArrowDownUpIcon from '@lucide/svelte/icons/arrow-down-up';
 	import XIcon from '@lucide/svelte/icons/x';
-	import { useMutation, useQuery } from 'convex-svelte';
 	import { tick } from 'svelte';
 
-	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { attempt } from '$lib/attempt';
 	import { getBudgetMonth, type BudgetView } from '$lib/budget.svelte';
+	import { CategoryActions } from '$lib/categoryActions.svelte';
 	import CategoryPicker from '$lib/components/category-picker.svelte';
 	import DeleteCategoryDialog from '$lib/components/categories/delete-category-dialog.svelte';
 	import InlineName from '$lib/components/categories/inline-name.svelte';
+	import { categoryMenu } from '$lib/components/menu/category-menu';
+	import MenuEntries from '$lib/components/menu/menu-entries.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { formatCents, parseCents } from '$lib/domain/money';
+	import type { FocusDestination } from '$lib/focusReturn';
 
 	import AssignNeededButton from './assign-needed-button.svelte';
 	import AssignedInput from './assigned-input.svelte';
@@ -36,7 +38,8 @@
 		readyToAssign,
 		steps,
 		onstep,
-		onclose
+		onclose,
+		focusAfterRemoval
 	}: {
 		category: CategoryBudget;
 
@@ -49,6 +52,8 @@
 		steps?: { previous: Step; next: Step } | undefined;
 		onstep?: (id: Id<'categories'>) => void;
 		onclose: () => void;
+
+		focusAfterRemoval: FocusDestination;
 	} = $props();
 
 	const budget = getBudgetMonth();
@@ -56,10 +61,7 @@
 	// svelte-ignore state_referenced_locally
 	const openedForId = category.id;
 
-	const list = useQuery(api.categories.list, {});
-	const rename = useMutation(api.categories.rename);
-	const moveToGroup = useMutation(api.categories.move);
-	const setHidden = useMutation(api.categories.setHidden);
+	const actions = new CategoryActions();
 
 	let direction: 'intoThis' | 'outOfThis' = $state('intoThis');
 	let otherId = $state('');
@@ -71,7 +73,6 @@
 	let coverError = $state('');
 	let done = $state('');
 	let renaming = $state(false);
-	let actionError = $state('');
 	let actionsTrigger: HTMLElement | null = $state(null);
 	let deleteOpen = $state(false);
 	let deleteDialog: { reset: () => void } | undefined = $state();
@@ -97,9 +98,16 @@
 
 	const status = $derived(availableStatus(category));
 
-	const managedGroups = $derived(list.data?.groups ?? []);
-	const ownGroup = $derived(
-		managedGroups.find((group) => group.categories.some((c) => c._id === openedForId))
+	const menu = $derived(
+		categoryMenu(actions, openedForId, {
+			rename: () => {
+				renaming = true;
+			},
+			remove: () => {
+				deleteDialog?.reset();
+				deleteOpen = true;
+			}
+		})
 	);
 	const otherLabel = $derived(direction === 'intoThis' ? 'From' : 'To');
 
@@ -195,24 +203,15 @@
 		direction = direction === 'intoThis' ? 'outOfThis' : 'intoThis';
 	}
 
-	async function act(change: () => Promise<unknown>): Promise<boolean> {
-		actionError = '';
-		const changed = await attempt(change);
-		if (!changed.ok) actionError = changed.error?.message ?? "Budge couldn't save that. Try again.";
-		return changed.ok;
-	}
-
-	function hide() {
-		void act(() => setHidden({ categoryId: openedForId, hidden: true }));
-	}
-
 	function editTarget() {
 		targetDialog?.reset();
 		targetOpen = true;
 	}
 
 	function keydown(event: KeyboardEvent) {
-		if (event.key === 'Escape' && !event.defaultPrevented) onclose();
+		const aDialogOfTheInspectorIsOpen = deleteOpen || targetOpen;
+		if (event.key === 'Escape' && !event.defaultPrevented && !aDialogOfTheInspectorIsOpen)
+			onclose();
 	}
 </script>
 
@@ -220,7 +219,7 @@
 <section
 	bind:this={section}
 	id="category-inspector"
-	aria-labelledby="inspector-heading"
+	aria-label={category.name}
 	tabindex="-1"
 	class="flex flex-col gap-4 outline-none"
 	onkeydown={keydown}
@@ -236,17 +235,17 @@
 			name={category.name}
 			label="Category name"
 			bind:editing={renaming}
-			onsave={(name: string) => rename({ categoryId: openedForId, name })}
+			onsave={(name: string) => actions.rename(openedForId, name)}
 			onleave={() => {
 				actionsTrigger?.focus();
 			}}
 		>
 			{#snippet children(name: string)}
-				<h2 id="inspector-heading" class="min-w-0 flex-1 text-lg font-bold break-words">{name}</h2>
+				<h2 class="min-w-0 flex-1 text-lg font-bold break-words">{name}</h2>
 			{/snippet}
 		</InlineName>
 		<div class="flex shrink-0 items-center">
-			{#if ownGroup}
+			{#if menu.length > 0}
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
@@ -267,45 +266,7 @@
 							if (renaming) event.preventDefault();
 						}}
 					>
-						<DropdownMenu.Item
-							onSelect={() => {
-								renaming = true;
-							}}
-						>
-							Rename
-						</DropdownMenu.Item>
-						{#if managedGroups.length > 1}
-							<DropdownMenu.Sub>
-								<DropdownMenu.SubTrigger>Move to group</DropdownMenu.SubTrigger>
-								<DropdownMenu.SubContent>
-									{#each managedGroups.filter((g) => g._id !== ownGroup._id) as other (other._id)}
-										<DropdownMenu.Item
-											onSelect={() =>
-												void act(() =>
-													moveToGroup({
-														categoryId: openedForId,
-														groupId: other._id,
-														index: other.categories.length
-													})
-												)}
-										>
-											{other.name}
-										</DropdownMenu.Item>
-									{/each}
-								</DropdownMenu.SubContent>
-							</DropdownMenu.Sub>
-						{/if}
-						<DropdownMenu.Item onSelect={hide}>Hide from budget</DropdownMenu.Item>
-						<DropdownMenu.Separator />
-						<DropdownMenu.Item
-							variant="destructive"
-							onSelect={() => {
-								deleteDialog?.reset();
-								deleteOpen = true;
-							}}
-						>
-							Delete…
-						</DropdownMenu.Item>
+						<MenuEntries menu="dropdown" entries={menu} />
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			{/if}
@@ -314,7 +275,9 @@
 			</Button>
 		</div>
 	</div>
-	{#if actionError}<p role="alert" class="-mt-2 text-sm text-destructive">{actionError}</p>{/if}
+	{#if actions.failure?.id === openedForId}
+		<p role="alert" class="-mt-2 text-sm text-destructive">{actions.failure.message}</p>
+	{/if}
 
 	{#if readyToAssign !== undefined}
 		<p
@@ -405,8 +368,6 @@
 			<h3 id="payment-heading" class="text-sm font-medium">Card payment</h3>
 			{#each paymentNotes(category) as note (note)}
 				<p class="text-sm">{note}</p>
-			{:else}
-				<p class="text-sm text-muted-foreground">Available covers the card's debt.</p>
 			{/each}
 			{#if category.payment.uncovered > 0}
 				<AssignNeededButton
@@ -421,12 +382,8 @@
 			<h3 id="target-heading" class="text-sm font-medium">Target</h3>
 			{#if category.target}
 				<p class="text-sm">{describeTarget(category.target)}</p>
-				<TargetBar
-					progress={category.target.progress}
-					label="{category.name} Target"
-					text={status?.text ?? ''}
-				/>
-				{#if status}
+				<TargetBar progress={category.target.progress} label="{category.name} Target" />
+				{#if status?.text}
 					<p class={['text-sm', status.class]}>{status.text}</p>
 				{/if}
 				{#if category.target.needed > 0}
@@ -543,7 +500,8 @@
 	bind:this={deleteDialog}
 	bind:open={deleteOpen}
 	category={{ id: openedForId, name: category.name }}
-	groups={managedGroups}
+	groups={actions.groups}
+	focusAfterDelete={focusAfterRemoval}
 />
 
 <TargetDialog

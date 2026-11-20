@@ -222,11 +222,10 @@
 	<StartingBalanceDialog bind:this={startingBalance} returnFocus={{ fallback: mainRegion }} />
 {:else if accounts.loaded}
 	<h1 class="text-2xl font-bold tracking-tight">No such Account</h1>
-	<p class="mt-2 text-muted-foreground">
-		It may have been removed.
-		<a class="underline underline-offset-4 hover:no-underline" href={resolve('/accounts')}
-			>See every Account</a
-		>.
+	<p class="mt-2">
+		<a class="underline underline-offset-4 hover:no-underline" href={resolve('/transactions')}
+			>All Transactions</a
+		>
 	</p>
 {:else}
 	<p role="status" class="text-muted-foreground">Loading…</p>

@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { useAuth, useQuery } from 'convex-svelte';
 
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+
 	import { api } from '$convex/_generated/api';
 	import { Accounts, setAccounts } from '$lib/accounts.svelte';
 	import { BankConnections, setBankConnections } from '$lib/bankConnections.svelte';
@@ -10,7 +13,9 @@
 	import SignOutButton from '$lib/components/shell/sign-out-button.svelte';
 	import TabBar from '$lib/components/shell/tab-bar.svelte';
 	import { setupConvexWithClerk } from '$lib/convex.svelte';
+	import { isIsoMonth } from '$lib/domain/dates';
 	import { readPublicError } from '$lib/publicError';
+	import { ShellQueries, setShellQueries } from '$lib/shellQueries.svelte';
 
 	import type { LayoutProps } from './$types';
 
@@ -22,18 +27,33 @@
 	const whoami = useQuery(api.owner.whoami, () => (auth.isAuthenticated ? {} : 'skip'));
 	const accounts = new Accounts(() => auth.isAuthenticated);
 	setAccounts(accounts);
-	setBankConnections(new BankConnections(() => accounts.loaded));
-	const budget = new BudgetMonth(() => auth.isAuthenticated);
+	const bank = new BankConnections(() => accounts.loaded);
+	setBankConnections(bank);
+	const monthTheBudgetLinkNames = (url: URL) => {
+		const linked = url.searchParams.get('month');
+		return url.pathname === resolve('/') && linked !== null && isIsoMonth(linked)
+			? linked
+			: undefined;
+	};
+	const budget = new BudgetMonth(() => auth.isAuthenticated, monthTheBudgetLinkNames(page.url));
 	setBudgetMonth(budget);
+	const shell = new ShellQueries(() => auth.isAuthenticated);
+	setShellQueries(shell);
+
+	const failure = $derived(whoami.error ?? accounts.error ?? shell.error);
+	const explained = $derived(readPublicError(failure));
 
 	const access = $derived.by(() => {
 		if (auth.isLoading) return 'loading';
 		if (!auth.isAuthenticated) return 'forbidden';
-		const failure = whoami.error ?? accounts.error;
-		if (failure) {
-			return readPublicError(failure)?.code === 'FORBIDDEN' ? 'forbidden' : 'failed';
-		}
-		return whoami.isLoading || !accounts.loaded ? 'loading' : 'owner';
+		if (failure) return explained?.code === 'FORBIDDEN' ? 'forbidden' : 'failed';
+		const settled =
+			!whoami.isLoading &&
+			accounts.loaded &&
+			shell.settled &&
+			budget.settled &&
+			(bank.loaded || bank.failed);
+		return settled ? 'owner' : 'loading';
 	});
 </script>
 
@@ -51,11 +71,11 @@
 		Skip to content
 	</a>
 	<div class="flex flex-1">
-		<aside class="hidden w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground lg:block">
+		<div class="hidden w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground lg:block">
 			<div class="sticky top-0 flex h-svh flex-col">
 				<AccountSidebar ready={access === 'owner'} />
 			</div>
-		</aside>
+		</div>
 		<main
 			id="main"
 			tabindex="-1"
@@ -78,7 +98,9 @@
 				<p role="alert">This account can't open Budge.</p>
 				<SignOutButton />
 			{:else}
-				<p role="alert">Budge couldn't reach its server. Try reloading the page.</p>
+				<p role="alert">
+					{explained?.message ?? "Budge couldn't reach its server. Try reloading the page."}
+				</p>
 			{/if}
 		</div>
 	</main>

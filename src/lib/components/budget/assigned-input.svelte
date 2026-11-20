@@ -8,11 +8,13 @@
 	let {
 		amount,
 		label,
+		quiet = false,
 		onsave
 	}: {
 		amount: number;
 
 		label: string;
+		quiet?: boolean;
 
 		onsave: (cents: number) => Promise<void>;
 	} = $props();
@@ -129,6 +131,7 @@
 
 <div class="ml-auto w-26 *:text-right *:tabular-nums max-sm:*:px-2 sm:w-28">
 	<Input
+		variant={quiet ? 'cell' : 'default'}
 		bind:value={read, write}
 		onfocus={start}
 		onblur={commit}

@@ -22,7 +22,7 @@ new RuleTester({ languageOptions: { parser: svelteParser } }).run('concise-copy'
 			name: 'an expression is one word however long its source',
 			filename,
 			options,
-			code: "<p>Starts on {since ?? 'the cutover date that the person picked'}.</p>"
+			code: "<p>Starts on {since.toLocaleDateString('en-US', { dateStyle: 'long' })}.</p>"
 		},
 		{
 			name: 'twelve words is the limit',
@@ -58,6 +58,20 @@ new RuleTester({ languageOptions: { parser: svelteParser } }).run('concise-copy'
 			options,
 			code: '<p>One two three four five six seven eight nine ten eleven twelve thirteen.</p>',
 			errors: [long(13)]
+		},
+		{
+			name: 'a conditional branch is counted as the words it shows',
+			filename,
+			options,
+			code: "<p>{busy ? 'One two three four five six seven eight nine ten eleven twelve thirteen.' : 'Done.'}</p>",
+			errors: [long(13)]
+		},
+		{
+			name: 'the longest branch of every conditional counts, however many conditionals join',
+			filename,
+			options,
+			code: "<p>{a ? '' : 'one two '}{b ? '' : 'one two '}{c ? '' : 'one two '}{d ? '' : 'one two '}{e ? '' : 'one two '}{f ? '' : 'one two '}{g ? '' : 'one two'}</p>",
+			errors: [long(14)]
 		},
 		{
 			name: 'the report starts on the first word, where a disable-next-line comment points',

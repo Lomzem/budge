@@ -15,6 +15,7 @@
 	import { DialogSession } from '$lib/dialogSession.svelte';
 	import { formatDate } from '$lib/domain/dates';
 	import { formatCents, parseCents } from '$lib/domain/money';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 
 	type Evidence = FunctionReturnType<typeof api.heldAccounts.startingBalanceEvidence>;
 	type Imported = Evidence['imported'];
@@ -35,7 +36,7 @@
 	const evidence = useQuery(api.heldAccounts.startingBalanceEvidence, () => ({
 		accountId: account._id
 	}));
-	const settings = useQuery(api.settings.get, {});
+	const { settings } = getShellQueries();
 	const owed = $derived(account.kind === 'creditCard');
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? evidence.data?.since ?? null);
 	const since = $derived(cutoverDate === null ? null : formatDate(cutoverDate));
@@ -176,7 +177,7 @@
 <Dialog.Header>
 	<Dialog.Title>Starting balance for {account.name}</Dialog.Title>
 	<Dialog.Description>
-		Budge records it on {since ?? 'the cutover date'}{since === null ? '' : ', the cutover date'}.
+		Budge records it on {since === null ? 'the cutover date' : `${since}, the cutover date`}.
 		Confirm or correct it.
 		{#if skippable}
 			You can change it later from the Account's actions.
@@ -272,9 +273,9 @@
 						<dd>Unknown. The bank doesn't say whether its history is complete.</dd>
 					</div>
 				</dl>
-				<p>
-					Estimates can be wrong. Check your balance at the start of {since ?? 'the cutover date'}.
-				</p>
+				{#if since !== null}
+					<p>Check your bank statement for the balance at the start of {since}.</p>
+				{/if}
 			</div>
 		</details>
 	{/if}

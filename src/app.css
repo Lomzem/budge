@@ -219,6 +219,24 @@
 	html:has([data-selection-bar]) {
 		scroll-padding-top: calc(var(--selection-bar-height, 0px) + 1rem);
 	}
+	/* While a menu is open, a click or tap anywhere outside it lands on this layer and only closes the menu. */
+	[data-slot='menu-dismiss-layer'] {
+		position: fixed;
+		inset: 0;
+		z-index: 55;
+		display: none;
+		pointer-events: auto;
+	}
+	body:has(
+			:is(
+				[data-slot='dropdown-menu-content'],
+				[data-slot='context-menu-content']
+			)[data-state='open']
+		)
+		[data-slot='menu-dismiss-layer'],
+	[data-slot='menu-dismiss-layer'][data-pressed] {
+		display: block;
+	}
 	h1,
 	h2,
 	h3 {
@@ -255,6 +273,16 @@
 	padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Keeps iOS from opening its own callout over a long-press menu. */
+@utility touch-callout-none {
+	-webkit-touch-callout: none;
+}
+
+/* Gives fields inside a long-press row back iOS's own copy and paste callout. */
+@utility touch-callout-default {
+	-webkit-touch-callout: default;
+}
+
 @utility fade-edges {
 	mask-image: linear-gradient(
 		to right,
@@ -271,9 +299,4 @@
 
 @utility fade-end {
 	--fade-end: 2.5rem;
-}
-
-/* A label column that takes the free room beside a figure column as wide as its figure. */
-@utility grid-cols-label-figure {
-	grid-template-columns: minmax(0, 1fr) auto;
 }

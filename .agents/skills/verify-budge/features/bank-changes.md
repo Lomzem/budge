@@ -7,12 +7,12 @@ Keep approved or edited Transactions safe when the bank changes history, while a
 - `bank-held`: hold rows until their external Account is resolved (driven in [Accounts](accounts.md#driving-it-with-playwright)).
 - `bank-quiet`: an untouched Unapproved row follows the bank's modification or removal without asking.
 - `bank-resolve`: an approved or edited row is flagged `Bank changed this` or `Bank removed this`; the owner takes the bank's version or keeps theirs.
-- `bank-many-rows`: a Transaction with more than ten Bank Rows lists ten, flagged ones first, and says `More Bank Rows back this Transaction than shown. Flagged ones are first.` when any are left out. Resolving the shown flagged rows brings the hidden ones into view. Search covers every Bank Row's Bank Text.
+- `bank-many-rows`: a Transaction with more than ten Bank Rows lists ten, flagged ones first, and says `Only some Bank Rows are shown.` when any are left out. Resolving the shown flagged rows brings the hidden ones into view. Search covers every Bank Row's Bank Text.
 
 ## How to get to it (user POV)
 
-- The Accounts page (`/accounts`) or an Account page (sidebar `Sections and Accounts` → `Checking`) → Transaction row with a `Bank changed this` or `Bank removed this` line under its Payee.
-- Or the Budget's `N bank changes` chip, which opens `/accounts?status=bank-changes` (Status `Bank changes`), listing the flagged Transactions. Budge reads at most the newest 500: past that the chip reads `500+ bank changes` and the result line adds `Resolve them to see the rest.`
+- The Transactions page (`/transactions`) or an Account page (sidebar `Sections and Accounts` → `Checking`) → Transaction row with a `Bank changed this` or `Bank removed this` line under its Payee.
+- Or the Budget's `N bank changes` chip, which opens `/transactions?status=bank-changes` (Status `Bank changes`), listing the flagged Transactions. Budge reads at most the newest 500: past that the chip reads `500+ bank changes` and the result line adds `Resolve them to see the rest.`
 - In the row itself, when one Bank Row is flagged: the flag reads `Bank changed this to <amount>` (or `Bank removed this`), then `Use the bank's` (named `Use the bank's <amount>: <Payee>, <date>`) or `Delete it`, and `Keep mine`. Each action's name ends `: <Payee>, <date>`. Resolving focuses the row's Payee button, or the next row's first action (or Payee) when the row leaves the list.
 - Or click the row's Payee button → dialog `Edit Transaction`, which opens focused on a region at the top named `Your bank changed this Transaction` (or `Your bank removed this Transaction`) that says `The bank now says <amount> on <date>.` (a removed row shows only its Bank Text; `The bank removed it.` appears only when several Bank Rows are flagged) → `Use the bank's version` / `Delete it` / `Keep mine`.
 - `Delete it` opens alert dialog `Delete this Transaction too?` (`Delete this Transfer too?` for a Transfer) → `Delete`. From the row it names the Payee: `The bank removed <Payee>. …`.
@@ -28,7 +28,7 @@ Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, 
 Preconditions:
 
 - Authenticated baseline from the index, then `bun run app seed bank-sync` instead of `budget-with-accounts`. Reseed before each independent recipe.
-- Readiness: on `/accounts/…` for Checking, require a `row` containing button `/^SAMPLE GARDEN CENTER 7720/` and the text `Bank changed this`.
+- Readiness: on `/transactions/…` for Checking, require a `row` containing button `/^SAMPLE GARDEN CENTER 7720/` and the text `Bank changed this`.
 
 The fixture syncs Sample Credit Union twice through the production sync mutations (no Plaid). Before the second sync the owner edits three rows: SAMPLE GARDEN CENTER 7720 to $40.00, SAMPLE STREAMING 4410's memo to `Shared family plan` and SAMPLE GYM 5521's memo to `Month to month`. The second sync then changes and removes rows:
 
@@ -48,7 +48,7 @@ The fixture syncs Sample Credit Union twice through the production sync mutation
 
 ## Gotchas
 
-- **Manual drive:** resolve flagged rows from the Accounts page as well as a named Account. File imports can Match Plaid-backed Transactions too.
+- **Manual drive:** resolve flagged rows from the Transactions page as well as a named Account. File imports can Match Plaid-backed Transactions too.
 - **Manual drive:** taking a bank amount that differs from a Split Transaction’s total is rejected with guidance to edit its lines first, then keep your version. Bank removal cannot delete a Transaction or Transfer while another Bank Row still backs either side; require the alert and unchanged balances.
 
 - `convex/bankChanges.test.ts` owns sync and resolution semantics (edited versus untouched, Transfers, reconciled rows). Drive the UI here; do not reassert backend states.

@@ -30,19 +30,19 @@ export const exportJourneys = {
 			'exports every table as JSON and paced CSV downloads, past Chromium’s ten-file burst limit',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step, keepAsEvidence }) => {
-			const dialog = page.getByRole('dialog', { name: 'Export' });
+			const section = page.getByRole('region', { name: 'Export' });
 			const text = async (download: Download) => readFile(await keepAsEvidence(download), 'utf8');
 
-			await step('open Export from Settings', async () => {
+			await step('open Export on Settings', async () => {
 				await page.goto('/settings');
-				await page.getByRole('button', { name: 'Export…' }).click();
+				await expect(section).toBeVisible();
 			});
 
 			const date = await step(
 				'Download JSON saves every table but the rebuildable caches and provider secrets',
 				async () => {
 					const jsonDownload = page.waitForEvent('download');
-					await dialog.getByRole('button', { name: 'Download JSON' }).click();
+					await section.getByRole('button', { name: 'Download JSON' }).click();
 					const json = await jsonDownload;
 					const date = /^budge-(\d{4}-\d{2}-\d{2})\.json$/.exec(json.suggestedFilename())?.[1];
 					if (date === undefined) throw new Error('The JSON file name has no date.');
@@ -56,7 +56,7 @@ export const exportJourneys = {
 					for (const connection of exported.bankConnections ?? []) {
 						expect(connection).not.toHaveProperty('provider');
 					}
-					await expect(dialog.getByRole('status')).toHaveText(`Downloaded budge-${date}.json.`);
+					await expect(section.getByRole('status')).toHaveText(`Downloaded budge-${date}.json.`);
 					return date;
 				}
 			);
@@ -65,7 +65,7 @@ export const exportJourneys = {
 				expect(tablesABackupRestores.length).toBeGreaterThan(downloadsChromiumAllowsInABurst);
 				const csvDownloads: Download[] = [];
 				page.on('download', (download) => csvDownloads.push(download));
-				await dialog.getByRole('button', { name: 'Download CSV' }).click();
+				await section.getByRole('button', { name: 'Download CSV' }).click();
 				await expect
 					.poll(() => csvDownloads.map((download) => download.suggestedFilename()).sort(), {
 						timeout: 15_000

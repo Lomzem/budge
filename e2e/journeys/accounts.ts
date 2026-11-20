@@ -278,7 +278,7 @@ export const accounts = {
 				async () => {
 					const held = await openHeld(page, 'Sample Rewards Card ending 9021');
 					const choose = page.getByRole('dialog', { name: 'Sample Rewards Card ending 9021' });
-					await expect(choose).toContainText('2 transactions waiting.');
+					await expect(choose).toContainText('2 transactions waiting');
 					await choose.getByRole('radio', { name: 'Into Checking' }).check();
 					const importIt = choose.getByRole('button', { name: 'Import its transactions' });
 					await expect(importIt).toHaveAttribute('aria-disabled', 'true');
@@ -433,7 +433,14 @@ export const accounts = {
 					await expect(dialog.getByTestId('imported-since')).toHaveText('None');
 					await expect(dialog).toContainText('Unknown. Not available to Budge.');
 					await expect(dialog).toContainText("Unknown. The bank doesn't say whether");
-					await expect(dialog).toContainText('Check your balance at the start of');
+					const since = await dialog
+						.getByText(/^Every Transaction since .+ arrived\?$/)
+						.textContent();
+					const date = /since (.+) arrived/.exec(since ?? '')?.[1] ?? '';
+					expect(date).toMatch(/\d{4}$/);
+					await expect(dialog).toContainText(
+						`Check your bank statement for the balance at the start of ${date}.`
+					);
 				}
 			);
 
@@ -471,7 +478,7 @@ export const accounts = {
 					).toBeFocused();
 					await page.keyboard.press('Enter');
 					await expect(
-						page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
+						page.getByRole('heading', { level: 1, name: 'Transactions', exact: true })
 					).toBeVisible();
 					const filters = page.getByRole('search', { name: 'Search and filter Transactions' });
 					await expect(filters.getByLabel('Account', { exact: true })).toHaveText('Savings');
@@ -549,8 +556,7 @@ export const accounts = {
 			});
 
 			const plus = feedOf(page, 'Sample Credit Union', 'Sample Savings Plus ending 4417');
-			const stillInSavings =
-				'Earlier Transactions are still in Savings. New ones go to Savings Plus.';
+			const stillInSavings = 'Earlier Transactions are still in Savings.';
 			const bankNeeds = async () => {
 				const bank = page
 					.getByRole('navigation', { name: /^Sections/ })
@@ -636,7 +642,7 @@ export const accounts = {
 				const button = await openHeld(page, 'Sample Holiday Club ending 1180');
 				const choose = page.getByRole('dialog', { name: 'Sample Holiday Club ending 1180' });
 				await choose.getByRole('radio', { name: 'Nowhere: ignore this bank Account' }).check();
-				await expect(choose.getByText(/^Budge drops its transactions\./)).toBeVisible();
+				await expect(choose.getByText(/^Its waiting transactions are deleted\./)).toBeVisible();
 				await choose.getByRole('button', { name: 'Ignore' }).click();
 				await expect(choose).toBeHidden();
 				await expect(button).toBeHidden();

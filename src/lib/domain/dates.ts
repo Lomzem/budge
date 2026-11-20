@@ -70,7 +70,8 @@ export function formatMonth(month: string): string {
 
 const dateFormats = {
 	long: new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' }),
-	short: new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeZone: 'UTC' })
+	short: new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeZone: 'UTC' }),
+	day: new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 };
 
 export function formatDate(date: string, style: keyof typeof dateFormats = 'long'): string {

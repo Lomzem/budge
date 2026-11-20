@@ -69,6 +69,8 @@ async function main() {
 					E2E_PREVIEW_PORT: String(ports.preview),
 					PUBLIC_CLERK_PUBLISHABLE_KEY: credentials.PUBLIC_CLERK_PUBLISHABLE_KEY,
 					CLERK_SECRET_KEY: credentials.CLERK_SECRET_KEY,
+					CLERK_JWT_ISSUER_DOMAIN: credentials.CLERK_JWT_ISSUER_DOMAIN,
+					E2E_CLERK_USER_ID: credentials.E2E_CLERK_USER_ID,
 					E2E_CLERK_USER_EMAIL: credentials.E2E_CLERK_USER_EMAIL
 				},
 				stdio: ['inherit', 'pipe', 'pipe']

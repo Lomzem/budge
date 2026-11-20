@@ -108,9 +108,7 @@
 	>
 		<Dialog.Header>
 			<Dialog.Title>Reconcile {account.name}</Dialog.Title>
-			<Dialog.Description>
-				Enter the bank's balance. Budge locks Cleared Transactions as Reconciled.
-			</Dialog.Description>
+			<Dialog.Description>Cleared Transactions lock as Reconciled.</Dialog.Description>
 		</Dialog.Header>
 		<form class="flex flex-col gap-4" onsubmit={submit}>
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -156,11 +154,8 @@
 				<p class="text-sm text-warning">{unapprovedWarning}</p>
 			{/if}
 			<p role="status" class="text-sm text-muted-foreground">
-				{#if difference === 0}
-					It matches the cleared balance.
-				{:else if difference !== undefined}
-					Off by {formatCents(difference)}. Budge adds a Reconciliation Adjustment to Ready to
-					Assign.
+				{#if difference !== undefined && difference !== 0}
+					Off by {formatCents(difference)}. The adjustment goes to Ready to Assign.
 				{/if}
 			</p>
 			<Dialog.Footer {error}>

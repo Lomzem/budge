@@ -254,7 +254,7 @@ export const transactions = {
 			await step(
 				'on All Accounts, Add Transaction still picks the Account in the form',
 				async () => {
-					await page.goto('/accounts');
+					await page.goto('/transactions');
 					await page.getByRole('button', { name: 'Add Transaction' }).click();
 					await expect(dialog.getByRole('combobox', { name: 'Account' })).toBeVisible();
 					await expect(changeAccount).toHaveCount(0);
@@ -265,22 +265,34 @@ export const transactions = {
 	},
 	categorize: {
 		title:
-			'a Category or Transfer is searched for and saved from its row, by keyboard and on a 320 px phone, survives reload, and leaves the row Unapproved',
+			'a Category or Transfer is searched for and saved from its row, by keyboard and on a 320 px phone, survives reload, and approves the row',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			const categoryOf = (payee: string) =>
 				page.getByRole('button', { name: new RegExp(`Category of ${payee} on `) }).first();
-			const unapproved = (payee: string) =>
-				page.getByRole('button', { name: new RegExp(`^${payee}, Unapproved, edit Transaction`) });
+			const approved = (payee: string) =>
+				page.getByRole('button', { name: new RegExp(`^${payee}, edit Transaction`) });
 			const listbox = page.getByRole('listbox');
 			const options = () => listbox.getByRole('option').allInnerTexts();
 
 			await step(
-				'typing on an Unapproved row’s Category opens a search that finds Groceries, and Enter saves it',
+				'typing on an Unapproved row’s Category opens a search that finds Groceries, and Enter saves and approves it, moving to the next Unapproved row',
 				async () => {
-					await page.goto('/accounts');
+					await page.goto('/transactions');
 					const category = categoryOf('SAMPLE HARDWARE 2208');
 					await expect(category).toHaveAccessibleName(/^Uncategorized, /);
+					const waiting = await page
+						.getByRole('row')
+						.filter({ has: page.getByRole('button', { name: /, Unapproved/ }) })
+						.locator('[data-category]')
+						.evaluateAll((pickers) =>
+							pickers
+								.filter((picker) => picker.checkVisibility())
+								.map((picker) => picker.getAttribute('data-category'))
+						);
+					const at = waiting.indexOf(await category.getAttribute('data-category'));
+					const next = waiting[at + 1] ?? waiting[at - 1];
+					expect(next).toBeTruthy();
 					await category.focus();
 					await page.keyboard.type('groc');
 					await expect(page.getByRole('combobox', { name: 'Search Categories' })).toHaveValue(
@@ -290,15 +302,15 @@ export const transactions = {
 					await page.keyboard.press('Enter');
 					await expect(listbox).toBeHidden();
 					await expect(category).toHaveAccessibleName(/^Groceries, /);
-					await expect(category).toBeFocused();
-					await expect(unapproved('SAMPLE HARDWARE 2208')).toBeVisible();
+					await expect(approved('SAMPLE HARDWARE 2208')).toBeVisible();
+					await expect(page.locator(':focus')).toHaveAttribute('data-category', String(next));
 				}
 			);
 
-			await step('after reload the row keeps Groceries and stays Unapproved', async () => {
+			await step('after reload the row keeps Groceries and stays Approved', async () => {
 				await reloadOnceSaved(page);
 				await expect(categoryOf('SAMPLE HARDWARE 2208')).toHaveAccessibleName(/^Groceries, /);
-				await expect(unapproved('SAMPLE HARDWARE 2208')).toBeVisible();
+				await expect(approved('SAMPLE HARDWARE 2208')).toBeVisible();
 			});
 
 			await step(
@@ -337,8 +349,11 @@ export const transactions = {
 				'on a 320 px phone the Category opens above the tab bar, fits the screen, and saves a search',
 				async () => {
 					await page.setViewportSize({ width: 320, height: 640 });
-					await page.goto('/accounts');
-					const category = categoryOf('Sample Coffee Shop');
+					await page.goto('/transactions');
+					const id = await categoryOf('Sample Coffee Shop').getAttribute('data-category');
+					const category = page
+						.getByRole('button')
+						.and(page.locator(`[data-category="${String(id)}"]`));
 					await category.scrollIntoViewIfNeeded();
 					await expectClearOf(
 						category,
@@ -353,7 +368,12 @@ export const transactions = {
 					await page.getByRole('combobox', { name: 'Search Categories' }).fill('coff');
 					await listbox.getByRole('option', { name: 'Coffee', exact: true }).click();
 					await expect(category).toHaveAccessibleName(/^Coffee, /);
-					await expect(unapproved('Sample Coffee Shop')).toBeVisible();
+					await expect(
+						page
+							.getByRole('row')
+							.filter({ has: category })
+							.getByRole('button', { name: /^Sample Coffee Shop, edit Transaction/ })
+					).toBeVisible();
 				}
 			);
 		}
@@ -445,7 +465,7 @@ export const transactions = {
 			const label = await step(
 				'Accounts heads the Unapproved rows apart from the Approved ones',
 				async () => {
-					await page.goto('/accounts');
+					await page.goto('/transactions');
 					await expect(waitingHeading).toBeVisible();
 					await expect(
 						page.getByRole('rowheader', { name: 'Approved', exact: true })
@@ -581,7 +601,7 @@ export const transactions = {
 			const before = await step(
 				'pick the Unapproved bookshop and two Coffee Shop rows that are not next to each other',
 				async () => {
-					await page.goto('/accounts');
+					await page.goto('/transactions');
 					await expect(
 						page.getByRole('rowheader', { name: 'Unapproved', exact: true })
 					).toBeVisible();
@@ -676,9 +696,6 @@ export const transactions = {
 					await hardware.check();
 					await bulk.click();
 					const approveToo = page.getByRole('checkbox', { name: 'Approve them too', exact: true });
-					await expect(approveToo).toHaveAccessibleDescription(
-						'Marks these Transactions reviewed. Balances already include them.'
-					);
 					await approveToo.check();
 					await page.getByRole('option', { name: 'Groceries', exact: true }).click();
 					await expect(page.getByText('2 Transactions now Groceries and approved.')).toBeVisible();
@@ -696,6 +713,11 @@ export const transactions = {
 				'a Transfer picked with an ordinary row keeps its Category while the ordinary row takes the new one',
 				async () => {
 					const transfer = page.getByRole('checkbox', { name: /^Select Transfer,/ }).first();
+					await expect(async () => {
+						if ((await transfer.count()) === 0)
+							await page.getByRole('button', { name: 'Show more' }).click();
+						await expect(transfer).toBeVisible({ timeout: 1_000 });
+					}).toPass();
 					const transferCategory = await categoryIn(transfer).getAttribute('aria-label');
 					await transfer.check();
 					await hardware.check();
@@ -709,14 +731,19 @@ export const transactions = {
 			);
 
 			await step(
-				'changing a row that action left alone keeps its Undo, and changing a row it touched retires it',
+				'changing a row that action left alone keeps its Undo, and picking the Category an Unapproved row it touched already has approves that row and retires the Undo',
 				async () => {
 					await expect(undo).toBeVisible();
 					await choose(categoryIn(bookshop), 'Dining Out');
 					await expect(categoryIn(bookshop)).toHaveAccessibleName(/^Dining Out, /);
 					await expect(undo).toBeVisible();
-					await choose(categoryIn(hardware), 'Dining Out');
-					await expect(categoryIn(hardware)).toHaveAccessibleName(/^Dining Out, /);
+					const unapprovedHardware = page.getByRole('button', {
+						name: /^SAMPLE HARDWARE 2208, Unapproved/
+					});
+					await expect(unapprovedHardware).toBeVisible();
+					await choose(categoryIn(hardware), 'Groceries');
+					await expect(unapprovedHardware).toHaveCount(0);
+					await expect(categoryIn(hardware)).toHaveAccessibleName(/^Groceries, /);
 					await expect(undo).toHaveCount(0);
 				}
 			);
@@ -725,7 +752,7 @@ export const transactions = {
 				'a bulk save that lands after its selection was cleared and another row checked leaves that row checked and focused, and offers no Undo',
 				async () => {
 					const saving = await holdResponseTo(page, 'transactions:categorizeMany');
-					await page.goto('/accounts');
+					await page.goto('/transactions');
 					await bookshop.check();
 					await choose(bulk, 'Groceries');
 					await saving.held;
@@ -1036,9 +1063,9 @@ export const transactions = {
 			const table = page.locator('[data-slot="table-container"]');
 
 			await step('Accounts lists the Unapproved bookshop row without sideways scroll', async () => {
-				await page.goto('/accounts');
+				await page.goto('/transactions');
 				await expect(
-					page.getByRole('heading', { level: 1, name: 'Accounts', exact: true })
+					page.getByRole('heading', { level: 1, name: 'Transactions', exact: true })
 				).toBeVisible();
 				await expect(
 					table.getByRole('button', { name: /^SAMPLE BOOKSHOP 0193, Unapproved/ })

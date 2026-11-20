@@ -1,14 +1,12 @@
 import CoinsIcon from '@lucide/svelte/icons/coins';
 import LandmarkIcon from '@lucide/svelte/icons/landmark';
+import ReceiptIcon from '@lucide/svelte/icons/receipt';
 import SettingsIcon from '@lucide/svelte/icons/settings';
-import TagsIcon from '@lucide/svelte/icons/tags';
-import WalletIcon from '@lucide/svelte/icons/wallet';
 
 export const SECTIONS = [
 	{ href: '/', label: 'Budget', icon: CoinsIcon },
-	{ href: '/accounts', label: 'Accounts', icon: WalletIcon },
+	{ href: '/transactions', label: 'Transactions', icon: ReceiptIcon },
 	{ href: '/bank', label: 'Bank', icon: LandmarkIcon },
-	{ href: '/categories', label: 'Categories', icon: TagsIcon },
 	{ href: '/settings', label: 'Settings', icon: SettingsIcon }
 ] as const;
 

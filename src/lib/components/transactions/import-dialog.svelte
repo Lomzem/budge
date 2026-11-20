@@ -20,6 +20,7 @@
 	import { readBankFile } from '$lib/import';
 	import { readPublicError } from '$lib/publicError';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
+	import { getShellQueries } from '$lib/shellQueries.svelte';
 
 	type FileRows = FunctionArgs<typeof api.imports.commit>['rows'];
 	type PreviewCandidate = Extract<
@@ -33,7 +34,7 @@
 	}: { open?: boolean; defaultAccountId?: Id<'accounts'> | undefined } = $props();
 
 	const accounts = getAccounts();
-	const settings = useQuery(api.settings.get, () => (open ? {} : 'skip'));
+	const { settings } = getShellQueries();
 	const commit = useMutation(api.imports.commit);
 
 	let accountId = $state('');
@@ -47,16 +48,8 @@
 	const saving = $derived(dialog.pending('save'));
 
 	const account = $derived(accounts.find(accountId));
-	const settingsLoaded = $derived(settings.data !== undefined);
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? null);
-	let fileFieldAwaitsSettings = $state(false);
 	let fileField = $state<HTMLInputElement | null>(null);
-
-	$effect(() => {
-		if (!settingsLoaded || !fileFieldAwaitsSettings || fileField === null) return;
-		fileFieldAwaitsSettings = false;
-		fileField.focus();
-	});
 
 	const preview = useQuery(
 		api.imports.preview,
@@ -91,7 +84,6 @@
 		file = undefined;
 		picks = [];
 		error = '';
-		fileFieldAwaitsSettings = false;
 	}
 
 	async function choose(event: Event & { currentTarget: HTMLInputElement }) {
@@ -150,19 +142,13 @@
 		size="wide"
 		onOpenAutoFocus={(event: Event) => {
 			if (defaultAccountId === undefined) return;
-			if (!settingsLoaded) {
-				fileFieldAwaitsSettings = true;
-				return;
-			}
 			event.preventDefault();
 			fileField?.focus();
 		}}
-		onkeydown={() => (fileFieldAwaitsSettings = false)}
-		onpointerdown={() => (fileFieldAwaitsSettings = false)}
 	>
 		<Dialog.Header>
 			<Dialog.Title>Import a bank file</Dialog.Title>
-			<Dialog.Description>Capital One CSV or QFX, or Discover CSV.</Dialog.Description>
+			<Dialog.Description>Capital One or Discover CSV, or QFX.</Dialog.Description>
 		</Dialog.Header>
 		<form class="flex min-w-0 flex-col gap-4" onsubmit={save}>
 			<div class="flex flex-col gap-2">
@@ -184,9 +170,9 @@
 					accept=".csv,.qfx,.ofx,text/csv"
 					bind:ref={fileField}
 					onchange={choose}
-					disabled={!settingsLoaded || cutoverDate === null || reading || saving}
+					disabled={cutoverDate === null || reading || saving}
 				/>
-				{#if settingsLoaded && cutoverDate === null}
+				{#if cutoverDate === null}
 					<p role="alert" class="text-destructive">Set the cutover date before importing.</p>
 				{/if}
 			</div>

@@ -8,19 +8,22 @@
 	import { Label } from '$lib/components/ui/label';
 	import SelectField from '$lib/components/select-field.svelte';
 	import { DialogSession } from '$lib/dialogSession.svelte';
-	import { mainRegion } from '$lib/focusReturn';
+	import type { FocusDestination, FocusReturn } from '$lib/focusReturn';
 
 	import type { ManagedGroup } from './types';
 
 	let {
 		open = $bindable(false),
 		category,
-		groups
+		groups,
+		focusAfterDelete
 	}: {
 		open?: boolean;
 		category: { id: Id<'categories'>; name: string } | undefined;
 
 		groups: readonly ManagedGroup[];
+
+		focusAfterDelete: FocusDestination;
 	} = $props();
 
 	const remove = useMutation(api.categories.remove);
@@ -28,6 +31,7 @@
 	const dialog = new DialogSession();
 	let destinationId = $state('');
 	let error = $state('');
+	let deleted = false;
 
 	const choices = $derived(
 		groups
@@ -42,6 +46,7 @@
 		dialog.open({});
 		destinationId = '';
 		error = '';
+		deleted = false;
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -57,13 +62,22 @@
 		const removed = await dialog.run('save', () =>
 			remove({ categoryId: id, destinationId: destination._id })
 		);
-		if (removed.ok) open = false;
-		else error = removed.error?.message ?? "Budge couldn't delete the Category. Try again.";
+		if (removed.ok) {
+			deleted = true;
+			open = false;
+		} else error = removed.error?.message ?? "Budge couldn't delete the Category. Try again.";
 	}
+
+	const afterDelete: FocusReturn = {
+		opener: (opened) => (deleted ? null : opened),
+		get fallback() {
+			return focusAfterDelete;
+		}
+	};
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content returnFocus={{ fallback: mainRegion }}>
+	<Dialog.Content returnFocus={afterDelete}>
 		<Dialog.Header>
 			<Dialog.Title>Delete {category?.name ?? 'Category'}</Dialog.Title>
 			<Dialog.Description>
