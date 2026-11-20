@@ -48,7 +48,6 @@
 	const saving = $derived(dialog.pending('save'));
 
 	const account = $derived(accounts.find(accountId));
-	const settingsLoaded = $derived(settings.data !== undefined);
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? null);
 	let fileField = $state<HTMLInputElement | null>(null);
 
@@ -142,7 +141,7 @@
 		returnFocus={{ fallback: mainRegion }}
 		size="wide"
 		onOpenAutoFocus={(event: Event) => {
-			if (defaultAccountId === undefined || !settingsLoaded) return;
+			if (defaultAccountId === undefined) return;
 			event.preventDefault();
 			fileField?.focus();
 		}}
@@ -171,9 +170,9 @@
 					accept=".csv,.qfx,.ofx,text/csv"
 					bind:ref={fileField}
 					onchange={choose}
-					disabled={!settingsLoaded || cutoverDate === null || reading || saving}
+					disabled={cutoverDate === null || reading || saving}
 				/>
-				{#if settingsLoaded && cutoverDate === null}
+				{#if cutoverDate === null}
 					<p role="alert" class="text-destructive">Set the cutover date before importing.</p>
 				{/if}
 			</div>

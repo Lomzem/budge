@@ -113,13 +113,7 @@
 
 	const view = $derived(budget.shown);
 	const readyToAssign = $derived(budget.readyToAssign);
-	const ready = $derived(
-		view !== undefined &&
-			settings.data !== undefined &&
-			unapproved.data !== undefined &&
-			bankChanges.data !== undefined &&
-			(bank.loaded || bank.failed)
-	);
+	const ready = $derived(view !== undefined && (bank.loaded || bank.failed));
 	const groupsACategoryCanJoin = $derived(
 		view?.groups
 			.filter((group) => group.kind === 'normal')

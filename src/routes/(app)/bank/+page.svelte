@@ -44,7 +44,7 @@
 		if (settings.data?.cutoverDate === null) cutoverUnsetOnArrival = true;
 	});
 
-	const ready = $derived(bank.loaded && settings.data !== undefined);
+	const ready = $derived(bank.loaded);
 	const blocker = $derived.by(() => {
 		if (bank.service?.available === false) return 'unavailable';
 		if (settings.data?.cutoverDate === null) return 'cutover';

@@ -33,7 +33,7 @@ Preconditions:
 ## Gotchas
 
 - **Manual drive:** punctuation-only Search returns no rows; only the first 16 alphanumeric terms count. Category offers `Ready to Assign` when it exists; select it and verify the matching Transactions.
-- **Manual drive:** distinguish the filter alert `Budge couldn't load the Categories or Payees to check your filters. Try reloading the page.` from the list alert `Budge couldn't load Transactions. Try reloading the page.`; neither is a successfully loaded empty result.
+- **Manual drive:** the list alert `Budge couldn't load Transactions. Try reloading the page.` is not a successfully loaded empty result. If the Categories or Payees fail to load, the app shell shows the failure instead of any Section (see [shell](shell.md)).
 
 - Search/filter changes can return short pages; use Show more before asserting global absence.
 - Bank Text matching after Unmatch is covered with imports; global Payee renaming has no UI (see Payees).

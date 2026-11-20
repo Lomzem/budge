@@ -134,9 +134,6 @@
 		})
 	);
 	const applied = $derived(offered ?? noFilters);
-	const unchecked = $derived(
-		offered === undefined && Boolean(categoryList.error ?? payeeChoices.error)
-	);
 	$effect(() => {
 		if (offered === undefined) return;
 		const dropped = (['accountId', 'categoryId', 'payeeId'] as const).some(
@@ -265,8 +262,6 @@
 
 	const problem = $derived.by(() => {
 		if (rowError !== '') return rowError;
-		if (unchecked)
-			return "Budge couldn't load the Categories or Payees to check your filters. Try reloading the page.";
 		if (first.error ?? second.error)
 			return "Budge couldn't load Transactions. Try reloading the page.";
 		return '';
@@ -344,7 +339,6 @@
 	const more = $derived(secondShown ? second : first);
 	const canShowMore = $derived(more.status === 'CanLoadMore' || more.status === 'LoadingMore');
 	const result = $derived.by(() => {
-		if (unchecked) return '';
 		if (rows.length === 0 && loading) return 'Loading Transactions…';
 		if (bankChangesCut) {
 			const newest = `the newest ${String(BANK_CHANGE_LIMIT)} bank changes`;
