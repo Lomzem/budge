@@ -30,6 +30,7 @@ function observeLayoutShifts(binding: string) {
 	const box = (rect: DOMRectReadOnly) =>
 		[rect.x, rect.y, rect.width, rect.height].map((n) => n.toFixed(1)).join(',');
 	const RECENT_INPUT_MS = 500;
+	const FRAME_BEFORE_INPUT_MS = 50;
 	let lastInput = -Infinity;
 	const noteInput = (event: Event) => {
 		lastInput = event.timeStamp;
@@ -37,7 +38,8 @@ function observeLayoutShifts(binding: string) {
 	for (const type of ['pointerdown', 'keydown', 'input', 'change']) {
 		addEventListener(type, noteInput, true);
 	}
-	const sinceInput = (at: number) => at - lastInput >= 0 && at - lastInput < RECENT_INPUT_MS;
+	const sinceInput = (at: number) =>
+		at - lastInput > -FRAME_BEFORE_INPUT_MS && at - lastInput < RECENT_INPUT_MS;
 	const pointerQueries = ['(pointer: coarse)', '(hover: hover)'].map((query) => matchMedia(query));
 	const pointerNow = () => pointerQueries.map((query) => String(query.matches)).join();
 	let pointer = pointerNow();
