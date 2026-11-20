@@ -39,7 +39,7 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
 
 - **Fixture:** `budget-with-accounts`, plus `bank-sync` where a journey asks for it. All data is synthetic.
 - **Journeys:**
-  - `categories/manage`, `categories/touch-menu`, `categories/held-rename`, `categories/failed-rename`
+  - `categories/manage`, `categories/touch-menu`, `categories/only-group`, `categories/held-rename`, `categories/failed-rename`
   - `inspector/move-money`, `inspector/cover-and-manage`
   - `targets/monthly`
   - `shell/navigate`, `shell/cold-start`, `shell/failed-query`, `shell/phone-pages`
@@ -81,14 +81,14 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
 - In a ⋯ menu, End pressed right after Enter focuses the last item, and focus stays on the item the keyboard reached while the menu is open.
 - While a row menu or ⋯ menu is open, a click, tap or right-click anywhere outside it only closes it. Nothing under the press changes, and no row is selected. This holds over a dialog too: on a phone, Move, Clear, Close, Previous and Next in the inspector dialog do nothing until the menu is closed. Once the menu is closed, the next click acts at once, also after a right-click.
 - If one of the shared queries (Settings, the counts, Categories, Payees) fails, the app shows the server's message in place of every Section, or `Budge couldn't reach its server. Try reloading the page.` when the server gives none, as it does for a failed owner check or Accounts query. No Section opens with part of its data.
-- Deleting a group that has one Category speaks of one Category: `Its Category moves to the group you pick, with its history.`
+- Deleting a group that has one Category speaks of one Category: `Its Category moves to the group you pick, with its history.` If no other group can take its Categories, the dialog says only `Add another Category Group to take over this Category and its history.` (or `these Categories and their history.`) and offers no Delete.
 
-### Checks already completed (on `051524e`, the dev-branch commit with this branch's code)
+### Checks already completed (on `b13f082`, the dev-branch commit with this branch's code)
 
 | Check                                             | Exit code | Result                                                     |
 | ------------------------------------------------- | --------- | ---------------------------------------------------------- |
 | `bun run check`                                   | 0         | Includes lint, lint:ui, typecheck and 1,145 Vitest tests   |
-| Full live journey suite with `bun run app verify` | 0         | 66/66 in run `r2-051524e`, clean tree                      |
+| Full live journey suite with `bun run app verify` | 0         | 67/67 in run `r2-b13f082`, clean tree                      |
 | `gitleaks` on each commit's staged changes        | 0         | Clean                                                      |
 
 A judge re-checking round 1 gets their own findings and dispositions in their task. Read no `ui-review-round-1*` file and no other judge's report or evidence.
