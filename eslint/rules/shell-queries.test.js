@@ -29,6 +29,11 @@ new RuleTester().run('shell-queries', rule, {
 			)
 		},
 		{
+			...svelte(
+				"const count = useQuery(api.transactions.unapprovedCount, () => { if (ready) { return { accountId }; } return 'skip'; });"
+			)
+		},
+		{
 			filename,
 			options,
 			code: '<script lang="ts">function useQuery() {}\nconst settings = useQuery(api.settings.get, {});</script>',
@@ -61,6 +66,12 @@ new RuleTester().run('shell-queries', rule, {
 			code: `<script lang="ts">import { useQuery as subscribe } from 'convex-svelte';\nconst list = subscribe(api.payees.list, () => { return {}; });</script>`,
 			languageOptions: { parser: svelteParser },
 			errors: [{ messageId: 'shared', data: { query: 'api.payees.list', owner } }]
+		},
+		{
+			...svelte(
+				"const list = useQuery(api.categories.list, () => { if (open) { return {}; } return 'skip'; });"
+			),
+			errors: [{ messageId: 'shared', data: { query: 'api.categories.list', owner } }]
 		}
 	]
 });

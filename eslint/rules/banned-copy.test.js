@@ -70,7 +70,13 @@ new RuleTester({
 			'Tip:',
 			'Tip:'
 		),
-		svelte('<script lang="ts">const text: string = "Note: export your data";</script>', 'Note:')
+		svelte('<script lang="ts">const text: string = "Note: export your data";</script>', 'Note:'),
+		svelte("<p>{busy ? 'Saving right now' : 'Saved'}</p>", 'right now'),
+		svelte("<p>{note && 'Tip: check the date'}</p>", 'Tip:'),
+		svelte("<p>Due {due ?? 'each month'}</p>", 'each month'),
+		svelte("<button aria-label={busy ? 'Saving' : 'Save right now'}>x</button>", 'right now'),
+		svelte("<p>Ready right now {open ? 'here' : 'there'}</p>", 'right now'),
+		svelte("<p>{busy ? `Saving ${name} right now` : 'Saved'}</p>", 'right now')
 	]
 });
 

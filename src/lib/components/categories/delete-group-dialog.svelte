@@ -64,7 +64,7 @@
 			<Dialog.Description>
 				{#if count > 0}
 					Its {count === 1 ? 'Category moves' : `${String(count)} Categories move`} to the group you pick,
-					with all their history.
+					with their history.
 				{:else}
 					It has no Categories.
 				{/if}

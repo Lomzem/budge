@@ -13,15 +13,28 @@ const chainOf = (node) => {
 	return object && `${object}.${node.property.name}`;
 };
 
+const isFunction = (node) =>
+	node.type === 'ArrowFunctionExpression' ||
+	node.type === 'FunctionExpression' ||
+	node.type === 'FunctionDeclaration';
+
+const returnsIn = (node) => {
+	if (node?.type === 'ReturnStatement') return [node];
+	if (typeof node?.type !== 'string' || isFunction(node)) return [];
+	return Object.entries(node)
+		.filter(([key]) => key !== 'parent')
+		.flatMap(([, value]) => (Array.isArray(value) ? value.flatMap(returnsIn) : returnsIn(value)));
+};
+
 const unscoped = (node) => {
 	if (!node) return true;
 	if (node.type === 'ObjectExpression') return node.properties.length === 0;
 	if (node.type === 'Literal') return node.value === 'skip';
 	if (node.type === 'ConditionalExpression')
 		return unscoped(node.consequent) && unscoped(node.alternate);
-	if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') {
+	if (isFunction(node)) {
 		if (node.body.type !== 'BlockStatement') return unscoped(node.body);
-		const returns = node.body.body.filter((statement) => statement.type === 'ReturnStatement');
+		const returns = node.body.body.flatMap(returnsIn);
 		return returns.length > 0 && returns.every((statement) => unscoped(statement.argument));
 	}
 	return false;

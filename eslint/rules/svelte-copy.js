@@ -36,33 +36,56 @@ export const literalText = (expression) => {
 	return undefined;
 };
 
-const mustacheText = (node) => literalText(node.expression) ?? 'X';
+const shownTexts = (expression) => {
+	const text = literalText(expression);
+	if (text !== undefined) return [text];
+	if (expression?.type === 'TemplateLiteral')
+		return [expression.quasis.map((quasi) => quasi.value.cooked).join('X')];
+	if (expression?.type === 'ConditionalExpression')
+		return [...shownTexts(expression.consequent), ...shownTexts(expression.alternate)];
+	if (expression?.type === 'LogicalExpression') {
+		const left = expression.operator === '&&' ? [''] : shownTexts(expression.left);
+		return [...left, ...shownTexts(expression.right)];
+	}
+	return ['X'];
+};
 
-const textOf = (node) => {
-	if (!isInline(node)) return ' ';
-	if (node.type === 'SvelteText') return node.value;
-	if (node.type === 'SvelteMustacheTag') return mustacheText(node);
-	return node.children.map(textOf).join('');
+const mostVariants = 32;
+
+const joined = (parts) =>
+	parts.reduce(
+		(texts, part) =>
+			texts.flatMap((text) => part.map((variant) => text + variant)).slice(0, mostVariants),
+		['']
+	);
+
+const textsOf = (node) => {
+	if (!isInline(node)) return [' '];
+	if (node.type === 'SvelteText') return [node.value];
+	if (node.type === 'SvelteMustacheTag') return shownTexts(node.expression);
+	return joined(node.children.map(textsOf));
 };
 
 export const svelteCopyVisitors = (sourceCode, report, { skipTitle = false } = {}) => {
 	const firstWord = (run) => {
-		const node = run.find((child) => textOf(child).trim() !== '');
+		const node = run.find((child) => textsOf(child).some((text) => text.trim() !== ''));
 		if (node.type !== 'SvelteText') return node.loc.start;
 		const leading = node.value.length - node.value.trimStart().length;
 		return sourceCode.getLocFromIndex(node.range[0] + leading);
 	};
 	const check = (run) => {
-		const text = run.map(textOf).join('');
-		if (text.trim() === '') return;
-		report(text, { start: firstWord(run), end: run.at(-1).loc.end });
+		const texts = [...new Set(joined(run.map(textsOf)))].filter((text) => text.trim() !== '');
+		if (texts.length === 0) return;
+		report(texts, { start: firstWord(run), end: run.at(-1).loc.end });
 	};
 	const checkAttribute = (node) => {
 		if (node.key.type !== 'SvelteName' || !copyAttributes.has(node.key.name)) return;
-		const text = node.value
-			.map((part) => (part.type === 'SvelteLiteral' ? part.value : mustacheText(part)))
-			.join('');
-		report(text, node.loc);
+		const texts = joined(
+			node.value.map((part) =>
+				part.type === 'SvelteLiteral' ? [part.value] : shownTexts(part.expression)
+			)
+		);
+		report([...new Set(texts)], node.loc);
 	};
 	const visit = (node) => {
 		if (node.type === 'SvelteElement' && node.kind === 'html') {

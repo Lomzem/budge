@@ -54,26 +54,42 @@ export default {
 				instead
 			})
 		);
-		const check = (text, loc) => {
+		const check = (texts, loc) => {
 			for (const { regex, why, instead } of phrases) {
-				for (const [match] of text.matchAll(regex)) {
-					context.report({ loc, messageId: 'banned', data: { match, why, instead } });
+				const counts = new Map();
+				for (const text of texts) {
+					const inText = new Map();
+					for (const [match] of text.matchAll(regex))
+						inText.set(match, (inText.get(match) ?? 0) + 1);
+					for (const [match, count] of inText)
+						counts.set(match, Math.max(count, counts.get(match) ?? 0));
+				}
+				for (const [match, count] of counts) {
+					for (let reported = 0; reported < count; reported += 1) {
+						context.report({ loc, messageId: 'banned', data: { match, why, instead } });
+					}
 				}
 			}
 		};
 		const checkLiteral = (node) => {
-			if (typeof node.value === 'string' && !isNonCopy(node)) check(node.value, node.loc);
+			if (typeof node.value === 'string' && !isNonCopy(node)) check([node.value], node.loc);
 		};
 		const checkQuasi = (node) => {
-			if (!isNonCopy(node.parent)) check(node.value.cooked ?? node.value.raw, node.loc);
+			if (!isNonCopy(node.parent)) check([node.value.cooked ?? node.value.raw], node.loc);
 		};
 		if (!sourceCode.parserServices.isSvelte) {
 			return { Literal: checkLiteral, TemplateElement: checkQuasi };
 		}
 		return {
-			...svelteCopyVisitors(sourceCode, (text, loc) => check(text.replace(/\s+/g, ' '), loc), {
-				skipTitle: true
-			}),
+			...svelteCopyVisitors(
+				sourceCode,
+				(texts, loc) =>
+					check(
+						texts.map((text) => text.replace(/\s+/g, ' ')),
+						loc
+					),
+				{ skipTitle: true }
+			),
 			'SvelteScriptElement Literal': checkLiteral,
 			'SvelteScriptElement TemplateElement': checkQuasi
 		};

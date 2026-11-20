@@ -177,7 +177,7 @@
 <Dialog.Header>
 	<Dialog.Title>Starting balance for {account.name}</Dialog.Title>
 	<Dialog.Description>
-		Budge records it on {since ?? 'the cutover date'}{since === null ? '' : ', the cutover date'}.
+		Budge records it on {since === null ? 'the cutover date' : `${since}, the cutover date`}.
 		Confirm or correct it.
 		{#if skippable}
 			You can change it later from the Account's actions.
@@ -273,9 +273,9 @@
 						<dd>Unknown. The bank doesn't say whether its history is complete.</dd>
 					</div>
 				</dl>
-				<p>
-					Check your bank statement for the balance at the start of {since ?? 'the cutover date'}.
-				</p>
+				{#if since !== null}
+					<p>Check your bank statement for the balance at the start of {since}.</p>
+				{/if}
 			</div>
 		</details>
 	{/if}

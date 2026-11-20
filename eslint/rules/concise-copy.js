@@ -20,8 +20,10 @@ export default {
 	},
 	create(context) {
 		const [{ maxWords }] = context.options;
-		return svelteCopyVisitors(context.sourceCode, (text, loc) => {
-			const words = text.split(/\s+/).filter((word) => /\p{L}/u.test(word)).length;
+		return svelteCopyVisitors(context.sourceCode, (texts, loc) => {
+			const words = Math.max(
+				...texts.map((text) => text.split(/\s+/).filter((word) => /\p{L}/u.test(word)).length)
+			);
 			if (words <= maxWords) return;
 			context.report({ loc, messageId: 'long', data: { words, maxWords } });
 		});
