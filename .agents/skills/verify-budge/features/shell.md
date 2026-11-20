@@ -20,7 +20,7 @@ Navigate between budgeting views and retain theme choice.
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/shell.ts`, also run by `bun run test:e2e:local`):
 
-- `shell/navigate`: Budget landing, every sidebar Section, a wheel over the Budget table and the sidebar scrolling the page, then the 320 px tab bar to every Section and an Account (`shell-nav`).
+- `shell/navigate`: Budget landing, every sidebar Section on its first and later visits with no `Loading…` status (a MutationObserver watches every `role="status"`), a wheel over the Budget table and the sidebar scrolling the page, then the 320 px tab bar to every Section and an Account (`shell-nav`).
 - `shell/phone-pages`: at 390 px, every Section and the Checking register load and take a large scroll (`shell-stable`); the journey does not assert the end was reached.
 
 Every journey runs under the layout-shift guard (`e2e/journeys/layoutShift.ts`): a shift fails the journey and names the elements that moved unless it comes within 500 ms of input, or while a request sent within 500 ms of input is pending and up to 500 ms after its result arrives (a mutation once the page has synced its commit, a new query once its first result lands). Background updates and page loads with no input still fail. It watches the `WebSocket` the page uses, so a journey's `routeWebSocket` (as in `e2e/heldResponse.ts`) does not hide held requests or forged answers from it.

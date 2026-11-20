@@ -190,7 +190,7 @@ Kept:
 - `Approved X as Y`: already terse.
 - The export statuses.
 - The bank-change blocker text in the cutover preview: deferred, needs a check against the controls' names.
-- `Funded` in the inspector and progress value: the owner's complaint was the contradiction, now fixed.
+- Target progress: the bar reports a percentage, and the status beside it carries the dollar shortfall (`$25.00 more needed`). A Target with nothing to fund shows no `Funded` status. `targets/monthly` asserts the shortfall text.
 - The assigned-input `Esc` hint: a phone can have a keyboard. Deferred.
 - The account-dialog cutover-date description: the person needs the date.
 - `Feeds no Budge Account yet.`: a journey covers it, and it carries the reconnect instruction.

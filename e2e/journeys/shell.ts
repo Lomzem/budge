@@ -50,14 +50,22 @@ export const shell = {
 				);
 			});
 
-			await step('each sidebar Section opens its page and marks itself current', async () => {
-				for (const name of SECTIONS) {
-					const link = sidebar.getByRole('link', { name: new RegExp(`^${name}`) });
-					await link.click();
-					await expect(page.getByRole('heading', { level: 1, name, exact: true })).toBeVisible();
-					await expect(link).toHaveAttribute('aria-current', 'page');
+			await step(
+				'each sidebar Section opens its page with no Loading… and marks itself current',
+				async () => {
+					for (const name of SECTIONS) {
+						const link = sidebar.getByRole('link', { name: new RegExp(`^${name}`) });
+						await page.evaluate(watchForLoading);
+						await link.click();
+						await expect(page.getByRole('heading', { level: 1, name, exact: true })).toBeVisible();
+						await expect(link).toHaveAttribute('aria-current', 'page');
+						await expect(
+							page.getByRole('main').locator(SECTION_CONTENT[name]).first()
+						).toBeVisible();
+						expect(await page.evaluate(sawLoading), `${name} showed Loading…`).toBe(false);
+					}
 				}
-			});
+			);
 
 			await step(
 				'returning to a Section shows its content at once, with no Loading… in between',
