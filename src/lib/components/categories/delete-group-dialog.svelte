@@ -74,7 +74,9 @@
 		</Dialog.Header>
 		{#if count > 0 && choices.length === 0}
 			<p class="text-sm text-muted-foreground">
-				Add another Category Group first, to take over {itsCategories}.
+				Add another Category Group first, to take over {count === 1
+					? 'this Category'
+					: 'these Categories'}.
 			</p>
 		{:else}
 			<form class="flex flex-col gap-4" onsubmit={submit}>
