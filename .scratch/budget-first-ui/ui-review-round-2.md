@@ -42,7 +42,8 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
   - `categories/manage`, `categories/touch-menu`, `categories/held-rename`, `categories/failed-rename`
   - `inspector/move-money`, `inspector/cover-and-manage`
   - `targets/monthly`
-  - `shell/navigate`, `shell/phone-pages`
+  - `shell/navigate`, `shell/cold-start`, `shell/phone-pages`
+  - `imports/approve`
   - `transactions/categorize`, `transactions/select-categorize`, `transactions/approve-phone`
   - `plaid/status`, `plaid/consent`, `export/files`, `budget/assign`
 
@@ -68,22 +69,24 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
 - Ready to Assign changes only when money moves.
 - Closing a menu, whether a row menu or a group's ⋯ menu, never selects a row or opens the inspector.
 - A tap or right-click in an Assigned field edits that field and opens no row menu.
-- Tab switches between Budget, Transactions, Bank and Settings never show `Loading…` once the app has loaded.
+- Tab switches between Budget, Transactions, Bank and Settings never show `Loading…` once the app has loaded. Before the shared data loads, the main region shows one `Loading…` beside the sidebar, and no Section opens on its own `Loading…`.
+- Import file opened from an Account opens on the File field.
 - Picking a Category drops the row from the Unapproved count.
 - Showing a hidden Category or group from the keyboard leaves focus on it, and showing a Category opens its group if it was collapsed.
 - Hiding a Category or group, or moving a Category to another group, from the keyboard leaves focus in Budget: on the next Category or group, or on the moved Category.
+- Deleting a Category from the inspector or from its row menu leaves focus on the Category beside it: the next one in its group, else the previous one, else its group.
 - On a 320 px phone a row menu and its "Move to group" submenu stay on screen, with 44 px items.
 - At 320 px a long hidden name wraps at word boundaries on its own line.
 - An Escape while the inspector's Delete or Target dialog is open closes only that dialog; the inspector and an unsaved Move money amount stay.
 - In a ⋯ menu, End pressed right after Enter focuses the last item, and focus stays on the item the keyboard reached while the menu is open.
 - While a menu is open over a dialog, a click or tap on the dialog only closes the menu; on a phone, Move, Clear, Close, Previous and Next in the inspector dialog do nothing until the menu is closed.
 
-### Checks already completed (on `3f70cab`, the code of `5505d72`)
+### Checks already completed (on `02de368`, the code of `0197a7f`)
 
 | Check                                             | Exit code | Result                                                     |
 | ------------------------------------------------- | --------- | ---------------------------------------------------------- |
-| `bun run check`                                   | 0         | Includes lint, lint:ui, typecheck and 1,131 Vitest tests   |
-| Full live journey suite with `bun run app verify` | 0         | 64/64: run `r2-full-a41` passed 40 and stalled at sign-in for 24; rerun `r2-full-a41-rerun2` passed those 24 |
+| `bun run check`                                   | 0         | Includes lint, lint:ui, typecheck and 1,145 Vitest tests   |
+| Full live journey suite with `bun run app verify` | 0         | 65/65 in run `full-02de368`, clean tree                    |
 | `gitleaks` on each commit's staged changes        | 0         | Clean                                                      |
 
 A judge re-checking round 1 gets their own findings and dispositions in their task. Read no `ui-review-round-1*` file and no other judge's report or evidence.
@@ -100,7 +103,7 @@ The judges run one at a time in the single checkout `/home/lomzem/proj/budge-ui`
 | Judge | Model and reasoning effort | Report file                                           |
 | ----- | -------------------------- | ----------------------------------------------------- |
 | Opus  | claude-opus-5-5, high      | `.scratch/budget-first-ui/ui-review-round-2-opus.md`  |
-| Sol A | gpt-6.2-sol, high          | `.scratch/budget-first-ui/ui-review-round-2-sol-a.md` |
-| Sol B | gpt-6.2-sol, high          | `.scratch/budget-first-ui/ui-review-round-2-sol-b.md` |
+| Sol A | gpt-6.2-sol, xhigh         | `.scratch/budget-first-ui/ui-review-round-2-sol-a.md` |
+| Sol B | gpt-6.2-sol, xhigh         | `.scratch/budget-first-ui/ui-review-round-2-sol-b.md` |
 
 Each judge writes their report file and returns its full text.
