@@ -513,20 +513,19 @@
 		if (unchanged && !approves && (!remembers || option === row.rememberedCategoryId)) {
 			return undefined;
 		}
-		return { choice: remembers ? { ...found, remember } : found, remembers };
+		return { choice: remembers ? { ...found, remember } : found, remembers, approves };
 	}
 
 	async function pickCategory(row: Row, option: string, payee: string, remember: boolean) {
 		const change = changeOf(row, option, remember);
 		if (change === undefined) return;
-		const { choice, remembers } = change;
+		const { choice, remembers, approves } = change;
 		rowError = '';
 		retireUndoOf(row._id);
 		const pick = (latestPick.get(row._id) ?? 0) + 1;
 		latestPick.set(row._id, pick);
 		picked.set(row._id, option);
 		const at = listed.findIndex((other) => other._id === row._id);
-		const approves = !row.approved && choice.kind !== 'uncategorized';
 		const waiting = [...listed.slice(at + 1), ...listed.slice(0, at).reverse()].filter(
 			(other) => !other.approved
 		);

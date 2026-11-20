@@ -18,14 +18,13 @@ interface LoadingWatch {
 function watchForLoading() {
 	const watch = window as unknown as LoadingWatch;
 	watch.sawLoading = false;
-	const isLoading = (node: Node) =>
-		node instanceof HTMLElement &&
-		[node, ...node.querySelectorAll('[role="status"]')].some(
-			(element) => element.matches('[role="status"]') && element.textContent.trim() === 'Loading…'
+	const aStatusIsLoading = () =>
+		[...document.querySelectorAll('[role="status"]')].some((status) =>
+			/^Loading\b/.test(status.textContent.trim())
 		);
-	new MutationObserver((records) => {
-		if (records.some((record) => [...record.addedNodes].some(isLoading))) watch.sawLoading = true;
-	}).observe(document.body, { subtree: true, childList: true });
+	new MutationObserver(() => {
+		if (aStatusIsLoading()) watch.sawLoading = true;
+	}).observe(document.body, { subtree: true, childList: true, characterData: true });
 }
 
 function sawLoading() {

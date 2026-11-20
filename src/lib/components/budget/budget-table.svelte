@@ -501,15 +501,6 @@
 								<MenuEntries menu="context" entries={categoryEntries(category, group)} />
 							</ContextMenu.Content>
 						</ContextMenu.Root>
-					{:else}
-						<Table.Row>
-							<Table.Cell>
-								<span class="text-muted-foreground xs:pl-3">No Categories yet.</span>
-							</Table.Cell>
-							<Table.Cell />
-							<Table.Cell showFrom="xl" />
-							<Table.Cell showFrom="md" />
-						</Table.Row>
 					{/each}
 				{/if}
 			</Table.Body>

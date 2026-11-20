@@ -1,3 +1,5 @@
+import type { OptimisticLocalStore } from 'convex/browser';
+import type { FunctionReturnType } from 'convex/server';
 import { useMutation } from 'convex-svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
@@ -19,6 +21,25 @@ function placeIn<T>(
 	const from = items.findIndex((item) => idOf(item) === id);
 	const to = items.findIndex((item) => idOf(item) === target);
 	return from === -1 || to === -1 ? [...items] : moveInList(items, from, to);
+}
+
+type ListedGroups = FunctionReturnType<typeof api.categories.list>['groups'];
+type MonthGroups = FunctionReturnType<typeof api.budget.month>['groups'];
+
+function reorderOptimistically(
+	store: OptimisticLocalStore,
+	reorder: {
+		listed: (groups: ListedGroups) => ListedGroups;
+		month: (groups: MonthGroups) => MonthGroups;
+	}
+) {
+	const listed = store.getQuery(api.categories.list, {});
+	if (listed !== undefined)
+		store.setQuery(api.categories.list, {}, { ...listed, groups: reorder.listed(listed.groups) });
+	for (const { args, value } of store.getAllQueries(api.budget.month)) {
+		if (value !== undefined)
+			store.setQuery(api.budget.month, args, { ...value, groups: reorder.month(value.groups) });
+	}
 }
 
 export class CategoryActions {
@@ -56,34 +77,20 @@ export class CategoryActions {
 				{ categoryId, groupId, index },
 				{
 					optimisticUpdate: (store) => {
-						const listed = store.getQuery(api.categories.list, {});
-						if (listed !== undefined)
-							store.setQuery(
-								api.categories.list,
-								{},
-								{
-									...listed,
-									groups: listed.groups.map((g) =>
-										g._id === groupId
-											? {
-													...g,
-													categories: placeIn(g.categories, (c) => c._id, categoryId, target)
-												}
-											: g
-									)
-								}
-							);
-						for (const { args, value } of store.getAllQueries(api.budget.month)) {
-							if (value === undefined) continue;
-							store.setQuery(api.budget.month, args, {
-								...value,
-								groups: value.groups.map((g) =>
+						reorderOptimistically(store, {
+							listed: (groups) =>
+								groups.map((g) =>
+									g._id === groupId
+										? { ...g, categories: placeIn(g.categories, (c) => c._id, categoryId, target) }
+										: g
+								),
+							month: (groups) =>
+								groups.map((g) =>
 									g.id === groupId
 										? { ...g, categories: placeIn(g.categories, (c) => c.id, categoryId, target) }
 										: g
 								)
-							});
-						}
+						});
 					}
 				}
 			)
@@ -104,20 +111,10 @@ export class CategoryActions {
 				{ groupId, index },
 				{
 					optimisticUpdate: (store) => {
-						const listed = store.getQuery(api.categories.list, {});
-						if (listed !== undefined)
-							store.setQuery(
-								api.categories.list,
-								{},
-								{ ...listed, groups: placeIn(listed.groups, (g) => g._id, groupId, target) }
-							);
-						for (const { args, value } of store.getAllQueries(api.budget.month)) {
-							if (value === undefined) continue;
-							store.setQuery(api.budget.month, args, {
-								...value,
-								groups: placeIn(value.groups, (g) => g.id, groupId, target)
-							});
-						}
+						reorderOptimistically(store, {
+							listed: (groups) => placeIn(groups, (g) => g._id, groupId, target),
+							month: (groups) => placeIn(groups, (g) => g.id, groupId, target)
+						});
 					}
 				}
 			)

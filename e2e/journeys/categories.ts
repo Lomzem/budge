@@ -334,9 +334,10 @@ export const categories = {
 					await deleteCategory.getByRole('button', { name: 'Delete Category' }).click();
 					await expect(deleteCategory).toBeHidden();
 					await expect(page.getByRole('button', { name: /^Smoke Test Renamed/ })).toHaveCount(0);
-					await expect(
-						groupOf(page, 'Smoke Test Shelf').getByText('No Categories yet.')
-					).toBeVisible();
+					await expect(groupOf(page, 'Smoke Test Shelf')).toBeVisible();
+					await expect(groupOf(page, 'Smoke Test Shelf').locator('[data-category-id]')).toHaveCount(
+						0
+					);
 					expect(
 						await everydayWidthOnAPhone(page),
 						'Everyday at 320 px once a group is empty'

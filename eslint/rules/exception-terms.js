@@ -27,6 +27,7 @@ export default {
 			date: 'The exception to {{rule}} expires on {{date}}, which is not a calendar date. Write YYYY-MM-DD.',
 			blanket:
 				'A blanket `eslint-disable` also silences {{rules}}. Disable one named rule for one line: `eslint-disable-next-line <rule> -- <reason>; expires YYYY-MM-DD; approved by <owner>`.',
+			one: 'An exception to {{rule}} names only that rule. Give each rule its own `eslint-disable-next-line` line.',
 			line: 'An exception to {{rule}} covers one line. Write `eslint-disable-next-line {{rule}} -- <reason>; expires YYYY-MM-DD; approved by <owner>` above it.'
 		}
 	},
@@ -34,11 +35,7 @@ export default {
 		const options = context.options[0].rules;
 		const guarded = new Set(options);
 		const today = new Date().toISOString().slice(0, 10);
-		const named = (list) =>
-			list
-				.split(',')
-				.map((name) => name.trim().split(/[\s:]/)[0])
-				.find((name) => guarded.has(name));
+		const namesIn = (list) => list.split(',').map((name) => name.trim().split(/[\s:]/)[0]);
 		const check = (node, text) => {
 			const config = inlineConfig.exec(text);
 			if (config && !/^\s*eslint-/.test(text)) {
@@ -51,9 +48,12 @@ export default {
 			const [, scope, list, reason] = match;
 			if (list === undefined)
 				return context.report({ node, messageId: 'blanket', data: { rules: options.join(', ') } });
-			const rule = named(list);
+			const names = namesIn(list);
+			const rule = names.find((name) => guarded.has(name));
 			if (!rule) return;
-			if (scope === undefined) return context.report({ node, messageId: 'line', data: { rule } });
+			if (scope !== '-next-line')
+				return context.report({ node, messageId: 'line', data: { rule } });
+			if (names.length > 1) return context.report({ node, messageId: 'one', data: { rule } });
 			const agreed = terms.exec(reason ?? '');
 			if (!agreed) return context.report({ node, messageId: 'terms', data: { rule } });
 			const date = agreed[2];

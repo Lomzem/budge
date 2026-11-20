@@ -67,6 +67,16 @@ new RuleTester().run('exception-terms', rule, {
 			options,
 			code: '<!-- eslint-disable-next-line no-console -->\n<p>x</p>',
 			errors: [{ messageId: 'terms' }]
+		},
+		{
+			options,
+			code: 'let a; // eslint-disable-line no-console -- quoted; expires 2999-01-01; approved by Owner',
+			errors: [{ messageId: 'line', data: { rule: 'no-console' } }]
+		},
+		{
+			options,
+			code: '// eslint-disable-next-line no-alert, no-console -- quoted; expires 2999-01-01; approved by Owner\nlet a;',
+			errors: [{ messageId: 'one', data: { rule: 'no-console' } }]
 		}
 	]
 });
