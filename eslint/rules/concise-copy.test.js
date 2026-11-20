@@ -67,6 +67,13 @@ new RuleTester({ languageOptions: { parser: svelteParser } }).run('concise-copy'
 			errors: [long(13)]
 		},
 		{
+			name: 'the longest branch of every conditional counts, however many conditionals join',
+			filename,
+			options,
+			code: "<p>{a ? '' : 'one two '}{b ? '' : 'one two '}{c ? '' : 'one two '}{d ? '' : 'one two '}{e ? '' : 'one two '}{f ? '' : 'one two '}{g ? '' : 'one two'}</p>",
+			errors: [long(14)]
+		},
+		{
 			name: 'the report starts on the first word, where a disable-next-line comment points',
 			filename,
 			options,

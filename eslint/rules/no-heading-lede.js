@@ -1,4 +1,4 @@
-import { literalText, svelteChildLists } from './svelte-copy.js';
+import { shownTexts, svelteChildLists } from './svelte-copy.js';
 
 const isHeading = (node) => node.kind === 'html' && /^h[1-3]$/.test(node.name.name);
 
@@ -24,7 +24,7 @@ const isWhitespace = (node) => node.type === 'SvelteText' && node.value.trim() =
 
 const staticText = (node) => {
 	if (node.type === 'SvelteText') return node.value;
-	if (node.type === 'SvelteMustacheTag') return literalText(node.expression) ?? 'x';
+	if (node.type === 'SvelteMustacheTag') return shownTexts(node.expression).join(' ');
 	if (node.type === 'SvelteSnippetBlock') return ' ';
 	const branches = node.else ? [staticText(node.else)] : [];
 	return [

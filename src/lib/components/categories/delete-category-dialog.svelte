@@ -8,7 +8,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import SelectField from '$lib/components/select-field.svelte';
 	import { DialogSession } from '$lib/dialogSession.svelte';
-	import { mainRegion, type FocusDestination, type FocusReturn } from '$lib/focusReturn';
+	import type { FocusDestination, FocusReturn } from '$lib/focusReturn';
 
 	import type { ManagedGroup } from './types';
 
@@ -16,14 +16,14 @@
 		open = $bindable(false),
 		category,
 		groups,
-		focusAfterDelete = mainRegion
+		focusAfterDelete
 	}: {
 		open?: boolean;
 		category: { id: Id<'categories'>; name: string } | undefined;
 
 		groups: readonly ManagedGroup[];
 
-		focusAfterDelete?: FocusDestination;
+		focusAfterDelete: FocusDestination;
 	} = $props();
 
 	const remove = useMutation(api.categories.remove);

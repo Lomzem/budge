@@ -76,7 +76,11 @@ new RuleTester({
 		svelte("<p>Due {due ?? 'each month'}</p>", 'each month'),
 		svelte("<button aria-label={busy ? 'Saving' : 'Save right now'}>x</button>", 'right now'),
 		svelte("<p>Ready right now {open ? 'here' : 'there'}</p>", 'right now'),
-		svelte("<p>{busy ? `Saving ${name} right now` : 'Saved'}</p>", 'right now')
+		svelte("<p>{busy ? `Saving ${name} right now` : 'Saved'}</p>", 'right now'),
+		svelte(
+			"<p>{a ? 'Ready' : 'Ready right now'}{b ? ' b' : ' B'}{c ? ' c' : ' C'}{d ? ' d' : ' D'}{e ? ' e' : ' E'}{f ? ' f' : ' F'}</p>",
+			'right now'
+		)
 	]
 });
 

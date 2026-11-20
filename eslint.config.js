@@ -336,6 +336,20 @@ export default defineConfig(
 		}
 	},
 	{
+		files: ['e2e/journeys/**/*.ts'],
+		ignores: ['e2e/journeys/journey.ts'],
+		rules: {
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='reload']",
+					message:
+						'Use reloadOnceSaved(page) so pending writes finish and the signed-in Section is ready.'
+				}
+			]
+		}
+	},
+	{
 		files: ['src/lib/domain/**'],
 		rules: {
 			'no-restricted-imports': [

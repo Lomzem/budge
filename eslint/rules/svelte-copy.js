@@ -36,7 +36,7 @@ export const literalText = (expression) => {
 	return undefined;
 };
 
-const shownTexts = (expression) => {
+export const shownTexts = (expression) => {
 	const text = literalText(expression);
 	if (text !== undefined) return [text];
 	if (expression?.type === 'TemplateLiteral')
@@ -52,12 +52,31 @@ const shownTexts = (expression) => {
 
 const mostVariants = 32;
 
-const joined = (parts) =>
+const allCombinations = (parts) =>
 	parts.reduce(
-		(texts, part) =>
-			texts.flatMap((text) => part.map((variant) => text + variant)).slice(0, mostVariants),
+		(texts, part) => texts.flatMap((text) => part.map((variant) => text + variant)),
 		['']
 	);
+
+const wordCount = (text) => text.split(/\s+/).filter(Boolean).length;
+
+const longest = (variants) =>
+	variants.reduce((most, variant) => (wordCount(variant) > wordCount(most) ? variant : most));
+
+const eachVariantInContext = (parts) => {
+	const usual = parts.map(([first]) => first);
+	const withOne = (index, variant) =>
+		usual.map((text, other) => (other === index ? variant : text)).join('');
+	return [
+		parts.map(longest).join(''),
+		...parts.flatMap((part, index) => part.map((variant) => withOne(index, variant)))
+	];
+};
+
+const joined = (parts) =>
+	parts.reduce((count, part) => count * part.length, 1) <= mostVariants
+		? allCombinations(parts)
+		: eachVariantInContext(parts);
 
 const textsOf = (node) => {
 	if (!isInline(node)) return [' '];

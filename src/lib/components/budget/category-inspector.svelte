@@ -20,7 +20,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { formatCents, parseCents } from '$lib/domain/money';
-	import { mainRegion, type FocusDestination } from '$lib/focusReturn';
+	import type { FocusDestination } from '$lib/focusReturn';
 
 	import AssignNeededButton from './assign-needed-button.svelte';
 	import AssignedInput from './assigned-input.svelte';
@@ -39,7 +39,7 @@
 		steps,
 		onstep,
 		onclose,
-		focusAfterRemoval = mainRegion
+		focusAfterRemoval
 	}: {
 		category: CategoryBudget;
 
@@ -53,7 +53,7 @@
 		onstep?: (id: Id<'categories'>) => void;
 		onclose: () => void;
 
-		focusAfterRemoval?: FocusDestination;
+		focusAfterRemoval: FocusDestination;
 	} = $props();
 
 	const budget = getBudgetMonth();

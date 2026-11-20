@@ -68,6 +68,11 @@ new RuleTester({ languageOptions: { parser: svelteParser } }).run('no-heading-le
 		},
 		{
 			filename,
+			code: "<h2>Export</h2><p class=\"text-muted-foreground\">{busy ? 'Saving' : 'Download CSV or JSON.'}</p>",
+			errors: [lede]
+		},
+		{
+			filename,
 			code: '<h2>Balance</h2><p class="text-muted-foreground">Your balance expires on day 1.</p>',
 			errors: [lede]
 		},
