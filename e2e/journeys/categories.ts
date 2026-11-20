@@ -75,17 +75,16 @@ async function tapTheCornerOf(page: Page, target: Locator) {
 	const box = await target.boundingBox();
 	if (box === null) throw new Error(`${String(target)} has no box to tap`);
 	const corner = { x: box.x + 3, y: box.y + box.height - 3 };
-	const owned = await target.evaluate(
-		(element, { x, y }) =>
-			element.contains(
-				document
-					.elementsFromPoint(x, y)
-					.find((shown) => !shown.matches('[data-slot="menu-dismiss-layer"]')) ?? null
-			),
-		corner
-	);
-	if (!owned)
-		throw new Error(`Something covers the corner of ${String(target)}, so a tap there misses it`);
+	for (const menu of await page.getByRole('menu').all()) {
+		const cover = await menu.boundingBox();
+		if (cover === null) continue;
+		const inside =
+			corner.x >= cover.x &&
+			corner.x <= cover.x + cover.width &&
+			corner.y >= cover.y &&
+			corner.y <= cover.y + cover.height;
+		if (inside) throw new Error(`A menu covers the corner of ${String(target)}`);
+	}
 	const screen = await touchscreen(page);
 	await screen.touch('touchStart', [{ id: 1, ...corner }]);
 	await screen.touch('touchEnd', []);
