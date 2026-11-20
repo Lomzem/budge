@@ -231,6 +231,14 @@ function assembledTransition(frame: Frame, chunks: string[]): Transition | 'part
 	return parse(chunks.splice(0).join('')) as Transition;
 }
 
+function querySetChanges(frame: Frame) {
+	const message = parse(frame) as {
+		type?: unknown;
+		modifications?: { type?: unknown; queryId?: unknown; udfPath?: unknown }[];
+	};
+	return message.type === 'ModifyQuerySet' ? (message.modifications ?? []) : [];
+}
+
 export async function withholdQueryResult(page: Page, udfPath: string) {
 	const queryIds = new Set<unknown>();
 	const pathOf = new Map<unknown, unknown>();
@@ -247,16 +255,10 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 		browser = socket;
 		const server = socket.connectToServer();
 		socket.onMessage((frame) => {
-			const message = parse(frame) as {
-				type?: unknown;
-				modifications?: { type?: unknown; queryId?: unknown; udfPath?: unknown }[];
-			};
-			if (message.type === 'ModifyQuerySet') {
-				for (const change of message.modifications ?? []) {
-					if (change.type === 'Add') pathOf.set(change.queryId, change.udfPath);
-					if (change.type === 'Add' && change.udfPath === udfPath) queryIds.add(change.queryId);
-					if (change.type === 'Remove' && queryIds.has(change.queryId)) markDropped(undefined);
-				}
+			for (const change of querySetChanges(frame)) {
+				if (change.type === 'Add') pathOf.set(change.queryId, change.udfPath);
+				if (change.type === 'Add' && change.udfPath === udfPath) queryIds.add(change.queryId);
+				if (change.type === 'Remove' && queryIds.has(change.queryId)) markDropped(undefined);
 			}
 			server.send(frame);
 		});
@@ -321,14 +323,9 @@ export async function failQueryResult(page: Page, udfPath: string) {
 	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => {
 		const server = socket.connectToServer();
 		socket.onMessage((frame) => {
-			const message = parse(frame) as {
-				type?: unknown;
-				modifications?: { type?: unknown; queryId?: unknown; udfPath?: unknown }[];
-			};
-			if (message.type === 'ModifyQuerySet') {
-				for (const change of message.modifications ?? []) {
-					if (change.type === 'Add' && change.udfPath === udfPath) queryIds.add(change.queryId);
-				}
+			for (const change of querySetChanges(frame)) {
+				if (change.type === 'Add' && change.udfPath === udfPath) queryIds.add(change.queryId);
+				if (change.type === 'Remove') queryIds.delete(change.queryId);
 			}
 			server.send(frame);
 		});
