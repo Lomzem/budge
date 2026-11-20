@@ -326,13 +326,14 @@ export const categories = {
 			);
 
 			await step(
-				'delete the Category into Groceries, which leaves its group empty without narrowing the phone table, then delete the group',
+				'delete the Category into Groceries, which puts focus on Transit beside it and leaves its group empty without narrowing the phone table, then delete the group',
 				async () => {
 					await fromRowMenu(page, rowOf(page, 'Smoke Test Renamed'), 'Delete…');
 					const deleteCategory = page.getByRole('dialog', { name: 'Delete Smoke Test Renamed' });
 					await choose(deleteCategory.getByLabel('Move its history to'), 'Groceries');
 					await deleteCategory.getByRole('button', { name: 'Delete Category' }).click();
 					await expect(deleteCategory).toBeHidden();
+					await expect(page.getByRole('button', { name: 'Transit', exact: true })).toBeFocused();
 					await expect(page.getByRole('button', { name: /^Smoke Test Renamed/ })).toHaveCount(0);
 					await expect(groupOf(page, 'Smoke Test Shelf')).toBeVisible();
 					await expect(groupOf(page, 'Smoke Test Shelf').locator('[data-category-id]')).toHaveCount(

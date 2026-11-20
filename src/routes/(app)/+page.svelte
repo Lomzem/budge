@@ -30,7 +30,7 @@
 	import { formatCents } from '$lib/domain/money';
 	import { formatUnapprovedCount } from '$lib/domain/unapproved';
 	import { formatBankChangeCount } from '$lib/domain/bankChanges';
-	import { mainRegion, type FocusDestination } from '$lib/focusReturn';
+	import { firstVisible, mainRegion, type FocusDestination } from '$lib/focusReturn';
 	import { keepInUrl } from '$lib/keepInUrl';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 
@@ -155,13 +155,7 @@
 	});
 
 	const besideTheLastSelected: FocusDestination = () =>
-		besideSelected
-			.map((selector) =>
-				[...document.querySelectorAll<HTMLElement>(selector)].find((element) =>
-					element.checkVisibility()
-				)
-			)
-			.find((element) => element !== undefined) ?? mainRegion();
+		firstVisible(besideSelected) ?? mainRegion();
 
 	let selectedPlacement: { id: Id<'categories'>; group: Id<'categoryGroups'> } | null = null;
 	$effect.pre(() => {

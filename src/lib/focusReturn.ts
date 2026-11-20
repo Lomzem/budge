@@ -8,6 +8,16 @@ export interface FocusReturn {
 
 export const mainRegion: FocusDestination = () => document.getElementById('main');
 
+export function firstVisible(selectors: readonly string[]): HTMLElement | undefined {
+	for (const selector of selectors) {
+		const found = [...document.querySelectorAll<HTMLElement>(selector)].find((element) =>
+			element.checkVisibility()
+		);
+		if (found !== undefined) return found;
+	}
+	return undefined;
+}
+
 const dialogs = '[role="dialog"], [role="alertdialog"]';
 
 const focusables =

@@ -19,6 +19,7 @@
 	import * as Table from '$lib/components/ui/table';
 	import { neededOf } from '$lib/domain/budget';
 	import { formatCents } from '$lib/domain/money';
+	import { firstVisible, mainRegion } from '$lib/focusReturn';
 	import { keepRefusalInView } from '$lib/refusalInView';
 	import { clickedTheRow } from '$lib/rowClick';
 
@@ -61,6 +62,7 @@
 	let leaving: string | null = null;
 
 	let deletingCategory: { id: Id<'categories'>; name: string } | undefined = $state();
+	let besideTheDeleted: string[] = [];
 	let deleteCategoryOpen = $state(false);
 	let deleteCategoryDialog: { reset: () => void } | undefined = $state();
 
@@ -81,9 +83,7 @@
 	}
 
 	function focusVisible(selector: string) {
-		const element = [...document.querySelectorAll<HTMLElement>(selector)].find((candidate) =>
-			candidate.checkVisibility()
-		);
+		const element = firstVisible([selector]);
 		element?.focus();
 		return element !== undefined;
 	}
@@ -133,6 +133,10 @@
 			},
 			remove: () => {
 				deletingCategory = { id: category.id, name: category.name };
+				besideTheDeleted = [
+					...(neighbour === undefined ? [] : [`[data-category-id="${neighbour.id}"]`]),
+					`[data-group-id="${group.id}"]`
+				];
 				deleteCategoryDialog?.reset();
 				deleteCategoryOpen = true;
 			}
@@ -513,6 +517,7 @@
 	bind:open={deleteCategoryOpen}
 	category={deletingCategory}
 	groups={actions.groups}
+	focusAfterDelete={() => firstVisible(besideTheDeleted) ?? mainRegion()}
 />
 <DeleteGroupDialog
 	bind:this={deleteGroupDialog}

@@ -8,7 +8,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import SelectField from '$lib/components/select-field.svelte';
 	import { DialogSession } from '$lib/dialogSession.svelte';
-	import { mainRegion, type FocusDestination } from '$lib/focusReturn';
+	import { mainRegion, type FocusDestination, type FocusReturn } from '$lib/focusReturn';
 
 	import type { ManagedGroup } from './types';
 
@@ -31,6 +31,7 @@
 	const dialog = new DialogSession();
 	let destinationId = $state('');
 	let error = $state('');
+	let deleted = false;
 
 	const choices = $derived(
 		groups
@@ -45,6 +46,7 @@
 		dialog.open({});
 		destinationId = '';
 		error = '';
+		deleted = false;
 	}
 
 	async function submit(event: SubmitEvent) {
@@ -60,13 +62,22 @@
 		const removed = await dialog.run('save', () =>
 			remove({ categoryId: id, destinationId: destination._id })
 		);
-		if (removed.ok) open = false;
-		else error = removed.error?.message ?? "Budge couldn't delete the Category. Try again.";
+		if (removed.ok) {
+			deleted = true;
+			open = false;
+		} else error = removed.error?.message ?? "Budge couldn't delete the Category. Try again.";
 	}
+
+	const afterDelete: FocusReturn = {
+		opener: (opened) => (deleted ? null : opened),
+		get fallback() {
+			return focusAfterDelete;
+		}
+	};
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content returnFocus={{ fallback: focusAfterDelete }}>
+	<Dialog.Content returnFocus={afterDelete}>
 		<Dialog.Header>
 			<Dialog.Title>Delete {category?.name ?? 'Category'}</Dialog.Title>
 			<Dialog.Description>
