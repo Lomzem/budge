@@ -50,14 +50,7 @@
 	const account = $derived(accounts.find(accountId));
 	const settingsLoaded = $derived(settings.data !== undefined);
 	const cutoverDate = $derived(settings.data?.cutoverDate ?? null);
-	let fileFieldAwaitsSettings = $state(false);
 	let fileField = $state<HTMLInputElement | null>(null);
-
-	$effect(() => {
-		if (!settingsLoaded || !fileFieldAwaitsSettings || fileField === null) return;
-		fileFieldAwaitsSettings = false;
-		fileField.focus();
-	});
 
 	const preview = useQuery(
 		api.imports.preview,
@@ -92,7 +85,6 @@
 		file = undefined;
 		picks = [];
 		error = '';
-		fileFieldAwaitsSettings = false;
 	}
 
 	async function choose(event: Event & { currentTarget: HTMLInputElement }) {
@@ -150,16 +142,10 @@
 		returnFocus={{ fallback: mainRegion }}
 		size="wide"
 		onOpenAutoFocus={(event: Event) => {
-			if (defaultAccountId === undefined) return;
-			if (!settingsLoaded) {
-				fileFieldAwaitsSettings = true;
-				return;
-			}
+			if (defaultAccountId === undefined || !settingsLoaded) return;
 			event.preventDefault();
 			fileField?.focus();
 		}}
-		onkeydown={() => (fileFieldAwaitsSettings = false)}
-		onpointerdown={() => (fileFieldAwaitsSettings = false)}
 	>
 		<Dialog.Header>
 			<Dialog.Title>Import a bank file</Dialog.Title>

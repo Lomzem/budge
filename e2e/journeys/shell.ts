@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 
+import { withholdQueryResult } from '../heldResponse';
 import { expectNothingPastTheRightEdge, openBudget, type Journey } from './journey';
 
 const SECTIONS = ['Budget', 'Transactions', 'Bank', 'Settings'] as const;
@@ -25,6 +26,11 @@ function watchForLoading() {
 	new MutationObserver(() => {
 		if (aStatusIsLoading()) watch.sawLoading = true;
 	}).observe(document.body, { subtree: true, childList: true, characterData: true });
+}
+
+function scrolledToTheEnd() {
+	const { scrollTop, scrollHeight } = document.documentElement;
+	return scrollTop + window.innerHeight >= scrollHeight - 1;
 }
 
 function sawLoading() {
@@ -131,6 +137,45 @@ export const shell = {
 			);
 		}
 	},
+	'cold-start': {
+		title:
+			'a Section opened before the shared data loads waits in the shell, then opens with no Loading… of its own',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			const sidebar = page.getByRole('navigation', { name: 'Sections and Accounts' });
+			const heading = page.getByRole('heading', { level: 1, name: 'Settings', exact: true });
+			const settings = await withholdQueryResult(page, 'settings:get');
+
+			await step(
+				'with Settings still loading, a switch to Settings shows only the shell',
+				async () => {
+					await page.goto('/transactions');
+					await settings.resultsReachBrowser('owner:whoami', 'accounts:list');
+					await sidebar.getByRole('link', { name: /^Settings/ }).click();
+					await expect(page).toHaveURL(/\/settings$/);
+					await page.evaluate(
+						() =>
+							new Promise((rendered) => {
+								requestAnimationFrame(() => {
+									rendered(undefined);
+								});
+							})
+					);
+					await expect(page.getByRole('main').getByRole('status')).toHaveText('Loading…');
+					await expect(heading).toBeHidden();
+				}
+			);
+
+			await step('once Settings loads, its page opens with its controls', async () => {
+				settings.release();
+				await expect(heading).toBeVisible();
+				await expect(
+					page.getByRole('heading', { name: 'Cutover date', exact: true })
+				).toBeVisible();
+				await expect(page.getByRole('status').filter({ hasText: /^Loading/ })).toHaveCount(0);
+			});
+		}
+	},
 	'phone-pages': {
 		title: 'on a 390 px phone every Section and an Account register load and scroll without moving',
 		fixture: 'bank-sync',
@@ -152,6 +197,7 @@ export const shell = {
 					await page.waitForLoadState('networkidle');
 					await page.mouse.wheel(0, 20_000);
 					await page.waitForLoadState('networkidle');
+					await expect.poll(() => page.evaluate(scrolledToTheEnd)).toBe(true);
 				});
 			}
 
@@ -168,6 +214,7 @@ export const shell = {
 				await page.waitForLoadState('networkidle');
 				await page.mouse.wheel(0, 20_000);
 				await page.waitForLoadState('networkidle');
+				await expect.poll(() => page.evaluate(scrolledToTheEnd)).toBe(true);
 			});
 		}
 	}

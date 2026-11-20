@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import { localToday } from '../../src/lib/domain/dates';
-import { holdResponseTo, withholdQueryResult } from '../heldResponse';
+import { holdResponseTo } from '../heldResponse';
 import { chooseBankFile, openAccount, type Journey } from './journey';
 
 function inventedCapitalOneCheckingAndSavingsCsv(description: string, amount: string) {
@@ -62,12 +62,11 @@ export const imports = {
 	},
 	approve: {
 		title:
-			'an imported row arrives Unapproved and Approve clears it; the File field waits for the cutover date',
+			'Import file opens on the File field, an imported row arrives Unapproved, and Approve clears it',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
 			const dialog = page.getByRole('dialog', { name: 'Import a bank file' });
 			const approve = page.getByRole('button', { name: /^Approve SAMPLE E2E BOOKSHOP/ });
-			const settings = await withholdQueryResult(page, 'settings:get');
 
 			await step('the sidebar counts Unapproved Transactions; open Savings', async () => {
 				await page.goto('/');
@@ -79,14 +78,12 @@ export const imports = {
 			});
 
 			await step(
-				'Import file opens on the File field for this Account once the cutover date loads, then previews and saves a one-row file',
+				'Import file opens on the File field for this Account, then previews and saves a one-row file',
 				async () => {
 					await page.getByRole('button', { name: 'Import file' }).click();
 					await expect(dialog.getByLabel('Account')).not.toHaveText('Pick an Account');
-					await expect(dialog.getByLabel('File')).toBeDisabled();
-					await expect(dialog.getByText('Set the cutover date before importing')).toBeHidden();
-					settings.release();
 					await expect(dialog.getByLabel('File')).toBeFocused();
+					await expect(dialog.getByText('Set the cutover date before importing')).toBeHidden();
 					await chooseFile(
 						page,
 						inventedCapitalOneCheckingAndSavingsCsv('SAMPLE E2E BOOKSHOP', '23.45')

@@ -233,6 +233,9 @@ function assembledTransition(frame: Frame, chunks: string[]): Transition | 'part
 
 export async function withholdQueryResult(page: Page, udfPath: string) {
 	const queryIds = new Set<unknown>();
+	const pathOf = new Map<unknown, unknown>();
+	const passedPaths = new Set<unknown>();
+	const waiters: { paths: string[]; resolve: () => void }[] = [];
 	const withheld = new Map<unknown, Modification>();
 	const chunks: string[] = [];
 	let browser: WebSocketRoute | undefined;
@@ -250,6 +253,7 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 			};
 			if (message.type === 'ModifyQuerySet') {
 				for (const change of message.modifications ?? []) {
+					if (change.type === 'Add') pathOf.set(change.queryId, change.udfPath);
 					if (change.type === 'Add' && change.udfPath === udfPath) queryIds.add(change.queryId);
 					if (change.type === 'Remove' && queryIds.has(change.queryId)) markDropped(undefined);
 				}
@@ -271,11 +275,29 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 				else withheld.set(change.queryId, change);
 			}
 			socket.send(JSON.stringify({ ...transition, modifications: passed }));
+			for (const change of passed) {
+				if (change.type === 'QueryUpdated') passedPaths.add(pathOf.get(change.queryId));
+			}
+			for (const waiter of waiters.splice(0)) {
+				if (waiter.paths.every((path) => passedPaths.has(path))) waiter.resolve();
+				else waiters.push(waiter);
+			}
 		});
 	});
 
 	return {
 		dropped,
+		resultsReachBrowser(...paths: string[]): Promise<void> {
+			if (paths.every((path) => passedPaths.has(path))) return Promise.resolve();
+			const { promise, resolve } = Promise.withResolvers<undefined>();
+			waiters.push({
+				paths,
+				resolve: () => {
+					resolve(undefined);
+				}
+			});
+			return promise;
+		},
 		release() {
 			withholding = false;
 			if (withheld.size === 0) return;
