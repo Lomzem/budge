@@ -16,7 +16,7 @@ Set Monthly or By date Targets, fund the missing amount, and see the upcoming ob
 
 Journeys (`bun run app verify <name>` reseeds the journey's fixture, drives it, and keeps its evidence; the source is `e2e/journeys/targets.ts`, also run by `bun run test:e2e:local`):
 
-- `targets/monthly`: the Monthly recipe through Target funding and the Upcoming list (`target-monthly`, `target-assign`, `target-upcoming`), funding from the table's `Assign $25.00 to Emergency Fund` button, which returns focus to the Category name. The funded item stays in Upcoming without the `Not funded` marker. Assigned survives reload, and Upcoming is visible below the table at 320 px.
+- `targets/monthly`: the Monthly recipe through Target funding and the Upcoming list (`target-monthly`, `target-assign`, `target-upcoming`), funding from the table's `Assign $25.00 to Emergency Fund` button, which returns focus to the Category name. The funded item stays in Upcoming without the `Not funded` marker. Before funding, the Target bar reports under 100%. Assigned survives reload, and at 320 px Upcoming starts below the table's bottom edge.
 
 The recipes below cover what the journeys leave out.
 

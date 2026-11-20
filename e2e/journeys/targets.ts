@@ -45,6 +45,9 @@ export const targets = {
 					await dialog.getByRole('button', { name: 'Save' }).click();
 					await expect(dialog).toBeHidden();
 					await expect(region.getByText('$25.00 more needed')).toBeVisible();
+					await expect
+						.poll(async () => Number(await bar.getAttribute('aria-valuenow')))
+						.toBeLessThan(100);
 					await expect(upcoming).toHaveCount(0);
 					await nameButton.click();
 					await expect(row).toContainText('Not funded');
@@ -76,6 +79,17 @@ export const targets = {
 			await step('on a phone the Upcoming list follows the table', async () => {
 				await page.setViewportSize({ width: 320, height: 640 });
 				await expect(upcoming).toBeVisible();
+				const table = page.getByRole('main').getByRole('table');
+				await expect
+					.poll(async () => {
+						const [tableBox, upcomingBox] = await Promise.all([
+							table.boundingBox(),
+							upcoming.boundingBox()
+						]);
+						if (tableBox === null || upcomingBox === null) return false;
+						return upcomingBox.y >= tableBox.y + tableBox.height;
+					})
+					.toBe(true);
 			});
 		}
 	}

@@ -302,6 +302,8 @@ export const inspector = {
 					.getByRole('cell');
 			const activity = (name: string) => centsIn(cellsOf(name).nth(2));
 			const available = (name: string) => centsIn(cellsOf(name).nth(3));
+			const assigned = async (name: string) =>
+				cents(await page.getByRole('textbox', { name: `Assigned for ${name}` }).inputValue());
 			const sync = await pausableSync(page);
 			const expectEveryday = async (names: string[], gone: string[]) => {
 				const everyday = rowgroup('Everyday');
@@ -556,11 +558,14 @@ export const inspector = {
 			);
 
 			await step(
-				'Delete… moves its history to the Category picked, then it is gone and focus is on the Category beside it',
+				'Delete… moves its history and Assigned money to the Category picked, then it is gone and focus is on the Category beside it',
 				async () => {
 					const diningOut = await activity('Dining Out');
 					expect(diningOut).not.toBe(0);
 					const coffee = await activity('Coffee');
+					const diningOutAssigned = await assigned('Dining Out');
+					expect(diningOutAssigned).not.toBe(0);
+					const coffeeAssigned = await assigned('Coffee');
 					await page.getByRole('button', { name: 'Dining Out', exact: true }).click();
 					await inspector.getByRole('button', { name: 'Dining Out actions' }).click();
 					await page.getByRole('menuitem', { name: 'Delete…' }).click();
@@ -575,6 +580,7 @@ export const inspector = {
 						0
 					);
 					await expect.poll(() => activity('Coffee')).toBe(coffee + diningOut);
+					await expect.poll(() => assigned('Coffee')).toBe(coffeeAssigned + diningOutAssigned);
 				}
 			);
 		}
