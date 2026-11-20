@@ -76,13 +76,14 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
 - At 320 px a long hidden name wraps at word boundaries on its own line.
 - An Escape while the inspector's Delete or Target dialog is open closes only that dialog; the inspector and an unsaved Move money amount stay.
 - In a ⋯ menu, End pressed right after Enter focuses the last item, and focus stays on the item the keyboard reached while the menu is open.
+- While a menu is open over a dialog, a click or tap on the dialog only closes the menu; on a phone, Move, Clear, Close, Previous and Next in the inspector dialog do nothing until the menu is closed.
 
-### Checks already completed (on `c08534e`, the code of `6e8e541`)
+### Checks already completed (on `3f70cab`, the code of `5505d72`)
 
 | Check                                             | Exit code | Result                                                     |
 | ------------------------------------------------- | --------- | ---------------------------------------------------------- |
 | `bun run check`                                   | 0         | Includes lint, lint:ui, typecheck and 1,131 Vitest tests   |
-| Full live journey suite with `bun run app verify` | 0         | 64/64, run `r2-full-a23`, tree identical to `c08534e`     |
+| Full live journey suite with `bun run app verify` | 0         | 64/64: run `r2-full-a41` passed 40 and stalled at sign-in for 24; rerun `r2-full-a41-rerun2` passed those 24 |
 | `gitleaks` on each commit's staged changes        | 0         | Clean                                                      |
 
 A judge re-checking round 1 gets their own findings and dispositions in their task. Read no `ui-review-round-1*` file and no other judge's report or evidence.
