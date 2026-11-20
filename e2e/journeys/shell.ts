@@ -180,7 +180,7 @@ export const shell = {
 		title: 'when a query every Section reads fails, the app says so instead of loading forever',
 		fixture: 'budget-with-accounts',
 		run: async (page, { step }) => {
-			await failQueryResult(page, 'settings:get');
+			const settings = await failQueryResult(page, 'settings:get');
 
 			await step('Budge reports the failure in place of every Section', async () => {
 				await page.goto('/');
@@ -188,6 +188,14 @@ export const shell = {
 					"Budge couldn't reach its server. Try reloading the page."
 				);
 				await expect(page.getByRole('status').filter({ hasText: /^Loading/ })).toHaveCount(0);
+			});
+
+			await step('a failure the server explains shows its explanation', async () => {
+				const explanation = "Budge couldn't find your Settings. Try reloading the page.";
+				settings.withErrorData({ code: 'NOT_FOUND', message: explanation });
+				await page.goto('/bank');
+				await expect(page.getByRole('alert')).toHaveText(explanation);
+				await expect(page.getByRole('heading', { name: 'Bank' })).toHaveCount(0);
 			});
 		}
 	},

@@ -319,6 +319,7 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 export async function failQueryResult(page: Page, udfPath: string) {
 	const queryIds = new Set<unknown>();
 	const chunks: string[] = [];
+	let errorData: unknown;
 
 	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => {
 		const server = socket.connectToServer();
@@ -342,6 +343,7 @@ export async function failQueryResult(page: Page, udfPath: string) {
 							type: 'QueryFailed',
 							queryId: change.queryId,
 							errorMessage: `${udfPath} failed`,
+							...(errorData === undefined ? {} : { errorData }),
 							logLines: [],
 							journal: null
 						}
@@ -350,4 +352,10 @@ export async function failQueryResult(page: Page, udfPath: string) {
 			socket.send(JSON.stringify({ ...transition, modifications }));
 		});
 	});
+
+	return {
+		withErrorData(data: unknown) {
+			errorData = data;
+		}
+	};
 }

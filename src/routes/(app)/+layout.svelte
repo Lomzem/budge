@@ -30,13 +30,13 @@
 	const shell = new ShellQueries(() => auth.isAuthenticated);
 	setShellQueries(shell);
 
+	const failure = $derived(whoami.error ?? accounts.error ?? shell.error);
+	const explained = $derived(readPublicError(failure));
+
 	const access = $derived.by(() => {
 		if (auth.isLoading) return 'loading';
 		if (!auth.isAuthenticated) return 'forbidden';
-		const failure = whoami.error ?? accounts.error ?? shell.error;
-		if (failure) {
-			return readPublicError(failure)?.code === 'FORBIDDEN' ? 'forbidden' : 'failed';
-		}
+		if (failure) return explained?.code === 'FORBIDDEN' ? 'forbidden' : 'failed';
 		const settled =
 			!whoami.isLoading &&
 			accounts.loaded &&
@@ -88,7 +88,9 @@
 				<p role="alert">This account can't open Budge.</p>
 				<SignOutButton />
 			{:else}
-				<p role="alert">Budge couldn't reach its server. Try reloading the page.</p>
+				<p role="alert">
+					{explained?.message ?? "Budge couldn't reach its server. Try reloading the page."}
+				</p>
 			{/if}
 		</div>
 	</main>
