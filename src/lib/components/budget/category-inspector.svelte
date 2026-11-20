@@ -205,7 +205,9 @@
 	}
 
 	function keydown(event: KeyboardEvent) {
-		if (event.key === 'Escape' && !event.defaultPrevented) onclose();
+		const aDialogOfTheInspectorIsOpen = deleteOpen || targetOpen;
+		if (event.key === 'Escape' && !event.defaultPrevented && !aDialogOfTheInspectorIsOpen)
+			onclose();
 	}
 </script>
 

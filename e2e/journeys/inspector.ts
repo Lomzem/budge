@@ -129,6 +129,21 @@ export const inspector = {
 				}
 			);
 
+			await step(
+				'an Escape still inside the inspector as Delete opens closes only Delete, and the started move stays',
+				async () => {
+					const actions = region.getByRole('button', { name: 'Groceries actions' });
+					await actions.click();
+					await page.getByRole('menuitem', { name: 'Delete…' }).click();
+					const deleting = page.getByRole('dialog', { name: 'Delete Groceries' });
+					await expect(deleting).toBeVisible();
+					await actions.dispatchEvent('keydown', { key: 'Escape', bubbles: true });
+					await expect(deleting).toHaveCount(0);
+					await expect(region).toBeVisible();
+					await expect(region.getByLabel('Amount')).toHaveValue('13.25');
+				}
+			);
+
 			await step('a Category with no amount is refused and nothing moves', async () => {
 				await region.getByLabel('Amount').fill('');
 				await region.getByLabel('Amount').press('Enter');
