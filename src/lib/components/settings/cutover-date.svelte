@@ -57,13 +57,7 @@
 
 <section aria-labelledby="cutover-heading" class="flex flex-col gap-3">
 	<h2 id="cutover-heading" class="text-lg font-bold">Cutover date</h2>
-	{#if settings.error}
-		<p role="alert" class="flex h-9 items-center text-destructive">
-			Budge couldn't load the cutover date. Try reloading the page.
-		</p>
-	{:else if settings.data === undefined}
-		<p role="status" class="h-9 text-muted-foreground">Loading…</p>
-	{:else if changing || cutoverDate === null}
+	{#if changing || cutoverDate === null}
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<form
 			class="flex flex-wrap items-center gap-2"

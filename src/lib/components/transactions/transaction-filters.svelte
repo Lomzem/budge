@@ -51,10 +51,7 @@
 
 	function payeeChoices(): Choices {
 		return [
-			{
-				value: '',
-				label: payees.error ? "Payees didn't load. Reload to filter by one." : 'Any Payee'
-			},
+			{ value: '', label: 'Any Payee' },
 			...(payees.data ?? []).map((payee) => ({ value: payee._id, label: payee.name }))
 		];
 	}
@@ -122,12 +119,7 @@
 	function categoryChoices(): Choices {
 		const data = categories.data;
 		return [
-			{
-				value: '',
-				label: categories.error
-					? "Categories didn't load. Reload to filter by one."
-					: 'Any Category'
-			},
+			{ value: '', label: 'Any Category' },
 			{ value: UNCATEGORIZED, label: 'Uncategorized' },
 			...(data?.readyToAssignId ? [{ value: data.readyToAssignId, label: 'Ready to Assign' }] : []),
 			...(data?.groups ?? []).map((group) => ({

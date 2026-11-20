@@ -33,7 +33,7 @@
 	const access = $derived.by(() => {
 		if (auth.isLoading) return 'loading';
 		if (!auth.isAuthenticated) return 'forbidden';
-		const failure = whoami.error ?? accounts.error;
+		const failure = whoami.error ?? accounts.error ?? shell.error;
 		if (failure) {
 			return readPublicError(failure)?.code === 'FORBIDDEN' ? 'forbidden' : 'failed';
 		}

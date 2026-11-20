@@ -313,3 +313,44 @@ export async function withholdQueryResult(page: Page, udfPath: string) {
 		}
 	};
 }
+
+export async function failQueryResult(page: Page, udfPath: string) {
+	const queryIds = new Set<unknown>();
+	const chunks: string[] = [];
+
+	await page.routeWebSocket(/\/api\/[^/]+\/sync$/, (socket) => {
+		const server = socket.connectToServer();
+		socket.onMessage((frame) => {
+			const message = parse(frame) as {
+				type?: unknown;
+				modifications?: { type?: unknown; queryId?: unknown; udfPath?: unknown }[];
+			};
+			if (message.type === 'ModifyQuerySet') {
+				for (const change of message.modifications ?? []) {
+					if (change.type === 'Add' && change.udfPath === udfPath) queryIds.add(change.queryId);
+				}
+			}
+			server.send(frame);
+		});
+		server.onMessage((frame) => {
+			const transition = assembledTransition(frame, chunks);
+			if (transition === 'partial') return;
+			if (transition === undefined) {
+				socket.send(frame);
+				return;
+			}
+			const modifications = (transition.modifications ?? []).map((change) =>
+				change.type === 'QueryUpdated' && queryIds.has(change.queryId)
+					? {
+							type: 'QueryFailed',
+							queryId: change.queryId,
+							errorMessage: `${udfPath} failed`,
+							logLines: [],
+							journal: null
+						}
+					: change
+			);
+			socket.send(JSON.stringify({ ...transition, modifications }));
+		});
+	});
+}

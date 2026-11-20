@@ -10,10 +10,9 @@ export class ShellQueries {
 	readonly categories: UseQueryReturn<typeof api.categories.list>;
 	readonly payees: UseQueryReturn<typeof api.payees.list>;
 	readonly settled = $derived.by(() =>
-		[this.settings, this.unapprovedCount, this.bankChangeCount, this.categories, this.payees].every(
-			(query) => query.data !== undefined || query.error !== undefined
-		)
+		this.#all().every((query) => query.data !== undefined || query.error !== undefined)
 	);
+	readonly error = $derived(this.#all().find((query) => query.error !== undefined)?.error);
 
 	constructor(enabled: () => boolean) {
 		const args = () => (enabled() ? {} : 'skip');
@@ -22,6 +21,16 @@ export class ShellQueries {
 		this.bankChangeCount = useQuery(api.transactions.bankChangeCount, args);
 		this.categories = useQuery(api.categories.list, args);
 		this.payees = useQuery(api.payees.list, args);
+	}
+
+	#all() {
+		return [
+			this.settings,
+			this.unapprovedCount,
+			this.bankChangeCount,
+			this.categories,
+			this.payees
+		];
 	}
 }
 

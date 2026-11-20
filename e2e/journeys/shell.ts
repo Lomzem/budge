@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { withholdQueryResult } from '../heldResponse';
+import { failQueryResult, withholdQueryResult } from '../heldResponse';
 import { expectNothingPastTheRightEdge, openBudget, type Journey } from './journey';
 
 const SECTIONS = ['Budget', 'Transactions', 'Bank', 'Settings'] as const;
@@ -172,6 +172,21 @@ export const shell = {
 				await expect(
 					page.getByRole('heading', { name: 'Cutover date', exact: true })
 				).toBeVisible();
+				await expect(page.getByRole('status').filter({ hasText: /^Loading/ })).toHaveCount(0);
+			});
+		}
+	},
+	'failed-query': {
+		title: 'when a query every Section reads fails, the app says so instead of loading forever',
+		fixture: 'budget-with-accounts',
+		run: async (page, { step }) => {
+			await failQueryResult(page, 'settings:get');
+
+			await step('Budge reports the failure in place of every Section', async () => {
+				await page.goto('/');
+				await expect(page.getByRole('alert')).toHaveText(
+					"Budge couldn't reach its server. Try reloading the page."
+				);
 				await expect(page.getByRole('status').filter({ hasText: /^Loading/ })).toHaveCount(0);
 			});
 		}
