@@ -79,16 +79,16 @@ Branch `feat/budget-first-ui`, checkout `/home/lomzem/proj/budge-ui`. Review the
 - At 320 px a long hidden name wraps at word boundaries on its own line.
 - An Escape while the inspector's Delete or Target dialog is open closes only that dialog; the inspector and an unsaved Move money amount stay.
 - In a ⋯ menu, End pressed right after Enter focuses the last item, and focus stays on the item the keyboard reached while the menu is open.
-- While a row menu or ⋯ menu is open, a click, tap or right-click anywhere outside it only closes it. Nothing under the press changes, and no row is selected. This holds over a dialog too: on a phone, Move, Clear, Close, Previous and Next in the inspector dialog do nothing until the menu is closed.
-- If one of the shared queries (Settings, the counts, Categories, Payees) fails, the app shows `Budge couldn't reach its server.` with the server's message, as it does for a failed owner check or Accounts query. No Section opens with part of its data.
+- While a row menu or ⋯ menu is open, a click, tap or right-click anywhere outside it only closes it. Nothing under the press changes, and no row is selected. This holds over a dialog too: on a phone, Move, Clear, Close, Previous and Next in the inspector dialog do nothing until the menu is closed. Once the menu is closed, the next click acts at once, also after a right-click.
+- If one of the shared queries (Settings, the counts, Categories, Payees) fails, the app shows the server's message in place of every Section, or `Budge couldn't reach its server. Try reloading the page.` when the server gives none, as it does for a failed owner check or Accounts query. No Section opens with part of its data.
 - Deleting a group that has one Category speaks of one Category: `Its Category moves to the group you pick, with its history.`
 
-### Checks already completed (on `a64f414`, the dev-branch commit with this branch's code)
+### Checks already completed (on `051524e`, the dev-branch commit with this branch's code)
 
 | Check                                             | Exit code | Result                                                     |
 | ------------------------------------------------- | --------- | ---------------------------------------------------------- |
 | `bun run check`                                   | 0         | Includes lint, lint:ui, typecheck and 1,145 Vitest tests   |
-| Full live journey suite with `bun run app verify` | 0         | 66/66 in run `r2-a64f414`, clean tree                      |
+| Full live journey suite with `bun run app verify` | 0         | 66/66 in run `r2-051524e`, clean tree                      |
 | `gitleaks` on each commit's staged changes        | 0         | Clean                                                      |
 
 A judge re-checking round 1 gets their own findings and dispositions in their task. Read no `ui-review-round-1*` file and no other judge's report or evidence.
