@@ -288,11 +288,7 @@
 		</div>
 		<div class="flex flex-col gap-1 sm:pl-13">
 			{#if connection.feeds.length === 0}
-				<p class="text-sm break-words text-muted-foreground">
-					Feeds no Budge Account yet.{paused && held.length === 0
-						? ' Reconnect to see its accounts and choose where they go.'
-						: ''}
-				</p>
+				<p class="text-sm break-words text-muted-foreground">Feeds no Budge Account yet.</p>
 			{:else}
 				<ul aria-label="Where {connection.name} goes" class="flex flex-col gap-2">
 					{#each connection.feeds as feed (feed.connectionAccountId)}

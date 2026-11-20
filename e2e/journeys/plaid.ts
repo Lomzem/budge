@@ -332,9 +332,8 @@ export const plaid = {
 
 			await step('only Sample Savings Bank asks for a reconnect', async () => {
 				await expect(savings).toContainText(needsReconnect);
-				await expect(savings).toContainText(
-					'Feeds no Budge Account yet. Reconnect to see its accounts and choose where they go.'
-				);
+				await expect(savings).toContainText('Feeds no Budge Account yet.');
+				await expect(savings).not.toContainText('choose where they go');
 				await expect(card(page, 'Sample Credit Union')).not.toContainText(needsReconnect);
 			});
 

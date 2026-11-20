@@ -435,11 +435,12 @@ export const categories = {
 					await expect(page.getByRole('menu')).toHaveCount(0);
 					await expect(page.getByRole('dialog')).toHaveCount(0);
 					await expect(rowOf(page, 'Transit')).not.toHaveAttribute('data-state', 'selected');
+					await expect(page.getByRole('button', { name: 'Everyday actions' })).toBeFocused();
 					await stopTouching?.();
 				}
 			);
 			await step(
-				"on a desktop, a right-click in an Assigned field opens no row menu, and a click on a name with a group's ⋯ menu open only closes it",
+				"on a desktop, a right-click in an Assigned field opens no row menu, and a click on a name or the page with a group's ⋯ menu open only closes it and leaves focus on ⋯",
 				async () => {
 					await page.setViewportSize({ width: 1280, height: 800 });
 					await page
@@ -452,6 +453,13 @@ export const categories = {
 					await expect(page.getByRole('menu')).toHaveCount(0);
 					await expect(rowOf(page, 'Coffee')).not.toHaveAttribute('data-state', 'selected');
 					await expect(page.getByRole('region', { name: 'Coffee' })).toHaveCount(0);
+					const bills = page.getByRole('button', { name: 'Bills actions' });
+					await expect(bills).toBeFocused();
+					await bills.click();
+					await expect(page.getByRole('menu')).toBeVisible();
+					await page.mouse.click(1080, 50);
+					await expect(page.getByRole('menu')).toHaveCount(0);
+					await expect(bills).toBeFocused();
 				}
 			);
 		}
