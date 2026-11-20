@@ -71,14 +71,20 @@ const proposalId = z
 	.describe('an ID you choose for this proposal: letters, digits, and . _ : -');
 
 const APPLY_DESCRIPTION = [
-	'Apply a Categorization Proposal the owner approved. Call it only after you showed the owner every change in chat and the owner said yes to it; never apply a change the owner has not seen.',
+	'Apply a Categorization Proposal the owner approved. Call it only after you showed the owner every change and Transfer link in chat and the owner said yes to it; never apply anything the owner has not seen.',
 	'Propose only changes you are sure of. List Transactions you are unsure of as questions to the owner instead of guessing.',
-	'Each change names a Transaction, the Category you read for it (fromCategoryId, null when it had none), and either an existing toCategoryId or a toNewCategory listed in newCategories. For a split Transaction, give line: the position of the split line in the splits you read, counting from 0.',
-	'Prefer existing Categories. A new Category or Category Group whose name matches an existing one, ignoring case, refuses the whole proposal.',
-	'Budge changes only the Category: approval, amount, date, Account, Payee, split amounts, and Remembered Categories stay as they are.',
-	'Each change answers with an outcome: applied; changed (the Transaction or split line no longer has the Category you read, or no longer exists; read it again); transfer and startingBalance (these take no Category); split (name a line); notAllowed (the target is hidden, in a hidden Group, removed, or a Category Budge manages, such as Ready to Assign).',
+	'Each item in changes names a Transaction, the Category you read for it (fromCategoryId, null when it had none), and either an existing toCategoryId or a toNewCategory listed in newCategories. Inflows (positive amounts) may target Ready to Assign using readyToAssign.id from budge_budget_month; outflows cannot. For a split Transaction, give line: the position of the split line in the splits you read, counting from 0.',
+	'Each item in transfers links two imported Transactions (such as a card payment) as one Transfer, naming first and second with each side’s transactionId and fromCategoryId (null when Uncategorized). Both sides must be imported Bank Rows in different Accounts (at least one Cash Account; card payments move money out of Cash) with opposite amounts within 10 days, and neither may already be a Transfer, Split, or Starting Balance. The linked Transfer takes first’s date and memo and keeps both Accounts’ balances, Cleared status, approval, and Bank Rows.',
+	'Prefer existing Categories. A new Category or Category Group whose name matches an existing one, ignoring case, refuses the whole proposal. A proposal must list at least one item across changes and transfers, up to 100 total.',
+	'Budge never changes Remembered Categories or approval; category changes keep amount, date, Account, Payee, and split amounts as they are.',
+	'Each change answers with an outcome: applied; changed (the Transaction or split line no longer has the Category you read, or no longer exists; read it again); transfer and startingBalance (these take no Category); split (name a line); notAllowed (the target is hidden, in a hidden Group, removed, a Payment Category, or Ready to Assign for a non-inflow). Each transfer answers with: applied; changed (either side is gone or its Category changed since read); transfer, startingBalance, or split (either side is one); notEligible (failed Transfer eligibility or second is Reconciled on a different date).',
 	'Sending the same id again answers with the first result and changes nothing, so retry with the same id after a failure.'
 ].join(' ');
+
+const transferSide = z.object({
+	transactionId: z.string(),
+	fromCategoryId: z.string().nullable()
+});
 
 function registerProposalTools(server: McpServer) {
 	server.registerTool(
@@ -113,8 +119,20 @@ function registerProposalTools(server: McpServer) {
 							toNewCategory: z.string().optional().describe('a name from newCategories')
 						})
 					)
-					.min(1)
 					.max(PROPOSAL_CHANGE_LIMIT)
+					.optional(),
+				transfers: z
+					.array(
+						z.object({
+							first: transferSide.describe(
+								'imported Transaction whose date and memo the Transfer keeps'
+							),
+							second: transferSide.describe('matching imported Transaction in the other Account')
+						})
+					)
+					.max(PROPOSAL_CHANGE_LIMIT)
+					.optional()
+					.describe('pairs of imported Transactions to link as Transfers')
 			},
 			annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: false }
 		},
@@ -126,7 +144,7 @@ function registerProposalTools(server: McpServer) {
 		{
 			title: 'Undo a Budge Categorization Proposal',
 			description:
-				"Undo an applied Categorization Proposal when the owner asks. Budge moves back only the Transactions that still have the Category the proposal gave them; it keeps the owner's later changes and reports them in keptTransactionIds. It removes the new Categories and Category Groups the proposal added unless something now uses them. Undoing the same id again answers with the first result.",
+				"Undo an applied Categorization Proposal when the owner asks. Budge restores only the Transactions that still have the Category the proposal gave them and the linked Transfer pairs whose sides still match the applied result; it keeps the owner's later changes and reports them in keptTransactionIds. It removes the new Categories and Category Groups the proposal added unless something now uses them. Undoing the same id again answers with the first result.",
 			inputSchema: { id: proposalId },
 			annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: false }
 		},
@@ -152,7 +170,7 @@ export function serveAgentTools() {
 		'budge_budget_month',
 		{
 			title: 'Budge budget month',
-			description: `The owner's budget for one month: Ready to Assign, each Category Group and Category with Assigned, Activity, Available, and Target, hidden Categories, Overspending, and upcoming Targets. ${MONEY_NOTE}`,
+			description: `The owner's budget for one month: Ready to Assign (with its Category id for inflows), each Category Group and Category with Assigned, Activity, Available, and Target, hidden Categories, Overspending, and upcoming Targets. ${MONEY_NOTE}`,
 			inputSchema: { month: isoMonth.optional().describe('YYYY-MM; defaults to this month') },
 			annotations: readOnly
 		},

@@ -14,6 +14,17 @@ export const proposalOutcome = v.union(
 
 export type ProposalOutcome = Infer<typeof proposalOutcome>;
 
+export const transferOutcome = v.union(
+	v.literal('applied'),
+	v.literal('changed'),
+	v.literal('transfer'),
+	v.literal('startingBalance'),
+	v.literal('split'),
+	v.literal('notEligible')
+);
+
+export type TransferOutcome = Infer<typeof transferOutcome>;
+
 export const PROPOSAL_CHANGE_LIMIT = 100;
 export const NEW_NAME_LIMIT = 20;
 export const PROPOSAL_ID = /^[\w.:-]{1,100}$/;
@@ -28,6 +39,16 @@ export interface ProposedChange {
 	to: ChangeTarget;
 }
 
+export interface ProposedTransferSide {
+	transactionId: string;
+	fromCategoryId: string | null;
+}
+
+export interface ProposedTransfer {
+	first: ProposedTransferSide;
+	second: ProposedTransferSide;
+}
+
 export interface NewCategory {
 	name: string;
 	group: GroupChoice;
@@ -38,6 +59,7 @@ export interface Proposal {
 	newGroups: string[];
 	newCategories: NewCategory[];
 	changes: ProposedChange[];
+	transfers: ProposedTransfer[];
 }
 
 type Json = Record<string, unknown>;
@@ -130,6 +152,30 @@ function parseChange(value: unknown, index: number): Parsed<ProposedChange> {
 	});
 }
 
+const TRANSFER_SIDE_FIELDS = ['transactionId', 'fromCategoryId'];
+
+function parseTransferSide(value: unknown, where: string): Parsed<ProposedTransferSide> {
+	return Result.gen(function* () {
+		const side = yield* fieldsAt(value, TRANSFER_SIDE_FIELDS, where);
+		const transactionId = yield* textAt(side.transactionId, `${where}.transactionId`);
+		const fromCategoryId = yield* fromAt(side.fromCategoryId, where);
+		return { transactionId, fromCategoryId };
+	});
+}
+
+function parseTransfer(value: unknown, index: number): Parsed<ProposedTransfer> {
+	const where = `transfers[${String(index)}]`;
+	return Result.gen(function* () {
+		const transfer = yield* fieldsAt(value, ['first', 'second'], where);
+		const first = yield* parseTransferSide(transfer.first, `${where}.first`);
+		const second = yield* parseTransferSide(transfer.second, `${where}.second`);
+		if (first.transactionId === second.transactionId) {
+			return yield* problem(`${where} must name two different Transactions.`);
+		}
+		return { first, second };
+	});
+}
+
 function parseNewCategory(value: unknown, index: number): Parsed<NewCategory> {
 	const where = `newCategories[${String(index)}]`;
 	return Result.gen(function* () {
@@ -164,7 +210,25 @@ function unlistedIn(
 	return `${where}[${String(index)}] names ${String(names[index])}, which is not in ${list}.`;
 }
 
-function inconsistencyIn({ newGroups, newCategories, changes }: Omit<Proposal, 'id'>) {
+function transferOverlapIn(
+	changes: readonly ProposedChange[],
+	transfers: readonly ProposedTransfer[]
+): string | undefined {
+	const changedIds = new Set(changes.map((change) => change.transactionId));
+	const seen = new Set<string>();
+	for (const transfer of transfers) {
+		for (const side of [transfer.first, transfer.second]) {
+			if (changedIds.has(side.transactionId)) {
+				return `changes and transfers both list ${side.transactionId}.`;
+			}
+			if (seen.has(side.transactionId)) return `transfers lists ${side.transactionId} twice.`;
+			seen.add(side.transactionId);
+		}
+	}
+	return undefined;
+}
+
+function inconsistencyIn({ newGroups, newCategories, changes, transfers }: Omit<Proposal, 'id'>) {
 	const categoryNames = newCategories.map((category) => category.name);
 	return (
 		duplicateIn(newGroups, 'newGroups') ??
@@ -175,6 +239,7 @@ function inconsistencyIn({ newGroups, newCategories, changes }: Omit<Proposal, '
 			),
 			'changes'
 		) ??
+		transferOverlapIn(changes, transfers) ??
 		unlistedIn(
 			newCategories.map(({ group }) => ('newGroup' in group ? group.newGroup : undefined)),
 			newGroups,
@@ -194,14 +259,27 @@ function proposalOf(value: unknown): Parsed<Proposal> {
 	return Result.gen(function* () {
 		const body = yield* fieldsAt(
 			value,
-			['id', 'newGroups', 'newCategories', 'changes'],
+			['id', 'newGroups', 'newCategories', 'changes', 'transfers'],
 			'The proposal'
 		);
 		const id = yield* textAt(body.id, 'id');
 		if (!PROPOSAL_ID.test(id))
 			return yield* problem('id takes up to 100 letters, digits, and . _ : -');
 		const changes = yield* listAt(body.changes, 'changes', PROPOSAL_CHANGE_LIMIT, parseChange);
-		if (changes.length === 0) return yield* problem('changes must list at least one change.');
+		const transfers = yield* listAt(
+			body.transfers,
+			'transfers',
+			PROPOSAL_CHANGE_LIMIT,
+			parseTransfer
+		);
+		if (changes.length + transfers.length === 0) {
+			return yield* problem('The proposal must list at least one change or transfer.');
+		}
+		if (changes.length + transfers.length > PROPOSAL_CHANGE_LIMIT) {
+			return yield* problem(
+				`The proposal takes at most ${String(PROPOSAL_CHANGE_LIMIT)} changes and transfers.`
+			);
+		}
 		const newGroups = yield* listAt(body.newGroups, 'newGroups', NEW_NAME_LIMIT, (name, index) =>
 			textAt(name, `newGroups[${String(index)}]`)
 		);
@@ -211,7 +289,7 @@ function proposalOf(value: unknown): Parsed<Proposal> {
 			NEW_NAME_LIMIT,
 			parseNewCategory
 		);
-		const proposal = { id, newGroups, newCategories, changes };
+		const proposal = { id, newGroups, newCategories, changes, transfers };
 		const inconsistency = inconsistencyIn(proposal);
 		if (inconsistency !== undefined) return yield* problem(inconsistency);
 		return proposal;

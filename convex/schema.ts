@@ -2,9 +2,22 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
 import { accountKind } from './lib/accountKind';
-import { proposalOutcome } from './lib/agentProposal';
+import { proposalOutcome, transferOutcome } from './lib/agentProposal';
 import { webhookKeyValidator } from './lib/plaidWebhook';
 import { targetValidator } from './lib/targets';
+
+const clearedState = v.union(v.literal('uncleared'), v.literal('cleared'), v.literal('reconciled'));
+
+const transferSideSnapshot = v.object({
+	accountId: v.id('accounts'),
+	date: v.string(),
+	amount: v.number(),
+	payeeId: v.optional(v.id('payees')),
+	categoryId: v.union(v.id('categories'), v.null()),
+	memo: v.optional(v.string()),
+	cleared: clearedState,
+	approved: v.boolean()
+});
 
 const transactionFields = {
 	accountId: v.id('accounts'),
@@ -17,7 +30,7 @@ const transactionFields = {
 	split: v.optional(v.literal(true)),
 	memo: v.optional(v.string()),
 
-	cleared: v.union(v.literal('uncleared'), v.literal('cleared'), v.literal('reconciled')),
+	cleared: clearedState,
 
 	approved: v.optional(v.boolean()),
 
@@ -246,6 +259,23 @@ export default defineSchema({
 				toCategoryId: v.id('categories'),
 				outcome: proposalOutcome
 			})
+		),
+		transfers: v.optional(
+			v.array(
+				v.object({
+					firstTransactionId: v.id('transactions'),
+					secondTransactionId: v.id('transactions'),
+					outcome: transferOutcome,
+					applied: v.optional(
+						v.object({
+							date: v.string(),
+							memo: v.optional(v.string()),
+							first: transferSideSnapshot,
+							second: transferSideSnapshot
+						})
+					)
+				})
+			)
 		),
 		createdGroups: v.array(v.object({ id: v.id('categoryGroups'), name: v.string() })),
 		createdCategories: v.array(v.object({ id: v.id('categories'), name: v.string() })),

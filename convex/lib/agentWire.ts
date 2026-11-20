@@ -1,5 +1,6 @@
 import type { Infer } from 'convex/values';
 
+import type { Id } from '../_generated/dataModel';
 import type { accountRows } from '../accounts';
 import type { budgetMonth } from '../budget';
 import type { transactionPage } from '../transactions';
@@ -43,10 +44,14 @@ function categoryForAgent(category: CategoryBudget) {
 	};
 }
 
-export function budgetForAgent(month: BudgetMonth) {
+export function budgetForAgent({
+	readyToAssignId,
+	...month
+}: BudgetMonth & { readyToAssignId: Id<'categories'> | null }) {
 	return {
 		...month,
 		readyToAssign: {
+			id: readyToAssignId,
 			amount: dollars(month.readyToAssign.amount),
 			uncategorized: dollars(month.readyToAssign.uncategorized)
 		},

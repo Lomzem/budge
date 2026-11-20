@@ -7,6 +7,7 @@ import { accountRows, readAccounts } from './accounts';
 import type { ApplyAnswer, RecentProposals, UndoAnswer } from './agentProposals';
 import { budgetMonth, readBudget } from './budget';
 import { admitsAgentKey } from './lib/agentKey';
+import { readReadyToAssign } from './lib/categories';
 import {
 	parseEmptyQuery,
 	parseBudgetQuery,
@@ -22,10 +23,18 @@ export const accounts = internalQuery({
 	handler: async (ctx) => await readAccounts(ctx)
 });
 
+const agentBudgetMonth = v.object({
+	...budgetMonth.fields,
+	readyToAssignId: v.union(v.id('categories'), v.null())
+});
+
 export const budget = internalQuery({
 	args: { month: v.string(), today: v.string() },
-	returns: budgetMonth,
-	handler: async (ctx, args) => await readBudget(ctx, args.month, args.today)
+	returns: agentBudgetMonth,
+	handler: async (ctx, args) => ({
+		...(await readBudget(ctx, args.month, args.today)),
+		readyToAssignId: (await readReadyToAssign(ctx))?._id ?? null
+	})
 });
 
 async function existingId<Table extends 'accounts' | 'categories'>(
