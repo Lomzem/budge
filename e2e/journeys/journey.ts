@@ -183,9 +183,13 @@ export async function centerOf(locator: Locator) {
 	return { x: box.x + box.width / 2, y: box.y + box.height / 2, top: box.y };
 }
 
-export async function clickTheSpotOf(page: Page, target: Locator) {
+export async function clickTheSpotOf(
+	page: Page,
+	target: Locator,
+	button: 'left' | 'right' = 'left'
+) {
 	const { x, y } = await centerOf(target);
-	await page.mouse.click(x, y);
+	await page.mouse.click(x, y, { button });
 }
 
 export async function tap(page: Page, locator: Locator) {

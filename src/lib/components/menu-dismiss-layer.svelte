@@ -5,9 +5,27 @@
 	let letGo: ReturnType<typeof setTimeout> | undefined;
 
 	function catchTaps(node: HTMLElement) {
-		const press = () => {
+		const closeTheMenuOnAnyButton = (event: PointerEvent) => {
+			if (event.button === 0) return;
+			node.dispatchEvent(
+				new PointerEvent('pointerdown', {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					button: 0,
+					buttons: 1,
+					clientX: event.clientX,
+					clientY: event.clientY,
+					pointerId: event.pointerId,
+					pointerType: event.pointerType,
+					isPrimary: event.isPrimary
+				})
+			);
+		};
+		const press = (event: PointerEvent) => {
 			clearTimeout(letGo);
 			pressed = true;
+			closeTheMenuOnAnyButton(event);
 		};
 		const release = () => {
 			clearTimeout(letGo);
@@ -27,6 +45,7 @@
 		node.addEventListener('pointercancel', release);
 		node.addEventListener('click', landed);
 		node.addEventListener('contextmenu', keepTheBrowserMenuClosed);
+		window.addEventListener('blur', landed);
 		return () => {
 			clearTimeout(letGo);
 			node.removeEventListener('pointerdown', press);
@@ -34,6 +53,7 @@
 			node.removeEventListener('pointercancel', release);
 			node.removeEventListener('click', landed);
 			node.removeEventListener('contextmenu', keepTheBrowserMenuClosed);
+			window.removeEventListener('blur', landed);
 		};
 	}
 </script>
