@@ -325,25 +325,34 @@ async function rememberPayee(
 	}
 }
 
+function transferAccountsProblem(
+	firstAccount: Pick<Doc<'accounts'>, '_id' | 'kind'>,
+	secondAccount: Pick<Doc<'accounts'>, '_id' | 'kind'>,
+	firstAmount: number
+): string | null {
+	if (secondAccount._id === firstAccount._id) return 'Pick another Account to transfer with.';
+	if (firstAccount.kind !== 'cash' && secondAccount.kind !== 'cash') {
+		return 'A Transfer needs a Cash Account on one side.';
+	}
+	const cashSideAmount = firstAccount.kind === 'cash' ? firstAmount : -firstAmount;
+	if ((firstAccount.kind !== 'cash' || secondAccount.kind !== 'cash') && cashSideAmount > 0) {
+		return 'A card payment moves money from a Cash Account.';
+	}
+	return null;
+}
+
 async function requireTransfer(
 	ctx: MutationCtx,
 	transferAccountId: Id<'accounts'>,
 	fields: TransactionFields,
 	lines: SplitLine[]
 ) {
-	const target = await ctx.db.get('accounts', transferAccountId);
-	if (target === null) throw publicError('NOT_FOUND');
-	if (transferAccountId === fields.accountId) {
-		throw publicError('INVALID_INPUT', 'Pick another Account to transfer with.');
-	}
-	const source = await ctx.db.get('accounts', fields.accountId);
-	if (source?.kind !== 'cash' && target.kind !== 'cash') {
-		throw publicError('INVALID_INPUT', 'A Transfer needs a Cash Account on one side.');
-	}
-	const cashSideAmount = source?.kind === 'cash' ? fields.amount : -fields.amount;
-	if ((source?.kind !== 'cash' || target.kind !== 'cash') && cashSideAmount > 0) {
-		throw publicError('INVALID_INPUT', 'A card payment moves money from a Cash Account.');
-	}
+	const otherAccount = await ctx.db.get('accounts', transferAccountId);
+	if (otherAccount === null) throw publicError('NOT_FOUND');
+	const account = await ctx.db.get('accounts', fields.accountId);
+	if (account === null) throw publicError('NOT_FOUND');
+	const problem = transferAccountsProblem(account, otherAccount, fields.amount);
+	if (problem !== null) throw publicError('INVALID_INPUT', problem);
 	if (fields.categoryId !== undefined || fields.payeeId !== undefined || lines.length > 0) {
 		throw publicError('INVALID_INPUT', 'A Transfer has no Category or Payee.');
 	}
@@ -390,6 +399,153 @@ function otherSideFields(
 		cleared: existing?.cleared ?? 'uncleared',
 		approved: linking || existing?.approved !== false
 	};
+}
+
+function isWithinTransferWindow(firstDate: string, secondDate: string): boolean {
+	return (
+		secondDate >= addDays(firstDate, -MATCH_WINDOW_DAYS) &&
+		secondDate <= addDays(firstDate, MATCH_WINDOW_DAYS)
+	);
+}
+
+function isPlainUnlinked(transaction: Doc<'transactions'>): boolean {
+	return (
+		transaction.transferTransactionId === undefined &&
+		transaction.kind === undefined &&
+		transaction.split !== true
+	);
+}
+
+export async function transactionRevisionOf(
+	ctx: QueryCtx,
+	transaction: Doc<'transactions'>
+): Promise<string> {
+	const bankRows: {
+		id: Id<'imports'>;
+		state: Doc<'imports'>['state'];
+		date: string;
+		amount: number;
+		bankText: string;
+		matched: boolean;
+	}[] = [];
+	for await (const bankRow of allBankRowsOf(ctx, transaction._id)) {
+		bankRows.push({
+			id: bankRow._id,
+			state: bankRow.state,
+			date: bankRow.date,
+			amount: bankRow.amount,
+			bankText: bankRow.bankText,
+			matched: bankRow.matched
+		});
+	}
+	bankRows.sort((a, b) => a.id.localeCompare(b.id));
+	const payload = JSON.stringify({
+		accountId: transaction.accountId,
+		date: transaction.date,
+		amount: transaction.amount,
+		payeeId: transaction.payeeId ?? null,
+		categoryId: transaction.categoryId ?? null,
+		memo: transaction.memo ?? null,
+		cleared: transaction.cleared,
+		approved: transaction.approved !== false,
+		split: transaction.split === true,
+		kind: transaction.kind ?? null,
+		transferTransactionId: transaction.transferTransactionId ?? null,
+		bankRows
+	});
+	const digest = new Uint8Array(
+		await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload))
+	);
+	return Array.from(digest.slice(0, 16), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function canLinkImportedTransfer(
+	ctx: QueryCtx,
+	first: Doc<'transactions'>,
+	second: Doc<'transactions'>
+): Promise<boolean> {
+	if (first._id === second._id || second.amount !== -first.amount) return false;
+	if (!isPlainUnlinked(first) || !isPlainUnlinked(second)) return false;
+	if (!isWithinTransferWindow(first.date, second.date)) return false;
+	if (second.cleared === 'reconciled' && second.date !== first.date) return false;
+	const firstAccount = await ctx.db.get('accounts', first.accountId);
+	const secondAccount = await ctx.db.get('accounts', second.accountId);
+	if (firstAccount === null || secondAccount === null) return false;
+	if (transferAccountsProblem(firstAccount, secondAccount, first.amount) !== null) return false;
+	return (await hasBankRow(ctx, first._id)) && (await hasBankRow(ctx, second._id));
+}
+
+export async function linkImportedTransfer(
+	ctx: MutationCtx,
+	first: Doc<'transactions'>,
+	second: Doc<'transactions'>
+): Promise<{ firstRevision: string; secondRevision: string }> {
+	const sharedMemo = first.memo === undefined ? {} : { memo: first.memo };
+	const firstFields: TransactionFields = {
+		accountId: first.accountId,
+		date: first.date,
+		amount: first.amount,
+		...sharedMemo,
+		cleared: first.cleared,
+		approved: first.approved !== false
+	};
+	const secondFields: TransactionFields = {
+		accountId: second.accountId,
+		date: first.date,
+		amount: -first.amount,
+		...sharedMemo,
+		cleared: second.cleared,
+		approved: second.approved !== false
+	};
+	await writeTransfer(
+		ctx,
+		{ existing: first, fields: firstFields },
+		{ existing: second, fields: secondFields }
+	);
+	const linkedFirst = await ctx.db.get('transactions', first._id);
+	const linkedSecond = await ctx.db.get('transactions', second._id);
+	if (linkedFirst === null || linkedSecond === null) throw publicError('NOT_FOUND');
+	return {
+		firstRevision: await transactionRevisionOf(ctx, linkedFirst),
+		secondRevision: await transactionRevisionOf(ctx, linkedSecond)
+	};
+}
+
+export interface RestoredTransferSide {
+	existing: Doc<'transactions'>;
+	date: string;
+	payeeId?: Id<'payees'> | undefined;
+	categoryId: Id<'categories'> | null;
+	memo?: string | undefined;
+}
+
+function restoredFieldsOf(side: RestoredTransferSide): TransactionFields {
+	return {
+		accountId: side.existing.accountId,
+		date: side.date,
+		amount: side.existing.amount,
+		...(side.payeeId === undefined ? {} : { payeeId: side.payeeId }),
+		...(side.categoryId === null ? {} : { categoryId: side.categoryId }),
+		...(side.memo === undefined ? {} : { memo: side.memo }),
+		cleared: side.existing.cleared,
+		approved: side.existing.approved !== false
+	};
+}
+
+export async function unlinkTransfer(
+	ctx: MutationCtx,
+	first: RestoredTransferSide,
+	second: RestoredTransferSide
+) {
+	for (const side of [first, second]) await takeOut(ctx, side.existing);
+	const firstFields = restoredFieldsOf(first);
+	const secondFields = restoredFieldsOf(second);
+	await ctx.db.replace('transactions', first.existing._id, firstFields);
+	await ctx.db.replace('transactions', second.existing._id, secondFields);
+	await countTransaction(ctx, firstFields, 1);
+	await countTransaction(ctx, secondFields, 1);
+	await refreshDerivedFields(ctx, first.existing._id);
+	await refreshDerivedFields(ctx, second.existing._id);
 }
 
 export async function transferCandidatesOf(

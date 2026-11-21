@@ -7,15 +7,28 @@ import {
 	parseProposal,
 	parseProposalId,
 	proposalOutcome,
+	transferOutcome,
 	type NewCategory,
 	type Proposal,
 	type ProposalOutcome,
-	type ProposedChange
+	type ProposedChange,
+	type ProposedTransfer,
+	type ProposedTransferSide,
+	type TransferOutcome
 } from './lib/agentProposal';
 import { insertCategory, insertGroup } from './lib/categories';
 import { categoriesCutoverUndoNeeds } from './lib/laterCutover';
 import { publicError } from './lib/publicError';
-import { categorizeTransaction, recategorizeSplitLine, splitLinesOf } from './lib/transactions';
+import { readCutoverDate } from './lib/settings';
+import {
+	canLinkImportedTransfer,
+	categorizeTransaction,
+	linkImportedTransfer,
+	recategorizeSplitLine,
+	splitLinesOf,
+	transactionRevisionOf,
+	unlinkTransfer
+} from './lib/transactions';
 
 const refusal = v.object({ refused: v.string() });
 
@@ -28,6 +41,13 @@ const appliedProposal = v.object({
 			outcome: proposalOutcome
 		})
 	),
+	transfers: v.array(
+		v.object({
+			firstTransactionId: v.id('transactions'),
+			secondTransactionId: v.id('transactions'),
+			outcome: transferOutcome
+		})
+	),
 	created: v.object({
 		groups: v.array(v.object({ id: v.id('categoryGroups'), name: v.string() })),
 		categories: v.array(v.object({ id: v.id('categories'), name: v.string() }))
@@ -38,6 +58,9 @@ const appliedProposal = v.object({
 export type ApplyAnswer = Infer<typeof refusal> | Infer<typeof appliedProposal>;
 
 type RecordedChange = Doc<'agentProposals'>['changes'][number];
+type RecordedTransfer = NonNullable<Doc<'agentProposals'>['transfers']>[number];
+type AppliedTransfer = NonNullable<RecordedTransfer['applied']>;
+type TransferSideSnapshot = AppliedTransfer['first'];
 
 type Created<T extends 'categoryGroups' | 'categories'> = { id: Id<T>; name: string }[];
 
@@ -46,6 +69,16 @@ interface ResolvedChange {
 	line?: number | undefined;
 	fromCategoryId: Id<'categories'> | null;
 	to: { categoryId: Id<'categories'> } | { newCategory: string };
+}
+
+interface ResolvedTransferSide {
+	transactionId: Id<'transactions'>;
+	revision: string;
+}
+
+interface ResolvedTransfer {
+	first: ResolvedTransferSide;
+	second: ResolvedTransferSide;
 }
 
 interface ResolvedCategory {
@@ -71,6 +104,29 @@ function resolveChange(
 	const toCategoryId = ctx.db.normalizeId('categories', change.to.categoryId);
 	if (toCategoryId === null) return { refused: `${where}.toCategoryId is not a Category ID.` };
 	return { ...base, to: { categoryId: toCategoryId } };
+}
+
+function resolveTransferSide(
+	ctx: MutationCtx,
+	side: ProposedTransferSide,
+	where: string
+): ResolvedTransferSide | Refusal {
+	const transactionId = ctx.db.normalizeId('transactions', side.transactionId);
+	if (transactionId === null) return { refused: `${where}.transactionId is not a Transaction ID.` };
+	return { transactionId, revision: side.revision };
+}
+
+function resolveTransfer(
+	ctx: MutationCtx,
+	transfer: ProposedTransfer,
+	index: number
+): ResolvedTransfer | Refusal {
+	const where = `transfers[${String(index)}]`;
+	const first = resolveTransferSide(ctx, transfer.first, `${where}.first`);
+	if ('refused' in first) return first;
+	const second = resolveTransferSide(ctx, transfer.second, `${where}.second`);
+	if ('refused' in second) return second;
+	return { first, second };
 }
 
 async function resolveNewCategory(
@@ -136,9 +192,11 @@ function targetOf({ to, ...change }: ResolvedChange, created: Created<'categorie
 	return { ...change, toCategoryId: category.id };
 }
 
-async function isAllowedTarget(ctx: MutationCtx, categoryId: Id<'categories'>) {
+async function isAllowedTarget(ctx: MutationCtx, categoryId: Id<'categories'>, amount: number) {
 	const category = await ctx.db.get('categories', categoryId);
-	if (category?.kind !== 'normal' || category.hidden === true) return false;
+	if (category === null || category.hidden === true) return false;
+	if (category.kind === 'readyToAssign') return amount > 0;
+	if (category.kind !== 'normal') return false;
 	const group = await ctx.db.get('categoryGroups', category.groupId);
 	return group !== null && group.hidden !== true;
 }
@@ -151,7 +209,10 @@ async function applyToLine(
 ): Promise<ProposalOutcome> {
 	if (transaction.split !== true) return 'changed';
 	const lines = await splitLinesOf(ctx, transaction._id);
-	if (lines[line]?.categoryId !== change.fromCategoryId) return 'changed';
+	const current = lines[line];
+	if (current === undefined) return 'changed';
+	if (!(await isAllowedTarget(ctx, change.toCategoryId, current.amount))) return 'notAllowed';
+	if (current.categoryId !== change.fromCategoryId) return 'changed';
 	await recategorizeSplitLine(ctx, transaction, line, change.toCategoryId);
 	return 'applied';
 }
@@ -161,15 +222,68 @@ async function applyChange(ctx: MutationCtx, change: Target): Promise<ProposalOu
 	if (transaction === null) return 'changed';
 	if (transaction.transferTransactionId !== undefined) return 'transfer';
 	if (transaction.kind === 'startingBalance') return 'startingBalance';
-	if (!(await isAllowedTarget(ctx, change.toCategoryId))) return 'notAllowed';
 	if (change.line !== undefined) return await applyToLine(ctx, transaction, change, change.line);
 	if (transaction.split === true) return 'split';
+	if (!(await isAllowedTarget(ctx, change.toCategoryId, transaction.amount))) return 'notAllowed';
 	if ((transaction.categoryId ?? null) !== change.fromCategoryId) return 'changed';
 	await categorizeTransaction(ctx, transaction, {
 		kind: 'category',
 		categoryId: change.toCategoryId
 	});
 	return 'applied';
+}
+
+function transferSideKindProblem(
+	transaction: Doc<'transactions'> | null
+): Exclude<TransferOutcome, 'applied' | 'notEligible'> | null {
+	if (transaction === null) return 'changed';
+	if (transaction.transferTransactionId !== undefined) return 'transfer';
+	if (transaction.kind === 'startingBalance') return 'startingBalance';
+	if (transaction.split === true) return 'split';
+	return null;
+}
+
+function snapshotOf(transaction: Doc<'transactions'>): TransferSideSnapshot {
+	return {
+		date: transaction.date,
+		...(transaction.payeeId === undefined ? {} : { payeeId: transaction.payeeId }),
+		categoryId: transaction.categoryId ?? null,
+		...(transaction.memo === undefined ? {} : { memo: transaction.memo })
+	};
+}
+
+async function applyTransfer(
+	ctx: MutationCtx,
+	transfer: ResolvedTransfer
+): Promise<RecordedTransfer> {
+	const base = {
+		firstTransactionId: transfer.first.transactionId,
+		secondTransactionId: transfer.second.transactionId
+	};
+	const first = await ctx.db.get('transactions', transfer.first.transactionId);
+	const second = await ctx.db.get('transactions', transfer.second.transactionId);
+	const problem = transferSideKindProblem(first) ?? transferSideKindProblem(second);
+	if (problem !== null) return { ...base, outcome: problem };
+	if (first === null || second === null) return { ...base, outcome: 'changed' };
+	if (
+		(await transactionRevisionOf(ctx, first)) !== transfer.first.revision ||
+		(await transactionRevisionOf(ctx, second)) !== transfer.second.revision
+	) {
+		return { ...base, outcome: 'changed' };
+	}
+	if (!(await canLinkImportedTransfer(ctx, first, second))) {
+		return { ...base, outcome: 'notEligible' };
+	}
+	const firstBefore = snapshotOf(first);
+	const secondBefore = snapshotOf(second);
+	const { firstRevision, secondRevision } = await linkImportedTransfer(ctx, first, second);
+	const applied: AppliedTransfer = {
+		firstRevision,
+		secondRevision,
+		first: firstBefore,
+		second: secondBefore
+	};
+	return { ...base, outcome: 'applied', applied };
 }
 
 async function recordOf(ctx: MutationCtx, proposalId: string) {
@@ -189,6 +303,13 @@ function answerOf(
 			line: line ?? null,
 			outcome
 		})),
+		transfers: (proposal.transfers ?? []).map(
+			({ firstTransactionId, secondTransactionId, outcome }) => ({
+				firstTransactionId,
+				secondTransactionId,
+				outcome
+			})
+		),
 		created: { groups: proposal.createdGroups, categories: proposal.createdCategories },
 		undone: proposal.undo !== undefined
 	};
@@ -197,12 +318,25 @@ function answerOf(
 async function resolveAll(
 	ctx: MutationCtx,
 	proposal: Proposal
-): Promise<{ changes: ResolvedChange[]; newCategories: ResolvedCategory[] } | Refusal> {
+): Promise<
+	| {
+			changes: ResolvedChange[];
+			transfers: ResolvedTransfer[];
+			newCategories: ResolvedCategory[];
+	  }
+	| Refusal
+> {
 	const changes: ResolvedChange[] = [];
 	for (const [index, change] of proposal.changes.entries()) {
 		const answer = resolveChange(ctx, change, index);
 		if ('refused' in answer) return answer;
 		changes.push(answer);
+	}
+	const transfers: ResolvedTransfer[] = [];
+	for (const [index, transfer] of proposal.transfers.entries()) {
+		const answer = resolveTransfer(ctx, transfer, index);
+		if ('refused' in answer) return answer;
+		transfers.push(answer);
 	}
 	const newCategories: ResolvedCategory[] = [];
 	for (const [index, category] of proposal.newCategories.entries()) {
@@ -214,7 +348,7 @@ async function resolveAll(
 		...proposal.newGroups,
 		...proposal.newCategories.map((category) => category.name)
 	]);
-	return clash ?? { changes, newCategories };
+	return clash ?? { changes, transfers, newCategories };
 }
 
 export const apply = internalMutation({
@@ -234,9 +368,14 @@ export const apply = internalMutation({
 			const outcome = await applyChange(ctx, { ...target, line });
 			changes.push({ ...target, ...(line === undefined ? {} : { line }), outcome });
 		}
+		const transfers: RecordedTransfer[] = [];
+		for (const transfer of resolved.transfers) {
+			transfers.push(await applyTransfer(ctx, transfer));
+		}
 		const recorded = {
 			proposalId: proposal.id,
 			changes,
+			transfers,
 			createdGroups: created.groups,
 			createdCategories: created.categories
 		};
@@ -272,6 +411,70 @@ async function restoreChange(ctx: MutationCtx, change: RecordedChange): Promise<
 		ctx,
 		transaction,
 		from === null ? { kind: 'uncategorized' } : { kind: 'category', categoryId: from }
+	);
+	return true;
+}
+
+async function sideCanRestore(
+	ctx: MutationCtx,
+	transaction: Doc<'transactions'> | null,
+	expectedRevision: string,
+	snapshot: TransferSideSnapshot,
+	cutoverDate: string | null
+): Promise<boolean> {
+	if (transaction === null) return false;
+	if (cutoverDate !== null && snapshot.date < cutoverDate) return false;
+	if ((await transactionRevisionOf(ctx, transaction)) !== expectedRevision) return false;
+	return (
+		snapshot.categoryId === null || (await ctx.db.get('categories', snapshot.categoryId)) !== null
+	);
+}
+
+async function existingPayeeId(
+	ctx: MutationCtx,
+	payeeId: Id<'payees'> | undefined
+): Promise<Id<'payees'> | undefined> {
+	if (payeeId === undefined) return undefined;
+	return (await ctx.db.get('payees', payeeId)) === null ? undefined : payeeId;
+}
+
+async function restoreTransfer(ctx: MutationCtx, transfer: RecordedTransfer): Promise<boolean> {
+	const applied = transfer.applied;
+	if (applied === undefined) return false;
+	const cutoverDate = await readCutoverDate(ctx);
+	const first = await ctx.db.get('transactions', transfer.firstTransactionId);
+	const second = await ctx.db.get('transactions', transfer.secondTransactionId);
+	const firstReady = await sideCanRestore(
+		ctx,
+		first,
+		applied.firstRevision,
+		applied.first,
+		cutoverDate
+	);
+	const secondReady = await sideCanRestore(
+		ctx,
+		second,
+		applied.secondRevision,
+		applied.second,
+		cutoverDate
+	);
+	if (!firstReady || !secondReady || first === null || second === null) return false;
+	await unlinkTransfer(
+		ctx,
+		{
+			existing: first,
+			date: applied.first.date,
+			payeeId: await existingPayeeId(ctx, applied.first.payeeId),
+			categoryId: applied.first.categoryId,
+			memo: applied.first.memo
+		},
+		{
+			existing: second,
+			date: applied.second.date,
+			payeeId: await existingPayeeId(ctx, applied.second.payeeId),
+			categoryId: applied.second.categoryId,
+			memo: applied.second.memo
+		}
 	);
 	return true;
 }
@@ -340,6 +543,11 @@ export const undo = internalMutation({
 			if (await restoreChange(ctx, change)) restored += 1;
 			else keptTransactionIds.push(change.transactionId);
 		}
+		for (const transfer of proposal.transfers ?? []) {
+			if (transfer.outcome !== 'applied') continue;
+			if (await restoreTransfer(ctx, transfer)) restored += 1;
+			else keptTransactionIds.push(transfer.firstTransactionId, transfer.secondTransactionId);
+		}
 		const result = { restored, keptTransactionIds, ...(await removeUnused(ctx, proposal)) };
 		await ctx.db.patch('agentProposals', proposal._id, { undo: result });
 		return { id: proposal.proposalId, ...result };
@@ -369,12 +577,15 @@ export const recent = internalQuery({
 		const records = await ctx.db.query('agentProposals').order('desc').take(RECENT_PROPOSAL_LIMIT);
 		return {
 			proposals: records.map((record) => {
-				const applied = record.changes.filter((change) => change.outcome === 'applied').length;
+				const transfers = record.transfers ?? [];
+				const applied =
+					record.changes.filter((change) => change.outcome === 'applied').length +
+					transfers.filter((transfer) => transfer.outcome === 'applied').length;
 				return {
 					id: record.proposalId,
 					appliedAt: new Date(record._creationTime).toISOString(),
 					applied,
-					refused: record.changes.length - applied,
+					refused: record.changes.length + transfers.length - applied,
 					undone: record.undo !== undefined
 				};
 			})

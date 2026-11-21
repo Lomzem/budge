@@ -1,3 +1,4 @@
+import { paginationResultValidator } from 'convex/server';
 import { v, type Infer } from 'convex/values';
 
 import { internal } from './_generated/api';
@@ -7,6 +8,7 @@ import { accountRows, readAccounts } from './accounts';
 import type { ApplyAnswer, RecentProposals, UndoAnswer } from './agentProposals';
 import { budgetMonth, readBudget } from './budget';
 import { admitsAgentKey } from './lib/agentKey';
+import { readReadyToAssign } from './lib/categories';
 import {
 	parseEmptyQuery,
 	parseBudgetQuery,
@@ -14,7 +16,8 @@ import {
 	type Refusal
 } from './lib/agentQuery';
 import { accountsForAgent, budgetForAgent, transactionsForAgent } from './lib/agentWire';
-import { readTransactions, transactionPage } from './transactions';
+import { transactionRevisionOf } from './lib/transactions';
+import { readTransactions, transactionRow } from './transactions';
 
 export const accounts = internalQuery({
 	args: {},
@@ -22,10 +25,18 @@ export const accounts = internalQuery({
 	handler: async (ctx) => await readAccounts(ctx)
 });
 
+const agentBudgetMonth = v.object({
+	...budgetMonth.fields,
+	readyToAssignId: v.union(v.id('categories'), v.null())
+});
+
 export const budget = internalQuery({
 	args: { month: v.string(), today: v.string() },
-	returns: budgetMonth,
-	handler: async (ctx, args) => await readBudget(ctx, args.month, args.today)
+	returns: agentBudgetMonth,
+	handler: async (ctx, args) => ({
+		...(await readBudget(ctx, args.month, args.today)),
+		readyToAssignId: (await readReadyToAssign(ctx))?._id ?? null
+	})
 });
 
 async function existingId<Table extends 'accounts' | 'categories'>(
@@ -39,7 +50,11 @@ async function existingId<Table extends 'accounts' | 'categories'>(
 	return (await ctx.db.get(table, id)) === null ? null : id;
 }
 
-const transactionsAnswer = v.union(v.object({ refused: v.string() }), transactionPage);
+export const agentTransactionPage = paginationResultValidator(
+	v.object({ ...transactionRow.fields, revision: v.string() })
+);
+
+const transactionsAnswer = v.union(v.object({ refused: v.string() }), agentTransactionPage);
 
 type TransactionsAnswer = Infer<typeof transactionsAnswer>;
 
@@ -54,7 +69,22 @@ export const transactions = internalQuery({
 		if (account === null) return { refused: 'No Account has that accountId.' };
 		const category = await existingId(ctx, 'categories', categoryId);
 		if (category === null) return { refused: 'No Category has that categoryId.' };
-		return await readTransactions(ctx, { ...filters, accountId: account, categoryId: category });
+		const page = await readTransactions(ctx, {
+			...filters,
+			accountId: account,
+			categoryId: category
+		});
+		return {
+			...page,
+			page: await Promise.all(
+				page.page.map(async (row) => {
+					const transaction = await ctx.db.get('transactions', row._id);
+					const revision =
+						transaction === null ? '' : await transactionRevisionOf(ctx, transaction);
+					return { ...row, revision };
+				})
+			)
+		};
 	}
 });
 
