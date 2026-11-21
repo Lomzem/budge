@@ -420,11 +420,25 @@ export async function transactionRevisionOf(
 	ctx: QueryCtx,
 	transaction: Doc<'transactions'>
 ): Promise<string> {
-	const bankRows: string[] = [];
+	const bankRows: {
+		id: Id<'imports'>;
+		state: Doc<'imports'>['state'];
+		date: string;
+		amount: number;
+		bankText: string;
+		matched: boolean;
+	}[] = [];
 	for await (const bankRow of allBankRowsOf(ctx, transaction._id)) {
-		bankRows.push(`${bankRow._id}:${bankRow.state}`);
+		bankRows.push({
+			id: bankRow._id,
+			state: bankRow.state,
+			date: bankRow.date,
+			amount: bankRow.amount,
+			bankText: bankRow.bankText,
+			matched: bankRow.matched
+		});
 	}
-	bankRows.sort();
+	bankRows.sort((a, b) => a.id.localeCompare(b.id));
 	const payload = JSON.stringify({
 		accountId: transaction.accountId,
 		date: transaction.date,

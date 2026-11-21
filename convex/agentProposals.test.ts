@@ -1254,6 +1254,21 @@ describe('linking imported Transactions as a Transfer', () => {
 			'changed'
 		],
 		[
+			'a side whose Bank Text changed since read',
+			async ({ t, intoCard, firstSide, secondSide }) => {
+				await t.run(async (ctx) => {
+					const row = await ctx.db
+						.query('imports')
+						.withIndex('by_transactionId_state', (q) => q.eq('transactionId', intoCard))
+						.first();
+					assert(row !== null, 'bank row missing');
+					await ctx.db.patch('imports', row._id, { bankText: 'SAMPLE REVISED BANK TEXT' });
+				});
+				return { first: firstSide, second: secondSide };
+			},
+			'changed'
+		],
+		[
 			'a side deleted since read',
 			async ({ owner, intoCard, firstSide, secondSide }) => {
 				await owner.mutation(api.transactions.remove, { transactionId: intoCard });
@@ -1593,6 +1608,43 @@ describe('linking imported Transactions as a Transfer', () => {
 		expect((await listRows(t)).find((row) => row.id === fromChecking)).toMatchObject({
 			kind: 'transfer',
 			bankText: []
+		});
+	});
+
+	test('keeps a linked Transfer on undo when the owner kept an already-approved side after a bank date change', async () => {
+		const { t, owner, fromChecking, intoCard } = await cardPaymentSetup();
+		await owner.mutation(api.transactions.approve, { transactionId: fromChecking });
+		await owner.mutation(api.transactions.approve, { transactionId: intoCard });
+		await apply(t, {
+			id: 'transfer-bank-date-changed',
+			transfers: [{ first: await sideOf(t, fromChecking), second: await sideOf(t, intoCard) }]
+		});
+		const bankRow = await t.run(async (ctx) => {
+			const row = await ctx.db
+				.query('imports')
+				.withIndex('by_transactionId_state', (q) => q.eq('transactionId', intoCard))
+				.first();
+			assert(row !== null, 'bank row missing');
+			await ctx.db.patch('imports', row._id, { date: '2026-08-23', state: 'changed' });
+			return row._id;
+		});
+		await owner.mutation(api.imports.resolveBankChange, { importId: bankRow, keep: 'mine' });
+
+		const undone = await agentPost(t, '/agent/proposals/undo', {
+			id: 'transfer-bank-date-changed'
+		});
+
+		expect(undone.status).toBe(200);
+		expect(await undone.json()).toEqual({
+			id: 'transfer-bank-date-changed',
+			restored: 0,
+			keptTransactionIds: [fromChecking, intoCard],
+			removedCategories: [],
+			removedGroups: []
+		});
+		expect((await listRows(t)).find((row) => row.id === intoCard)).toMatchObject({
+			kind: 'transfer',
+			date: '2026-08-20'
 		});
 	});
 

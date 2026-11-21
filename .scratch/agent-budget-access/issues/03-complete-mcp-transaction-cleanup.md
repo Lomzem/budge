@@ -19,3 +19,11 @@ During a budget cleanup, the MCP could categorize ordinary spending. The owner s
 - **Conflicts and retries.** Revalidate both Transfer sides at apply time. If either has changed or is no longer eligible, report the conflict and leave the pair as it was. Repeating an apply request returns the recorded result. Undo restores the pair when both sides still match the applied result and preserves later owner edits.
 
 Prioritize linking imported payments. Each payment leaves two Transactions in the cleanup queue.
+
+## Comments
+
+- **Ready to Assign inflows:** `GET /agent/budget` now includes `readyToAssign.id` so MCP agents can identify the Ready to Assign Category without inferring it from a Starting Balance. `POST /agent/proposals` allows `toCategoryId` to target `readyToAssign` when the moved Transaction or split line has `amount > 0`; outflows and Credit Card Payment Categories remain `notAllowed`.
+- **Linked imported Transfers:** `GET /agent/transactions` returns a `revision` per row hashing Transaction fields and Bank Row details (`id`, `state`, `date`, `amount`, `bankText`, `matched`). `POST /agent/proposals` accepts optional `transfers: [{ first: { transactionId, revision }, second: { transactionId, revision } }]` alongside optional `changes` (at least 1 and at most 100 total, no Transaction ID overlap). Apply revalidates kind, revision, and Budge's Transfer eligibility rules (`canLinkImportedTransfer`), links both sides through `linkImportedTransfer` (keeping `first`'s date and memo and both sides' Accounts, amounts, Cleared status, approval, and Bank Rows), and records post-link revisions plus original snapshots for undo.
+- **Undo:** `POST /agent/proposals/undo` unlinks a Transfer pair via `unlinkTransfer` only when both sides still match their recorded post-link revisions, neither original date precedes the current cutover date, and any prior Category still exists; otherwise both Transaction IDs are returned in `keptTransactionIds` and left untouched.
+- **Glossary note:** `GLOSSARY.md`'s **Categorization Proposal** definition still mentions only Category and Category Group changes; noted for future `domain-modeling`.
+
