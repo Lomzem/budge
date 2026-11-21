@@ -19,12 +19,14 @@ import {
 import { insertCategory, insertGroup } from './lib/categories';
 import { categoriesCutoverUndoNeeds } from './lib/laterCutover';
 import { publicError } from './lib/publicError';
+import { readCutoverDate } from './lib/settings';
 import {
 	canLinkImportedTransfer,
 	categorizeTransaction,
 	linkImportedTransfer,
 	recategorizeSplitLine,
 	splitLinesOf,
+	transactionRevisionOf,
 	unlinkTransfer
 } from './lib/transactions';
 
@@ -71,7 +73,7 @@ interface ResolvedChange {
 
 interface ResolvedTransferSide {
 	transactionId: Id<'transactions'>;
-	fromCategoryId: Id<'categories'> | null;
+	revision: string;
 }
 
 interface ResolvedTransfer {
@@ -111,12 +113,7 @@ function resolveTransferSide(
 ): ResolvedTransferSide | Refusal {
 	const transactionId = ctx.db.normalizeId('transactions', side.transactionId);
 	if (transactionId === null) return { refused: `${where}.transactionId is not a Transaction ID.` };
-	const fromCategoryId =
-		side.fromCategoryId === null ? null : ctx.db.normalizeId('categories', side.fromCategoryId);
-	if (fromCategoryId === null && side.fromCategoryId !== null) {
-		return { refused: `${where}.fromCategoryId is not a Category ID.` };
-	}
-	return { transactionId, fromCategoryId };
+	return { transactionId, revision: side.revision };
 }
 
 function resolveTransfer(
@@ -236,28 +233,22 @@ async function applyChange(ctx: MutationCtx, change: Target): Promise<ProposalOu
 	return 'applied';
 }
 
-function transferSideRefusal(
-	transaction: Doc<'transactions'> | null,
-	expectedCategoryId: Id<'categories'> | null
+function transferSideKindProblem(
+	transaction: Doc<'transactions'> | null
 ): Exclude<TransferOutcome, 'applied' | 'notEligible'> | null {
 	if (transaction === null) return 'changed';
 	if (transaction.transferTransactionId !== undefined) return 'transfer';
 	if (transaction.kind === 'startingBalance') return 'startingBalance';
 	if (transaction.split === true) return 'split';
-	if ((transaction.categoryId ?? null) !== expectedCategoryId) return 'changed';
 	return null;
 }
 
 function snapshotOf(transaction: Doc<'transactions'>): TransferSideSnapshot {
 	return {
-		accountId: transaction.accountId,
 		date: transaction.date,
-		amount: transaction.amount,
 		...(transaction.payeeId === undefined ? {} : { payeeId: transaction.payeeId }),
 		categoryId: transaction.categoryId ?? null,
-		...(transaction.memo === undefined ? {} : { memo: transaction.memo }),
-		cleared: transaction.cleared,
-		approved: transaction.approved !== false
+		...(transaction.memo === undefined ? {} : { memo: transaction.memo })
 	};
 }
 
@@ -271,21 +262,27 @@ async function applyTransfer(
 	};
 	const first = await ctx.db.get('transactions', transfer.first.transactionId);
 	const second = await ctx.db.get('transactions', transfer.second.transactionId);
-	const problem =
-		transferSideRefusal(first, transfer.first.fromCategoryId) ??
-		transferSideRefusal(second, transfer.second.fromCategoryId);
+	const problem = transferSideKindProblem(first) ?? transferSideKindProblem(second);
 	if (problem !== null) return { ...base, outcome: problem };
 	if (first === null || second === null) return { ...base, outcome: 'changed' };
+	if (
+		(await transactionRevisionOf(ctx, first)) !== transfer.first.revision ||
+		(await transactionRevisionOf(ctx, second)) !== transfer.second.revision
+	) {
+		return { ...base, outcome: 'changed' };
+	}
 	if (!(await canLinkImportedTransfer(ctx, first, second))) {
 		return { ...base, outcome: 'notEligible' };
 	}
+	const firstBefore = snapshotOf(first);
+	const secondBefore = snapshotOf(second);
+	const { firstRevision, secondRevision } = await linkImportedTransfer(ctx, first, second);
 	const applied: AppliedTransfer = {
-		date: first.date,
-		...(first.memo === undefined ? {} : { memo: first.memo }),
-		first: snapshotOf(first),
-		second: snapshotOf(second)
+		firstRevision,
+		secondRevision,
+		first: firstBefore,
+		second: secondBefore
 	};
-	await linkImportedTransfer(ctx, first, second);
 	return { ...base, outcome: 'applied', applied };
 }
 
@@ -418,27 +415,16 @@ async function restoreChange(ctx: MutationCtx, change: RecordedChange): Promise<
 	return true;
 }
 
-async function sideMatchesApplied(
+async function sideCanRestore(
 	ctx: MutationCtx,
 	transaction: Doc<'transactions'> | null,
-	otherId: Id<'transactions'>,
-	applied: AppliedTransfer,
-	snapshot: TransferSideSnapshot
+	expectedRevision: string,
+	snapshot: TransferSideSnapshot,
+	cutoverDate: string | null
 ): Promise<boolean> {
 	if (transaction === null) return false;
-	const fieldsMatch =
-		transaction.transferTransactionId === otherId &&
-		transaction.accountId === snapshot.accountId &&
-		transaction.date === applied.date &&
-		transaction.amount === snapshot.amount &&
-		transaction.memo === applied.memo &&
-		transaction.cleared === snapshot.cleared &&
-		(transaction.approved !== false) === snapshot.approved;
-	const stillPlainTransfer =
-		transaction.categoryId === undefined &&
-		transaction.payeeId === undefined &&
-		transaction.split !== true;
-	if (!fieldsMatch || !stillPlainTransfer) return false;
+	if (cutoverDate !== null && snapshot.date < cutoverDate) return false;
+	if ((await transactionRevisionOf(ctx, transaction)) !== expectedRevision) return false;
 	return (
 		snapshot.categoryId === null || (await ctx.db.get('categories', snapshot.categoryId)) !== null
 	);
@@ -455,23 +441,24 @@ async function existingPayeeId(
 async function restoreTransfer(ctx: MutationCtx, transfer: RecordedTransfer): Promise<boolean> {
 	const applied = transfer.applied;
 	if (applied === undefined) return false;
+	const cutoverDate = await readCutoverDate(ctx);
 	const first = await ctx.db.get('transactions', transfer.firstTransactionId);
 	const second = await ctx.db.get('transactions', transfer.secondTransactionId);
-	const firstMatches = await sideMatchesApplied(
+	const firstReady = await sideCanRestore(
 		ctx,
 		first,
-		transfer.secondTransactionId,
-		applied,
-		applied.first
+		applied.firstRevision,
+		applied.first,
+		cutoverDate
 	);
-	const secondMatches = await sideMatchesApplied(
+	const secondReady = await sideCanRestore(
 		ctx,
 		second,
-		transfer.firstTransactionId,
-		applied,
-		applied.second
+		applied.secondRevision,
+		applied.second,
+		cutoverDate
 	);
-	if (!firstMatches || !secondMatches || first === null || second === null) return false;
+	if (!firstReady || !secondReady || first === null || second === null) return false;
 	await unlinkTransfer(
 		ctx,
 		{

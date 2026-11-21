@@ -1,6 +1,6 @@
 # 03 — Complete transaction cleanup through Budge MCP
 
-Status: needs-triage
+Status: implemented on feat/mcp-transaction-cleanup
 Spec: [Agent budget access](../spec.md)
 Follow-up to [Agent categorization](02-agent-categorization.md).
 

@@ -14,6 +14,7 @@ type Backend = Awaited<ReturnType<typeof startBudget>>['t'];
 
 interface Row {
 	id: string;
+	revision: string;
 	date: string;
 	kind: string;
 	account: { id: string; name: string };
@@ -191,7 +192,12 @@ describe('applying a Categorization Proposal', () => {
 		const after = await rows(t);
 		const dining = { id: categories.Dining, name: 'Dining' };
 		for (const payee of ['Corner Grocer', 'SAMPLE COFFEE 0042']) {
-			expect(after.get(payee)).toEqual({ ...read.get(payee), category: dining });
+			expect(after.get(payee)).toEqual({
+				...read.get(payee),
+				revision: expect.any(String) as unknown,
+				category: dining
+			});
+			expect(after.get(payee)?.revision).not.toBe(read.get(payee)?.revision);
 		}
 		expect(after.get('SAMPLE COFFEE 0042')?.approved).toBe(false);
 		expect(await owner.query(api.payees.lastCategory, { name: 'Corner Grocer' })).toBe(
@@ -813,8 +819,8 @@ describe('a malformed Categorization Proposal', () => {
 				id: 'p',
 				transfers: [
 					{
-						first: { transactionId: ids.coffee, fromCategoryId: null },
-						second: { transactionId: ids.coffee, fromCategoryId: null }
+						first: { transactionId: ids.coffee, revision: 'rev-1' },
+						second: { transactionId: ids.coffee, revision: 'rev-1' }
 					}
 				]
 			}),
@@ -826,12 +832,12 @@ describe('a malformed Categorization Proposal', () => {
 				id: 'p',
 				transfers: [
 					{
-						first: { transactionId: ids.coffee, fromCategoryId: null },
-						second: { transactionId: ids.grocer, fromCategoryId: ids.dining }
+						first: { transactionId: ids.coffee, revision: 'rev-1' },
+						second: { transactionId: ids.grocer, revision: 'rev-2' }
 					},
 					{
-						first: { transactionId: ids.coffee, fromCategoryId: null },
-						second: { transactionId: ids.transfer, fromCategoryId: null }
+						first: { transactionId: ids.coffee, revision: 'rev-1' },
+						second: { transactionId: ids.transfer, revision: 'rev-3' }
 					}
 				]
 			}),
@@ -844,8 +850,8 @@ describe('a malformed Categorization Proposal', () => {
 				changes: [change(ids)],
 				transfers: [
 					{
-						first: { transactionId: ids.coffee, fromCategoryId: null },
-						second: { transactionId: ids.grocer, fromCategoryId: ids.dining }
+						first: { transactionId: ids.coffee, revision: 'rev-1' },
+						second: { transactionId: ids.grocer, revision: 'rev-2' }
 					}
 				]
 			}),
@@ -858,8 +864,8 @@ describe('a malformed Categorization Proposal', () => {
 				changes: many(ids, 100),
 				transfers: [
 					{
-						first: { transactionId: ids.grocer, fromCategoryId: ids.dining },
-						second: { transactionId: ids.transfer, fromCategoryId: null }
+						first: { transactionId: ids.grocer, revision: 'rev-2' },
+						second: { transactionId: ids.transfer, revision: 'rev-3' }
 					}
 				]
 			}),
@@ -871,25 +877,25 @@ describe('a malformed Categorization Proposal', () => {
 				id: 'p',
 				transfers: [
 					{
-						first: { transactionId: 'not-an-id', fromCategoryId: null },
-						second: { transactionId: ids.coffee, fromCategoryId: null }
+						first: { transactionId: 'not-an-id', revision: 'rev-1' },
+						second: { transactionId: ids.coffee, revision: 'rev-2' }
 					}
 				]
 			}),
 			'transfers[0].first.transactionId'
 		],
 		[
-			'a transfer with an Account ID as fromCategoryId',
+			'a transfer missing a revision',
 			(ids) => ({
 				id: 'p',
 				transfers: [
 					{
-						first: { transactionId: ids.coffee, fromCategoryId: null },
-						second: { transactionId: ids.grocer, fromCategoryId: ids.checking }
+						first: { transactionId: ids.coffee, revision: 'rev-1' },
+						second: { transactionId: ids.grocer }
 					}
 				]
 			}),
-			'transfers[0].second.fromCategoryId'
+			'transfers[0].second.revision'
 		]
 	])('refuses %s, naming what is wrong', async (_, bodyOf, mention) => {
 		const { t, accounts, categories, read } = await spending();
@@ -1091,6 +1097,17 @@ describe('moving an inflow to Ready to Assign', () => {
 });
 
 describe('linking imported Transactions as a Transfer', () => {
+	interface SideRef {
+		transactionId: Id<'transactions'>;
+		revision: string;
+	}
+
+	async function sideOf(t: Backend, transactionId: Id<'transactions'>): Promise<SideRef> {
+		const found = (await listRows(t)).find((row) => row.id === transactionId);
+		assert(found !== undefined, `no row for ${transactionId}`);
+		return { transactionId, revision: found.revision };
+	}
+
 	async function cardPaymentSetup(
 		dates: { checking: string; card: string } = { checking: '2026-08-20', card: '2026-08-21' }
 	) {
@@ -1115,39 +1132,34 @@ describe('linking imported Transactions as a Transfer', () => {
 			rows: [{ date: dates.card, amount: 25_000, bankText: 'SAMPLE PAYMENT THANK YOU' }]
 		});
 		const read = await rows(backend.t);
+		const checkingRow = read.get('SAMPLE CARD PAYOUT');
+		const cardRow = read.get('SAMPLE PAYMENT THANK YOU');
+		assert(checkingRow !== undefined && cardRow !== undefined, 'imports missing');
+		const fromChecking = checkingRow.id as Id<'transactions'>;
+		const intoCard = cardRow.id as Id<'transactions'>;
 		return {
 			...backend,
-			fromChecking: idOf(read, 'SAMPLE CARD PAYOUT') as Id<'transactions'>,
-			intoCard: idOf(read, 'SAMPLE PAYMENT THANK YOU') as Id<'transactions'>
+			fromChecking,
+			intoCard,
+			firstSide: { transactionId: fromChecking, revision: checkingRow.revision },
+			secondSide: { transactionId: intoCard, revision: cardRow.revision }
 		};
 	}
 
-	async function monthlyTotalsSnapshot(t: Backend) {
-		return (await t.run((ctx) => ctx.db.query('monthlyTotals').collect()))
-			.map(({ month, accountId, bucket, amount, count }) => ({
-				month,
-				accountId,
-				bucket,
-				amount,
-				count
-			}))
-			.sort((a, b) =>
-				`${a.month}${a.accountId}${a.bucket}`.localeCompare(`${b.month}${b.accountId}${b.bucket}`)
-			);
+	async function readsSnapshot(t: Backend, months: readonly string[]) {
+		return {
+			accounts: await accountsOf(t),
+			budgets: await Promise.all(months.map((month) => budgetOf(t, month, `${month}-28`)))
+		};
 	}
 
 	test('links a card payment pair one day apart, preserving balances, Bank Rows, and budget totals', async () => {
-		const { t, accounts, fromChecking, intoCard } = await cardPaymentSetup();
+		const { t, accounts, fromChecking, intoCard, firstSide, secondSide } = await cardPaymentSetup();
 		const balancesBefore = await accountsOf(t);
 
 		const result = await apply(t, {
 			id: 'link-card-payment',
-			transfers: [
-				{
-					first: { transactionId: fromChecking, fromCategoryId: null },
-					second: { transactionId: intoCard, fromCategoryId: null }
-				}
-			]
+			transfers: [{ first: firstSide, second: secondSide }]
 		});
 
 		expect(result.transfers).toEqual([
@@ -1203,9 +1215,9 @@ describe('linking imported Transactions as a Transfer', () => {
 			?.categories.find((category) => category.name === 'Discover');
 		expect(discoverPayment).toMatchObject({ activity: -250, available: -250 });
 
-		const beforeRebuild = await monthlyTotalsSnapshot(t);
+		const beforeRebuild = await readsSnapshot(t, ['2026-08']);
 		await t.mutation(internal.monthlyTotals.rebuild, {});
-		expect(await monthlyTotalsSnapshot(t)).toEqual(beforeRebuild);
+		expect(await readsSnapshot(t, ['2026-08'])).toEqual(beforeRebuild);
 
 		const recent = await agentGet(t, '/agent/proposals');
 		expect(await recent.json()).toMatchObject({
@@ -1214,56 +1226,68 @@ describe('linking imported Transactions as a Transfer', () => {
 	});
 
 	type CardSetup = Awaited<ReturnType<typeof cardPaymentSetup>>;
-	test.each<
-		[
-			string,
-			(setup: CardSetup) => Promise<{ first: Id<'transactions'>; second: Id<'transactions'> }>,
-			string
-		]
-	>([
+	test.each<[string, (setup: CardSetup) => Promise<{ first: SideRef; second: SideRef }>, string]>([
 		[
 			'a side whose Category changed since read',
-			async ({ owner, categories, fromChecking, intoCard }) => {
+			async ({ owner, categories, intoCard, firstSide, secondSide }) => {
 				await owner.mutation(api.transactions.categorize, {
 					transactionId: intoCard,
 					choice: { kind: 'category', categoryId: categories.Groceries }
 				});
-				return { first: fromChecking, second: intoCard };
+				return { first: firstSide, second: secondSide };
+			},
+			'changed'
+		],
+		[
+			'a second side given a memo by the owner since read',
+			async ({ owner, accounts, intoCard, firstSide, secondSide }) => {
+				await owner.mutation(api.transactions.update, {
+					transactionId: intoCard,
+					accountId: accounts.Discover,
+					date: '2026-08-21',
+					amount: 25_000,
+					payee: 'SAMPLE PAYMENT THANK YOU',
+					memo: 'Owner note to keep'
+				});
+				return { first: firstSide, second: secondSide };
 			},
 			'changed'
 		],
 		[
 			'a side deleted since read',
-			async ({ owner, fromChecking, intoCard }) => {
+			async ({ owner, intoCard, firstSide, secondSide }) => {
 				await owner.mutation(api.transactions.remove, { transactionId: intoCard });
-				return { first: fromChecking, second: intoCard };
+				return { first: firstSide, second: secondSide };
 			},
 			'changed'
 		],
 		[
 			'a side already linked as a Transfer',
-			async ({ owner, accounts, fromChecking, intoCard }) => {
+			async ({ owner, accounts, fromChecking, firstSide, secondSide }) => {
 				await owner.mutation(api.transactions.categorize, {
 					transactionId: fromChecking,
 					choice: { kind: 'transfer', accountId: accounts.Savings }
 				});
-				return { first: fromChecking, second: intoCard };
+				return { first: firstSide, second: secondSide };
 			},
 			'transfer'
 		],
 		[
 			'a Starting Balance',
-			async ({ t, accounts, intoCard }) => {
+			async ({ t, accounts, secondSide }) => {
 				const checkingRows = await listRows(t, `?accountId=${accounts.Checking}`);
 				const starting = checkingRows.find((row) => row.kind === 'startingBalance');
 				assert(starting !== undefined, 'Starting Balance missing');
-				return { first: starting.id as Id<'transactions'>, second: intoCard };
+				return {
+					first: { transactionId: starting.id as Id<'transactions'>, revision: starting.revision },
+					second: secondSide
+				};
 			},
 			'startingBalance'
 		],
 		[
 			'a Split Transaction',
-			async ({ owner, accounts, categories, fromChecking, intoCard }) => {
+			async ({ owner, accounts, categories, intoCard, firstSide, secondSide }) => {
 				await owner.mutation(api.transactions.update, {
 					transactionId: intoCard,
 					accountId: accounts.Discover,
@@ -1276,13 +1300,13 @@ describe('linking imported Transactions as a Transfer', () => {
 						{ categoryId: categories.Dining, amount: 5_000, memo: '' }
 					]
 				});
-				return { first: fromChecking, second: intoCard };
+				return { first: firstSide, second: secondSide };
 			},
 			'split'
 		],
 		[
 			'a manual Transaction with no Bank Row',
-			async ({ owner, accounts, fromChecking }) => {
+			async ({ t, owner, accounts, firstSide }) => {
 				const manual = await owner.mutation(api.transactions.create, {
 					accountId: accounts.Discover,
 					date: '2026-08-21',
@@ -1290,33 +1314,33 @@ describe('linking imported Transactions as a Transfer', () => {
 					payee: 'Manual Payment',
 					memo: ''
 				});
-				return { first: fromChecking, second: manual };
+				return { first: firstSide, second: await sideOf(t, manual) };
 			},
 			'notEligible'
 		],
 		[
 			'opposite Accounts with amounts that do not cancel',
-			async ({ t, owner, accounts, fromChecking }) => {
+			async ({ t, owner, accounts, firstSide }) => {
 				await owner.mutation(api.imports.commit, {
 					accountId: accounts.Discover,
 					source: 'csv',
 					rows: [{ date: '2026-08-21', amount: 20_000, bankText: 'SAMPLE SHORT PAY' }]
 				});
-				const other = idOf(await rows(t), 'SAMPLE SHORT PAY');
-				return { first: fromChecking, second: other as Id<'transactions'> };
+				const other = idOf(await rows(t), 'SAMPLE SHORT PAY') as Id<'transactions'>;
+				return { first: firstSide, second: await sideOf(t, other) };
 			},
 			'notEligible'
 		],
 		[
 			'dates more than 10 days apart',
-			async ({ t, owner, accounts, fromChecking }) => {
+			async ({ t, owner, accounts, firstSide }) => {
 				await owner.mutation(api.imports.commit, {
 					accountId: accounts.Discover,
 					source: 'csv',
 					rows: [{ date: '2026-08-31', amount: 25_000, bankText: 'SAMPLE LATE PAY' }]
 				});
-				const other = idOf(await rows(t), 'SAMPLE LATE PAY');
-				return { first: fromChecking, second: other as Id<'transactions'> };
+				const other = idOf(await rows(t), 'SAMPLE LATE PAY') as Id<'transactions'>;
+				return { first: firstSide, second: await sideOf(t, other) };
 			},
 			'notEligible'
 		],
@@ -1335,47 +1359,47 @@ describe('linking imported Transactions as a Transfer', () => {
 				});
 				const read = await rows(t);
 				return {
-					first: idOf(read, 'SAMPLE CASH IN') as Id<'transactions'>,
-					second: idOf(read, 'SAMPLE CARD OUT') as Id<'transactions'>
+					first: await sideOf(t, idOf(read, 'SAMPLE CASH IN') as Id<'transactions'>),
+					second: await sideOf(t, idOf(read, 'SAMPLE CARD OUT') as Id<'transactions'>)
 				};
 			},
 			'notEligible'
 		],
 		[
 			'two Credit Card Accounts',
-			async ({ t, owner, accounts, intoCard }) => {
+			async ({ t, owner, accounts, secondSide }) => {
 				await owner.mutation(api.imports.commit, {
 					accountId: accounts.Visa,
 					source: 'csv',
 					rows: [{ date: '2026-08-21', amount: -25_000, bankText: 'SAMPLE VISA OUT' }]
 				});
-				const other = idOf(await rows(t), 'SAMPLE VISA OUT');
-				return { first: other as Id<'transactions'>, second: intoCard };
+				const other = idOf(await rows(t), 'SAMPLE VISA OUT') as Id<'transactions'>;
+				return { first: await sideOf(t, other), second: secondSide };
 			},
 			'notEligible'
 		],
 		[
 			'two Transactions in the same Account',
-			async ({ t, owner, accounts, fromChecking }) => {
+			async ({ t, owner, accounts, firstSide }) => {
 				await owner.mutation(api.imports.commit, {
 					accountId: accounts.Checking,
 					source: 'csv',
 					rows: [{ date: '2026-08-21', amount: 25_000, bankText: 'SAMPLE SAME ACCT' }]
 				});
-				const other = idOf(await rows(t), 'SAMPLE SAME ACCT');
-				return { first: fromChecking, second: other as Id<'transactions'> };
+				const other = idOf(await rows(t), 'SAMPLE SAME ACCT') as Id<'transactions'>;
+				return { first: firstSide, second: await sideOf(t, other) };
 			},
 			'notEligible'
 		],
 		[
 			'a Reconciled second side with a different date',
-			async ({ owner, accounts, fromChecking, intoCard }) => {
+			async ({ t, owner, accounts, intoCard, firstSide }) => {
 				await owner.mutation(api.reconciliation.reconcile, {
 					accountId: accounts.Discover,
 					balance: -15_000,
 					date: '2026-08-31'
 				});
-				return { first: fromChecking, second: intoCard };
+				return { first: firstSide, second: await sideOf(t, intoCard) };
 			},
 			'notEligible'
 		]
@@ -1385,38 +1409,32 @@ describe('linking imported Transactions as a Transfer', () => {
 			const setup = await cardPaymentSetup();
 			const { t } = setup;
 			const { first, second } = await prepare(setup);
-			const beforeFirst = (await listRows(t)).find((row) => row.id === first);
-			const beforeSecond = (await listRows(t)).find((row) => row.id === second);
+			const beforeFirst = (await listRows(t)).find((row) => row.id === first.transactionId);
+			const beforeSecond = (await listRows(t)).find((row) => row.id === second.transactionId);
 
 			const result = await apply(t, {
 				id: 'transfer-conflict',
-				transfers: [
-					{
-						first: { transactionId: first, fromCategoryId: null },
-						second: { transactionId: second, fromCategoryId: null }
-					}
-				]
+				transfers: [{ first, second }]
 			});
 
 			expect(result.transfers).toEqual([
-				{ firstTransactionId: first, secondTransactionId: second, outcome: expectedOutcome }
+				{
+					firstTransactionId: first.transactionId,
+					secondTransactionId: second.transactionId,
+					outcome: expectedOutcome
+				}
 			]);
 			const afterRows = await listRows(t);
-			expect(afterRows.find((row) => row.id === first)).toEqual(beforeFirst);
-			expect(afterRows.find((row) => row.id === second)).toEqual(beforeSecond);
+			expect(afterRows.find((row) => row.id === first.transactionId)).toEqual(beforeFirst);
+			expect(afterRows.find((row) => row.id === second.transactionId)).toEqual(beforeSecond);
 		}
 	);
 
 	test('replays a transfer proposal by id without re-linking after an owner edit', async () => {
-		const { t, owner, categories, fromChecking, intoCard } = await cardPaymentSetup();
+		const { t, owner, categories, fromChecking, firstSide, secondSide } = await cardPaymentSetup();
 		const proposal = {
 			id: 'transfer-replay',
-			transfers: [
-				{
-					first: { transactionId: fromChecking, fromCategoryId: null },
-					second: { transactionId: intoCard, fromCategoryId: null }
-				}
-			]
+			transfers: [{ first: firstSide, second: secondSide }]
 		};
 		const firstResult = await apply(t, proposal);
 		await owner.mutation(api.transactions.categorize, {
@@ -1434,19 +1452,14 @@ describe('linking imported Transactions as a Transfer', () => {
 	});
 
 	test('undoes a linked Transfer across a month boundary, restoring both sides, Bank Rows, and totals', async () => {
-		const { t, accounts, fromChecking, intoCard } = await cardPaymentSetup({
+		const { t, accounts, fromChecking, intoCard, firstSide, secondSide } = await cardPaymentSetup({
 			checking: '2026-08-31',
 			card: '2026-09-01'
 		});
 		const balancesBefore = await accountsOf(t);
 		await apply(t, {
 			id: 'transfer-cross-month',
-			transfers: [
-				{
-					first: { transactionId: fromChecking, fromCategoryId: null },
-					second: { transactionId: intoCard, fromCategoryId: null }
-				}
-			]
+			transfers: [{ first: firstSide, second: secondSide }]
 		});
 
 		const firstUndo = await agentPost(t, '/agent/proposals/undo', { id: 'transfer-cross-month' });
@@ -1493,13 +1506,94 @@ describe('linking imported Transactions as a Transfer', () => {
 			[fromChecking, intoCard].sort()
 		);
 
-		const totalsAfterUndo = await monthlyTotalsSnapshot(t);
+		const readsAfterUndo = await readsSnapshot(t, ['2026-08', '2026-09']);
 		await t.mutation(internal.monthlyTotals.rebuild, {});
-		expect(await monthlyTotalsSnapshot(t)).toEqual(totalsAfterUndo);
+		expect(await readsSnapshot(t, ['2026-08', '2026-09'])).toEqual(readsAfterUndo);
 
 		const secondUndo = await agentPost(t, '/agent/proposals/undo', { id: 'transfer-cross-month' });
 		expect(secondUndo.status).toBe(200);
 		expect(await secondUndo.json()).toEqual(firstUndoBody);
+	});
+
+	test('keeps a linked Transfer on undo when the owner moved cutover past an original side date', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(new Date('2026-11-17T18:00:00Z'));
+		onTestFinished(() => {
+			vi.useRealTimers();
+		});
+		const { t, owner, fromChecking, intoCard, firstSide, secondSide } = await cardPaymentSetup({
+			checking: '2026-08-31',
+			card: '2026-09-01'
+		});
+		await apply(t, {
+			id: 'transfer-before-cutover-move',
+			transfers: [{ first: secondSide, second: firstSide }]
+		});
+		const later = { cutoverDate: '2026-09-01', today: '2026-11-17' };
+		const preview = await owner.query(api.settings.previewLaterCutover, later);
+		assert(preview.kind === 'ready', `expected a ready preview, got ${preview.kind}`);
+		await owner.mutation(api.settings.applyLaterCutover, {
+			...later,
+			fingerprint: preview.fingerprint,
+			unlockReconciled: true
+		});
+
+		const undone = await agentPost(t, '/agent/proposals/undo', {
+			id: 'transfer-before-cutover-move'
+		});
+
+		expect(undone.status).toBe(200);
+		expect(await undone.json()).toEqual({
+			id: 'transfer-before-cutover-move',
+			restored: 0,
+			keptTransactionIds: [intoCard, fromChecking],
+			removedCategories: [],
+			removedGroups: []
+		});
+		const afterRows = await listRows(t);
+		expect(afterRows.find((row) => row.id === fromChecking)).toMatchObject({
+			kind: 'transfer',
+			date: '2026-09-01'
+		});
+		expect(afterRows.find((row) => row.id === intoCard)).toMatchObject({
+			kind: 'transfer',
+			date: '2026-09-01'
+		});
+	});
+
+	test('keeps a linked Transfer on undo when the owner kept an already-approved side after bank removal', async () => {
+		const { t, owner, fromChecking, intoCard } = await cardPaymentSetup();
+		await owner.mutation(api.transactions.approve, { transactionId: fromChecking });
+		await owner.mutation(api.transactions.approve, { transactionId: intoCard });
+		await apply(t, {
+			id: 'transfer-bank-removed',
+			transfers: [{ first: await sideOf(t, fromChecking), second: await sideOf(t, intoCard) }]
+		});
+		const bankRow = await t.run(async (ctx) => {
+			const row = await ctx.db
+				.query('imports')
+				.withIndex('by_transactionId_state', (q) => q.eq('transactionId', fromChecking))
+				.first();
+			assert(row !== null, 'bank row missing');
+			await ctx.db.patch('imports', row._id, { state: 'removed' });
+			return row._id;
+		});
+		await owner.mutation(api.imports.resolveBankChange, { importId: bankRow, keep: 'mine' });
+
+		const undone = await agentPost(t, '/agent/proposals/undo', { id: 'transfer-bank-removed' });
+
+		expect(undone.status).toBe(200);
+		expect(await undone.json()).toEqual({
+			id: 'transfer-bank-removed',
+			restored: 0,
+			keptTransactionIds: [fromChecking, intoCard],
+			removedCategories: [],
+			removedGroups: []
+		});
+		expect((await listRows(t)).find((row) => row.id === fromChecking)).toMatchObject({
+			kind: 'transfer',
+			bankText: []
+		});
 	});
 
 	test.each<[string, (setup: CardSetup) => Promise<unknown>]>([
@@ -1555,15 +1649,10 @@ describe('linking imported Transactions as a Transfer', () => {
 		]
 	])('preserves the pair on undo when the owner %s', async (_, ownerEdit) => {
 		const setup = await cardPaymentSetup();
-		const { t, fromChecking, intoCard } = setup;
+		const { t, fromChecking, intoCard, firstSide, secondSide } = setup;
 		await apply(t, {
 			id: 'transfer-owner-edit',
-			transfers: [
-				{
-					first: { transactionId: fromChecking, fromCategoryId: null },
-					second: { transactionId: intoCard, fromCategoryId: null }
-				}
-			]
+			transfers: [{ first: firstSide, second: secondSide }]
 		});
 		await ownerEdit(setup);
 		const beforeUndoFirst = (await listRows(t)).find((row) => row.id === fromChecking);

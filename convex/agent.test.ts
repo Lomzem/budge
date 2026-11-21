@@ -214,7 +214,14 @@ describe('the agent Transactions read', () => {
 		expect(response.status).toBe(200);
 		const checking = { id: accounts.Checking, name: 'Checking' };
 		const groceries = { id: categories.Groceries, name: 'Groceries' };
-		const base = { account: checking, memo: null, splits: [], bankText: [], transferAccount: null };
+		const base = {
+			revision: expect.any(String) as unknown,
+			account: checking,
+			memo: null,
+			splits: [],
+			bankText: [],
+			transferAccount: null
+		};
 		expect(await response.json()).toEqual({
 			transactions: [
 				{

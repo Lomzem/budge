@@ -9,14 +9,10 @@ import { targetValidator } from './lib/targets';
 const clearedState = v.union(v.literal('uncleared'), v.literal('cleared'), v.literal('reconciled'));
 
 const transferSideSnapshot = v.object({
-	accountId: v.id('accounts'),
 	date: v.string(),
-	amount: v.number(),
 	payeeId: v.optional(v.id('payees')),
 	categoryId: v.union(v.id('categories'), v.null()),
-	memo: v.optional(v.string()),
-	cleared: clearedState,
-	approved: v.boolean()
+	memo: v.optional(v.string())
 });
 
 const transactionFields = {
@@ -268,8 +264,8 @@ export default defineSchema({
 					outcome: transferOutcome,
 					applied: v.optional(
 						v.object({
-							date: v.string(),
-							memo: v.optional(v.string()),
+							firstRevision: v.string(),
+							secondRevision: v.string(),
 							first: transferSideSnapshot,
 							second: transferSideSnapshot
 						})

@@ -326,16 +326,16 @@ async function rememberPayee(
 }
 
 function transferAccountsProblem(
-	source: Pick<Doc<'accounts'>, '_id' | 'kind'>,
-	target: Pick<Doc<'accounts'>, '_id' | 'kind'>,
-	sourceAmount: number
+	firstAccount: Pick<Doc<'accounts'>, '_id' | 'kind'>,
+	secondAccount: Pick<Doc<'accounts'>, '_id' | 'kind'>,
+	firstAmount: number
 ): string | null {
-	if (target._id === source._id) return 'Pick another Account to transfer with.';
-	if (source.kind !== 'cash' && target.kind !== 'cash') {
+	if (secondAccount._id === firstAccount._id) return 'Pick another Account to transfer with.';
+	if (firstAccount.kind !== 'cash' && secondAccount.kind !== 'cash') {
 		return 'A Transfer needs a Cash Account on one side.';
 	}
-	const cashSideAmount = source.kind === 'cash' ? sourceAmount : -sourceAmount;
-	if ((source.kind !== 'cash' || target.kind !== 'cash') && cashSideAmount > 0) {
+	const cashSideAmount = firstAccount.kind === 'cash' ? firstAmount : -firstAmount;
+	if ((firstAccount.kind !== 'cash' || secondAccount.kind !== 'cash') && cashSideAmount > 0) {
 		return 'A card payment moves money from a Cash Account.';
 	}
 	return null;
@@ -347,11 +347,11 @@ async function requireTransfer(
 	fields: TransactionFields,
 	lines: SplitLine[]
 ) {
-	const target = await ctx.db.get('accounts', transferAccountId);
-	if (target === null) throw publicError('NOT_FOUND');
-	const source = await ctx.db.get('accounts', fields.accountId);
-	if (source === null) throw publicError('NOT_FOUND');
-	const problem = transferAccountsProblem(source, target, fields.amount);
+	const otherAccount = await ctx.db.get('accounts', transferAccountId);
+	if (otherAccount === null) throw publicError('NOT_FOUND');
+	const account = await ctx.db.get('accounts', fields.accountId);
+	if (account === null) throw publicError('NOT_FOUND');
+	const problem = transferAccountsProblem(account, otherAccount, fields.amount);
 	if (problem !== null) throw publicError('INVALID_INPUT', problem);
 	if (fields.categoryId !== undefined || fields.payeeId !== undefined || lines.length > 0) {
 		throw publicError('INVALID_INPUT', 'A Transfer has no Category or Payee.');
@@ -416,6 +416,35 @@ function isPlainUnlinked(transaction: Doc<'transactions'>): boolean {
 	);
 }
 
+export async function transactionRevisionOf(
+	ctx: QueryCtx,
+	transaction: Doc<'transactions'>
+): Promise<string> {
+	const bankRows: string[] = [];
+	for await (const bankRow of allBankRowsOf(ctx, transaction._id)) {
+		bankRows.push(`${bankRow._id}:${bankRow.state}`);
+	}
+	bankRows.sort();
+	const payload = JSON.stringify({
+		accountId: transaction.accountId,
+		date: transaction.date,
+		amount: transaction.amount,
+		payeeId: transaction.payeeId ?? null,
+		categoryId: transaction.categoryId ?? null,
+		memo: transaction.memo ?? null,
+		cleared: transaction.cleared,
+		approved: transaction.approved !== false,
+		split: transaction.split === true,
+		kind: transaction.kind ?? null,
+		transferTransactionId: transaction.transferTransactionId ?? null,
+		bankRows
+	});
+	const digest = new Uint8Array(
+		await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload))
+	);
+	return Array.from(digest.slice(0, 16), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export async function canLinkImportedTransfer(
 	ctx: QueryCtx,
 	first: Doc<'transactions'>,
@@ -425,10 +454,10 @@ export async function canLinkImportedTransfer(
 	if (!isPlainUnlinked(first) || !isPlainUnlinked(second)) return false;
 	if (!isWithinTransferWindow(first.date, second.date)) return false;
 	if (second.cleared === 'reconciled' && second.date !== first.date) return false;
-	const source = await ctx.db.get('accounts', first.accountId);
-	const target = await ctx.db.get('accounts', second.accountId);
-	if (source === null || target === null) return false;
-	if (transferAccountsProblem(source, target, first.amount) !== null) return false;
+	const firstAccount = await ctx.db.get('accounts', first.accountId);
+	const secondAccount = await ctx.db.get('accounts', second.accountId);
+	if (firstAccount === null || secondAccount === null) return false;
+	if (transferAccountsProblem(firstAccount, secondAccount, first.amount) !== null) return false;
 	return (await hasBankRow(ctx, first._id)) && (await hasBankRow(ctx, second._id));
 }
 
@@ -436,7 +465,7 @@ export async function linkImportedTransfer(
 	ctx: MutationCtx,
 	first: Doc<'transactions'>,
 	second: Doc<'transactions'>
-) {
+): Promise<{ firstRevision: string; secondRevision: string }> {
 	const sharedMemo = first.memo === undefined ? {} : { memo: first.memo };
 	const firstFields: TransactionFields = {
 		accountId: first.accountId,
@@ -459,6 +488,13 @@ export async function linkImportedTransfer(
 		{ existing: first, fields: firstFields },
 		{ existing: second, fields: secondFields }
 	);
+	const linkedFirst = await ctx.db.get('transactions', first._id);
+	const linkedSecond = await ctx.db.get('transactions', second._id);
+	if (linkedFirst === null || linkedSecond === null) throw publicError('NOT_FOUND');
+	return {
+		firstRevision: await transactionRevisionOf(ctx, linkedFirst),
+		secondRevision: await transactionRevisionOf(ctx, linkedSecond)
+	};
 }
 
 export interface RestoredTransferSide {

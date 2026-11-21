@@ -41,7 +41,7 @@ export interface ProposedChange {
 
 export interface ProposedTransferSide {
 	transactionId: string;
-	fromCategoryId: string | null;
+	revision: string;
 }
 
 export interface ProposedTransfer {
@@ -152,14 +152,14 @@ function parseChange(value: unknown, index: number): Parsed<ProposedChange> {
 	});
 }
 
-const TRANSFER_SIDE_FIELDS = ['transactionId', 'fromCategoryId'];
+const TRANSFER_SIDE_FIELDS = ['transactionId', 'revision'];
 
 function parseTransferSide(value: unknown, where: string): Parsed<ProposedTransferSide> {
 	return Result.gen(function* () {
 		const side = yield* fieldsAt(value, TRANSFER_SIDE_FIELDS, where);
 		const transactionId = yield* textAt(side.transactionId, `${where}.transactionId`);
-		const fromCategoryId = yield* fromAt(side.fromCategoryId, where);
-		return { transactionId, fromCategoryId };
+		const revision = yield* textAt(side.revision, `${where}.revision`);
+		return { transactionId, revision };
 	});
 }
 
