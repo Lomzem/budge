@@ -416,18 +416,24 @@ function isPlainUnlinked(transaction: Doc<'transactions'>): boolean {
 	);
 }
 
+type SystemField = '_id' | '_creationTime';
+type DerivedTransactionField = 'searchText' | 'bankChange';
+type FixedBankRowField =
+	'source' | 'sourceId' | 'accountId' | 'connectionAccountId' | 'merchantName' | 'transactionId';
+type RevisedTransaction = Record<
+	Exclude<keyof Doc<'transactions'>, SystemField | DerivedTransactionField>,
+	unknown
+>;
+type RevisedBankRow = { id: Id<'imports'> } & Record<
+	Exclude<keyof Doc<'imports'>, SystemField | FixedBankRowField>,
+	unknown
+>;
+
 export async function transactionRevisionOf(
 	ctx: QueryCtx,
 	transaction: Doc<'transactions'>
 ): Promise<string> {
-	const bankRows: {
-		id: Id<'imports'>;
-		state: Doc<'imports'>['state'];
-		date: string;
-		amount: number;
-		bankText: string;
-		matched: boolean;
-	}[] = [];
+	const bankRows: RevisedBankRow[] = [];
 	for await (const bankRow of allBankRowsOf(ctx, transaction._id)) {
 		bankRows.push({
 			id: bankRow._id,
@@ -439,7 +445,7 @@ export async function transactionRevisionOf(
 		});
 	}
 	bankRows.sort((a, b) => a.id.localeCompare(b.id));
-	const payload = JSON.stringify({
+	const revised: RevisedTransaction = {
 		accountId: transaction.accountId,
 		date: transaction.date,
 		amount: transaction.amount,
@@ -450,9 +456,9 @@ export async function transactionRevisionOf(
 		approved: transaction.approved !== false,
 		split: transaction.split === true,
 		kind: transaction.kind ?? null,
-		transferTransactionId: transaction.transferTransactionId ?? null,
-		bankRows
-	});
+		transferTransactionId: transaction.transferTransactionId ?? null
+	};
+	const payload = JSON.stringify({ ...revised, bankRows });
 	const digest = new Uint8Array(
 		await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload))
 	);
