@@ -27,3 +27,13 @@ Prioritize linking imported payments. Each payment leaves two Transactions in th
 - **Undo:** `POST /agent/proposals/undo` unlinks a Transfer pair via `unlinkTransfer` only when both sides still match their recorded post-link revisions, neither original date precedes the current cutover date, and any prior Category still exists; otherwise both Transaction IDs are returned in `keptTransactionIds` and left untouched.
 - **Glossary note:** `GLOSSARY.md`'s **Categorization Proposal** definition now names Ready to Assign moves and linked imported Transfers.
 
+
+## Corrections
+
+Sol ran `/correct` (analysis only) on PR #39. Opus decided each class:
+
+- **Freshness check omits state (accepted, types):** `transactionRevisionOf` now types its Transaction and Bank Row projections from `Doc<'transactions'>` and `Doc<'imports'>`, with excluded fields listed. A dropped or new field fails `typecheck:convex`. The serialized payload is unchanged, so recorded revisions still match.
+- **Undo misses a live restore dependency (rejected):** `restoreTransfer` is the only caller of `unlinkTransfer`, and `sideCanRestore` already holds the cutover and Category checks beside it. Moving them would not protect the other Undo paths.
+- **Refusal test passes for the wrong reason (accepted, tests):** the memo apply case and the memo and date undo cases now approve both sides before reading revisions, so only the named edit differs. With `memo` or `date` left out of the revision, the old cases passed and the new cases fail.
+- **Bounded parent read, unbounded child reads (deferred):** a Transaction rarely has more than one or two Bank Rows, and `accounts.ts` iterates Bank Rows the same way. Revisit if the capacity check grows a many-Bank-Row fixture.
+- **MCP text copies server limits (accepted):** `APPLY_DESCRIPTION` builds its window and proposal limit from `MATCH_WINDOW_DAYS` and `PROPOSAL_CHANGE_LIMIT`. `tools/list` followed both constants when they changed.

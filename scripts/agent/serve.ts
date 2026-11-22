@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { NEW_NAME_LIMIT, PROPOSAL_CHANGE_LIMIT, PROPOSAL_ID } from '../../convex/lib/agentProposal';
 import { TRANSACTIONS_LIMIT } from '../../convex/lib/agentQuery';
+import { MATCH_WINDOW_DAYS } from '../../src/lib/domain/matcher';
 
 import { agentCommand, readAgentConfig } from './config';
 
@@ -74,8 +75,8 @@ const APPLY_DESCRIPTION = [
 	'Apply a Categorization Proposal the owner approved. Call it only after you showed the owner every change and Transfer link in chat and the owner said yes to it; never apply anything the owner has not seen.',
 	'Propose only changes you are sure of. List Transactions you are unsure of as questions to the owner instead of guessing.',
 	'Each item in changes names a Transaction, the Category you read for it (fromCategoryId, null when it had none), and either an existing toCategoryId or a toNewCategory listed in newCategories. Inflows (positive amounts) may target Ready to Assign using readyToAssign.id from budge_budget_month; outflows cannot. For a split Transaction, give line: the position of the split line in the splits you read, counting from 0.',
-	'Each item in transfers links two imported Transactions (such as a card payment) as one Transfer, naming first and second with each side’s transactionId and revision from budge_transactions. Both sides must be imported Transactions (each with a Bank Row) in different Accounts (at least one Cash Account; card payments move money out of a Cash Account) with opposite amounts within 10 days, and neither may already be a Transfer, Split, or Starting Balance. The linked Transfer takes first’s date and memo and keeps both Accounts’ balances, Cleared status, approval, and Bank Rows.',
-	'Prefer existing Categories. A new Category or Category Group whose name matches an existing one, ignoring case, refuses the whole proposal. A proposal must list at least one item across changes and transfers, up to 100 total.',
+	`Each item in transfers links two imported Transactions (such as a card payment) as one Transfer, naming first and second with each side’s transactionId and revision from budge_transactions. Both sides must be imported Transactions (each with a Bank Row) in different Accounts (at least one Cash Account; card payments move money out of a Cash Account) with opposite amounts within ${String(MATCH_WINDOW_DAYS)} days, and neither may already be a Transfer, Split, or Starting Balance. The linked Transfer takes first’s date and memo and keeps both Accounts’ balances, Cleared status, approval, and Bank Rows.`,
+	`Prefer existing Categories. A new Category or Category Group whose name matches an existing one, ignoring case, refuses the whole proposal. A proposal must list at least one item across changes and transfers, up to ${String(PROPOSAL_CHANGE_LIMIT)} total.`,
 	'Budge never changes Remembered Categories or approval; category changes keep amount, date, Account, Payee, and split amounts as they are.',
 	'Each change answers with an outcome: applied; changed (the Transaction or split line no longer has the Category you read, or no longer exists; read it again); transfer and startingBalance (these take no Category); split (name a line); notAllowed (the target is hidden, in a hidden Group, removed, a Credit Card Payment Category, or Ready to Assign for a non-inflow). Each transfer answers with: applied; changed (either side is gone or changed since read); transfer, startingBalance, or split (either side is one); notEligible (failed Transfer eligibility or second is Reconciled on a different date).',
 	'Sending the same id again answers with the first result and changes nothing, so retry with the same id after a failure.'

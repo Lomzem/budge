@@ -1239,8 +1239,10 @@ describe('linking imported Transactions as a Transfer', () => {
 			'changed'
 		],
 		[
-			'a second side given a memo by the owner since read',
-			async ({ owner, accounts, intoCard, firstSide, secondSide }) => {
+			'an approved second side given a memo by the owner since read',
+			async ({ t, owner, accounts, intoCard, firstSide }) => {
+				await owner.mutation(api.transactions.approve, { transactionId: intoCard });
+				const secondSide = await sideOf(t, intoCard);
 				await owner.mutation(api.transactions.update, {
 					transactionId: intoCard,
 					accountId: accounts.Discover,
@@ -1648,7 +1650,7 @@ describe('linking imported Transactions as a Transfer', () => {
 		});
 	});
 
-	test.each<[string, (setup: CardSetup) => Promise<unknown>]>([
+	test.each<[string, (setup: CardSetup) => Promise<unknown>, { approvedBeforeApply: boolean }]>([
 		[
 			'edits the memo',
 			({ owner, accounts, fromChecking, intoCard }) =>
@@ -1661,12 +1663,14 @@ describe('linking imported Transactions as a Transfer', () => {
 					memo: 'August statement',
 					transferAccountId: accounts.Discover,
 					transferTransactionId: intoCard
-				})
+				}),
+			{ approvedBeforeApply: true }
 		],
 		[
 			'approves one side',
 			({ owner, fromChecking }) =>
-				owner.mutation(api.transactions.approve, { transactionId: fromChecking })
+				owner.mutation(api.transactions.approve, { transactionId: fromChecking }),
+			{ approvedBeforeApply: false }
 		],
 		[
 			'changes the date',
@@ -1680,7 +1684,8 @@ describe('linking imported Transactions as a Transfer', () => {
 					memo: '',
 					transferAccountId: accounts.Discover,
 					transferTransactionId: intoCard
-				})
+				}),
+			{ approvedBeforeApply: true }
 		],
 		[
 			'recategorizes the Transfer',
@@ -1688,7 +1693,8 @@ describe('linking imported Transactions as a Transfer', () => {
 				owner.mutation(api.transactions.categorize, {
 					transactionId: fromChecking,
 					choice: { kind: 'category', categoryId: categories.Groceries }
-				})
+				}),
+			{ approvedBeforeApply: true }
 		],
 		[
 			'reconciles one side',
@@ -1697,31 +1703,39 @@ describe('linking imported Transactions as a Transfer', () => {
 					accountId: accounts.Discover,
 					balance: -15_000,
 					date: '2026-08-31'
-				})
+				}),
+			{ approvedBeforeApply: true }
 		]
-	])('preserves the pair on undo when the owner %s', async (_, ownerEdit) => {
-		const setup = await cardPaymentSetup();
-		const { t, fromChecking, intoCard, firstSide, secondSide } = setup;
-		await apply(t, {
-			id: 'transfer-owner-edit',
-			transfers: [{ first: firstSide, second: secondSide }]
-		});
-		await ownerEdit(setup);
-		const beforeUndoFirst = (await listRows(t)).find((row) => row.id === fromChecking);
-		const beforeUndoSecond = (await listRows(t)).find((row) => row.id === intoCard);
+	])(
+		'preserves the pair on undo when the owner %s',
+		async (_, ownerEdit, { approvedBeforeApply }) => {
+			const setup = await cardPaymentSetup();
+			const { t, owner, fromChecking, intoCard } = setup;
+			if (approvedBeforeApply) {
+				await owner.mutation(api.transactions.approve, { transactionId: fromChecking });
+				await owner.mutation(api.transactions.approve, { transactionId: intoCard });
+			}
+			await apply(t, {
+				id: 'transfer-owner-edit',
+				transfers: [{ first: await sideOf(t, fromChecking), second: await sideOf(t, intoCard) }]
+			});
+			await ownerEdit(setup);
+			const beforeUndoFirst = (await listRows(t)).find((row) => row.id === fromChecking);
+			const beforeUndoSecond = (await listRows(t)).find((row) => row.id === intoCard);
 
-		const undone = await agentPost(t, '/agent/proposals/undo', { id: 'transfer-owner-edit' });
+			const undone = await agentPost(t, '/agent/proposals/undo', { id: 'transfer-owner-edit' });
 
-		expect(undone.status).toBe(200);
-		expect(await undone.json()).toEqual({
-			id: 'transfer-owner-edit',
-			restored: 0,
-			keptTransactionIds: [fromChecking, intoCard],
-			removedCategories: [],
-			removedGroups: []
-		});
-		const afterRows = await listRows(t);
-		expect(afterRows.find((row) => row.id === fromChecking)).toEqual(beforeUndoFirst);
-		expect(afterRows.find((row) => row.id === intoCard)).toEqual(beforeUndoSecond);
-	});
+			expect(undone.status).toBe(200);
+			expect(await undone.json()).toEqual({
+				id: 'transfer-owner-edit',
+				restored: 0,
+				keptTransactionIds: [fromChecking, intoCard],
+				removedCategories: [],
+				removedGroups: []
+			});
+			const afterRows = await listRows(t);
+			expect(afterRows.find((row) => row.id === fromChecking)).toEqual(beforeUndoFirst);
+			expect(afterRows.find((row) => row.id === intoCard)).toEqual(beforeUndoSecond);
+		}
+	);
 });
