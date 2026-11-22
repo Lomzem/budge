@@ -1,12 +1,13 @@
 import type { Infer } from 'convex/values';
 
+import type { Id } from '../_generated/dataModel';
 import type { accountRows } from '../accounts';
+import type { agentTransactionPage } from '../agent';
 import type { budgetMonth } from '../budget';
-import type { transactionPage } from '../transactions';
 
 type BudgetMonth = Infer<typeof budgetMonth>;
 type CategoryBudget = BudgetMonth['hidden'][number];
-type TransactionPage = Infer<typeof transactionPage>;
+type TransactionPage = Infer<typeof agentTransactionPage>;
 type TransactionRow = TransactionPage['page'][number];
 
 const dollars = (cents: number) => cents / 100;
@@ -43,10 +44,14 @@ function categoryForAgent(category: CategoryBudget) {
 	};
 }
 
-export function budgetForAgent(month: BudgetMonth) {
+export function budgetForAgent({
+	readyToAssignId,
+	...month
+}: BudgetMonth & { readyToAssignId: Id<'categories'> | null }) {
 	return {
 		...month,
 		readyToAssign: {
+			id: readyToAssignId,
 			amount: dollars(month.readyToAssign.amount),
 			uncategorized: dollars(month.readyToAssign.uncategorized)
 		},
@@ -72,6 +77,7 @@ function kindOf(row: TransactionRow) {
 function transactionForAgent(row: TransactionRow) {
 	return {
 		id: row._id,
+		revision: row.revision,
 		date: row.date,
 		kind: kindOf(row),
 		account: { id: row.accountId, name: row.accountName },

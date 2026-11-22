@@ -103,14 +103,14 @@ describe('the agent budget read', () => {
 	}
 
 	test('reports the month in dollars', async () => {
-		const { t, categories } = await rentBudget();
+		const { t, categories, readyToAssignId } = await rentBudget();
 
 		const response = await agentGet(t, '/agent/budget?month=2026-08&today=2026-08-20');
 
 		expect(response.status).toBe(200);
 		expect(await response.json()).toMatchObject({
 			month: '2026-08',
-			readyToAssign: { amount: 700, uncategorized: 0 },
+			readyToAssign: { id: readyToAssignId, amount: 700, uncategorized: 0 },
 			uncategorizedCount: 0,
 			groups: [
 				{
@@ -214,7 +214,14 @@ describe('the agent Transactions read', () => {
 		expect(response.status).toBe(200);
 		const checking = { id: accounts.Checking, name: 'Checking' };
 		const groceries = { id: categories.Groceries, name: 'Groceries' };
-		const base = { account: checking, memo: null, splits: [], bankText: [], transferAccount: null };
+		const base = {
+			revision: expect.any(String) as unknown,
+			account: checking,
+			memo: null,
+			splits: [],
+			bankText: [],
+			transferAccount: null
+		};
 		expect(await response.json()).toEqual({
 			transactions: [
 				{
