@@ -1,6 +1,6 @@
 # 03 — Complete transaction cleanup through Budge MCP
 
-Status: implemented on feat/mcp-transaction-cleanup
+Status: merged to main in PR #39 (9d46cc1)
 Spec: [Agent budget access](../spec.md)
 Follow-up to [Agent categorization](02-agent-categorization.md).
 
