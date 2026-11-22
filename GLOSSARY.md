@@ -83,7 +83,7 @@ To assign or move money into an overspent Category until its Available is back t
 _Avoid_: Fix, top up
 
 **Categorization Proposal**:
-A set of Transaction Category changes and any new Categories or Category Groups that the owner reviews before an agent applies them.
+A set of changes that the owner reviews before an agent applies them: Transactions moved to a Category or to Ready to Assign, pairs of imported Transactions linked into a Transfer, and any new Categories or Category Groups.
 _Avoid_: Automatic cleanup, approved changes
 
 **Agent Key**:
